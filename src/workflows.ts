@@ -1,0 +1,707 @@
+import { App, TFile, TFolder } from "obsidian";
+import { localePack } from "./i18n";
+import { renderTemplate, type TemplateName } from "./templates";
+import {
+  dateFromCli,
+  isoWeekInfo,
+  localDate,
+  localDateTimeSpace,
+  localTime
+} from "./time";
+import type {
+  CaptureResult,
+  NoteResult,
+  ParaZkSettings,
+  PromotionResult,
+  PromotionZkKind,
+  ZkKind
+} from "./types";
+import { frontmatterLinks, yamlScalar } from "./vault/frontmatter";
+import {
+  joinVaultPath,
+  normalizeVaultPath,
+  sanitizeFileName,
+  wikiLink
+} from "./vault/paths";
+import { normalizePromotionKind, normalizeZkKind } from "./zk/kinds";
+import { slugify } from "./text/slug";
+
+export type WorkflowContext = {
+  app: App;
+  settings: ParaZkSettings;
+};
+
+export type CreateProjectOptions = {
+  title: string;
+  areas?: string[];
+  status?: string;
+  priority?: string;
+  open?: boolean;
+};
+
+export type CreateAreaOptions = {
+  title: string;
+  parentPath?: string;
+  open?: boolean;
+};
+
+export type CreateResourceOptions = {
+  title: string;
+  sourcePath?: string;
+  linkToSource?: boolean;
+  open?: boolean;
+};
+
+export type CreateSubnoteOptions = {
+  title: string;
+  sourcePath?: string;
+  open?: boolean;
+};
+
+export type CreateSubareaOptions = {
+  title: string;
+  sourcePath?: string;
+  inheritParentTag?: boolean;
+  open?: boolean;
+};
+
+export type CreateRetroOptions = {
+  sourcePath?: string;
+  name?: string;
+  date?: string;
+  open?: boolean;
+};
+
+export type CreateZkOptions = {
+  title: string;
+  kind?: string;
+  open?: boolean;
+};
+
+export type CaptureJournalOptions = {
+  content: string;
+  date?: string;
+  time?: string;
+  open?: boolean;
+};
+
+export type PromoteResourceOptions = {
+  sourcePath?: string;
+  title?: string;
+  kind?: string;
+  open?: boolean;
+};
+
+export type PromoteFleetingOptions = {
+  sourcePath?: string;
+  title?: string;
+  kind?: string;
+  open?: boolean;
+};
+
+type TemplateVariables = Record<string, string | undefined>;
+
+export async function createProject(ctx: WorkflowContext, options: CreateProjectOptions): Promise<NoteResult> {
+  const title = requireTitle(options.title, "project title");
+  const folder = joinVaultPath(ctx.settings.paths.projectsFolder, title);
+  await ensureFolder(ctx.app, folder);
+
+  const createdAt = localDateTimeSpace();
+  const path = await uniqueMarkdownPath(ctx.app, joinVaultPath(folder, `${title}.md`));
+  const file = await createMarkdownFile(ctx, "project", path, {
+    created: createdAt,
+    slug: slugify(title),
+    areas: inlineList(options.areas),
+    cursor: ""
+  });
+
+  const tags = localePack(ctx.settings.locale).tags;
+  const t = localePack(ctx.settings.locale);
+  await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+    fm.type = "project";
+    if (options.areas && options.areas.length > 0) fm.areas = options.areas;
+    fm.status = options.status ?? fm.status ?? t.projectStatus.idea;
+    fm.priority = options.priority ?? fm.priority ?? t.priority.low;
+    fm.tags = [`${tags.project}/${slugify(title)}`];
+    fm.created = fm.created || createdAt;
+    if (fm.updated === undefined) fm.updated = "";
+  });
+
+  await openIfRequested(ctx, file, options.open);
+  return noteResult(file, true, options.open);
+}
+
+export async function createArea(ctx: WorkflowContext, options: CreateAreaOptions): Promise<NoteResult> {
+  const title = requireTitle(options.title, "area title");
+  const folder = joinVaultPath(ctx.settings.paths.areasFolder, title);
+  await ensureFolder(ctx.app, folder);
+
+  const createdAt = localDateTimeSpace();
+  const path = await uniqueMarkdownPath(ctx.app, joinVaultPath(folder, `${title}.md`));
+  const parent = resolveOptionalFile(ctx, options.parentPath);
+  const file = await createMarkdownFile(ctx, "area", path, {
+    created: createdAt,
+    slug: slugify(title),
+    cursor: ""
+  });
+
+  const tags = localePack(ctx.settings.locale).tags;
+  await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+    fm.type = "area";
+    fm.tags = [`${tags.area}/${slugify(title)}`];
+    if (parent) fm.parent = linkToFile(parent);
+    fm.created = fm.created || createdAt;
+    if (fm.updated === undefined) fm.updated = "";
+  });
+
+  await openIfRequested(ctx, file, options.open);
+  return noteResult(file, true, options.open);
+}
+
+export async function createResource(ctx: WorkflowContext, options: CreateResourceOptions): Promise<NoteResult & {
+  sourcePath?: string;
+  linkedFromSource: boolean;
+}> {
+  const title = requireTitle(options.title, "resource title");
+  const source = resolveOptionalFile(ctx, options.sourcePath);
+  const createdAt = localDateTimeSpace();
+  const path = await uniqueMarkdownPath(ctx.app, joinVaultPath(ctx.settings.paths.resourcesFolder, `${title}.md`));
+  const file = await createMarkdownFile(ctx, "resource", path, {
+    created: createdAt,
+    slug: slugify(title),
+    cursor: ""
+  });
+
+  const tags = localePack(ctx.settings.locale).tags;
+  await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+    fm.type = "resource";
+    fm.tags = [`${tags.resource}/${slugify(title)}`];
+    fm.created = fm.created || createdAt;
+    if (fm.updated === undefined) fm.updated = "";
+  });
+
+  let linkedFromSource = false;
+  if (source && options.linkToSource !== false) {
+    linkedFromSource = await appendReferenceLink(ctx, source, file);
+  }
+
+  await openIfRequested(ctx, file, options.open);
+  return {
+    ...noteResult(file, true, options.open),
+    sourcePath: source?.path,
+    linkedFromSource
+  };
+}
+
+export async function createSubnote(ctx: WorkflowContext, options: CreateSubnoteOptions): Promise<NoteResult & {
+  parentPath: string;
+}> {
+  const title = requireTitle(options.title, "subnote title");
+  const parent = await ensureFolderStyleParent(ctx, resolveRequiredFile(ctx, options.sourcePath, "source note"));
+  const createdAt = localDateTimeSpace();
+  const path = joinVaultPath(parent.childFolder, `${title}.md`);
+  let created = true;
+  let file = ctx.app.vault.getFileByPath(path);
+
+  if (!file) {
+    file = await createMarkdownFile(ctx, "subnote", path, {
+      created: createdAt,
+      cursor: ""
+    });
+    await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+      fm.type = fm.type || "doc";
+      fm.parent = linkToFile(parent.file);
+      fm.created = fm.created || createdAt;
+      if (fm.updated === undefined) fm.updated = "";
+    });
+  } else {
+    created = false;
+  }
+
+  await openIfRequested(ctx, file, options.open);
+  return {
+    ...noteResult(file, created, options.open),
+    parentPath: parent.file.path
+  };
+}
+
+export async function createSubarea(ctx: WorkflowContext, options: CreateSubareaOptions): Promise<NoteResult & {
+  parentPath: string;
+}> {
+  const title = requireTitle(options.title, "subarea title");
+  const parent = await ensureFolderStyleParent(ctx, resolveRequiredFile(ctx, options.sourcePath, "source area"));
+  const subareaFolder = joinVaultPath(parent.childFolder, title);
+  await ensureFolder(ctx.app, subareaFolder);
+
+  const createdAt = localDateTimeSpace();
+  const path = joinVaultPath(subareaFolder, `${title}.md`);
+  let created = true;
+  let file = ctx.app.vault.getFileByPath(path);
+  if (!file) {
+    file = await createMarkdownFile(ctx, "area", path, {
+      created: createdAt,
+      slug: slugify(title),
+      cursor: ""
+    });
+  } else {
+    created = false;
+  }
+
+  const tags = localePack(ctx.settings.locale).tags;
+  const parentTags = frontmatterLinks(ctx.app.metadataCache.getFileCache(parent.file)?.frontmatter?.tags);
+  const parentNamespace = parentTags.find((tag) => tag.startsWith(`${tags.area}/`)) ?? `${tags.area}/${slugify(parent.file.basename)}`;
+  const childNamespace = `${parentNamespace}/${slugify(title)}`;
+  await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+    fm.type = "area";
+    fm.parent = linkToFile(parent.file);
+    fm.tags = options.inheritParentTag === false
+      ? [childNamespace]
+      : Array.from(new Set([parentNamespace, childNamespace]));
+    fm.created = fm.created || createdAt;
+    if (fm.updated === undefined) fm.updated = "";
+  });
+
+  await openIfRequested(ctx, file, options.open);
+  return {
+    ...noteResult(file, created, options.open),
+    parentPath: parent.file.path
+  };
+}
+
+export async function createRetro(ctx: WorkflowContext, options: CreateRetroOptions = {}): Promise<NoteResult & {
+  sourcePath?: string;
+  weekIso: string;
+}> {
+  const source = resolveOptionalFile(ctx, options.sourcePath);
+  const date = dateFromCli(options.date);
+  const dateText = localDate(date);
+  const createdAt = localDateTimeSpace();
+  const week = isoWeekInfo(date);
+  const weekSegment = week.weekIso.replace("-", "_");
+  const sourceFm = source ? ctx.app.metadataCache.getFileCache(source)?.frontmatter ?? {} : {};
+  const sourceType = String(sourceFm.type ?? "").toLowerCase();
+  const labels = localePack(ctx.settings.locale).labels;
+  const sourceLink = source ? linkToFile(source) : "";
+  const project = sourceType === "project" ? sourceLink : "";
+  const areas = sourceType === "area"
+    ? [sourceLink]
+    : sourceType === "project"
+      ? frontmatterLinks(sourceFm.areas)
+      : [];
+  const defaultName = source
+    ? `${sourceType === "area" ? labels.retroNameAreaPrefix : sourceType === "project" ? labels.retroNameProjectPrefix : labels.retroNameNotePrefix}-${source.basename}`
+    : labels.retroNameGeneral;
+  const name = sanitizeFileName(options.name || defaultName) || "General";
+  const folder = joinVaultPath(ctx.settings.paths.retrosFolder, weekSegment);
+  await ensureFolder(ctx.app, folder);
+
+  const path = joinVaultPath(folder, `${sanitizeFileName(`Retro-${name}-${weekSegment}`)}.md`);
+  let created = true;
+  let file = ctx.app.vault.getFileByPath(path);
+  if (!file) {
+    file = await createMarkdownFile(ctx, "retro", path, {
+      created: createdAt,
+      date: dateText,
+      week_iso: week.weekIso,
+      week_start: week.weekStart,
+      week_end: week.weekEnd,
+      project,
+      project_frontmatter: project ? yamlScalar(project) : "",
+      areas: inlineList(areas),
+      areas_frontmatter: frontmatterListBlock(areas),
+      cursor: ""
+    });
+  } else {
+    created = false;
+  }
+
+  const tags = localePack(ctx.settings.locale).tags;
+  await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+    fm.type = "retro";
+    if (project) fm.project = project;
+    if (areas.length > 0) fm.areas = areas;
+    fm.date = fm.date || dateText;
+    fm.week_iso = fm.week_iso || week.weekIso;
+    fm.week_start = fm.week_start || week.weekStart;
+    fm.week_end = fm.week_end || week.weekEnd;
+    fm.tags = fm.tags || [tags.retro];
+    fm.created = fm.created || createdAt;
+    if (fm.updated === undefined) fm.updated = "";
+  });
+
+  await openIfRequested(ctx, file, options.open);
+  return {
+    ...noteResult(file, created, options.open),
+    sourcePath: source?.path,
+    weekIso: week.weekIso
+  };
+}
+
+export async function createZk(ctx: WorkflowContext, options: CreateZkOptions): Promise<NoteResult & {
+  kind: ZkKind;
+}> {
+  const title = requireTitle(options.title, "ZK title");
+  const kind = normalizeZkKind(options.kind, "Fleeting");
+  const folder = folderForZkKind(ctx.settings, kind);
+  await ensureFolder(ctx.app, folder);
+  const path = await uniqueMarkdownPath(ctx.app, joinVaultPath(folder, `${title}.md`));
+  const file = await createZkFile(ctx, kind, path, title);
+
+  await openIfRequested(ctx, file, options.open);
+  return {
+    ...noteResult(file, true, options.open),
+    kind
+  };
+}
+
+export async function captureJournal(ctx: WorkflowContext, options: CaptureJournalOptions): Promise<CaptureResult> {
+  const content = options.content?.trim();
+  if (!content) throw new Error("journal capture content is required");
+
+  const date = dateFromCli(options.date);
+  const dateText = localDate(date);
+  const createdAt = localDateTimeSpace();
+  const timeText = options.time?.trim() || localTime();
+  const folder = joinVaultPath(ctx.settings.paths.journalFolder, dateText.slice(0, 7));
+  await ensureFolder(ctx.app, folder);
+  const path = joinVaultPath(folder, `${dateText}.md`);
+
+  let created = true;
+  let file = ctx.app.vault.getFileByPath(path);
+  if (!file) {
+    file = await createMarkdownFile(ctx, "journal", path, {
+      created: createdAt,
+      date: dateText,
+      cursor: ""
+    });
+    await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+      fm.type = "journal";
+      fm.date = fm.date || dateText;
+      fm.created = fm.created || createdAt;
+      if (fm.updated === undefined) fm.updated = "";
+    });
+  } else {
+    created = false;
+  }
+
+  const t = localePack(ctx.settings.locale);
+  await appendLineUnderHeader(ctx.app, file, t.labels.quickMemo, `- ${timeText} - ${content}`, {
+    createHeadingLevel: 1,
+    ordered: false,
+    dedupe: false
+  });
+  await openIfRequested(ctx, file, options.open);
+
+  return {
+    path: file.path,
+    content,
+    date: dateText,
+    created
+  };
+}
+
+export async function promoteResource(ctx: WorkflowContext, options: PromoteResourceOptions = {}): Promise<PromotionResult> {
+  const source = resolveRequiredFile(ctx, options.sourcePath, "source resource");
+  const kind = normalizeZkKind(options.kind, "Permanent");
+  const title = requireTitle(options.title || source.basename, "ZK title");
+  const folder = folderForZkKind(ctx.settings, kind);
+  await ensureFolder(ctx.app, folder);
+  const path = await uniqueMarkdownPath(ctx.app, joinVaultPath(folder, `${title}.md`));
+  const file = await createZkFile(ctx, kind, path, title);
+
+  await appendReferenceLine(ctx, file, `- ${wikiLink(source.path)}`);
+  await openIfRequested(ctx, file, options.open);
+
+  return {
+    ...noteResult(file, true, options.open),
+    sourcePath: source.path,
+    kind
+  };
+}
+
+export async function promoteFleeting(ctx: WorkflowContext, options: PromoteFleetingOptions = {}): Promise<PromotionResult> {
+  const source = resolveRequiredFile(ctx, options.sourcePath, "source fleeting note");
+  const originalSourcePath = source.path;
+  const kind = normalizePromotionKind(options.kind, "Permanent");
+  const title = requireTitle(options.title || source.basename, "ZK title");
+  const folder = folderForZkKind(ctx.settings, kind);
+  await ensureFolder(ctx.app, folder);
+  const path = await uniqueMarkdownPath(ctx.app, joinVaultPath(folder, `${title}.md`));
+  const file = await createZkFile(ctx, kind, path, title);
+
+  await ensureFolder(ctx.app, ctx.settings.paths.fleetingArchiveFolder);
+  const archivedPath = await uniqueMarkdownPath(
+    ctx.app,
+    joinVaultPath(ctx.settings.paths.fleetingArchiveFolder, `${source.basename}.md`)
+  );
+  await ctx.app.fileManager.renameFile(source, archivedPath);
+  const archivedFile = ctx.app.vault.getFileByPath(archivedPath);
+  if (!archivedFile) throw new Error(`failed to archive source at ${archivedPath}`);
+
+  await appendReferenceLine(ctx, file, `- ${wikiLink(archivedPath)}`);
+  await ctx.app.fileManager.processFrontMatter(archivedFile, (fm) => {
+    fm.processed = true;
+    fm.promoted_to = linkToFile(file);
+  });
+
+  await openIfRequested(ctx, file, options.open);
+
+  return {
+    ...noteResult(file, true, options.open),
+    sourcePath: originalSourcePath,
+    archivedPath,
+    kind
+  };
+}
+
+async function createZkFile(ctx: WorkflowContext, kind: ZkKind, path: string, title: string): Promise<TFile> {
+  const templateName: TemplateName = kind === "Fleeting"
+    ? "zk_fleeting"
+    : kind === "Literature"
+      ? "zk_literature"
+      : "zk_permanent";
+  const file = await createMarkdownFile(ctx, templateName, path, {
+    created: localDateTimeSpace(),
+    slug: slugify(title),
+    cursor: ""
+  });
+
+  const tags = localePack(ctx.settings.locale).tags;
+  await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+    fm.type = `zk_${kind.toLowerCase()}`;
+    fm.tags = [`${tags.knowledge}/${slugify(title)}`];
+    fm.created = fm.created || localDateTimeSpace();
+    if (kind === "Fleeting" && fm.processed === undefined) fm.processed = false;
+    if (fm.updated === undefined) fm.updated = "";
+  });
+  return file;
+}
+
+async function createMarkdownFile(
+  ctx: WorkflowContext,
+  templateName: TemplateName,
+  path: string,
+  variables: TemplateVariables
+): Promise<TFile> {
+  await ensureFolder(ctx.app, parentFolder(path));
+  const template = await readTemplate(ctx, templateName);
+  const content = applyTemplateVariables(template, variables);
+  return ctx.app.vault.create(path, content);
+}
+
+async function readTemplate(ctx: WorkflowContext, templateName: TemplateName): Promise<string> {
+  const templatePath = joinVaultPath(ctx.settings.paths.managedTemplatesFolder, `template_${templateName}.md`);
+  const templateFile = ctx.app.vault.getFileByPath(templatePath);
+  if (templateFile) return ctx.app.vault.read(templateFile);
+  return renderTemplate(templateName, ctx.settings.locale);
+}
+
+function applyTemplateVariables(content: string, variables: TemplateVariables): string {
+  let result = content;
+  for (const [key, value] of Object.entries(variables)) {
+    result = result.replace(new RegExp(`{{\\s*${escapeRegExp(key)}\\s*}}`, "g"), value ?? "");
+  }
+  return result.replace(/{{\s*[A-Za-z0-9_]+\s*}}/g, "");
+}
+
+async function appendReferenceLink(ctx: WorkflowContext, source: TFile, target: TFile): Promise<boolean> {
+  const label = localePack(ctx.settings.locale).labels.references;
+  const link = wikiLink(target.path, target.basename);
+  return appendLineUnderHeader(ctx.app, source, label, link, {
+    createHeadingLevel: 2,
+    ordered: true,
+    dedupeTargetPath: target.path
+  });
+}
+
+async function appendReferenceLine(ctx: WorkflowContext, file: TFile, line: string): Promise<boolean> {
+  const label = localePack(ctx.settings.locale).labels.references;
+  return appendLineUnderHeader(ctx.app, file, label, line, {
+    createHeadingLevel: 2,
+    ordered: false,
+    dedupe: true
+  });
+}
+
+async function appendLineUnderHeader(
+  app: App,
+  file: TFile,
+  headerName: string,
+  line: string,
+  options: {
+    createHeadingLevel: number;
+    ordered: boolean;
+    dedupe?: boolean;
+    dedupeTargetPath?: string;
+  }
+): Promise<boolean> {
+  const content = await app.vault.read(file);
+  const headerPattern = escapeRegExp(headerName).replace(/\s+/g, "\\s+");
+  const headerRe = new RegExp(`^(?<quote>(?:>\\s*)*)\\s*(?<hashes>#{1,6})\\s*${headerPattern}(?=\\s|$).*?$`, "im");
+  const match = content.match(headerRe);
+
+  if (!match) {
+    const prefix = "#".repeat(options.createHeadingLevel);
+    const insertedLine = options.ordered ? `1. ${line}` : line;
+    await app.vault.modify(file, `${content.replace(/\s*$/, "")}\n\n${prefix} ${headerName}\n${insertedLine}\n`);
+    return true;
+  }
+
+  const quote = match.groups?.quote ?? "";
+  const headerEnd = (match.index ?? 0) + match[0].length;
+  const sectionStart = content.charAt(headerEnd) === "\n" ? headerEnd + 1 : headerEnd;
+  const after = content.slice(sectionStart);
+  const nextHeaderRel = after.search(/^\s*(?:>\s*)*#{1,6}\s+/m);
+  const sectionEnd = nextHeaderRel === -1 ? content.length : sectionStart + nextHeaderRel;
+  const section = content.slice(sectionStart, sectionEnd);
+
+  if (options.dedupeTargetPath) {
+    const linkTargetRe = new RegExp(`\\[\\[${escapeRegExp(options.dedupeTargetPath)}(?:\\|[^\\]]*)?\\]\\]`, "i");
+    if (linkTargetRe.test(section)) return false;
+  }
+  if (options.dedupe && section.includes(line)) return false;
+
+  const firstNonEmpty = section.split(/\n/).find((item) => item.trim());
+  const insertQuote = quote && firstNonEmpty?.startsWith(quote) ? quote : "";
+  const newLine = options.ordered
+    ? `${insertQuote}${countListItems(section, insertQuote) + 1}. ${line}`
+    : `${insertQuote}${line}`;
+  const gap = section.length === 0 || section.endsWith("\n") ? "" : "\n";
+  const updated = content.slice(0, sectionStart) + section + gap + newLine + "\n" + content.slice(sectionEnd);
+  await app.vault.modify(file, updated);
+  return true;
+}
+
+function countListItems(section: string, prefix: string): number {
+  const escapedPrefix = escapeRegExp(prefix);
+  const numberRe = new RegExp(`^${escapedPrefix}\\s*\\d+\\.\\s+`);
+  const bulletRe = new RegExp(`^${escapedPrefix}\\s*[-*+]\\s+`);
+  return section.split(/\n/).filter((line) => numberRe.test(line) || bulletRe.test(line)).length;
+}
+
+async function ensureFolderStyleParent(ctx: WorkflowContext, file: TFile): Promise<{
+  file: TFile;
+  childFolder: string;
+}> {
+  const parentPath = file.parent?.path ?? "";
+  const parentName = parentPath.split("/").filter(Boolean).pop() ?? "";
+  const isFolderStyle = parentPath.length > 0 && parentName === file.basename;
+  const childFolder = isFolderStyle ? parentPath : joinVaultPath(parentPath, file.basename);
+  await ensureFolder(ctx.app, childFolder);
+
+  if (isFolderStyle) {
+    return { file, childFolder };
+  }
+
+  const newPath = joinVaultPath(childFolder, `${file.basename}.md`);
+  const existing = ctx.app.vault.getAbstractFileByPath(newPath);
+  if (existing && existing !== file) {
+    throw new Error(`cannot move ${file.path}; ${newPath} already exists`);
+  }
+  if (normalizeVaultPath(file.path) !== newPath) {
+    await ctx.app.fileManager.renameFile(file, newPath);
+  }
+
+  const moved = ctx.app.vault.getFileByPath(newPath);
+  if (!moved) throw new Error(`failed to move ${file.path} to ${newPath}`);
+  return { file: moved, childFolder };
+}
+
+async function ensureFolder(app: App, folder: string): Promise<void> {
+  const normalized = normalizeVaultPath(folder);
+  if (!normalized) return;
+
+  const parts = normalized.split("/");
+  let current = "";
+  for (const part of parts) {
+    current = current ? `${current}/${part}` : part;
+    const existing = app.vault.getAbstractFileByPath(current);
+    if (existing instanceof TFolder) continue;
+    if (existing) throw new Error(`cannot create folder; a file exists at ${current}`);
+    await app.vault.createFolder(current);
+  }
+}
+
+async function uniqueMarkdownPath(app: App, path: string): Promise<string> {
+  const normalized = ensureMdPath(path);
+  if (!app.vault.getAbstractFileByPath(normalized)) return normalized;
+
+  const dot = normalized.toLowerCase().lastIndexOf(".md");
+  const base = dot >= 0 ? normalized.slice(0, dot) : normalized;
+  let index = 1;
+  let candidate = "";
+  do {
+    candidate = `${base} ${index}.md`;
+    index += 1;
+  } while (app.vault.getAbstractFileByPath(candidate));
+  return candidate;
+}
+
+function ensureMdPath(path: string): string {
+  const normalized = normalizeVaultPath(path);
+  return /\.md$/i.test(normalized) ? normalized : `${normalized}.md`;
+}
+
+function folderForZkKind(settings: ParaZkSettings, kind: ZkKind | PromotionZkKind): string {
+  if (kind === "Literature") return settings.paths.literatureFolder;
+  if (kind === "Permanent") return settings.paths.permanentFolder;
+  return settings.paths.fleetingFolder;
+}
+
+function resolveRequiredFile(ctx: WorkflowContext, path: string | undefined, label: string): TFile {
+  const file = resolveOptionalFile(ctx, path) ?? ctx.app.workspace.getActiveFile();
+  if (!file) throw new Error(`${label} is required`);
+  return file;
+}
+
+function resolveOptionalFile(ctx: WorkflowContext, path: string | undefined): TFile | undefined {
+  const normalized = normalizeVaultPath(path);
+  if (!normalized) return undefined;
+  const file = ctx.app.vault.getFileByPath(normalized);
+  if (!file) throw new Error(`file not found: ${normalized}`);
+  return file;
+}
+
+function requireTitle(value: string | undefined, label: string): string {
+  const title = sanitizeFileName(value ?? "");
+  if (!title) throw new Error(`${label} is required`);
+  return title;
+}
+
+function linkToFile(file: TFile): string {
+  return wikiLink(file.path, file.basename);
+}
+
+function noteResult(file: TFile, created: boolean, open?: boolean): NoteResult {
+  return {
+    path: file.path,
+    title: file.basename,
+    created,
+    opened: open || undefined
+  };
+}
+
+async function openIfRequested(ctx: WorkflowContext, file: TFile, open?: boolean): Promise<void> {
+  if (!open) return;
+  await ctx.app.workspace.getLeaf(true).openFile(file);
+}
+
+function parentFolder(path: string): string {
+  const normalized = normalizeVaultPath(path);
+  const index = normalized.lastIndexOf("/");
+  return index === -1 ? "" : normalized.slice(0, index);
+}
+
+function frontmatterListBlock(values: string[] | undefined): string {
+  const items = values?.map((value) => value.trim()).filter(Boolean) ?? [];
+  if (items.length === 0) return "";
+  return `\n${items.map((value) => `  - ${yamlScalar(value)}`).join("\n")}`;
+}
+
+function inlineList(values: string[] | undefined): string {
+  return values?.map((value) => value.trim()).filter(Boolean).join(", ") ?? "";
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
