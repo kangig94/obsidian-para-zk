@@ -1,0 +1,10 @@
+{
+  "id": "para-zk",
+  "name": "PARA-ZK",
+  "version": "0.0.1",
+  "minAppVersion": "1.0.0",
+  "description": "Native Obsidian plugin for PARA and Zettelkasten workflows.",
+  "author": "kangig94",
+  "authorUrl": "https://github.com/kangig94",
+  "isDesktopOnly": false
+}

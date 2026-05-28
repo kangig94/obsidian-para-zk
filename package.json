@@ -1,0 +1,25 @@
+{
+  "name": "obsidian-para-zk",
+  "version": "0.0.1",
+  "description": "Native Obsidian plugin for PARA and Zettelkasten workflows.",
+  "type": "module",
+  "scripts": {
+    "build": "node esbuild.config.mjs production",
+    "dev": "node esbuild.config.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "obsidian",
+    "para",
+    "zettelkasten"
+  ],
+  "author": "kangig94",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "esbuild": "^0.28.0",
+    "obsidian": "^1.12.3",
+    "typescript": "^6.0.3"
+  }
+}
+
