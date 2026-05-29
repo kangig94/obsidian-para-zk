@@ -80,6 +80,9 @@ to replace those plugins.
 
 ## Development
 
+Start with [docs/FIRST_READ.md](docs/FIRST_READ.md) for the project intent,
+reference-vault rules, and the GUI/CLI contract.
+
 See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the current development changelog.
 
 ```bash

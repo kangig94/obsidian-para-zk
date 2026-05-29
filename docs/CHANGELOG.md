@@ -22,6 +22,7 @@ Notable changes for PARA-ZK are tracked here.
   replacing Meta Bind input controls while writing frontmatter directly.
 - Added native Home dashboard action rendering with `para-zk-dashboard-actions`.
 - Added native dashboard summary card rendering with `para-zk-dashboard-summary`.
+- Added a first-read project intent document for LLM agents and contributors.
 
 ### Changed
 
@@ -39,4 +40,3 @@ Notable changes for PARA-ZK are tracked here.
 
 - Removed the need for Meta Bind in generated PARA-ZK templates and dashboards.
 - Removed DataviewJS-only card rendering for dashboard summary sections.
-
