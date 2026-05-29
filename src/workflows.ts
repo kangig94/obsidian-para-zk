@@ -23,7 +23,30 @@ import {
   sanitizeFileName,
   wikiLink
 } from "./vault/paths";
-import { normalizePromotionKind, normalizeZkKind } from "./zk/kinds";
+import {
+  ENERGY_CODE_HELP,
+  MATURITY_CODE_HELP,
+  PRIORITY_CODE_HELP,
+  PROJECT_STATUS_CODE_HELP,
+  SUBNOTE_TYPE_CODE_HELP,
+  energyLabel,
+  maturityLabel,
+  parseEnergyCode,
+  parseMaturityCode,
+  parsePriorityCode,
+  parseProjectStatusCode,
+  parseSubnoteTypeCode,
+  priorityLabel,
+  projectStatusLabel,
+  subnoteTypeLabel,
+  type MaturityCode
+} from "./vocabulary";
+import {
+  PROMOTION_ZK_KIND_CODE_HELP,
+  ZK_KIND_CODE_HELP,
+  parsePromotionKind,
+  parseZkKind
+} from "./zk/kinds";
 import { slugify } from "./text/slug";
 
 export type WorkflowContext = {
@@ -55,6 +78,7 @@ export type CreateResourceOptions = {
 export type CreateSubnoteOptions = {
   title: string;
   sourcePath?: string;
+  subnoteType?: string;
   open?: boolean;
 };
 
@@ -75,6 +99,7 @@ export type CreateRetroOptions = {
 export type CreateZkOptions = {
   title: string;
   kind?: string;
+  maturity?: string;
   open?: boolean;
 };
 
@@ -82,6 +107,7 @@ export type CaptureJournalOptions = {
   content: string;
   date?: string;
   time?: string;
+  energy?: string;
   open?: boolean;
 };
 
@@ -89,6 +115,7 @@ export type PromoteResourceOptions = {
   sourcePath?: string;
   title?: string;
   kind?: string;
+  maturity?: string;
   open?: boolean;
 };
 
@@ -96,6 +123,7 @@ export type PromoteFleetingOptions = {
   sourcePath?: string;
   title?: string;
   kind?: string;
+  maturity?: string;
   open?: boolean;
 };
 
@@ -107,21 +135,28 @@ export async function createProject(ctx: WorkflowContext, options: CreateProject
   await ensureFolder(ctx.app, folder);
 
   const createdAt = localDateTimeSpace();
+  const statusCode = readOptionalCode(options.status, parseProjectStatusCode, "status", PROJECT_STATUS_CODE_HELP);
+  const priorityCode = readOptionalCode(options.priority, parsePriorityCode, "priority", PRIORITY_CODE_HELP);
+  const defaultStatus = projectStatusLabel("idea", ctx.settings.locale);
+  const defaultPriority = priorityLabel("low", ctx.settings.locale);
+  const status = statusCode ? projectStatusLabel(statusCode, ctx.settings.locale) : defaultStatus;
+  const priority = priorityCode ? priorityLabel(priorityCode, ctx.settings.locale) : defaultPriority;
   const path = await uniqueMarkdownPath(ctx.app, joinVaultPath(folder, `${title}.md`));
   const file = await createMarkdownFile(ctx, "project", path, {
     created: createdAt,
     slug: slugify(title),
     areas: inlineList(options.areas),
+    status,
+    priority,
     cursor: ""
   });
 
   const tags = localePack(ctx.settings.locale).tags;
-  const t = localePack(ctx.settings.locale);
   await ctx.app.fileManager.processFrontMatter(file, (fm) => {
     fm.type = "project";
     if (options.areas && options.areas.length > 0) fm.areas = options.areas;
-    fm.status = options.status ?? fm.status ?? t.projectStatus.idea;
-    fm.priority = options.priority ?? fm.priority ?? t.priority.low;
+    fm.status = statusCode ? status : fm.status ?? defaultStatus;
+    fm.priority = priorityCode ? priority : fm.priority ?? defaultPriority;
     fm.tags = [`${tags.project}/${slugify(title)}`];
     fm.created = fm.created || createdAt;
     if (fm.updated === undefined) fm.updated = "";
@@ -199,6 +234,9 @@ export async function createSubnote(ctx: WorkflowContext, options: CreateSubnote
   const title = requireTitle(options.title, "subnote title");
   const parent = await ensureFolderStyleParent(ctx, resolveRequiredFile(ctx, options.sourcePath, "source note"));
   const createdAt = localDateTimeSpace();
+  const subnoteTypeCode = readOptionalCode(options.subnoteType, parseSubnoteTypeCode, "subnote_type", SUBNOTE_TYPE_CODE_HELP);
+  const defaultSubnoteType = subnoteTypeLabel("free", ctx.settings.locale);
+  const subnoteType = subnoteTypeCode ? subnoteTypeLabel(subnoteTypeCode, ctx.settings.locale) : defaultSubnoteType;
   const path = joinVaultPath(parent.childFolder, `${title}.md`);
   let created = true;
   let file = ctx.app.vault.getFileByPath(path);
@@ -206,11 +244,13 @@ export async function createSubnote(ctx: WorkflowContext, options: CreateSubnote
   if (!file) {
     file = await createMarkdownFile(ctx, "subnote", path, {
       created: createdAt,
+      subnote_type: subnoteType,
       cursor: ""
     });
     await ctx.app.fileManager.processFrontMatter(file, (fm) => {
       fm.type = fm.type || "doc";
       fm.parent = linkToFile(parent.file);
+      fm.subnote_type = subnoteTypeCode ? subnoteType : fm.subnote_type ?? defaultSubnoteType;
       fm.created = fm.created || createdAt;
       if (fm.updated === undefined) fm.updated = "";
     });
@@ -341,11 +381,12 @@ export async function createZk(ctx: WorkflowContext, options: CreateZkOptions): 
   kind: ZkKind;
 }> {
   const title = requireTitle(options.title, "ZK title");
-  const kind = normalizeZkKind(options.kind, "Fleeting");
+  const kind = readOptionalCode(options.kind, parseZkKind, "kind", ZK_KIND_CODE_HELP) ?? "Fleeting";
+  const maturityCode = readOptionalCode(options.maturity, parseMaturityCode, "maturity", MATURITY_CODE_HELP);
   const folder = folderForZkKind(ctx.settings, kind);
   await ensureFolder(ctx.app, folder);
   const path = await uniqueMarkdownPath(ctx.app, joinVaultPath(folder, `${title}.md`));
-  const file = await createZkFile(ctx, kind, path, title);
+  const file = await createZkFile(ctx, kind, path, title, { maturityCode });
 
   await openIfRequested(ctx, file, options.open);
   return {
@@ -362,6 +403,9 @@ export async function captureJournal(ctx: WorkflowContext, options: CaptureJourn
   const dateText = localDate(date);
   const createdAt = localDateTimeSpace();
   const timeText = options.time?.trim() || localTime();
+  const energyCode = readOptionalCode(options.energy, parseEnergyCode, "energy", ENERGY_CODE_HELP);
+  const defaultEnergy = energyLabel("normal", ctx.settings.locale);
+  const energy = energyCode ? energyLabel(energyCode, ctx.settings.locale) : defaultEnergy;
   const folder = joinVaultPath(ctx.settings.paths.journalFolder, dateText.slice(0, 7));
   await ensureFolder(ctx.app, folder);
   const path = joinVaultPath(folder, `${dateText}.md`);
@@ -372,11 +416,13 @@ export async function captureJournal(ctx: WorkflowContext, options: CaptureJourn
     file = await createMarkdownFile(ctx, "journal", path, {
       created: createdAt,
       date: dateText,
+      energy,
       cursor: ""
     });
     await ctx.app.fileManager.processFrontMatter(file, (fm) => {
       fm.type = "journal";
       fm.date = fm.date || dateText;
+      fm.energy = energyCode ? energy : fm.energy ?? defaultEnergy;
       fm.created = fm.created || createdAt;
       if (fm.updated === undefined) fm.updated = "";
     });
@@ -402,12 +448,13 @@ export async function captureJournal(ctx: WorkflowContext, options: CaptureJourn
 
 export async function promoteResource(ctx: WorkflowContext, options: PromoteResourceOptions = {}): Promise<PromotionResult> {
   const source = resolveRequiredFile(ctx, options.sourcePath, "source resource");
-  const kind = normalizeZkKind(options.kind, "Permanent");
+  const kind = readOptionalCode(options.kind, parseZkKind, "kind", ZK_KIND_CODE_HELP) ?? "Permanent";
+  const maturityCode = readOptionalCode(options.maturity, parseMaturityCode, "maturity", MATURITY_CODE_HELP);
   const title = requireTitle(options.title || source.basename, "ZK title");
   const folder = folderForZkKind(ctx.settings, kind);
   await ensureFolder(ctx.app, folder);
   const path = await uniqueMarkdownPath(ctx.app, joinVaultPath(folder, `${title}.md`));
-  const file = await createZkFile(ctx, kind, path, title);
+  const file = await createZkFile(ctx, kind, path, title, { maturityCode });
 
   await appendReferenceLine(ctx, file, `- ${wikiLink(source.path)}`);
   await openIfRequested(ctx, file, options.open);
@@ -422,12 +469,13 @@ export async function promoteResource(ctx: WorkflowContext, options: PromoteReso
 export async function promoteFleeting(ctx: WorkflowContext, options: PromoteFleetingOptions = {}): Promise<PromotionResult> {
   const source = resolveRequiredFile(ctx, options.sourcePath, "source fleeting note");
   const originalSourcePath = source.path;
-  const kind = normalizePromotionKind(options.kind, "Permanent");
+  const kind = readOptionalCode(options.kind, parsePromotionKind, "kind", PROMOTION_ZK_KIND_CODE_HELP) ?? "Permanent";
+  const maturityCode = readOptionalCode(options.maturity, parseMaturityCode, "maturity", MATURITY_CODE_HELP);
   const title = requireTitle(options.title || source.basename, "ZK title");
   const folder = folderForZkKind(ctx.settings, kind);
   await ensureFolder(ctx.app, folder);
   const path = await uniqueMarkdownPath(ctx.app, joinVaultPath(folder, `${title}.md`));
-  const file = await createZkFile(ctx, kind, path, title);
+  const file = await createZkFile(ctx, kind, path, title, { maturityCode });
 
   await ensureFolder(ctx.app, ctx.settings.paths.fleetingArchiveFolder);
   const archivedPath = await uniqueMarkdownPath(
@@ -454,15 +502,26 @@ export async function promoteFleeting(ctx: WorkflowContext, options: PromoteFlee
   };
 }
 
-async function createZkFile(ctx: WorkflowContext, kind: ZkKind, path: string, title: string): Promise<TFile> {
+async function createZkFile(
+  ctx: WorkflowContext,
+  kind: ZkKind,
+  path: string,
+  title: string,
+  options: { maturityCode?: MaturityCode } = {}
+): Promise<TFile> {
   const templateName: TemplateName = kind === "Fleeting"
     ? "zk_fleeting"
     : kind === "Literature"
       ? "zk_literature"
       : "zk_permanent";
+  const defaultMaturity = maturityLabel("draft", ctx.settings.locale);
+  const maturity = options.maturityCode
+    ? maturityLabel(options.maturityCode, ctx.settings.locale)
+    : defaultMaturity;
   const file = await createMarkdownFile(ctx, templateName, path, {
     created: localDateTimeSpace(),
     slug: slugify(title),
+    maturity,
     cursor: ""
   });
 
@@ -472,9 +531,22 @@ async function createZkFile(ctx: WorkflowContext, kind: ZkKind, path: string, ti
     fm.tags = [`${tags.knowledge}/${slugify(title)}`];
     fm.created = fm.created || localDateTimeSpace();
     if (kind === "Fleeting" && fm.processed === undefined) fm.processed = false;
+    if (kind === "Permanent") fm.maturity = options.maturityCode ? maturity : fm.maturity ?? defaultMaturity;
     if (fm.updated === undefined) fm.updated = "";
   });
   return file;
+}
+
+function readOptionalCode<T extends string>(
+  value: string | undefined,
+  parse: (value: string | undefined) => T | undefined,
+  field: string,
+  allowed: string
+): T | undefined {
+  if (value === undefined) return undefined;
+  const code = parse(value);
+  if (code) return code;
+  throw new Error(`${field} must be one of: ${allowed} (received: ${value})`);
 }
 
 async function createMarkdownFile(
@@ -485,7 +557,7 @@ async function createMarkdownFile(
 ): Promise<TFile> {
   await ensureFolder(ctx.app, parentFolder(path));
   const template = await readTemplate(ctx, templateName);
-  const content = applyTemplateVariables(template, variables);
+  const content = stripManagedTemplateKeys(applyTemplateVariables(template, variables));
   return ctx.app.vault.create(path, content);
 }
 
@@ -502,6 +574,17 @@ function applyTemplateVariables(content: string, variables: TemplateVariables): 
     result = result.replace(new RegExp(`{{\\s*${escapeRegExp(key)}\\s*}}`, "g"), value ?? "");
   }
   return result.replace(/{{\s*[A-Za-z0-9_]+\s*}}/g, "");
+}
+
+function stripManagedTemplateKeys(content: string): string {
+  const match = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!match) return content;
+
+  const frontmatter = match[1]
+    .split("\n")
+    .filter((line) => !/^para_zk_(managed|kind):/.test(line.trim()))
+    .join("\n");
+  return `---\n${frontmatter}\n---${content.slice(match[0].length)}`;
 }
 
 async function appendReferenceLink(ctx: WorkflowContext, source: TFile, target: TFile): Promise<boolean> {

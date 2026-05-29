@@ -28,13 +28,17 @@ Native CLI handlers, when supported by the running Obsidian app:
 obsidian para-zk:ping format=json
 obsidian para-zk:init locale=ko format=json
 obsidian para-zk:init dryRun=true force=true locale=en format=json
-obsidian para-zk:create-project title="Project name" format=json
+obsidian para-zk:create-project title="Project name" status=in_progress priority=high format=json
 obsidian para-zk:create-resource file_path="PARA/Projects/Project name/Project name.md" title="Source" format=json
-obsidian para-zk:create-subnote file_path="PARA/Projects/Project name/Project name.md" title="Meeting notes" format=json
-obsidian para-zk:create-zk title="Idea" kind=Fleeting format=json
-obsidian para-zk:promote-fleeting file_path="ZK/Fleeting/Idea.md" kind=Permanent title="Evergreen idea" format=json
-obsidian para-zk:capture-journal content="Quick memo" format=json
+obsidian para-zk:create-subnote file_path="PARA/Projects/Project name/Project name.md" title="Meeting notes" subnote_type=meeting format=json
+obsidian para-zk:create-zk title="Idea" kind=fleeting format=json
+obsidian para-zk:promote-fleeting file_path="ZK/Fleeting/Idea.md" kind=permanent maturity=evergreen title="Evergreen idea" format=json
+obsidian para-zk:capture-journal content="Quick memo" energy=normal format=json
 ```
+
+CLI option values use locale-neutral codes only. For example, pass
+`status=in_progress` instead of `status="1. 진행중"`; the plugin renders the
+localized label inside the generated note.
 
 `para-zk:init` creates the PARA/ZK vault layout, managed template reference files under
 `Templates/para-zk`, Dataview/Tasks dashboard files under `Dashboard`, and a root vault guide. It

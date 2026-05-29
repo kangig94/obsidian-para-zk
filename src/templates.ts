@@ -90,8 +90,8 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         managedFrontmatter("template_project", [
           "type: project",
           "areas:",
-          `status: ${t.projectStatus.idea}`,
-          `priority: ${t.priority.low}`,
+          "status: {{status}}",
+          "priority: {{priority}}",
           "start_date:",
           "due_date:",
           "done_date:",
@@ -102,8 +102,8 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         ]),
         propsTable([
           [t.labels.area, "{{areas}}", t.labels.dueDate, "{{due_date}}"],
-          [t.labels.status, t.projectStatus.idea, t.labels.startDate, "{{start_date}}"],
-          [t.labels.priority, t.priority.low, t.labels.doneDate, "{{done_date}}"]
+          [t.labels.status, "{{status}}", t.labels.startDate, "{{start_date}}"],
+          [t.labels.priority, "{{priority}}", t.labels.doneDate, "{{done_date}}"]
         ]),
         `# ${t.labels.summary}`,
         "",
@@ -211,13 +211,13 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         managedFrontmatter("template_journal", [
           "type: journal",
           "date: {{date}}",
-          `energy: ${t.energy.normal}`,
+          "energy: {{energy}}",
           "tags:",
           `  - ${tags.journal}`,
           `created: ${nowPlaceholder}`,
           "updated:"
         ]),
-        propsTable([[t.labels.date, "{{date}}", t.labels.energy, t.energy.normal]]),
+        propsTable([[t.labels.date, "{{date}}", t.labels.energy, "{{energy}}"]]),
         `# ${t.labels.focus}`,
         "- [ ] {{cursor}}",
         "",
@@ -293,14 +293,14 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
       return [
         managedFrontmatter("template_subnote", [
           "type: doc",
-          `subnote_type: ${t.subnoteTypes[0]}`,
+          "subnote_type: {{subnote_type}}",
           "parent:",
           `created: ${nowPlaceholder}`,
           "updated:"
         ]),
         propsTable([
           [t.labels.created, "{{created}}", t.labels.updated, "{{updated}}"],
-          [t.labels.kind, t.subnoteTypes[0], "", ""]
+          [t.labels.kind, "{{subnote_type}}", "", ""]
         ]),
         "",
         "{{cursor}}",
@@ -384,14 +384,14 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
           "type: zk_permanent",
           "tags:",
           `  - ${tags.knowledge}/${slugPlaceholder}`,
-          `maturity: ${t.maturity.draft}`,
+          "maturity: {{maturity}}",
           "aliases:",
           `created: ${nowPlaceholder}`,
           "updated:"
         ]),
         propsTable([
           [t.labels.created, "{{created}}", t.labels.updated, "{{updated}}"],
-          [t.labels.status, t.maturity.draft, t.labels.aliases, "{{aliases}}"]
+          [t.labels.status, "{{maturity}}", t.labels.aliases, "{{aliases}}"]
         ]),
         `# ${t.labels.oneSentenceSummary}`,
         "",
@@ -414,9 +414,10 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
 }
 
 function managedFrontmatter(kind: string, extra: string[] = []): string {
-  void kind;
   return [
     "---",
+    "para_zk_managed: true",
+    `para_zk_kind: ${kind}`,
     ...extra,
     "---"
   ].join("\n");
@@ -864,15 +865,18 @@ function dashboardZkSummary(t: ReturnType<typeof localePack>): string[] {
     "const literature = pages('\"ZK/Literature\"');",
     "const permanent = pages('\"ZK/Permanent\"');",
     "const stale = fleeting.filter(f => now - timeOf(f.file.ctime) >= days(7));",
-    "const draft = permanent.filter(p => p.maturity === 'Draft');",
-    "const refined = permanent.filter(p => p.maturity === 'Refined');",
-    "const evergreen = permanent.filter(p => p.maturity === 'Evergreen');",
+    `const draftLabel = ${jsString(t.maturity.draft)};`,
+    `const refinedLabel = ${jsString(t.maturity.refined)};`,
+    `const evergreenLabel = ${jsString(t.maturity.evergreen)};`,
+    "const draft = permanent.filter(p => p.maturity === draftLabel);",
+    "const refined = permanent.filter(p => p.maturity === refinedLabel);",
+    "const evergreen = permanent.filter(p => p.maturity === evergreenLabel);",
     `card('🌟', 'Fleeting', fleeting.length, ${jsString(t.labels.staleFleeting)} + ' ' + stale.length);`,
     "card('📚', 'Literature', literature.length);",
     "card('🧠', 'Permanent', permanent.length);",
-    "card('📝', 'Draft', draft.length);",
-    "card('✨', 'Refined', refined.length);",
-    "card('🍃', 'Evergreen', evergreen.length);"
+    "card('📝', draftLabel, draft.length);",
+    "card('✨', refinedLabel, refined.length);",
+    "card('🍃', evergreenLabel, evergreen.length);"
   ]);
 }
 
@@ -1013,8 +1017,9 @@ function dashboardDraftPermanent(t: ReturnType<typeof localePack>, limit: number
   return dataviewJs([
     "const days = (n) => 1000 * 60 * 60 * 24 * n;",
     "const now = Date.now();",
+    `const draftLabel = ${jsString(t.maturity.draft)};`,
     "const rows = pages('\"ZK/Permanent\"')",
-    "  .filter(p => p.maturity === 'Draft' && now - timeOf(p.file.mtime) >= days(14))",
+    "  .filter(p => p.maturity === draftLabel && now - timeOf(p.file.mtime) >= days(14))",
     "  .sort((a,b) => timeOf(a.file.mtime) - timeOf(b.file.mtime))",
     `  .slice(0, ${limit})`,
     "  .map(p => [p.file.link, p.file.mtime]);",

@@ -40,6 +40,7 @@ export async function initializeVault(
     await writeManagedFile(app, artifact.path, artifact.content, result, {
       dryRun,
       force,
+      managedTemplatesFolder: nextSettings.paths.managedTemplatesFolder,
       managedFiles: nextSettings.managedFiles
     });
   }
@@ -88,6 +89,7 @@ async function writeManagedFile(
   options: {
     dryRun: boolean;
     force: boolean;
+    managedTemplatesFolder: string;
     managedFiles: Record<string, ManagedFileState>;
   }
 ): Promise<void> {
@@ -121,6 +123,7 @@ async function writeManagedFile(
   const currentHash = hashText(current);
   const known = options.managedFiles[normalized];
   const legacyManaged = isLegacyParaZkManaged(current);
+  const conventionManaged = isUnderManagedTemplatesFolder(normalized, options.managedTemplatesFolder);
 
   if (current === content) {
     addUnique(result.existing, normalized);
@@ -130,7 +133,7 @@ async function writeManagedFile(
     return;
   }
 
-  if (!known && !legacyManaged) {
+  if (!known && !legacyManaged && !(options.force && conventionManaged)) {
     addUnique(result.skipped, normalized);
     addUnique(result.warnings, `Skipped user-managed file at ${normalized}`);
     return;
@@ -163,6 +166,11 @@ function parentFolder(path: string): string {
 
 function isLegacyParaZkManaged(content: string): boolean {
   return /^para_zk_managed:\s*true\s*$/m.test(content);
+}
+
+function isUnderManagedTemplatesFolder(path: string, managedTemplatesFolder: string): boolean {
+  const folder = normalizeVaultPath(managedTemplatesFolder);
+  return path === folder || path.startsWith(`${folder}/`);
 }
 
 function addUnique(items: string[], value: string): void {

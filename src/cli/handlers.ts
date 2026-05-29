@@ -2,6 +2,14 @@ import type { Plugin } from "obsidian";
 import { localePack, normalizeLocale } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import type { CliArgs, CliOptionSpec } from "../types";
+import {
+  ENERGY_CODE_HELP,
+  MATURITY_CODE_HELP,
+  PRIORITY_CODE_HELP,
+  PROJECT_STATUS_CODE_HELP,
+  SUBNOTE_TYPE_CODE_HELP
+} from "../vocabulary";
+import { PROMOTION_ZK_KIND_CODE_HELP, ZK_KIND_CODE_HELP } from "../zk/kinds";
 import { parseList } from "./parse";
 import type { WorkflowContext } from "../workflows";
 
@@ -68,8 +76,8 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
     {
       title: { value: "<title>", description: "Project title." },
       areas: { value: "<json|comma-list>", description: "Area links to store in frontmatter." },
-      status: { value: "<status>", description: "Project status value." },
-      priority: { value: "<priority>", description: "Project priority value." },
+      status: { value: `<${PROJECT_STATUS_CODE_HELP}>`, description: "Locale-neutral project status code." },
+      priority: { value: `<${PRIORITY_CODE_HELP}>`, description: "Locale-neutral project priority code." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -135,6 +143,7 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
     {
       title: { value: "<title>", description: "Subnote title." },
       file_path: { value: "<path>", description: "Parent note path." },
+      subnote_type: { value: `<${SUBNOTE_TYPE_CODE_HELP}>`, description: "Locale-neutral subnote type code." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -143,6 +152,7 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
       const result = await createSubnote(workflowContext(plugin), {
         title: readCliTitle(args),
         sourcePath: readCliPath(args),
+        subnoteType: readCliString(args, "subnote_type") ?? readCliString(args, "subnoteType") ?? readCliString(args, "type"),
         open: readCliBoolean(args, "open") ?? false
       });
       return { ok: true, command: "para-zk:create-subnote", ...result };
@@ -198,7 +208,8 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
     "Create a ZK note",
     {
       title: { value: "<title>", description: "ZK note title." },
-      kind: { value: "<Fleeting|Literature|Permanent>", description: "ZK note kind." },
+      kind: { value: `<${ZK_KIND_CODE_HELP}>`, description: "Locale-neutral ZK note kind." },
+      maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -207,6 +218,7 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
       const result = await createZk(workflowContext(plugin), {
         title: readCliTitle(args),
         kind: readCliString(args, "kind") ?? readCliString(args, "type"),
+        maturity: readCliString(args, "maturity"),
         open: readCliBoolean(args, "open") ?? false
       });
       return { ok: true, command: "para-zk:create-zk", ...result };
@@ -220,6 +232,7 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
       content: { value: "<content>", description: "Memo content." },
       date: { value: "<YYYY-MM-DD>", description: "Journal date." },
       time: { value: "<HH:mm>", description: "Memo time." },
+      energy: { value: `<${ENERGY_CODE_HELP}>`, description: "Locale-neutral daily energy code." },
       open: { value: "<true|false>", description: "Open the journal note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -229,6 +242,7 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
         content: readCliContent(args),
         date: readCliString(args, "date"),
         time: readCliString(args, "time"),
+        energy: readCliString(args, "energy"),
         open: readCliBoolean(args, "open") ?? false
       });
       return { ok: true, command: "para-zk:capture-journal", ...result };
@@ -241,7 +255,8 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
     {
       file_path: { value: "<path>", description: "Source resource path." },
       title: { value: "<title>", description: "New ZK note title." },
-      kind: { value: "<Fleeting|Literature|Permanent>", description: "Target ZK kind." },
+      kind: { value: `<${ZK_KIND_CODE_HELP}>`, description: "Locale-neutral target ZK kind." },
+      maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -251,6 +266,7 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
         sourcePath: readCliPath(args),
         title: readCliString(args, "title") ?? readCliString(args, "name"),
         kind: readCliString(args, "kind") ?? readCliString(args, "type"),
+        maturity: readCliString(args, "maturity"),
         open: readCliBoolean(args, "open") ?? false
       });
       return { ok: true, command: "para-zk:promote-resource", ...result };
@@ -263,7 +279,8 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
     {
       file_path: { value: "<path>", description: "Source fleeting note path." },
       title: { value: "<title>", description: "New ZK note title." },
-      kind: { value: "<Literature|Permanent>", description: "Target ZK kind." },
+      kind: { value: `<${PROMOTION_ZK_KIND_CODE_HELP}>`, description: "Locale-neutral target ZK kind." },
+      maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -273,6 +290,7 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
         sourcePath: readCliPath(args),
         title: readCliString(args, "title") ?? readCliString(args, "name"),
         kind: readCliString(args, "kind") ?? readCliString(args, "type"),
+        maturity: readCliString(args, "maturity"),
         open: readCliBoolean(args, "open") ?? false
       });
       return { ok: true, command: "para-zk:promote-fleeting", ...result };
