@@ -3,6 +3,7 @@ import { registerNativeCliHandlers } from "./cli/handlers";
 import { loadSettings as loadRuntimeSettings, saveSettings as saveRuntimeSettings } from "./runtime/settings";
 import { DEFAULT_SETTINGS, type InitOptions, type InitResult, type ParaZkSettings } from "./types";
 import { registerInlineActionRenderers } from "./ux/inline-actions";
+import { registerPropsControlRenderers } from "./ux/props-controls";
 import { ParaZkSettingTab } from "./ux/settings";
 import {
   registerStatusAndInitCommands,
@@ -18,6 +19,7 @@ export default class ParaZkPlugin extends Plugin {
     registerStatusAndInitCommands(this);
     registerWorkflowCommands(this);
     registerInlineActionRenderers(this);
+    registerPropsControlRenderers(this);
 
     this.addSettingTab(new ParaZkSettingTab(this));
     registerNativeCliHandlers(this);

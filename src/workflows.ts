@@ -29,16 +29,11 @@ import {
   PRIORITY_CODE_HELP,
   PROJECT_STATUS_CODE_HELP,
   SUBNOTE_TYPE_CODE_HELP,
-  energyLabel,
-  maturityLabel,
   parseEnergyCode,
   parseMaturityCode,
   parsePriorityCode,
   parseProjectStatusCode,
   parseSubnoteTypeCode,
-  priorityLabel,
-  projectStatusLabel,
-  subnoteTypeLabel,
   type MaturityCode
 } from "./vocabulary";
 import {
@@ -137,10 +132,8 @@ export async function createProject(ctx: WorkflowContext, options: CreateProject
   const createdAt = localDateTimeSpace();
   const statusCode = readOptionalCode(options.status, parseProjectStatusCode, "status", PROJECT_STATUS_CODE_HELP);
   const priorityCode = readOptionalCode(options.priority, parsePriorityCode, "priority", PRIORITY_CODE_HELP);
-  const defaultStatus = projectStatusLabel("idea", ctx.settings.locale);
-  const defaultPriority = priorityLabel("low", ctx.settings.locale);
-  const status = statusCode ? projectStatusLabel(statusCode, ctx.settings.locale) : defaultStatus;
-  const priority = priorityCode ? priorityLabel(priorityCode, ctx.settings.locale) : defaultPriority;
+  const status = statusCode ?? "idea";
+  const priority = priorityCode ?? "low";
   const path = await uniqueMarkdownPath(ctx.app, joinVaultPath(folder, `${title}.md`));
   const file = await createMarkdownFile(ctx, "project", path, {
     created: createdAt,
@@ -155,8 +148,8 @@ export async function createProject(ctx: WorkflowContext, options: CreateProject
   await ctx.app.fileManager.processFrontMatter(file, (fm) => {
     fm.type = "project";
     if (options.areas && options.areas.length > 0) fm.areas = options.areas;
-    fm.status = statusCode ? status : fm.status ?? defaultStatus;
-    fm.priority = priorityCode ? priority : fm.priority ?? defaultPriority;
+    fm.status = fm.status ?? status;
+    fm.priority = fm.priority ?? priority;
     fm.tags = [`${tags.project}/${slugify(title)}`];
     fm.created = fm.created || createdAt;
     if (fm.updated === undefined) fm.updated = "";
@@ -235,8 +228,7 @@ export async function createSubnote(ctx: WorkflowContext, options: CreateSubnote
   const parent = await ensureFolderStyleParent(ctx, resolveRequiredFile(ctx, options.sourcePath, "source note"));
   const createdAt = localDateTimeSpace();
   const subnoteTypeCode = readOptionalCode(options.subnoteType, parseSubnoteTypeCode, "subnote_type", SUBNOTE_TYPE_CODE_HELP);
-  const defaultSubnoteType = subnoteTypeLabel("free", ctx.settings.locale);
-  const subnoteType = subnoteTypeCode ? subnoteTypeLabel(subnoteTypeCode, ctx.settings.locale) : defaultSubnoteType;
+  const subnoteType = subnoteTypeCode ?? "free";
   const path = joinVaultPath(parent.childFolder, `${title}.md`);
   let created = true;
   let file = ctx.app.vault.getFileByPath(path);
@@ -250,7 +242,7 @@ export async function createSubnote(ctx: WorkflowContext, options: CreateSubnote
     await ctx.app.fileManager.processFrontMatter(file, (fm) => {
       fm.type = fm.type || "doc";
       fm.parent = linkToFile(parent.file);
-      fm.subnote_type = subnoteTypeCode ? subnoteType : fm.subnote_type ?? defaultSubnoteType;
+      fm.subnote_type = fm.subnote_type ?? subnoteType;
       fm.created = fm.created || createdAt;
       if (fm.updated === undefined) fm.updated = "";
     });
@@ -404,8 +396,7 @@ export async function captureJournal(ctx: WorkflowContext, options: CaptureJourn
   const createdAt = localDateTimeSpace();
   const timeText = options.time?.trim() || localTime();
   const energyCode = readOptionalCode(options.energy, parseEnergyCode, "energy", ENERGY_CODE_HELP);
-  const defaultEnergy = energyLabel("normal", ctx.settings.locale);
-  const energy = energyCode ? energyLabel(energyCode, ctx.settings.locale) : defaultEnergy;
+  const energy = energyCode ?? "normal";
   const folder = joinVaultPath(ctx.settings.paths.journalFolder, dateText.slice(0, 7));
   await ensureFolder(ctx.app, folder);
   const path = joinVaultPath(folder, `${dateText}.md`);
@@ -422,7 +413,7 @@ export async function captureJournal(ctx: WorkflowContext, options: CaptureJourn
     await ctx.app.fileManager.processFrontMatter(file, (fm) => {
       fm.type = "journal";
       fm.date = fm.date || dateText;
-      fm.energy = energyCode ? energy : fm.energy ?? defaultEnergy;
+      fm.energy = fm.energy ?? energy;
       fm.created = fm.created || createdAt;
       if (fm.updated === undefined) fm.updated = "";
     });
@@ -514,10 +505,7 @@ async function createZkFile(
     : kind === "Literature"
       ? "zk_literature"
       : "zk_permanent";
-  const defaultMaturity = maturityLabel("draft", ctx.settings.locale);
-  const maturity = options.maturityCode
-    ? maturityLabel(options.maturityCode, ctx.settings.locale)
-    : defaultMaturity;
+  const maturity = options.maturityCode ?? "draft";
   const file = await createMarkdownFile(ctx, templateName, path, {
     created: localDateTimeSpace(),
     slug: slugify(title),
@@ -531,7 +519,7 @@ async function createZkFile(
     fm.tags = [`${tags.knowledge}/${slugify(title)}`];
     fm.created = fm.created || localDateTimeSpace();
     if (kind === "Fleeting" && fm.processed === undefined) fm.processed = false;
-    if (kind === "Permanent") fm.maturity = options.maturityCode ? maturity : fm.maturity ?? defaultMaturity;
+    if (kind === "Permanent") fm.maturity = fm.maturity ?? maturity;
     if (fm.updated === undefined) fm.updated = "";
   });
   return file;
@@ -557,7 +545,7 @@ async function createMarkdownFile(
 ): Promise<TFile> {
   await ensureFolder(ctx.app, parentFolder(path));
   const template = await readTemplate(ctx, templateName);
-  const content = stripManagedTemplateKeys(applyTemplateVariables(template, variables));
+  const content = applyTemplateVariables(template, variables);
   return ctx.app.vault.create(path, content);
 }
 
@@ -574,17 +562,6 @@ function applyTemplateVariables(content: string, variables: TemplateVariables): 
     result = result.replace(new RegExp(`{{\\s*${escapeRegExp(key)}\\s*}}`, "g"), value ?? "");
   }
   return result.replace(/{{\s*[A-Za-z0-9_]+\s*}}/g, "");
-}
-
-function stripManagedTemplateKeys(content: string): string {
-  const match = content.match(/^---\n([\s\S]*?)\n---/);
-  if (!match) return content;
-
-  const frontmatter = match[1]
-    .split("\n")
-    .filter((line) => !/^para_zk_(managed|kind):/.test(line.trim()))
-    .join("\n");
-  return `---\n${frontmatter}\n---${content.slice(match[0].length)}`;
 }
 
 async function appendReferenceLink(ctx: WorkflowContext, source: TFile, target: TFile): Promise<boolean> {

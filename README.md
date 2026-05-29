@@ -28,6 +28,7 @@ Native CLI handlers, when supported by the running Obsidian app:
 obsidian para-zk:ping format=json
 obsidian para-zk:init locale=ko format=json
 obsidian para-zk:init dryRun=true force=true locale=en format=json
+obsidian para-zk:init installDeps=true format=json
 obsidian para-zk:create-project title="Project name" status=in_progress priority=high format=json
 obsidian para-zk:create-resource file_path="PARA/Projects/Project name/Project name.md" title="Source" format=json
 obsidian para-zk:create-subnote file_path="PARA/Projects/Project name/Project name.md" title="Meeting notes" subnote_type=meeting format=json
@@ -45,10 +46,29 @@ localized label inside the generated note.
 is idempotent. Existing non-managed files are skipped, and changed managed files are only
 overwritten with `force=true`.
 
+`para-zk:init` also checks required community plugin dependencies. It warns when
+Dataview, Tasks, or Tabs is missing or disabled. Pass `installDeps=true` to
+install and enable those dependencies. When Dataview is installed, PARA-ZK also
+enables Dataview JavaScript queries because the generated dashboards use
+`dataviewjs` blocks.
+
 The generated templates use native inline action tokens such as
 `` `PZK[create-subnote|Create subnote]` `` instead of Meta Bind buttons. The inline action
 token is rendered as a compact button inside the Markdown heading and calls the same
 workflow implementation as the matching CLI handler.
+
+Generated templates also use native PARA-ZK props controls:
+
+````markdown
+```para-zk-props
+type: project
+```
+````
+
+These controls edit frontmatter directly through Obsidian and store locale-neutral
+codes such as `status: in_progress` while rendering localized labels in the GUI.
+Individual controls can be embedded with inline tokens such as
+`` `PZK_INPUT[project.status]` ``.
 
 Query/dashboard sections are generated as Dataview and Tasks blocks. PARA-ZK does not try
 to replace those plugins.

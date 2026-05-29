@@ -1,5 +1,6 @@
 import type { Locale, ParaZkSettings } from "./types";
 import { localePack } from "./i18n";
+import type { PropsViewType } from "./props/schema";
 
 export type ManagedArtifact = {
   path: string;
@@ -64,7 +65,6 @@ export function managedArtifacts(settings: ParaZkSettings): ManagedArtifact[] {
     {
       path: `${settings.paths.managedTemplatesFolder}/README.md`,
       content: [
-        managedFrontmatter("template_index"),
         `# ${t.labels.references}`,
         "",
         ...TEMPLATE_NAMES.map((name) => `- [[template_${name}]]`),
@@ -87,7 +87,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
   switch (name) {
     case "project":
       return [
-        managedFrontmatter("template_project", [
+        frontmatter([
           "type: project",
           "areas:",
           "status: {{status}}",
@@ -100,12 +100,9 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
           `created: ${nowPlaceholder}`,
           "updated:"
         ]),
-        propsTable([
-          [t.labels.area, "{{areas}}", t.labels.dueDate, "{{due_date}}"],
-          [t.labels.status, "{{status}}", t.labels.startDate, "{{start_date}}"],
-          [t.labels.priority, "{{priority}}", t.labels.doneDate, "{{done_date}}"]
-        ]),
+        paraZkPropsBlock("project"),
         `# ${t.labels.summary}`,
+        ...latestRetroSummaryTip(t),
         "",
         "{{cursor}}",
         "",
@@ -137,7 +134,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
       ].join("\n");
     case "area":
       return [
-        managedFrontmatter("template_area", [
+        frontmatter([
           "type: area",
           "tags:",
           `  - ${tags.area}/${slugPlaceholder}`,
@@ -156,7 +153,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         "---",
         `# ${t.labels.tasks}`,
         "",
-        ...tasksArea(tags.area, slugPlaceholder, t.subnoteTypes[1]),
+        ...tasksArea(t, tags.area, slugPlaceholder),
         "",
         "---",
         `# ${t.labels.subareas} ${paraZkInlineAction("create-subarea", t.labels.createSubarea)}`,
@@ -180,14 +177,14 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
       ].join("\n");
     case "resource":
       return [
-        managedFrontmatter("template_resource", [
+        frontmatter([
           "type: resource",
           "tags:",
           `  - ${tags.resource}/${slugPlaceholder}`,
           `created: ${nowPlaceholder}`,
           "updated:"
         ]),
-        propsTable([[t.labels.created, "{{created}}", t.labels.updated, "{{updated}}"]]),
+        paraZkPropsBlock("resource"),
         `# ${t.labels.overview}`,
         "",
         "{{cursor}}",
@@ -208,7 +205,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
       ].join("\n");
     case "journal":
       return [
-        managedFrontmatter("template_journal", [
+        frontmatter([
           "type: journal",
           "date: {{date}}",
           "energy: {{energy}}",
@@ -217,7 +214,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
           `created: ${nowPlaceholder}`,
           "updated:"
         ]),
-        propsTable([[t.labels.date, "{{date}}", t.labels.energy, "{{energy}}"]]),
+        paraZkPropsBlock("journal"),
         `# ${t.labels.focus}`,
         "- [ ] {{cursor}}",
         "",
@@ -242,7 +239,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
       ].join("\n");
     case "retro":
       return [
-        managedFrontmatter("template_retro", [
+        frontmatter([
           "type: retro",
           "project: {{project_frontmatter}}",
           "date: {{date}}",
@@ -255,10 +252,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
           `created: ${nowPlaceholder}`,
           "updated:"
         ]),
-        propsTable([
-          [t.labels.project, "{{project}}", t.labels.period, "{{week_start}} ~ {{week_end}}"],
-          [t.labels.area, "{{areas}}", t.labels.week, "{{week_iso}}"]
-        ]),
+        paraZkPropsBlock("retro"),
         "---",
         `# ${t.labels.weekProgress}`,
         "- {{cursor}}",
@@ -277,10 +271,10 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         "",
         "---",
         `# ${t.labels.retroSummary}`,
-        "> ###### ",
+        `> ###### ${retroSummaryPlaceholder(t.locale)}`,
         "",
         "---",
-        `### ${t.labels.links}`,
+        `### ${linksHeading(t.locale)}`,
         "",
         `#### ${t.labels.output}`,
         "",
@@ -291,24 +285,21 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
       ].join("\n");
     case "subnote":
       return [
-        managedFrontmatter("template_subnote", [
+        frontmatter([
           "type: doc",
           "subnote_type: {{subnote_type}}",
           "parent:",
           `created: ${nowPlaceholder}`,
           "updated:"
         ]),
-        propsTable([
-          [t.labels.created, "{{created}}", t.labels.updated, "{{updated}}"],
-          [t.labels.kind, "{{subnote_type}}", "", ""]
-        ]),
+        paraZkPropsBlock("subnote"),
         "",
         "{{cursor}}",
         ""
       ].join("\n");
     case "zk_fleeting":
       return [
-        managedFrontmatter("template_zk_fleeting", [
+        frontmatter([
           "type: zk_fleeting",
           "tags:",
           `  - ${tags.knowledge}/${slugPlaceholder}`,
@@ -316,7 +307,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
           "updated:",
           "processed: false"
         ]),
-        propsTable([[t.labels.created, "{{created}}", t.labels.updated, "{{updated}}"]]),
+        paraZkPropsBlock("zk_fleeting"),
         `# ${t.labels.thoughtSummary}`,
         "",
         "{{cursor}}",
@@ -339,7 +330,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
       ].join("\n");
     case "zk_literature":
       return [
-        managedFrontmatter("template_zk_literature", [
+        frontmatter([
           "type: zk_literature",
           "tags:",
           `  - ${tags.knowledge}/${slugPlaceholder}`,
@@ -350,18 +341,14 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
           `created: ${nowPlaceholder}`,
           "updated:"
         ]),
-        propsTable([
-          [t.labels.created, "{{created}}", t.labels.updated, "{{updated}}"],
-          [t.labels.source, "{{sourceTitle}}", t.labels.authors, "{{authors}}"],
-          [t.labels.published, "{{published}}", t.labels.url, "{{url}}"]
-        ]),
+        paraZkPropsBlock("zk_literature"),
         `## ${t.labels.highlightBlock}`,
-        "> [!quote]",
+        `> [!quote] ${quoteExampleTitle(t.locale)}`,
         `> ${t.labels.quotePlaceholder}`,
         "> ",
         `> - ${t.labels.source}: `,
         `> - ${t.labels.pageTimestamp}: `,
-        `> - ${t.labels.note}: `,
+        `> - ${t.labels.note}: ${noteContextHint(t.locale)}`,
         "",
         `# ${t.labels.summary}`,
         "",
@@ -380,7 +367,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
       ].join("\n");
     case "zk_permanent":
       return [
-        managedFrontmatter("template_zk_permanent", [
+        frontmatter([
           "type: zk_permanent",
           "tags:",
           `  - ${tags.knowledge}/${slugPlaceholder}`,
@@ -389,10 +376,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
           `created: ${nowPlaceholder}`,
           "updated:"
         ]),
-        propsTable([
-          [t.labels.created, "{{created}}", t.labels.updated, "{{updated}}"],
-          [t.labels.status, "{{maturity}}", t.labels.aliases, "{{aliases}}"]
-        ]),
+        paraZkPropsBlock("zk_permanent"),
         `# ${t.labels.oneSentenceSummary}`,
         "",
         "{{cursor}}",
@@ -413,28 +397,39 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
   }
 }
 
-function managedFrontmatter(kind: string, extra: string[] = []): string {
+function frontmatter(lines: string[]): string {
   return [
     "---",
-    "para_zk_managed: true",
-    `para_zk_kind: ${kind}`,
-    ...extra,
+    ...lines,
     "---"
   ].join("\n");
 }
 
-function propsTable(rows: Array<[string, string, string, string]>): string {
+function paraZkPropsBlock(type: PropsViewType): string {
   return [
-    "> [!props-table|w1]",
-    "> |||||",
-    "> | --- | --- | --- | --- |",
-    ...rows.map(([a, b, c, d]) => `> | ${a} | ${b} | ${c} | ${d} |`),
-    ""
+    "```para-zk-props",
+    `type: ${type}`,
+    "```"
   ].join("\n");
 }
 
 function paraZkInlineAction(command: string, label: string): string {
   return `\`PZK[${command}|${label}]\``;
+}
+
+function latestRetroSummaryTip(t: ReturnType<typeof localePack>): string[] {
+  return [
+    `> [!tip] ${latestRetroSummaryTitle(t.locale)}`,
+    "> ```dataview",
+    "> TABLE WITHOUT ID rows[0] AS \"Latest\"",
+    "> FROM \"PARA/Retros\"",
+    "> WHERE project = this.file.link",
+    "> SORT date DESC",
+    `> FLATTEN choice(rows[0].file.frontmatter[${jsString(t.labels.retroSummary)}], rows[0].file.frontmatter["summary"], "") AS latest`,
+    "> WHERE latest != \"\"",
+    "> LIMIT 1",
+    "> ```"
+  ];
 }
 
 function fenced(language: string, lines: string[]): string[] {
@@ -443,6 +438,45 @@ function fenced(language: string, lines: string[]): string[] {
     ...lines,
     "```"
   ];
+}
+
+function tabbedTasks(openLines: string[], doneLines: string[], locale: Locale): string[] {
+  return [
+    "````tabs",
+    `tab: ${openTabLabel(locale)}`,
+    ...fenced("tasks", openLines),
+    `tab: ${doneTabLabel(locale)}`,
+    ...fenced("tasks", doneLines),
+    "````"
+  ];
+}
+
+function openTabLabel(locale: Locale): string {
+  return locale === "ko" ? "미완" : "Open";
+}
+
+function doneTabLabel(locale: Locale): string {
+  return locale === "ko" ? "완료" : "Done";
+}
+
+function latestRetroSummaryTitle(locale: Locale): string {
+  return locale === "ko" ? "최근 회고 요약" : "Latest retro summary";
+}
+
+function quoteExampleTitle(locale: Locale): string {
+  return locale === "ko" ? "하이라이트 예시" : "Highlight example";
+}
+
+function noteContextHint(locale: Locale): string {
+  return locale === "ko" ? "(나의 생각/맥락)" : "(my thought/context)";
+}
+
+function retroSummaryPlaceholder(locale: Locale): string {
+  return locale === "ko" ? "(다음 주에 바로 도움이 될 핵심 한 줄)" : "(one line that helps next week)";
+}
+
+function linksHeading(locale: Locale): string {
+  return locale === "ko" ? "링크" : "Links";
 }
 
 function dataviewProjectChildDocs(): string[] {
@@ -471,15 +505,20 @@ function dataviewAreaProjects(t: ReturnType<typeof localePack>): string[] {
   ]);
 }
 
-function tasksArea(areaTag: string, slugPlaceholder: string, checklistValue: string): string[] {
-  return fenced("tasks", [
-    "not done",
+function tasksArea(t: ReturnType<typeof localePack>, areaTag: string, slugPlaceholder: string): string[] {
+  const base = [
     `tags include #${areaTag}/${slugPlaceholder}`,
     "path does not include \"Templates\"",
     "path does not include \".trash\"",
-    `filter by function task.file.property('subnote_type') !== '${escapeSingleQuoted(checklistValue)}'`,
     "sort by due date"
-  ]);
+  ];
+  return tabbedTasks([
+    "not done",
+    ...base
+  ], [
+    "done",
+    ...base
+  ], t.locale);
 }
 
 function dataviewChildAreas(t: ReturnType<typeof localePack>): string[] {
@@ -518,10 +557,6 @@ function dataviewResourceZkLinks(): string[] {
   ]);
 }
 
-function escapeSingleQuoted(value: string): string {
-  return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-}
-
 function renderGuide(locale: Locale): string {
   const t = localePack(locale);
   const tags = t.tags;
@@ -558,7 +593,7 @@ function renderGuide(locale: Locale): string {
   ];
 
   return [
-    managedFrontmatter("guide", [
+    frontmatter([
       "type: guide"
     ]),
     ...lines,
@@ -583,7 +618,7 @@ function renderDashboard(
   };
 
   return [
-    managedFrontmatter(`dashboard_${kind}`, [
+    frontmatter([
       "type: dashboard",
       `title: ${titleByKind[kind]}`
     ]),
@@ -617,11 +652,11 @@ function renderDashboardBody(
         "",
         "---",
         `## ${t.labels.todayTasks}`,
-        ...tasksDueToday(t.subnoteTypes[1]),
+        ...tasksDueToday(),
         "",
         "---",
         `## ${t.labels.upcoming7}`,
-        ...tasksDueSoon(t.subnoteTypes[1], 10),
+        ...tasksDueSoon(10),
         "",
         "---",
         `## ${t.labels.recentUpdates}`,
@@ -713,31 +748,31 @@ function renderDashboardBody(
     case "tasks":
       return [
         `## ${t.labels.today}`,
-        ...tasksDueToday(t.subnoteTypes[1]),
+        ...tasksDueToday(),
         "",
         "---",
         `## ${t.labels.upcoming7}`,
-        ...tasksDueSoon(t.subnoteTypes[1], 0),
+        ...tasksDueSoon(0),
         "",
         "---",
         `## ${t.labels.upcoming30}`,
-        ...tasksDueMedium(t.subnoteTypes[1]),
+        ...tasksDueMedium(),
         "",
         "---",
         `## ${t.labels.area}`,
-        ...tasksAreaAll(areaTag, t.subnoteTypes[1]),
+        ...tasksAreaAll(areaTag),
         "",
         "---",
         `## ${t.labels.project}`,
-        ...tasksProjects(t.subnoteTypes[1]),
+        ...tasksProjects(),
         "",
         "---",
         `## ${t.labels.journal}`,
-        ...tasksJournal(t.subnoteTypes[1]),
+        ...tasksJournal(),
         "",
         "---",
         `## ${t.labels.completedRecent}`,
-        ...tasksDone(t.subnoteTypes[1])
+        ...tasksDone()
       ];
     case "review":
       return [
@@ -868,9 +903,9 @@ function dashboardZkSummary(t: ReturnType<typeof localePack>): string[] {
     `const draftLabel = ${jsString(t.maturity.draft)};`,
     `const refinedLabel = ${jsString(t.maturity.refined)};`,
     `const evergreenLabel = ${jsString(t.maturity.evergreen)};`,
-    "const draft = permanent.filter(p => p.maturity === draftLabel);",
-    "const refined = permanent.filter(p => p.maturity === refinedLabel);",
-    "const evergreen = permanent.filter(p => p.maturity === evergreenLabel);",
+    "const draft = permanent.filter(p => p.maturity === 'draft');",
+    "const refined = permanent.filter(p => p.maturity === 'refined');",
+    "const evergreen = permanent.filter(p => p.maturity === 'evergreen');",
     `card('🌟', 'Fleeting', fleeting.length, ${jsString(t.labels.staleFleeting)} + ' ' + stale.length);`,
     "card('📚', 'Literature', literature.length);",
     "card('🧠', 'Permanent', permanent.length);",
@@ -1017,9 +1052,8 @@ function dashboardDraftPermanent(t: ReturnType<typeof localePack>, limit: number
   return dataviewJs([
     "const days = (n) => 1000 * 60 * 60 * 24 * n;",
     "const now = Date.now();",
-    `const draftLabel = ${jsString(t.maturity.draft)};`,
     "const rows = pages('\"ZK/Permanent\"')",
-    "  .filter(p => p.maturity === draftLabel && now - timeOf(p.file.mtime) >= days(14))",
+    "  .filter(p => p.maturity === 'draft' && now - timeOf(p.file.mtime) >= days(14))",
     "  .sort((a,b) => timeOf(a.file.mtime) - timeOf(b.file.mtime))",
     `  .slice(0, ${limit})`,
     "  .map(p => [p.file.link, p.file.mtime]);",
@@ -1059,26 +1093,24 @@ function dashboardThisWeekFleeting(t: ReturnType<typeof localePack>): string[] {
   ]);
 }
 
-function tasksDueToday(checklistValue: string): string[] {
+function tasksDueToday(): string[] {
   return fenced("tasks", [
     "not done",
     "due today",
     "path does not include \"Templates\"",
     "path does not include \".trash\"",
-    `filter by function task.file.property('subnote_type') !== '${escapeSingleQuoted(checklistValue)}'`,
     "hide backlinks",
     "sort by priority",
     "sort by due date"
   ]);
 }
 
-function tasksDueSoon(checklistValue: string, limit: number): string[] {
+function tasksDueSoon(limit: number): string[] {
   return fenced("tasks", [
     "not done",
     "(due on or after tomorrow) AND (due on or before in 7 days)",
     "path does not include \"Templates\"",
     "path does not include \".trash\"",
-    `filter by function task.file.property('subnote_type') !== '${escapeSingleQuoted(checklistValue)}'`,
     "hide backlinks",
     ...(limit > 0 ? [`limit ${limit}`] : []),
     "sort by priority",
@@ -1086,61 +1118,56 @@ function tasksDueSoon(checklistValue: string, limit: number): string[] {
   ]);
 }
 
-function tasksDueMedium(checklistValue: string): string[] {
+function tasksDueMedium(): string[] {
   return fenced("tasks", [
     "not done",
     "(due on or after in 8 days) AND (due on or before in 30 days)",
     "path does not include \"Templates\"",
     "path does not include \".trash\"",
-    `filter by function task.file.property('subnote_type') !== '${escapeSingleQuoted(checklistValue)}'`,
     "sort by priority",
     "sort by due date"
   ]);
 }
 
-function tasksAreaAll(areaTag: string, checklistValue: string): string[] {
+function tasksAreaAll(areaTag: string): string[] {
   return fenced("tasks", [
     "not done",
     `tags include #${areaTag}`,
     "path does not include \"Templates\"",
     "path does not include \".trash\"",
-    `filter by function task.file.property('subnote_type') !== '${escapeSingleQuoted(checklistValue)}'`,
     "group by tags",
     "sort by due date"
   ]);
 }
 
-function tasksProjects(checklistValue: string): string[] {
+function tasksProjects(): string[] {
   return fenced("tasks", [
     "not done",
     "path includes \"PARA/Projects\"",
     "path does not include \"/Archives/\"",
     "path does not include \"Templates\"",
     "path does not include \".trash\"",
-    `filter by function task.file.property('subnote_type') !== '${escapeSingleQuoted(checklistValue)}'`,
     "group by backlink",
     "sort by due date"
   ]);
 }
 
-function tasksJournal(checklistValue: string): string[] {
+function tasksJournal(): string[] {
   return fenced("tasks", [
     "not done",
     "path includes \"Journal\"",
     "path does not include \".trash\"",
-    `filter by function task.file.property('subnote_type') !== '${escapeSingleQuoted(checklistValue)}'`,
     "hide backlinks",
     "group by path",
     "sort by due date"
   ]);
 }
 
-function tasksDone(checklistValue: string): string[] {
+function tasksDone(): string[] {
   return fenced("tasks", [
     "done",
     "path does not include \"Templates\"",
     "path does not include \".trash\"",
-    `filter by function task.file.property('subnote_type') !== '${escapeSingleQuoted(checklistValue)}'`,
     "hide backlinks",
     "sort by done reverse",
     "limit 50"

@@ -142,9 +142,9 @@ async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: 
       return workflows.createRetro(ctx, { sourcePath: activePath, open: true });
     case "create-zk": {
       const kind = await chooseValue(plugin.app, labels.promptPromoteKind, [
-        { label: "Fleeting", value: "Fleeting" },
-        { label: "Literature", value: "Literature" },
-        { label: "Permanent", value: "Permanent" }
+        { label: "Fleeting", value: "fleeting" },
+        { label: "Literature", value: "literature" },
+        { label: "Permanent", value: "permanent" }
       ]);
       if (!kind) return undefined;
       const title = await prompt(plugin, labels.createZkCommandName, labels.promptZkTitle, sourceFile?.basename ?? "");
@@ -156,9 +156,9 @@ async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: 
     }
     case "promote-resource": {
       const kind = await chooseValue(plugin.app, labels.promptPromoteKind, [
-        { label: "Fleeting", value: "Fleeting" },
-        { label: "Literature", value: "Literature" },
-        { label: "Permanent", value: "Permanent" }
+        { label: "Fleeting", value: "fleeting" },
+        { label: "Literature", value: "literature" },
+        { label: "Permanent", value: "permanent" }
       ]);
       if (!kind) return undefined;
       const title = await prompt(plugin, labels.promoteResourceCommandName, labels.promptZkTitle, sourceFile?.basename ?? "");
@@ -166,8 +166,8 @@ async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: 
     }
     case "promote-fleeting": {
       const kind = await chooseValue(plugin.app, labels.promptPromoteKind, [
-        { label: "Literature", value: "Literature" },
-        { label: "Permanent", value: "Permanent" }
+        { label: "Literature", value: "literature" },
+        { label: "Permanent", value: "permanent" }
       ]);
       if (!kind) return undefined;
       const title = await prompt(plugin, labels.promoteFleetingCommandName, labels.promptZkTitle, sourceFile?.basename ?? "");

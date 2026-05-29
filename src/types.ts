@@ -48,12 +48,36 @@ export type InitResult = {
   existing: string[];
   skipped: string[];
   warnings: string[];
+  dependencies: DependencyResult[];
 };
 
 export type InitOptions = {
   locale?: Locale;
   force?: boolean;
   dryRun?: boolean;
+  installDeps?: boolean;
+};
+
+export type DependencyAction =
+  | "none"
+  | "warn"
+  | "would_install_and_enable"
+  | "would_enable"
+  | "installed_and_enabled"
+  | "enabled"
+  | "failed";
+
+export type DependencyResult = {
+  id: string;
+  name: string;
+  repo: string;
+  installed: boolean;
+  enabled: boolean;
+  installedVersion?: string;
+  latestVersion?: string;
+  action: DependencyAction;
+  configured?: string[];
+  error?: string;
 };
 
 export type NoteResult = {

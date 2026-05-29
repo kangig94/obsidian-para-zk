@@ -61,3 +61,114 @@
   min-height: 36px;
   text-align: left;
 }
+
+.para-zk-props {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  display: grid;
+  margin: 0.75em 0;
+  overflow: hidden;
+}
+
+.para-zk-props-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.para-zk-props-row + .para-zk-props-row {
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.para-zk-props-field {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(80px, 0.35fr) minmax(0, 1fr);
+  min-height: 38px;
+  padding: 6px 8px;
+}
+
+.para-zk-props-field + .para-zk-props-field {
+  border-left: 1px solid var(--background-modifier-border);
+}
+
+.para-zk-props-label {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: var(--line-height-tight);
+}
+
+.para-zk-props-control {
+  min-width: 0;
+}
+
+.para-zk-props-input,
+.para-zk-props-select {
+  box-sizing: border-box;
+  min-height: 28px;
+  width: 100%;
+}
+
+.para-zk-props-display {
+  display: inline-block;
+  min-height: 28px;
+  overflow-wrap: anywhere;
+  padding: 4px 0;
+}
+
+.para-zk-inline-input :is(input, select) {
+  min-height: 24px;
+  width: auto;
+}
+
+.para-zk-area-list {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+.para-zk-area-chips {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.para-zk-area-chip {
+  align-items: center;
+  background: var(--background-modifier-hover);
+  border-radius: 4px;
+  display: inline-flex;
+  font-size: var(--font-ui-smaller);
+  gap: 4px;
+  max-width: 100%;
+  min-height: 24px;
+  padding: 2px 4px 2px 8px;
+}
+
+.para-zk-area-remove,
+.para-zk-area-add {
+  cursor: pointer;
+  font-size: var(--font-ui-smaller);
+  min-height: 24px;
+  min-width: 24px;
+  padding: 0 6px;
+}
+
+.para-zk-props-muted {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+@media (max-width: 640px) {
+  .para-zk-props-row {
+    grid-template-columns: 1fr;
+  }
+
+  .para-zk-props-field + .para-zk-props-field {
+    border-left: 0;
+    border-top: 1px solid var(--background-modifier-border);
+  }
+}

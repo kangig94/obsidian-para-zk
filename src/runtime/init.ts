@@ -7,6 +7,7 @@ import {
   type ParaZkSettings
 } from "../types";
 import { normalizeVaultPath } from "../vault/paths";
+import { resolveDependencies } from "./dependencies";
 
 export async function initializeVault(
   app: App,
@@ -28,7 +29,8 @@ export async function initializeVault(
     updated: [],
     existing: [],
     skipped: [],
-    warnings: []
+    warnings: [],
+    dependencies: []
   };
 
   const folders = Array.from(new Set(nextSettings.layoutFolders.map(normalizeVaultPath).filter(Boolean)));
@@ -44,6 +46,12 @@ export async function initializeVault(
       managedFiles: nextSettings.managedFiles
     });
   }
+
+  result.dependencies = await resolveDependencies(app, {
+    installDeps: options.installDeps ?? false,
+    dryRun,
+    warnings: result.warnings
+  });
 
   if (!dryRun) {
     return {
@@ -122,7 +130,6 @@ async function writeManagedFile(
   const current = await app.vault.read(existing);
   const currentHash = hashText(current);
   const known = options.managedFiles[normalized];
-  const legacyManaged = isLegacyParaZkManaged(current);
   const conventionManaged = isUnderManagedTemplatesFolder(normalized, options.managedTemplatesFolder);
 
   if (current === content) {
@@ -133,7 +140,7 @@ async function writeManagedFile(
     return;
   }
 
-  if (!known && !legacyManaged && !(options.force && conventionManaged)) {
+  if (!known && !(options.force && conventionManaged)) {
     addUnique(result.skipped, normalized);
     addUnique(result.warnings, `Skipped user-managed file at ${normalized}`);
     return;
@@ -162,10 +169,6 @@ function parentFolder(path: string): string {
   const normalized = normalizeVaultPath(path);
   const index = normalized.lastIndexOf("/");
   return index === -1 ? "" : normalized.slice(0, index);
-}
-
-function isLegacyParaZkManaged(content: string): boolean {
-  return /^para_zk_managed:\s*true\s*$/m.test(content);
 }
 
 function isUnderManagedTemplatesFolder(path: string, managedTemplatesFolder: string): boolean {

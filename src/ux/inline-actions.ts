@@ -124,7 +124,7 @@ function createInlineActionEditorExtension(plugin: ParaZkPluginContext): Extensi
 
   const buildDecorations = (view: EditorView): DecorationSet => {
     const builder = new RangeSetBuilder<Decoration>();
-    const tokenRe = /`((?:PZK|PARA-ZK|BUTTON)\[[^\]\n]+\])`/gi;
+    const tokenRe = /`(PZK\[[^\]\n]+\])`/g;
 
     for (const range of view.visibleRanges) {
       const text = view.state.doc.sliceString(range.from, range.to);
@@ -176,7 +176,7 @@ function parseCodeBlockKeyValues(source: string): Record<string, string> {
 }
 
 function parseInlineActionToken(value: string): InlineActionToken | undefined {
-  const match = value.trim().match(/^(?:PZK|PARA-ZK|BUTTON)\[([^\]|]+)(?:\|([^\]]+))?\]$/i);
+  const match = value.trim().match(/^PZK\[([^\]|]+)(?:\|([^\]]+))?\]$/);
   if (!match) return undefined;
   return {
     command: match[1].trim(),

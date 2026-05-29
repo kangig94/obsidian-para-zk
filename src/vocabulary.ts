@@ -127,5 +127,5 @@ function codeHelp(codes: readonly string[]): string {
 }
 
 function normalizeToken(value: string | undefined): string {
-  return (value ?? "").trim().toLowerCase();
+  return (value ?? "").trim();
 }

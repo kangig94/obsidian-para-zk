@@ -33,7 +33,7 @@ export function normalizePromotionKind(value: string | undefined, fallback: Prom
 }
 
 function parseCode<T extends string>(value: string | undefined, codes: readonly T[]): T | undefined {
-  const normalized = (value ?? "").trim().toLowerCase();
+  const normalized = (value ?? "").trim();
   return codes.find((code) => normalized === code);
 }
 

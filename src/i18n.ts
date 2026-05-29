@@ -48,11 +48,11 @@ const ko: LocalePack = {
     retro: "회고"
   },
   projectStatus: {
-    idea: "0. 아이디어",
-    active: "1. 진행중",
-    paused: "2. 보류",
-    done: "3. 완료",
-    archived: "4. Archived"
+    idea: "아이디어",
+    active: "진행중",
+    paused: "보류",
+    done: "완료",
+    archived: "Archived"
   },
   priority: {
     low: "Low",
@@ -253,11 +253,11 @@ const en: LocalePack = {
     retro: "retro"
   },
   projectStatus: {
-    idea: "0. Idea",
-    active: "1. Active",
-    paused: "2. Paused",
-    done: "3. Done",
-    archived: "4. Archived"
+    idea: "Idea",
+    active: "In progress",
+    paused: "Paused",
+    done: "Done",
+    archived: "Archived"
   },
   priority: {
     low: "Low",

@@ -48,6 +48,7 @@ export function registerNativeCliHandlers(plugin: ParaZkPluginContext): void {
       locale: { value: "<ko|en>", description: "Language for UI, generated files, and tags." },
       dryRun: { value: "<true|false>", description: "Plan changes without writing." },
       force: { value: "<true|false>", description: "Overwrite PARA-ZK managed files when content differs." },
+      installDeps: { value: "<true|false>", description: "Install and enable required community plugins." },
       format: { value: "<text|json>", description: "Output format (default: text)" }
     },
     async (args = {}) => withCliErrors(plugin, args, "para-zk:init", async () => {
@@ -55,7 +56,8 @@ export function registerNativeCliHandlers(plugin: ParaZkPluginContext): void {
       const result = await plugin.initializeVault({
         locale,
         dryRun: readCliBoolean(args, "dryRun") ?? false,
-        force: readCliBoolean(args, "force") ?? false
+        force: readCliBoolean(args, "force") ?? false,
+        installDeps: readCliBoolean(args, "installDeps") ?? false
       });
       return {
         ok: true,
@@ -326,7 +328,13 @@ function workflowContext(plugin: ParaZkPluginContext): WorkflowContext {
 }
 
 function renderCli(args: CliArgs, payload: Record<string, unknown>, text: string): string {
-  return readCliString(args, "format") === "json" ? JSON.stringify(payload) : text;
+  if (readCliString(args, "format") === "json") return JSON.stringify(payload);
+  const warnings = Array.isArray(payload.warnings)
+    ? payload.warnings.filter((warning): warning is string => typeof warning === "string")
+    : [];
+  return warnings.length > 0
+    ? [text, ...warnings.map((warning) => `warning: ${warning}`)].join("\n")
+    : text;
 }
 
 function readCliString(args: CliArgs, key: string): string | undefined {
