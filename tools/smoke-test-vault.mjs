@@ -36,6 +36,7 @@ if (args.build !== false) {
 ensureGuiVault(vaultPath);
 run("optsidian", ["raw", "plugin:enable", "id=para-zk"], { allowFailure: true });
 run("optsidian", ["raw", "plugin:reload", "id=para-zk"]);
+simulateMissedHomepageStartup();
 
 const init = cliJson("para-zk:init", [
   `installDeps=${installDeps}`,
@@ -50,9 +51,12 @@ assertDependency(init, "folder-notes");
 assertDependency(init, "update-time-on-edit");
 assertDependency(init, "obsidian-trash-explorer");
 assertDependency(init, "custom-sort");
+assertDependency(init, "homepage");
 assertObsidianCoreConfig();
 assertUpdateTimeOnEditConfig();
 assertCustomSortConfig();
+assertHomepageConfig();
+assertHomepageRuntime();
 assertGuiLocaleLabels(ribbonLabelsEn, "PARA-ZK: Create project", emptyTrashLabelEn);
 
 const koInit = cliJson("para-zk:init", [
@@ -455,6 +459,16 @@ function assertGuiLocaleLabels(expectedRibbonLabels, expectedCreateProjectComman
   }
 }
 
+function simulateMissedHomepageStartup() {
+  if (!installDeps) return;
+
+  guiJson(`(() => {
+    const plugin = app.plugins.plugins.homepage;
+    if (plugin) plugin.loaded = false;
+    console.log(JSON.stringify({ ok: true, homepageLoaded: plugin?.loaded ?? null }));
+  })()`);
+}
+
 function run(command, commandArgs, options = {}) {
   const result = spawnSync(command, commandArgs, {
     cwd: process.cwd(),
@@ -546,6 +560,71 @@ function assertCustomSortConfig() {
   for (const title of ["Dashboard", "PARA", "ZK", "Journal", "Templates"]) {
     assert(topLevelTitles?.includes(title), `sortspec bookmark group is missing ${title}`);
   }
+}
+
+function assertHomepageConfig() {
+  if (!installDeps) return;
+
+  const config = readVaultJson(".obsidian/plugins/homepage/data.json");
+  assert(config.version === 4, "homepage version is not 4");
+  assert(config.separateMobile === false, "homepage separateMobile is not false");
+
+  const homepage = config.homepages?.["Main Homepage"];
+  assert(homepage, "homepage Main Homepage is missing");
+  assert(homepage.value === "Dashboard/HomePage", "homepage value is not Dashboard/HomePage");
+  assert(homepage.kind === "File", "homepage kind is not File");
+  assert(homepage.openOnStartup === true, "homepage openOnStartup is not enabled");
+  assert(homepage.openMode === "Replace all open notes", "homepage openMode is not Replace all open notes");
+  assert(homepage.manualOpenMode === "Keep open notes", "homepage manualOpenMode is not Keep open notes");
+  assert(homepage.view === "Default view", "homepage view is not Default view");
+  assert(homepage.revertView === true, "homepage revertView is not enabled");
+  assert(homepage.openWhenEmpty === true, "homepage openWhenEmpty is not enabled");
+  assert(homepage.autoCreate === false, "homepage autoCreate should be disabled");
+}
+
+function assertHomepageRuntime() {
+  if (!installDeps) return;
+
+  const snapshot = guiJson(`(async () => {
+    const plugin = app.plugins.plugins.homepage;
+    const layout = app.workspace.getLayout();
+    layout.main = {
+      id: "para-zk-smoke-main",
+      type: "split",
+      children: [{
+        id: "para-zk-smoke-tabs",
+        type: "tabs",
+        children: [{
+          id: "para-zk-smoke-empty",
+          type: "leaf",
+          state: { type: "empty", state: {}, icon: "lucide-file", title: "New tab" }
+        }]
+      }],
+      direction: "vertical"
+    };
+    layout.active = "para-zk-smoke-empty";
+    await app.workspace.changeLayout(layout);
+    for (
+      let index = 0;
+      index < 30 && (app.workspace.getActiveFile()?.path !== "Dashboard/HomePage.md" || plugin?.executing === true);
+      index += 1
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    console.log(JSON.stringify({
+      pluginLoaded: Boolean(plugin),
+      homepageLoaded: plugin?.loaded,
+      homepageExecuting: plugin?.executing,
+      activeType: app.workspace.activeLeaf?.getViewState?.().type,
+      activeFile: app.workspace.getActiveFile()?.path ?? null
+    }));
+  })()`);
+
+  assert(snapshot.pluginLoaded === true, "homepage plugin is not loaded in Obsidian runtime");
+  assert(snapshot.homepageLoaded === true, "homepage runtime did not reach loaded state after init");
+  assert(snapshot.homepageExecuting === false, "homepage runtime is stuck executing after opening HomePage");
+  assert(snapshot.activeType === "markdown", `homepage did not replace empty tab; active type is ${snapshot.activeType}`);
+  assert(snapshot.activeFile === "Dashboard/HomePage.md", `homepage active file expected Dashboard/HomePage.md, got ${snapshot.activeFile}`);
 }
 
 function readVaultJson(path) {

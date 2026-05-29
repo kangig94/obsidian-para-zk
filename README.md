@@ -66,14 +66,16 @@ Existing non-managed files are skipped, and changed managed files are only overw
 with `force=true`.
 
 `para-zk:init` also checks required community plugin dependencies. It warns when
-Dataview, Tasks, Tabs, Folder notes, Update time on edit, Trash Explorer, or Custom
-File Explorer sorting is missing or disabled. Pass `installDeps=true` to install and
-enable those dependencies. When Dataview is installed, PARA-ZK also enables Dataview
-JavaScript queries because the generated dashboards use `dataviewjs` blocks. When
-Update time on edit is installed, PARA-ZK configures `created` and `updated` frontmatter
-maintenance for editable notes while excluding generated templates, dashboards, assets,
-and the managed root guide. When Custom File Explorer sorting is installed, PARA-ZK
-configures bookmark-based sorting with a baseline `sortspec` group.
+Dataview, Tasks, Tabs, Folder notes, Update time on edit, Trash Explorer, Custom
+File Explorer sorting, or Homepage is missing or disabled. Pass `installDeps=true`
+to install and enable those dependencies. When Dataview is installed, PARA-ZK also
+enables Dataview JavaScript queries because the generated dashboards use `dataviewjs`
+blocks. When Update time on edit is installed, PARA-ZK configures `created` and
+`updated` frontmatter maintenance for editable notes while excluding generated
+templates, dashboards, assets, and the managed root guide. When Custom File Explorer
+sorting is installed, PARA-ZK configures bookmark-based sorting with a baseline
+`sortspec` group. When Homepage is installed, PARA-ZK opens `Dashboard/HomePage`
+on startup and when the workspace is empty.
 
 The generated templates use native inline action tokens such as
 `` `PZK[create-subnote|Create subnote]` `` instead of Meta Bind buttons. The inline action

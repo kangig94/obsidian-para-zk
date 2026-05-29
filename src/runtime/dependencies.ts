@@ -62,6 +62,12 @@ const REQUIRED_DEPENDENCIES: RequiredDependency[] = [
     name: "Custom File Explorer sorting",
     repo: "SebastianMC/obsidian-custom-sort",
     reason: "PARA-ZK uses a stable PARA/ZK folder order in Obsidian's file explorer"
+  },
+  {
+    id: "homepage",
+    name: "Homepage",
+    repo: "mirnovov/obsidian-homepage",
+    reason: "PARA-ZK opens the generated Home dashboard on startup and when the workspace is empty"
   }
 ];
 
@@ -77,6 +83,10 @@ const CUSTOM_SORT_PLUGIN_DIR = ".obsidian/plugins/custom-sort";
 const CUSTOM_SORT_SETTINGS_PATH = `${CUSTOM_SORT_PLUGIN_DIR}/data.json`;
 const BOOKMARKS_CONFIG_PATH = ".obsidian/bookmarks.json";
 const CUSTOM_SORT_BOOKMARKS_GROUP = "sortspec";
+const HOMEPAGE_PLUGIN_ID = "homepage";
+const HOMEPAGE_PLUGIN_DIR = ".obsidian/plugins/homepage";
+const HOMEPAGE_SETTINGS_PATH = `${HOMEPAGE_PLUGIN_DIR}/data.json`;
+const HOMEPAGE_NAME = "Main Homepage";
 const ATTACHMENT_FOLDER = "assets";
 
 export async function resolveDependencies(
@@ -158,10 +168,25 @@ async function configureDependency(
     dependency.id !== DATAVIEW_PLUGIN_ID
     && dependency.id !== UPDATE_TIME_PLUGIN_ID
     && dependency.id !== CUSTOM_SORT_PLUGIN_ID
+    && dependency.id !== HOMEPAGE_PLUGIN_ID
   ) return;
   if (!result.installed && !options.dryRun) return;
 
   try {
+    if (dependency.id === HOMEPAGE_PLUGIN_ID) {
+      if (options.dryRun) {
+        if (!await isHomepageConfigured(app, manager, options.settings)) {
+          addConfigured(result, "would_configure_homepage");
+        }
+        return;
+      }
+
+      if (await ensureHomepageConfigured(app, manager, options.settings)) {
+        addConfigured(result, "configured_homepage");
+      }
+      return;
+    }
+
     if (dependency.id === CUSTOM_SORT_PLUGIN_ID) {
       if (options.dryRun) {
         if (!await isCustomSortConfigured(app, manager, options.settings)) {
@@ -405,6 +430,143 @@ async function updateRunningDataviewSettings(
   }
 }
 
+async function isHomepageConfigured(
+  app: App,
+  manager: PluginManager,
+  settings: ParaZkSettings
+): Promise<boolean> {
+  const currentSettings = await readHomepageSettings(app);
+  const nextSettings = mergeHomepageSettings(currentSettings, settings);
+  if (JSON.stringify(currentSettings) !== JSON.stringify(nextSettings)) return false;
+
+  const runtimeSettings = readRuntimePluginSettings(manager, HOMEPAGE_PLUGIN_ID);
+  if (!runtimeSettings) return true;
+  return JSON.stringify(runtimeSettings) === JSON.stringify(mergeHomepageSettings(runtimeSettings, settings))
+    && isRunningHomepageReady(manager);
+}
+
+async function ensureHomepageConfigured(
+  app: App,
+  manager: PluginManager,
+  settings: ParaZkSettings
+): Promise<boolean> {
+  const currentSettings = await readHomepageSettings(app);
+  const nextSettings = mergeHomepageSettings(currentSettings, settings);
+  const runtimeSettings = readRuntimePluginSettings(manager, HOMEPAGE_PLUGIN_ID);
+  const runtimeChanged = runtimeSettings
+    ? JSON.stringify(runtimeSettings) !== JSON.stringify(mergeHomepageSettings(runtimeSettings, settings))
+    : false;
+  const diskChanged = JSON.stringify(currentSettings) !== JSON.stringify(nextSettings);
+  const changed = diskChanged || runtimeChanged || !isRunningHomepageReady(manager);
+  if (!changed) return false;
+
+  if (diskChanged) {
+    await ensureAdapterFolder(app, HOMEPAGE_PLUGIN_DIR);
+    await app.vault.adapter.write(HOMEPAGE_SETTINGS_PATH, `${JSON.stringify(nextSettings, null, 2)}\n`);
+  }
+  await updateRunningHomepageSettings(manager, nextSettings);
+  return true;
+}
+
+async function readHomepageSettings(app: App): Promise<Record<string, unknown>> {
+  if (!await app.vault.adapter.exists(HOMEPAGE_SETTINGS_PATH)) return {};
+  const raw = await app.vault.adapter.read(HOMEPAGE_SETTINGS_PATH);
+  if (!raw.trim()) return {};
+  const parsed = JSON.parse(raw) as unknown;
+  if (!isRecord(parsed)) throw new Error(`${HOMEPAGE_SETTINGS_PATH} is not a JSON object`);
+  return parsed;
+}
+
+function mergeHomepageSettings(
+  current: Record<string, unknown>,
+  settings: ParaZkSettings
+): Record<string, unknown> {
+  const homepages = isRecord(current.homepages) ? current.homepages : {};
+  const currentHomepage = isRecord(homepages[HOMEPAGE_NAME]) ? homepages[HOMEPAGE_NAME] : {};
+
+  return {
+    ...current,
+    version: 4,
+    homepages: {
+      ...homepages,
+      [HOMEPAGE_NAME]: {
+        ...currentHomepage,
+        value: normalizeVaultPath(`${settings.paths.dashboardFolder}/HomePage`),
+        kind: "File",
+        openOnStartup: true,
+        openMode: "Replace all open notes",
+        manualOpenMode: "Keep open notes",
+        view: "Default view",
+        revertView: true,
+        openWhenEmpty: true,
+        refreshDataview: false,
+        autoCreate: false,
+        autoScroll: false,
+        pin: false,
+        commands: Array.isArray(currentHomepage.commands) ? currentHomepage.commands : [],
+        alwaysApply: false,
+        hideReleaseNotes: false
+      }
+    },
+    separateMobile: false
+  };
+}
+
+async function updateRunningHomepageSettings(
+  manager: PluginManager,
+  settings: Record<string, unknown>
+): Promise<void> {
+  const plugin = manager.plugins?.[HOMEPAGE_PLUGIN_ID];
+  if (!isRecord(plugin)) return;
+
+  plugin.settings = { ...settings };
+  if (isRecord(plugin.homepage)) {
+    const homepages = settings.homepages;
+    if (isRecord(homepages) && isRecord(homepages[HOMEPAGE_NAME])) {
+      plugin.homepage.data = { ...homepages[HOMEPAGE_NAME] };
+    }
+  }
+
+  const saveSettings = plugin.saveSettings;
+  if (typeof saveSettings === "function") {
+    await saveSettings.call(plugin);
+  } else {
+    const saveData = plugin.saveData;
+    if (typeof saveData === "function") {
+      await saveData.call(plugin, plugin.settings);
+    }
+  }
+
+  await activateRunningHomepage(plugin);
+}
+
+function isRunningHomepageReady(manager: PluginManager): boolean {
+  const plugin = manager.plugins?.[HOMEPAGE_PLUGIN_ID];
+  if (!isRecord(plugin)) return true;
+  return plugin.loaded !== false && plugin.executing !== true;
+}
+
+async function activateRunningHomepage(plugin: Record<string, unknown>): Promise<void> {
+  if (plugin.loaded === false) {
+    plugin.loaded = true;
+    const unpatchReleaseNotes = plugin.unpatchReleaseNotes;
+    if (typeof unpatchReleaseNotes === "function") {
+      unpatchReleaseNotes.call(plugin);
+    }
+  }
+  if (plugin.executing === true) {
+    plugin.executing = false;
+  }
+
+  const homepage = plugin.homepage;
+  if (!isRecord(homepage)) return;
+
+  const openWhenEmpty = homepage.openWhenEmpty;
+  if (typeof openWhenEmpty === "function") {
+    await openWhenEmpty.call(homepage);
+  }
+}
+
 async function isCustomSortConfigured(
   app: App,
   manager: PluginManager,
@@ -471,14 +633,21 @@ function mergeCustomSortSettings(current: Record<string, unknown>): Record<strin
 
 async function hasCustomSortBookmarksGroup(app: App): Promise<boolean> {
   const bookmarks = await readBookmarksConfig(app);
-  return bookmarks.items.some((item) => isBookmarkGroup(item, CUSTOM_SORT_BOOKMARKS_GROUP));
+  const group = findCustomSortBookmarksGroup(bookmarks.items);
+  return Boolean(group && Array.isArray(group.items) && group.items.length > 0);
 }
 
 async function ensureCustomSortBookmarksGroup(app: App, settings: ParaZkSettings): Promise<boolean> {
   const bookmarks = await readBookmarksConfig(app);
-  if (bookmarks.items.some((item) => isBookmarkGroup(item, CUSTOM_SORT_BOOKMARKS_GROUP))) return false;
+  const existing = findCustomSortBookmarksGroup(bookmarks.items);
+  if (existing && Array.isArray(existing.items) && existing.items.length > 0) return false;
 
-  bookmarks.items.push(createCustomSortBookmarksGroup(settings));
+  const baseline = createCustomSortBookmarksGroup(settings);
+  if (existing) {
+    existing.items = baseline.items;
+  } else {
+    bookmarks.items.push(baseline);
+  }
   await app.vault.adapter.write(BOOKMARKS_CONFIG_PATH, `${JSON.stringify(bookmarks, null, 2)}\n`);
   return true;
 }
@@ -557,6 +726,10 @@ function isBookmarkItem(value: unknown): value is BookmarkItem {
 
 function isBookmarkGroup(value: unknown, title: string): boolean {
   return isRecord(value) && value.type === "group" && value.title === title;
+}
+
+function findCustomSortBookmarksGroup(items: BookmarkItem[]): BookmarkItem | undefined {
+  return items.find((item) => isBookmarkGroup(item, CUSTOM_SORT_BOOKMARKS_GROUP));
 }
 
 function folderName(path: string, indexFromRoot?: number): string {

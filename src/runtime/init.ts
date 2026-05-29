@@ -41,13 +41,6 @@ export async function initializeVault(
 
   await configureObsidianCoreSettings(app, nextSettings, result, dryRun);
 
-  result.dependencies = await resolveDependencies(app, {
-    installDeps: options.installDeps ?? false,
-    dryRun,
-    settings: nextSettings,
-    warnings: result.warnings
-  });
-
   for (const artifact of managedArtifacts(nextSettings)) {
     await writeManagedFile(app, artifact.path, artifact.content, result, {
       dryRun,
@@ -55,6 +48,13 @@ export async function initializeVault(
       managedFiles: nextSettings.managedFiles
     });
   }
+
+  result.dependencies = await resolveDependencies(app, {
+    installDeps: options.installDeps ?? false,
+    dryRun,
+    settings: nextSettings,
+    warnings: result.warnings
+  });
 
   if (!dryRun) {
     return {

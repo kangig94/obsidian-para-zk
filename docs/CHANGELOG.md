@@ -12,11 +12,12 @@ Notable changes for PARA-ZK are tracked here.
 - Added idempotent vault initialization for PARA, ZK, Journal, Dashboard, Templates,
   and managed PARA-ZK template files.
 - Added dependency checks for Dataview, Tasks, Tabs, Folder notes, Update time
-  on edit, Trash Explorer, and Custom File Explorer sorting during initialization.
-  `installDeps=true` installs and enables missing dependencies, DataviewJS is
-  enabled when Dataview is present, Update time on edit is configured for
-  `created`/`updated` frontmatter, and Custom File Explorer sorting is configured
-  with a baseline `sortspec` bookmarks group.
+  on edit, Trash Explorer, Custom File Explorer sorting, and Homepage during
+  initialization. `installDeps=true` installs and enables missing dependencies,
+  DataviewJS is enabled when Dataview is present, Update time on edit is configured
+  for `created`/`updated` frontmatter, Custom File Explorer sorting is configured
+  with a baseline `sortspec` bookmarks group, and Homepage opens the generated
+  Home dashboard on startup and when the workspace is empty.
 - Added a native file-explorer empty-trash action that calls Trash Explorer,
   replacing the Commander-managed explorer shortcut.
 - Added Obsidian core configuration to vault initialization, including automatic
@@ -61,6 +62,9 @@ Notable changes for PARA-ZK are tracked here.
   the selected language is visible immediately without moving ribbon icons.
 - Native PARA-ZK ribbon actions now keep a stable order below Obsidian's default
   ribbon actions even after plugin reloads.
+- Vault initialization now writes managed dashboard files before dependency
+  runtime activation, so Homepage can open `Dashboard/HomePage.md` immediately
+  after a clean init.
 - The disposable-vault smoke test now validates GUI command labels, ribbon
   labels, and ribbon ordering across English and Korean locale changes.
 
