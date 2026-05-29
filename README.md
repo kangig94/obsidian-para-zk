@@ -47,9 +47,9 @@ is idempotent. Existing non-managed files are skipped, and changed managed files
 overwritten with `force=true`.
 
 `para-zk:init` also checks required community plugin dependencies. It warns when
-Dataview, Tasks, or Tabs is missing or disabled. Pass `installDeps=true` to
-install and enable those dependencies. When Dataview is installed, PARA-ZK also
-enables Dataview JavaScript queries because the generated dashboards use
+Dataview, Tasks, Tabs, or Folder notes is missing or disabled. Pass `installDeps=true`
+to install and enable those dependencies. When Dataview is installed, PARA-ZK
+also enables Dataview JavaScript queries because the generated dashboards use
 `dataviewjs` blocks.
 
 The generated templates use native inline action tokens such as

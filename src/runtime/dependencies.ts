@@ -37,6 +37,12 @@ const REQUIRED_DEPENDENCIES: RequiredDependency[] = [
     name: "Tabs",
     repo: "xhuajin/obsidian-tabs",
     reason: "PARA-ZK area templates use Tabs blocks to separate open and completed tasks"
+  },
+  {
+    id: "folder-notes",
+    name: "Folder notes",
+    repo: "LostPaul/obsidian-folder-notes",
+    reason: "PARA-ZK uses folder-style project and area notes that should open from folder clicks"
   }
 ];
 

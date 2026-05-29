@@ -11,7 +11,7 @@ Notable changes for PARA-ZK are tracked here.
   journal capture, and note promotion.
 - Added idempotent vault initialization for PARA, ZK, Journal, Dashboard, Templates,
   and managed PARA-ZK template files.
-- Added dependency checks for Dataview, Tasks, and Tabs during initialization.
+- Added dependency checks for Dataview, Tasks, Tabs, and Folder notes during initialization.
   `installDeps=true` installs and enables missing dependencies, and DataviewJS is
   enabled when Dataview is present.
 - Added locale-neutral workflow arguments for CLI automation while keeping localized
