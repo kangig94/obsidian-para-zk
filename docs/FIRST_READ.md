@@ -86,8 +86,8 @@ Important modules:
 - `src/ux/dashboard-actions.ts`: native Home dashboard action block.
 - `src/ux/dashboard-summary.ts`: native dashboard summary cards.
 - `src/runtime/init.ts`: idempotent vault initialization and managed file writes.
-- `src/runtime/dependencies.ts`: Dataview, Tasks, Tabs, Folder Notes, and
-  Update time on edit dependency handling.
+- `src/runtime/dependencies.ts`: Dataview, Tasks, Tabs, Folder Notes, Update
+  time on edit, and Trash Explorer dependency handling.
 
 The architecture lint intentionally rejects content-blank modules and enforces
 layer boundaries. Keep core workflow/template modules independent from CLI, UX,
@@ -114,6 +114,8 @@ experience. Folder Notes is required because PARA-ZK uses folder-style project
 and area notes, where a folder and its main note share the same name.
 Update time on edit is required to keep `created` and `updated` frontmatter
 current after human edits in Obsidian.
+Trash Explorer is required for reviewing and emptying the local `.trash` folder;
+PARA-ZK owns the replacement for the old Commander explorer empty-trash button.
 
 Folder-style notes are part of the workflow. Projects and areas are created as
 folders containing their main note. Child documents and child areas should link

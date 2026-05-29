@@ -83,6 +83,7 @@ function mergeAppConfig(current: Record<string, unknown>, settings: ParaZkSettin
     ...current,
     alwaysUpdateLinks: true,
     attachmentFolderPath: ATTACHMENT_FOLDER,
+    trashOption: "local",
     userIgnoreFilters: mergeStringList(current.userIgnoreFilters, [
       ignoreFilterFolder(settings.paths.templatesFolder),
       ignoreFilterFolder(settings.paths.dashboardFolder),

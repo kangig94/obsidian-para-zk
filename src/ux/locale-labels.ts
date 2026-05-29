@@ -1,6 +1,7 @@
 import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { isRecord } from "../records";
+import { refreshExplorerActionLabels } from "./explorer-actions";
 
 type Labels = Record<string, string>;
 
@@ -96,6 +97,7 @@ export function refreshRegisteredLocaleLabels(plugin: ParaZkPluginContext, previ
       button.setAttribute("aria-label", action.label(labels));
     }
   }
+  refreshExplorerActionLabels(plugin);
 }
 
 function setCommandName(plugin: ParaZkPluginContext, id: string, name: string): void {

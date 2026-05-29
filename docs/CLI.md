@@ -144,18 +144,22 @@ Required dependencies:
 - Tabs
 - Folder Notes
 - Update time on edit
+- Trash Explorer
 
 Dataview JavaScript queries are enabled when Dataview is installed.
 Update time on edit is configured to maintain `created` and `updated`
 frontmatter fields while ignoring generated templates, dashboards, assets, and
 the managed root guide.
+Trash Explorer is installed and enabled so local `.trash` contents can be
+reviewed or emptied through the Obsidian GUI.
 
 Obsidian core settings are merged into existing config files without deleting
 unrelated user settings:
 
 - `.obsidian/app.json`: enables automatic link updates, uses `assets` for
-  attachments, hides document properties, and excludes generated/reference
-  folders from Obsidian's ignored-file filters.
+  attachments, moves deleted files to local Obsidian trash, hides document
+  properties, and excludes generated/reference folders from Obsidian's
+  ignored-file filters.
 - `.obsidian/templates.json`: sets the core Templates plugin folder to
   `Templates`.
 

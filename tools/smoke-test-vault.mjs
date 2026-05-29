@@ -16,6 +16,8 @@ const installDeps = args.installDeps !== false;
 const stamp = args.stamp ?? timestamp();
 const ribbonLabelsEn = ["New project", "New area", "New ZK", "New resource", "Open daily note", "Quick memo"];
 const ribbonLabelsKo = ["새 프로젝트", "새 영역", "새 ZK", "새 자료", "일일노트", "빠른 메모"];
+const emptyTrashLabelEn = "Empty trash";
+const emptyTrashLabelKo = "휴지통 비우기";
 
 assertVault(vaultPath);
 mkdirSync(pluginDir, { recursive: true });
@@ -46,9 +48,10 @@ assertDependency(init, "obsidian-tasks-plugin");
 assertDependency(init, "tabs");
 assertDependency(init, "folder-notes");
 assertDependency(init, "update-time-on-edit");
+assertDependency(init, "obsidian-trash-explorer");
 assertObsidianCoreConfig();
 assertUpdateTimeOnEditConfig();
-assertGuiLocaleLabels(ribbonLabelsEn, "PARA-ZK: Create project");
+assertGuiLocaleLabels(ribbonLabelsEn, "PARA-ZK: Create project", emptyTrashLabelEn);
 
 const koInit = cliJson("para-zk:init", [
   "locale=ko",
@@ -57,7 +60,7 @@ const koInit = cliJson("para-zk:init", [
   "format=json"
 ]);
 assert(koInit.ok === true, "ko locale init failed");
-assertGuiLocaleLabels(ribbonLabelsKo, "PARA-ZK: 새 프로젝트 만들기");
+assertGuiLocaleLabels(ribbonLabelsKo, "PARA-ZK: 새 프로젝트 만들기", emptyTrashLabelKo);
 
 const enInit = cliJson("para-zk:init", [
   "locale=en",
@@ -66,7 +69,7 @@ const enInit = cliJson("para-zk:init", [
   "format=json"
 ]);
 assert(enInit.ok === true, "en locale init failed");
-assertGuiLocaleLabels(ribbonLabelsEn, "PARA-ZK: Create project");
+assertGuiLocaleLabels(ribbonLabelsEn, "PARA-ZK: Create project", emptyTrashLabelEn);
 
 const today = todayIso();
 const dailyJournalPath = `Journal/${today.slice(0, 7)}/${today}.md`;
@@ -411,7 +414,7 @@ function guiJson(code) {
   }
 }
 
-function assertGuiLocaleLabels(expectedRibbonLabels, expectedCreateProjectCommandName) {
+function assertGuiLocaleLabels(expectedRibbonLabels, expectedCreateProjectCommandName, expectedEmptyTrashLabel) {
   const snapshot = guiJson(`console.log(JSON.stringify({
     ribbon: Array.from(document.querySelectorAll(".para-zk-ribbon-action"))
       .map((el) => ({
@@ -420,7 +423,9 @@ function assertGuiLocaleLabels(expectedRibbonLabels, expectedCreateProjectComman
         top: el.getBoundingClientRect().top
       }))
       .sort((left, right) => left.top - right.top),
-    createProjectCommandName: app.commands.commands["para-zk:create-project"]?.name
+    createProjectCommandName: app.commands.commands["para-zk:create-project"]?.name,
+    emptyTrashLabel: document.querySelector(".para-zk-explorer-action-empty-trash")?.getAttribute("aria-label"),
+    emptyTrashCommandExists: Boolean(app.commands.commands["obsidian-trash-explorer:empty-trash"])
   }))`);
 
   assert(Array.isArray(snapshot.ribbon), "ribbon snapshot is not an array");
@@ -439,6 +444,13 @@ function assertGuiLocaleLabels(expectedRibbonLabels, expectedCreateProjectComman
     snapshot.createProjectCommandName === expectedCreateProjectCommandName,
     `create-project command name expected ${expectedCreateProjectCommandName}, got ${snapshot.createProjectCommandName}`
   );
+  assert(
+    snapshot.emptyTrashLabel === expectedEmptyTrashLabel,
+    `empty trash label expected ${expectedEmptyTrashLabel}, got ${snapshot.emptyTrashLabel}`
+  );
+  if (installDeps) {
+    assert(snapshot.emptyTrashCommandExists === true, "Trash Explorer empty-trash command is missing");
+  }
 }
 
 function run(command, commandArgs, options = {}) {
@@ -479,6 +491,7 @@ function assertObsidianCoreConfig() {
   const appConfig = readVaultJson(".obsidian/app.json");
   assert(appConfig.alwaysUpdateLinks === true, "app.json alwaysUpdateLinks was not enabled");
   assert(appConfig.attachmentFolderPath === "assets", "app.json attachmentFolderPath is not assets");
+  assert(appConfig.trashOption === "local", "app.json trashOption is not local");
   assert(appConfig.propertiesInDocument === "hidden", "app.json propertiesInDocument is not hidden");
 
   const ignoreFilters = appConfig.userIgnoreFilters;

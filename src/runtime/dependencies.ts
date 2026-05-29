@@ -50,6 +50,12 @@ const REQUIRED_DEPENDENCIES: RequiredDependency[] = [
     name: "Update time on edit",
     repo: "beaussan/update-time-on-edit-obsidian",
     reason: "PARA-ZK relies on created and updated frontmatter staying current after human edits"
+  },
+  {
+    id: "obsidian-trash-explorer",
+    name: "Trash Explorer",
+    repo: "proog/obsidian-trash-explorer",
+    reason: "PARA-ZK uses Obsidian's local trash and exposes a native empty-trash explorer action"
   }
 ];
 

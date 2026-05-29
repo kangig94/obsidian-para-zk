@@ -4,6 +4,7 @@ import { loadSettings as loadRuntimeSettings, saveSettings as saveRuntimeSetting
 import { DEFAULT_SETTINGS, type InitOptions, type InitResult, type ParaZkSettings } from "./types";
 import { registerDashboardActionRenderers } from "./ux/dashboard-actions";
 import { registerDashboardSummaryRenderers } from "./ux/dashboard-summary";
+import { registerExplorerActions } from "./ux/explorer-actions";
 import { registerInlineActionRenderers } from "./ux/inline-actions";
 import { refreshRegisteredLocaleLabels } from "./ux/locale-labels";
 import { registerPropsControlRenderers } from "./ux/props-controls";
@@ -23,6 +24,7 @@ export default class ParaZkPlugin extends Plugin {
     registerStatusAndInitCommands(this);
     registerWorkflowCommands(this);
     registerRibbonActions(this);
+    registerExplorerActions(this);
     registerDashboardActionRenderers(this);
     registerDashboardSummaryRenderers(this);
     registerInlineActionRenderers(this);

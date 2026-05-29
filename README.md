@@ -23,7 +23,9 @@ GUI commands:
 - `PARA-ZK: Promote fleeting note`
 
 PARA-ZK also adds left-ribbon shortcuts for the main human workflows:
-project, area, resource, ZK, daily note, and quick memo.
+project, area, resource, ZK, daily note, and quick memo. It adds a file-explorer
+header shortcut for Trash Explorer's empty-trash command, replacing the old
+Commander explorer button.
 
 `PARA-ZK: Initialize PARA-ZK vault` opens an options modal in the Obsidian GUI.
 When invoked through Obsidian's command passthrough, it also accepts command
@@ -58,17 +60,18 @@ palette and ribbon labels in place, without moving existing ribbon icons.
 `para-zk:init` creates the PARA/ZK vault layout, managed template reference files under
 `Templates/para-zk`, Dataview/Tasks dashboard files under `Dashboard`, and a root vault guide.
 It also merges required Obsidian core settings such as automatic link updates, the
-`assets` attachment folder, excluded generated/reference folders, hidden document properties,
-and the core Templates folder. It is idempotent. Existing non-managed files are skipped, and
-changed managed files are only overwritten with `force=true`.
+`assets` attachment folder, local Obsidian trash, excluded generated/reference folders,
+hidden document properties, and the core Templates folder. It is idempotent.
+Existing non-managed files are skipped, and changed managed files are only overwritten
+with `force=true`.
 
 `para-zk:init` also checks required community plugin dependencies. It warns when
-Dataview, Tasks, Tabs, Folder notes, or Update time on edit is missing or disabled.
-Pass `installDeps=true` to install and enable those dependencies. When Dataview is
-installed, PARA-ZK also enables Dataview JavaScript queries because the generated
-dashboards use `dataviewjs` blocks. When Update time on edit is installed, PARA-ZK
-configures `created` and `updated` frontmatter maintenance for editable notes while
-excluding generated templates, dashboards, assets, and the managed root guide.
+Dataview, Tasks, Tabs, Folder notes, Update time on edit, or Trash Explorer is
+missing or disabled. Pass `installDeps=true` to install and enable those dependencies.
+When Dataview is installed, PARA-ZK also enables Dataview JavaScript queries because
+the generated dashboards use `dataviewjs` blocks. When Update time on edit is installed,
+PARA-ZK configures `created` and `updated` frontmatter maintenance for editable notes
+while excluding generated templates, dashboards, assets, and the managed root guide.
 
 The generated templates use native inline action tokens such as
 `` `PZK[create-subnote|Create subnote]` `` instead of Meta Bind buttons. The inline action
