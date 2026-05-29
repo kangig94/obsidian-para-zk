@@ -346,7 +346,7 @@ function assertVault(path) {
 
 function cleanVault(path, paraZkPluginDir) {
   const name = basename(path).toLowerCase();
-  assert(name !== "overmind", "refusing to clean Overmind reference vault");
+  assert(name.includes("para-zk") || name.includes("test"), `refusing to clean non-test vault: ${path}`);
   assert(existsSync(join(path, ".obsidian")), "refusing to clean a path without .obsidian");
 
   for (const entry of readdirSync(path)) {

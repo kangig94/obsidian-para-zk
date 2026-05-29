@@ -1,7 +1,7 @@
 # First Read: PARA-ZK Project Intent
 
 This document is the first context an LLM or automation agent should read before
-changing this repository. It explains the product intent, the reference vaults,
+changing this repository. It explains the product intent, the test vaults,
 and the contract between the GUI and CLI surfaces.
 
 ## Purpose
@@ -9,11 +9,9 @@ and the contract between the GUI and CLI surfaces.
 PARA-ZK is a native Obsidian plugin that turns a hand-built PARA and
 Zettelkasten vault setup into repeatable plugin-owned workflows.
 
-The original workflow lives in the user's Overmind vault. That vault was built
-manually with Obsidian folders, templates, dashboards, QuickAdd choices,
-Templater snippets, Meta Bind buttons, Dataview, Tasks, Tabs, and JavaScript
-helper scripts. This repository exists to move those behaviors into a native
-plugin so they can be invoked reliably by both humans and LLM-driven automation.
+It owns the vault layout, generated templates, dashboards, workflow commands,
+inline actions, frontmatter controls, dependency configuration, and native CLI
+surface needed to operate a PARA/ZK knowledge system from Obsidian or automation.
 
 The main product goal is not only to make Obsidian nicer for a person. It is to
 let an LLM create and maintain knowledge-work structures in the vault: create a
@@ -21,14 +19,10 @@ project, attach it to areas, add child notes, create resources, capture journal
 memos, create ZK notes, promote resources into ZK, promote fleeting notes, and
 keep the resulting frontmatter and backlinks coherent.
 
-## Reference Vaults
+## Test Vaults
 
 Use these vaults with different trust levels:
 
-- `/home/kang/documents/Overmind` is the read-only reference. It represents the
-  original hand-built PARA/ZK setup and the user's intended behavior. Never
-  modify it from this repository work. Read it only to compare templates,
-  dashboards, QuickAdd flows, Meta Bind actions, and JavaScript helper behavior.
 - `/home/kang/documents/para-zk` is the usual disposable test vault, but the
   exact test vault name or path may vary between machines and sessions. Infer it
   from local context when needed: look for a vault that has `.obsidian`, a
@@ -37,8 +31,8 @@ Use these vaults with different trust levels:
   plugin. Do not treat its current contents as a specification; older generated
   files may not match the current source.
 - This repository is the implementation source of truth. Generated vault output
-  must be judged against current source code and the Overmind reference intent,
-  not against stale test-vault artifacts.
+  must be judged against current source code, not against stale test-vault
+  artifacts.
 
 ## GUI And CLI Contract
 
@@ -72,8 +66,6 @@ dashboard action blocks, and native CLI handlers should call this workflow layer
 instead of duplicating business logic.
 
 The LLM-facing CLI contract is documented in `docs/CLI.md`.
-The Overmind-to-PARA-ZK behavior mapping is documented in
-`docs/OVERMIND_MAPPING.md`.
 
 Important modules:
 
@@ -100,8 +92,8 @@ templates under `Templates/para-zk`, dashboards under `Dashboard`, and a root
 vault guide. Existing non-managed files are skipped. Managed files are updated
 only when safe or when `force=true` is requested.
 
-Generated templates should no longer depend on Meta Bind, QuickAdd, or
-Templater. Native plugin blocks and tokens replace the old Overmind mechanisms:
+Generated templates should not depend on Meta Bind, QuickAdd, or Templater.
+Native plugin blocks and tokens replace legacy prompt/script mechanisms:
 
 - `PZK[...]` replaces Meta Bind buttons for workflow actions.
 - `para-zk-props` and `PZK_INPUT[...]` replace Meta Bind input controls.
@@ -109,9 +101,9 @@ Templater. Native plugin blocks and tokens replace the old Overmind mechanisms:
 - `para-zk-dashboard-summary` replaces DataviewJS-only summary cards.
 
 Dataview and Tasks remain query engines. PARA-ZK should not try to replace them.
-Tabs may still be used for generated task views where it matches the Overmind
-experience. Folder Notes is required because PARA-ZK uses folder-style project
-and area notes, where a folder and its main note share the same name.
+Tabs may still be used for generated task views where it improves the generated
+vault experience. Folder Notes is required because PARA-ZK uses folder-style
+project and area notes, where a folder and its main note share the same name.
 Update time on edit is required to keep `created` and `updated` frontmatter
 current after human edits in Obsidian.
 Trash Explorer is required for reviewing and emptying the local `.trash` folder;
@@ -180,8 +172,6 @@ Always run `npm run lint` and `npm run build` before considering behavior
 changes complete.
 
 ## Development Rules
-
-Read Overmind for intent, but do not mutate it.
 
 Use the disposable `para-zk` vault for destructive testing, initialization tests,
 and smoke-test notes. Its contents are not authoritative.

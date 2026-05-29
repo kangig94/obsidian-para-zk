@@ -499,4 +499,4 @@ npm run smoke:vault -- --vault /path/to/test-vault --clean
 On Linux, the smoke test opens the target vault with `open-gui no-wait` and
 uses `xdotool` when available to focus the matching Obsidian vault window before
 running native CLI commands. This keeps the test pointed at the disposable vault
-even when the Overmind reference vault is also open.
+even when multiple Obsidian vault windows are open.

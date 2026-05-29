@@ -106,11 +106,9 @@ to replace those plugins.
 ## Development
 
 Start with [docs/FIRST_READ.md](docs/FIRST_READ.md) for the project intent,
-reference-vault rules, and the GUI/CLI contract.
+test-vault rules, and the GUI/CLI contract.
 
 See [docs/CLI.md](docs/CLI.md) for the LLM-facing native CLI contract.
-See [docs/OVERMIND_MAPPING.md](docs/OVERMIND_MAPPING.md) for the mapping from
-the read-only Overmind reference vault to PARA-ZK workflows.
 See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the current development changelog.
 
 ```bash
