@@ -26,6 +26,8 @@ Notable changes for PARA-ZK are tracked here.
 - Added LLM-facing CLI contract documentation and disposable-vault smoke test tooling.
 - Added an Overmind reference mapping document for tracking ported behavior and intentional improvements.
 - Added `area_titles` support to project creation so CLI automation can reuse or create area notes by title.
+- Added a native daily journal GUI command that creates or opens today's journal
+  without requiring QuickAdd.
 
 ### Changed
 
@@ -40,8 +42,14 @@ Notable changes for PARA-ZK are tracked here.
   original Overmind callout and Meta Bind implementation.
 - The disposable-vault smoke test now focuses the target Obsidian vault window
   with `xdotool` when multiple vault windows are open.
+- Vault initialization and managed-file regeneration now share the same GUI
+  command; the GUI command opens an options modal, and command args such as
+  `force=true` select the sync behavior when passed by automation.
+- The default locale is now English when no locale is configured or supplied;
+  Korean output is still available with `locale=ko`.
 
 ### Removed
 
 - Removed the need for Meta Bind in generated PARA-ZK templates and dashboards.
 - Removed DataviewJS-only card rendering for dashboard summary sections.
+- Removed the separate `sync-managed-files` GUI command.

@@ -9,7 +9,6 @@ When Obsidian is running, the plugin can expose native CLI handlers through Obsi
 GUI commands:
 
 - `PARA-ZK: Initialize PARA-ZK vault`
-- `PARA-ZK: Sync PARA-ZK managed files`
 - `PARA-ZK: Check plugin status`
 - `PARA-ZK: Create project`
 - `PARA-ZK: Create area`
@@ -18,16 +17,23 @@ GUI commands:
 - `PARA-ZK: Create subarea`
 - `PARA-ZK: Create retro`
 - `PARA-ZK: Create ZK note`
+- `PARA-ZK: Open daily note`
 - `PARA-ZK: Quick memo`
 - `PARA-ZK: Promote resource to ZK`
 - `PARA-ZK: Promote fleeting note`
+
+`PARA-ZK: Initialize PARA-ZK vault` opens an options modal in the Obsidian GUI.
+When invoked through Obsidian's command passthrough, it also accepts command
+arguments. Use `force=true` to regenerate managed files instead of exposing a
+separate sync command.
 
 Native CLI handlers, when supported by the running Obsidian app:
 
 ```bash
 obsidian para-zk:ping format=json
-obsidian para-zk:init locale=ko format=json
+obsidian para-zk:init format=json
 obsidian para-zk:init dryRun=true force=true locale=en format=json
+obsidian para-zk:init locale=ko format=json
 obsidian para-zk:init installDeps=true format=json
 obsidian para-zk:create-project title="Project name" area_titles='["AI","Software"]' status=in_progress priority=high format=json
 obsidian para-zk:create-resource file_path="PARA/Projects/Project name/Project name.md" title="Source" format=json
@@ -40,6 +46,9 @@ obsidian para-zk:capture-journal content="Quick memo" energy=normal format=json
 CLI option values use locale-neutral codes only. For example, pass
 `status=in_progress` instead of `status="1. 진행중"`; the plugin renders the
 localized label inside the generated note.
+
+When `locale` is omitted, PARA-ZK defaults to English. Pass `locale=ko` when a
+Korean vault UI and generated Markdown are desired.
 
 `para-zk:init` creates the PARA/ZK vault layout, managed template reference files under
 `Templates/para-zk`, Dataview/Tasks dashboard files under `Dashboard`, and a root vault guide. It

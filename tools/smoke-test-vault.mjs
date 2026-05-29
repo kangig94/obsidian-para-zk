@@ -35,7 +35,6 @@ run("optsidian", ["raw", "plugin:reload", "id=para-zk"]);
 
 const init = cliJson("para-zk:init", [
   `installDeps=${installDeps}`,
-  "locale=ko",
   "format=json"
 ]);
 assert(init.ok === true, "init failed");
@@ -44,6 +43,15 @@ assertDependency(init, "dataview");
 assertDependency(init, "obsidian-tasks-plugin");
 assertDependency(init, "tabs");
 assertDependency(init, "folder-notes");
+
+const today = todayIso();
+const dailyJournalPath = `Journal/${today.slice(0, 7)}/${today}.md`;
+run("optsidian", ["raw", "command", "id=para-zk:open-journal"]);
+assertFileExists(dailyJournalPath, "daily journal command did not create journal");
+assertFileContains(dailyJournalPath, [
+  "type: journal",
+  `date: ${today}`
+]);
 
 const areaTitle = `Smoke Area ${stamp}`;
 const linkedAreaTitle = `Smoke Linked Area ${stamp}`;
@@ -123,7 +131,7 @@ assertCreated(permanent, "permanent");
 
 const journal = cliJson("para-zk:capture-journal", [
   `content=Smoke memo ${stamp}`,
-  `date=${todayIso()}`,
+  `date=${today}`,
   "time=09:01",
   "energy=high",
   "open=false",
@@ -133,7 +141,7 @@ assert(journal.ok === true, "journal capture failed");
 
 const retro = cliJson("para-zk:create-retro", [
   `file_path=${project.path}`,
-  `date=${todayIso()}`,
+  `date=${today}`,
   "open=false",
   "format=json"
 ]);
@@ -160,7 +168,6 @@ assertCreated(promotedFleeting, "promoted fleeting");
 
 const dryRun = cliJson("para-zk:init", [
   "dryRun=true",
-  "locale=ko",
   "format=json"
 ]);
 assert(dryRun.ok === true, "dry-run init failed");
@@ -411,11 +418,30 @@ function assertCreated(payload, label) {
   assert(existsSync(join(vaultPath, payload.path)), `${label} file does not exist: ${payload.path}`);
 }
 
+function assertFileExists(path, message) {
+  const absolute = join(vaultPath, path);
+  const deadline = Date.now() + 3000;
+  while (Date.now() <= deadline) {
+    if (existsSync(absolute)) return;
+    sleepMs(100);
+  }
+  assert(false, `${message}: ${path}`);
+}
+
 function assertFileContains(path, needles) {
   const absolute = join(vaultPath, path);
+  const deadline = Date.now() + 3000;
+  let text = "";
+  while (Date.now() <= deadline) {
+    if (existsSync(absolute) && statSync(absolute).isFile()) {
+      text = readFileSync(absolute, "utf8");
+      if (needles.every((needle) => text.includes(needle))) return;
+    }
+    sleepMs(100);
+  }
+
   assert(existsSync(absolute), `missing file: ${path}`);
   assert(statSync(absolute).isFile(), `not a file: ${path}`);
-  const text = readFileSync(absolute, "utf8");
   for (const needle of needles) {
     assert(text.includes(needle), `${path} does not contain: ${needle}`);
   }

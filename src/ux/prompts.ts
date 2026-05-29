@@ -1,4 +1,12 @@
 import { App, Modal, Setting } from "obsidian";
+import { localePack } from "../i18n";
+import type { Locale } from "../types";
+
+export type InitPromptOptions = {
+  locale: Locale;
+  force: boolean;
+  installDeps: boolean;
+};
 
 export function promptText(
   app: App,
@@ -16,6 +24,15 @@ export function promptText(
 export function chooseValue(app: App, title: string, choices: Array<{ label: string; value: string }>): Promise<string | null> {
   return new Promise((resolve) => {
     new ChoiceModal(app, title, choices, resolve).open();
+  });
+}
+
+export function promptInitOptions(
+  app: App,
+  initial: InitPromptOptions
+): Promise<InitPromptOptions | null> {
+  return new Promise((resolve) => {
+    new InitOptionsModal(app, initial, resolve).open();
   });
 }
 
@@ -81,6 +98,102 @@ class TextPromptModal extends Modal {
     if (this.done) return;
     this.done = true;
     this.resolve(value.trim() || null);
+    this.close();
+  }
+
+  private cancel(): void {
+    if (this.done) return;
+    this.done = true;
+    this.resolve(null);
+    this.close();
+  }
+}
+
+class InitOptionsModal extends Modal {
+  private done = false;
+  private value: InitPromptOptions;
+
+  constructor(
+    app: App,
+    initial: InitPromptOptions,
+    private readonly resolve: (value: InitPromptOptions | null) => void
+  ) {
+    super(app);
+    this.value = { ...initial };
+  }
+
+  onOpen(): void {
+    this.render();
+  }
+
+  private render(): void {
+    const { contentEl } = this;
+    const labels = localePack(this.value.locale).labels;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: labels.initCommandName });
+
+    new Setting(contentEl)
+      .setName(labels.locale)
+      .setDesc(labels.initLocaleDesc)
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption("ko", "ko")
+          .addOption("en", "en")
+          .setValue(this.value.locale)
+          .onChange((value) => {
+            this.value.locale = value === "en" ? "en" : "ko";
+            this.render();
+          });
+      });
+
+    new Setting(contentEl)
+      .setName(labels.initForce)
+      .setDesc(labels.initForceDesc)
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.value.force)
+          .onChange((value) => {
+            this.value.force = value;
+          });
+      });
+
+    new Setting(contentEl)
+      .setName(labels.initInstallDeps)
+      .setDesc(labels.initInstallDepsDesc)
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.value.installDeps)
+          .onChange((value) => {
+            this.value.installDeps = value;
+          });
+      });
+
+    new Setting(contentEl)
+      .addButton((button) => {
+        button
+          .setButtonText(labels.confirm)
+          .setCta()
+          .onClick(() => this.submit());
+      })
+      .addButton((button) => {
+        button
+          .setButtonText(labels.cancel)
+          .onClick(() => this.cancel());
+      });
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+    if (!this.done) {
+      this.done = true;
+      this.resolve(null);
+    }
+  }
+
+  private submit(): void {
+    if (this.done) return;
+    this.done = true;
+    this.resolve({ ...this.value });
     this.close();
   }
 

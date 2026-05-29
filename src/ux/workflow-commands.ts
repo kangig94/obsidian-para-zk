@@ -1,9 +1,9 @@
 import { Notice } from "obsidian";
-import { localePack } from "../i18n";
+import { localePack, normalizeLocale } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { isRecord } from "../records";
 import type { WorkflowContext } from "../workflows";
-import { chooseValue, promptText } from "./prompts";
+import { chooseValue, promptInitOptions, promptText } from "./prompts";
 
 export function registerStatusAndInitCommands(plugin: ParaZkPluginContext): void {
   const labels = localePack(plugin.settings.locale).labels;
@@ -19,18 +19,27 @@ export function registerStatusAndInitCommands(plugin: ParaZkPluginContext): void
   plugin.addCommand({
     id: "initialize-vault",
     name: labels.initCommandName,
-    callback: async () => {
-      const result = await plugin.initializeVault({ force: false, dryRun: false });
-      new Notice(`${localePack(plugin.settings.locale).messages.initReady}: ${result.created.length} created, ${result.updated.length} updated`);
-    }
-  });
-
-  plugin.addCommand({
-    id: "sync-managed-files",
-    name: labels.syncTemplatesCommandName,
-    callback: async () => {
-      const result = await plugin.initializeVault({ force: true, dryRun: false });
-      new Notice(`${localePack(plugin.settings.locale).messages.initReady}: ${result.created.length} created, ${result.updated.length} updated`);
+    callback: async (...rawArgs: unknown[]) => {
+      const args = readCommandArgs(rawArgs);
+      const options = hasCommandArgs(args)
+        ? {
+          locale: normalizeLocale(readCommandString(args, "locale"), plugin.settings.locale),
+          force: readCommandBoolean(args, "force") ?? false,
+          dryRun: readCommandBoolean(args, "dryRun") ?? readCommandBoolean(args, "dry-run") ?? false,
+          installDeps: readCommandBoolean(args, "installDeps") ?? readCommandBoolean(args, "install-deps") ?? false
+        }
+        : await promptInitOptions(plugin.app, {
+          locale: plugin.settings.locale,
+          force: false,
+          installDeps: false
+        });
+      if (!options) {
+        new Notice(localePack(plugin.settings.locale).messages.commandCancelled);
+        return;
+      }
+      const result = await plugin.initializeVault(options);
+      const messages = localePack(options.locale).messages;
+      new Notice(`${messages.initReady}: ${result.created.length} created, ${result.updated.length} updated`);
     }
   });
 }
@@ -45,6 +54,7 @@ export function registerWorkflowCommands(plugin: ParaZkPluginContext): void {
     ["create-subarea", labels.createSubareaCommandName],
     ["create-retro", labels.createRetroCommandName],
     ["create-zk", labels.createZkCommandName],
+    ["open-journal", labels.openJournalCommandName],
     ["capture-journal", labels.captureJournalCommandName],
     ["promote-resource", labels.promoteResourceCommandName],
     ["promote-fleeting", labels.promoteFleetingCommandName]
@@ -88,6 +98,7 @@ export function workflowButtonLabel(plugin: ParaZkPluginContext, command: string
     "create-subarea": labels.createSubarea,
     "create-retro": labels.createRetro,
     "create-zk": labels.createZkCommandName,
+    "open-journal": labels.openJournalCommandName,
     "capture-journal": labels.captureJournalCommandName,
     "promote-resource": labels.promoteToZk,
     "promote-fleeting": labels.promote
@@ -100,6 +111,8 @@ export function normalizeWorkflowCommand(value: string | undefined): string | un
   if (!command) return undefined;
   const aliases: Record<string, string> = {
     "create-project-subnote": "create-subnote",
+    "daily-journal": "open-journal",
+    "open-daily-journal": "open-journal",
     "promote-to-zk": "promote-resource"
   };
   return aliases[command] ?? command;
@@ -150,6 +163,8 @@ async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: 
       const title = await prompt(plugin, labels.createZkCommandName, labels.promptZkTitle, sourceFile?.basename ?? "");
       return title ? workflows.createZk(ctx, { title, kind, open: true }) : undefined;
     }
+    case "open-journal":
+      return workflows.openJournal(ctx, { open: true });
     case "capture-journal": {
       const content = await prompt(plugin, labels.captureJournalCommandName, labels.promptCaptureContent);
       return content ? workflows.captureJournal(ctx, { content, open: true }) : undefined;
@@ -183,6 +198,43 @@ function workflowContext(plugin: ParaZkPluginContext): WorkflowContext {
     app: plugin.app,
     settings: plugin.settings
   };
+}
+
+function readCommandArgs(rawArgs: unknown[]): Record<string, unknown> {
+  const args: Record<string, unknown> = {};
+  for (const rawArg of rawArgs) {
+    if (isRecord(rawArg)) {
+      Object.assign(args, rawArg);
+      continue;
+    }
+    if (typeof rawArg !== "string") continue;
+    const index = rawArg.indexOf("=");
+    if (index === -1) {
+      args[rawArg] = true;
+    } else {
+      args[rawArg.slice(0, index)] = rawArg.slice(index + 1);
+    }
+  }
+  return args;
+}
+
+function hasCommandArgs(args: Record<string, unknown>): boolean {
+  return Object.keys(args).length > 0;
+}
+
+function readCommandString(args: Record<string, unknown>, key: string): string | undefined {
+  const value = args[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function readCommandBoolean(args: Record<string, unknown>, key: string): boolean | undefined {
+  const value = args[key];
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (["true", "1", "yes", "on"].includes(normalized)) return true;
+  if (["false", "0", "no", "off"].includes(normalized)) return false;
+  return undefined;
 }
 
 function prompt(plugin: ParaZkPluginContext, title: string, placeholder: string, initialValue = ""): Promise<string | null> {

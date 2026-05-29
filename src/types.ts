@@ -139,6 +139,6 @@ export const DEFAULT_LAYOUT_FOLDERS = [
 export const DEFAULT_SETTINGS: ParaZkSettings = {
   paths: DEFAULT_PATHS,
   layoutFolders: DEFAULT_LAYOUT_FOLDERS,
-  locale: "ko",
+  locale: "en",
   managedFiles: {}
 };

@@ -152,6 +152,9 @@ Example:
 optsidian raw para-zk:init installDeps=true locale=ko format=json
 ```
 
+When `locale` is omitted, PARA-ZK defaults to English. Pass `locale=ko` for
+Korean generated labels, headings, and tags.
+
 Important fields:
 
 - `created`

@@ -49,7 +49,7 @@ CLI ergonomics.
 | `새 회고 만들기` | Create weekly retro under `PARA/Retros/<week>` | `para-zk:create-retro`; GUI `Create retro`; `createRetro()` | improved | CLI can set `file_path`, `name`, and `date`. |
 | `새 자료 만들기` | Create resource under `PARA/Resources` | `para-zk:create-resource`; GUI `Create resource`; `createResource()` | improved | CLI can link from a source note in one call. |
 | `새 ZK 만들기` | Run `Templates/qa-new-zk.js` to choose ZK type and create note | `para-zk:create-zk`; GUI `Create ZK note`; `createZk()` | improved | CLI accepts `kind` and `maturity`. |
-| `일일노트` | Create/open daily journal note from template | `para-zk:capture-journal` creates journal when needed | partial | PARA-ZK currently exposes quick memo capture, not a separate "open daily note" CLI. |
+| `일일노트` | Create/open daily journal note from template | GUI `Open daily note`; `openJournal()` | ported | Native command palette action creates or opens today's journal without QuickAdd. |
 | `빠른 메모` | Append memo under `# 빠른 메모` | `para-zk:capture-journal`; GUI `Quick memo`; `captureJournal()` | improved | CLI accepts `content`, `date`, `time`, and `energy`. |
 
 ## Template Mapping
@@ -104,9 +104,6 @@ CLI ergonomics.
 
 | Item | Status | Notes |
 | --- | --- | --- |
-| Dedicated daily-note open/create command | pending | Current `captureJournal()` creates the journal when appending a memo. |
-| Folder Notes settings enforcement | pending | Dependency is installed/enabled; decide whether `init` should enforce settings such as `folderNoteName`, `storageLocation`, and `hideFolderNote`. |
-| Batch workflow command | pending | Useful for LLMs that need to create a project, areas, resources, and first subnotes in one atomic-ish call. |
 | Automated GUI renderer screenshot checks | pending | Smoke test validates CLI side effects, not visual rendering of Obsidian Markdown processors. |
 | Broader regression fixtures | pending | `tools/smoke-test-vault.mjs` is end-to-end smoke coverage; unit-level workflow fixtures could catch smaller changes faster. |
 
@@ -118,6 +115,7 @@ It validates:
 
 - `para-zk:init`
 - required dependency results
+- native daily journal GUI command
 - area/project/resource/subnote/subarea/ZK/journal/retro creation
 - resource promotion
 - fleeting promotion and archival

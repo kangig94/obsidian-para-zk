@@ -34,6 +34,7 @@ import {
   parsePriorityCode,
   parseProjectStatusCode,
   parseSubnoteTypeCode,
+  type EnergyCode,
   type MaturityCode
 } from "./vocabulary";
 import {
@@ -110,6 +111,12 @@ export type CaptureJournalOptions = {
   content: string;
   date?: string;
   time?: string;
+  energy?: string;
+  open?: boolean;
+};
+
+export type OpenJournalOptions = {
+  date?: string;
   energy?: string;
   open?: boolean;
 };
@@ -409,49 +416,35 @@ export async function captureJournal(ctx: WorkflowContext, options: CaptureJourn
   const content = options.content?.trim();
   if (!content) throw new Error("journal capture content is required");
 
-  const date = dateFromCli(options.date);
-  const dateText = localDate(date);
-  const createdAt = localDateTimeSpace();
   const timeText = options.time?.trim() || localTime();
-  const energyCode = readOptionalCode(options.energy, parseEnergyCode, "energy", ENERGY_CODE_HELP);
-  const energy = energyCode ?? "normal";
-  const folder = joinVaultPath(ctx.settings.paths.journalFolder, dateText.slice(0, 7));
-  await ensureFolder(ctx.app, folder);
-  const path = joinVaultPath(folder, `${dateText}.md`);
-
-  let created = true;
-  let file = ctx.app.vault.getFileByPath(path);
-  if (!file) {
-    file = await createMarkdownFile(ctx, "journal", path, {
-      created: createdAt,
-      date: dateText,
-      energy,
-      cursor: ""
-    });
-    await ctx.app.fileManager.processFrontMatter(file, (fm) => {
-      fm.type = "journal";
-      fm.date = fm.date || dateText;
-      fm.energy = fm.energy ?? energy;
-      fm.created = fm.created || createdAt;
-      if (fm.updated === undefined) fm.updated = "";
-    });
-  } else {
-    created = false;
-  }
+  const journal = await ensureJournal(ctx, options);
 
   const t = localePack(ctx.settings.locale);
-  await appendLineUnderHeader(ctx.app, file, t.labels.quickMemo, `- ${timeText} - ${content}`, {
+  await appendLineUnderHeader(ctx.app, journal.file, t.labels.quickMemo, `- ${timeText} - ${content}`, {
     createHeadingLevel: 1,
     ordered: false,
     dedupe: false
   });
-  await openIfRequested(ctx, file, options.open);
+  await openIfRequested(ctx, journal.file, options.open);
 
   return {
-    path: file.path,
+    path: journal.file.path,
     content,
-    date: dateText,
-    created
+    date: journal.date,
+    created: journal.created
+  };
+}
+
+export async function openJournal(ctx: WorkflowContext, options: OpenJournalOptions = {}): Promise<NoteResult & {
+  date: string;
+  energy: EnergyCode;
+}> {
+  const journal = await ensureJournal(ctx, options);
+  await openIfRequested(ctx, journal.file, options.open);
+  return {
+    ...noteResult(journal.file, journal.created, options.open),
+    date: journal.date,
+    energy: journal.energy
   };
 }
 
@@ -756,6 +749,51 @@ function noteResult(file: TFile, created: boolean, open?: boolean): NoteResult {
     title: file.basename,
     created,
     opened: open || undefined
+  };
+}
+
+async function ensureJournal(ctx: WorkflowContext, options: OpenJournalOptions): Promise<{
+  file: TFile;
+  created: boolean;
+  date: string;
+  energy: EnergyCode;
+}> {
+  const date = dateFromCli(options.date);
+  const dateText = localDate(date);
+  const createdAt = localDateTimeSpace();
+  const energyCode = readOptionalCode(options.energy, parseEnergyCode, "energy", ENERGY_CODE_HELP);
+  const energy = energyCode ?? "normal";
+  const folder = joinVaultPath(ctx.settings.paths.journalFolder, dateText.slice(0, 7));
+  await ensureFolder(ctx.app, folder);
+  const path = joinVaultPath(folder, `${dateText}.md`);
+
+  let created = false;
+  let file = ctx.app.vault.getFileByPath(path);
+  if (!file) {
+    created = true;
+    file = await createMarkdownFile(ctx, "journal", path, {
+      created: createdAt,
+      date: dateText,
+      energy,
+      cursor: ""
+    });
+  }
+
+  const tags = localePack(ctx.settings.locale).tags;
+  await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+    fm.type = "journal";
+    fm.date = fm.date || dateText;
+    fm.energy = fm.energy ?? energy;
+    fm.tags = fm.tags || [tags.journal];
+    fm.created = fm.created || createdAt;
+    if (fm.updated === undefined) fm.updated = "";
+  });
+
+  return {
+    file,
+    created,
+    date: dateText,
+    energy
   };
 }
 

@@ -85,7 +85,6 @@ const ko: LocalePack = {
   labels: {
     initCommandName: "Initialize PARA-ZK vault",
     statusCommandName: "Check plugin status",
-    syncTemplatesCommandName: "Sync PARA-ZK managed files",
     createProjectCommandName: "새 프로젝트 만들기",
     createAreaCommandName: "새 영역 만들기",
     createResourceCommandName: "새 자료 만들기",
@@ -93,6 +92,7 @@ const ko: LocalePack = {
     createSubareaCommandName: "서브영역 만들기",
     createRetroCommandName: "새 회고 작성",
     createZkCommandName: "새 ZK 만들기",
+    openJournalCommandName: "일일노트",
     captureJournalCommandName: "빠른 메모",
     promoteResourceCommandName: "지식화(ZK)",
     promoteFleetingCommandName: "Fleeting 승격",
@@ -112,6 +112,11 @@ const ko: LocalePack = {
     promptZkTitle: "ZK 파일명",
     promptCaptureContent: "내용",
     promptPromoteKind: "승격 대상",
+    initLocaleDesc: "변경하기 전까지 기본값은 English(en)입니다.",
+    initForce: "관리 파일 강제 재생성",
+    initForceDesc: "변경된 PARA-ZK 관리 템플릿과 대시보드를 현재 코드 기준으로 덮어씁니다.",
+    initInstallDeps: "필수 플러그인 설치/활성화",
+    initInstallDepsDesc: "Dataview, Tasks, Tabs, Folder Notes가 없거나 꺼져 있으면 설치하고 활성화합니다.",
     settingsNote: "PARA-ZK에서 사용할 폴더와 언어를 설정합니다.",
     layoutFolders: "레이아웃 폴더",
     layoutFoldersDesc: "vault 기준 상대 경로를 한 줄에 하나씩 입력합니다.",
@@ -298,7 +303,6 @@ const en: LocalePack = {
   labels: {
     initCommandName: "Initialize PARA-ZK vault",
     statusCommandName: "Check plugin status",
-    syncTemplatesCommandName: "Sync PARA-ZK managed files",
     createProjectCommandName: "Create project",
     createAreaCommandName: "Create area",
     createResourceCommandName: "Create resource",
@@ -306,6 +310,7 @@ const en: LocalePack = {
     createSubareaCommandName: "Create subarea",
     createRetroCommandName: "Create retro",
     createZkCommandName: "Create ZK note",
+    openJournalCommandName: "Open daily note",
     captureJournalCommandName: "Quick memo",
     promoteResourceCommandName: "Promote resource to ZK",
     promoteFleetingCommandName: "Promote fleeting note",
@@ -325,6 +330,11 @@ const en: LocalePack = {
     promptZkTitle: "ZK filename",
     promptCaptureContent: "Content",
     promptPromoteKind: "Promote to",
+    initLocaleDesc: "Defaults to English until changed.",
+    initForce: "Regenerate managed files",
+    initForceDesc: "Overwrite changed PARA-ZK managed templates and dashboards from the current plugin code.",
+    initInstallDeps: "Install and enable dependencies",
+    initInstallDepsDesc: "Install and enable Dataview, Tasks, Tabs, and Folder Notes when missing or disabled.",
     settingsNote: "Configure the folders and language used by PARA-ZK.",
     layoutFolders: "Layout folders",
     layoutFoldersDesc: "One vault-relative folder per line.",
@@ -464,7 +474,7 @@ const en: LocalePack = {
 };
 
 export function localePack(locale: Locale | undefined): LocalePack {
-  return locale === "en" ? en : ko;
+  return locale === "ko" ? ko : en;
 }
 
 export function normalizeLocale(value: unknown, fallback: Locale): Locale {

@@ -134,8 +134,11 @@ install directories.
 OBSIDIAN_PLUGIN_DIR=/home/kang/documents/para-zk/.obsidian/plugins/para-zk npm run build
 optsidian open-gui vault-path=/home/kang/documents/para-zk
 optsidian raw plugin:reload id=para-zk
-optsidian raw para-zk:init installDeps=true locale=ko format=json
+optsidian raw para-zk:init installDeps=true format=json
 ```
+
+The default locale is English. Pass `locale=ko` only when validating Korean
+generated headings, labels, and tags.
 
 The automated smoke test wraps the same flow and verifies generated files:
 
