@@ -24,6 +24,7 @@ Notable changes for PARA-ZK are tracked here.
 - Added native dashboard summary card rendering with `para-zk-dashboard-summary`.
 - Added a first-read project intent document for LLM agents and contributors.
 - Added LLM-facing CLI contract documentation and disposable-vault smoke test tooling.
+- Added an Overmind reference mapping document for tracking ported behavior and intentional improvements.
 
 ### Changed
 

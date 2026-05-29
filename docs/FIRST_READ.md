@@ -72,6 +72,8 @@ dashboard action blocks, and native CLI handlers should call this workflow layer
 instead of duplicating business logic.
 
 The LLM-facing CLI contract is documented in `docs/CLI.md`.
+The Overmind-to-PARA-ZK behavior mapping is documented in
+`docs/OVERMIND_MAPPING.md`.
 
 Important modules:
 
