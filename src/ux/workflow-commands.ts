@@ -3,14 +3,20 @@ import { localePack, normalizeLocale } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { isRecord } from "../records";
 import type { WorkflowContext } from "../workflows";
+import {
+  statusCommandEntries,
+  workflowCommandEntries
+} from "./locale-labels";
 import { chooseValue, promptInitOptions, promptText } from "./prompts";
 
 export function registerStatusAndInitCommands(plugin: ParaZkPluginContext): void {
   const labels = localePack(plugin.settings.locale).labels;
 
+  const commandNames = new Map(statusCommandEntries(labels));
+
   plugin.addCommand({
     id: "check-status",
-    name: labels.statusCommandName,
+    name: commandNames.get("check-status") ?? labels.statusCommandName,
     callback: () => {
       new Notice(localePack(plugin.settings.locale).messages.statusReady);
     }
@@ -18,7 +24,7 @@ export function registerStatusAndInitCommands(plugin: ParaZkPluginContext): void
 
   plugin.addCommand({
     id: "initialize-vault",
-    name: labels.initCommandName,
+    name: commandNames.get("initialize-vault") ?? labels.initCommandName,
     callback: async (...rawArgs: unknown[]) => {
       const args = readCommandArgs(rawArgs);
       const options = hasCommandArgs(args)
@@ -46,19 +52,7 @@ export function registerStatusAndInitCommands(plugin: ParaZkPluginContext): void
 
 export function registerWorkflowCommands(plugin: ParaZkPluginContext): void {
   const labels = localePack(plugin.settings.locale).labels;
-  const commands = [
-    ["create-project", labels.createProjectCommandName],
-    ["create-area", labels.createAreaCommandName],
-    ["create-resource", labels.createResourceCommandName],
-    ["create-subnote", labels.createSubnoteCommandName],
-    ["create-subarea", labels.createSubareaCommandName],
-    ["create-retro", labels.createRetroCommandName],
-    ["create-zk", labels.createZkCommandName],
-    ["open-journal", labels.openJournalCommandName],
-    ["capture-journal", labels.captureJournalCommandName],
-    ["promote-resource", labels.promoteResourceCommandName],
-    ["promote-fleeting", labels.promoteFleetingCommandName]
-  ] as const;
+  const commands = workflowCommandEntries(labels);
 
   for (const [id, name] of commands) {
     plugin.addCommand({

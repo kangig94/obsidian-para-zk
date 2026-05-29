@@ -5,7 +5,9 @@ import { DEFAULT_SETTINGS, type InitOptions, type InitResult, type ParaZkSetting
 import { registerDashboardActionRenderers } from "./ux/dashboard-actions";
 import { registerDashboardSummaryRenderers } from "./ux/dashboard-summary";
 import { registerInlineActionRenderers } from "./ux/inline-actions";
+import { refreshRegisteredLocaleLabels } from "./ux/locale-labels";
 import { registerPropsControlRenderers } from "./ux/props-controls";
+import { registerRibbonActions } from "./ux/ribbon-actions";
 import { ParaZkSettingTab } from "./ux/settings";
 import {
   registerStatusAndInitCommands,
@@ -20,6 +22,7 @@ export default class ParaZkPlugin extends Plugin {
 
     registerStatusAndInitCommands(this);
     registerWorkflowCommands(this);
+    registerRibbonActions(this);
     registerDashboardActionRenderers(this);
     registerDashboardSummaryRenderers(this);
     registerInlineActionRenderers(this);
@@ -39,10 +42,12 @@ export default class ParaZkPlugin extends Plugin {
 
   async initializeVault(options: InitOptions = {}): Promise<InitResult> {
     const { initializeVault } = await import("./runtime/init");
+    const previousLocale = this.settings.locale;
     const { result, settings } = await initializeVault(this.app, this.settings, options);
     if (!result.dryRun) {
       this.settings = settings;
       await this.saveSettings();
+      refreshRegisteredLocaleLabels(this, previousLocale);
     }
     return result;
   }

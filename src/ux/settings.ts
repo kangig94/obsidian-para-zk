@@ -2,6 +2,7 @@ import { PluginSettingTab, Setting } from "obsidian";
 import { localePack, normalizeLocale } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { normalizeVaultPath } from "../vault/paths";
+import { refreshRegisteredLocaleLabels } from "./locale-labels";
 
 export class ParaZkSettingTab extends PluginSettingTab {
   constructor(private readonly plugin: ParaZkPluginContext) {
@@ -28,8 +29,10 @@ export class ParaZkSettingTab extends PluginSettingTab {
           .addOption("en", "en")
           .setValue(this.plugin.settings.locale)
           .onChange(async (value) => {
-            this.plugin.settings.locale = normalizeLocale(value, this.plugin.settings.locale);
+            const previousLocale = this.plugin.settings.locale;
+            this.plugin.settings.locale = normalizeLocale(value, previousLocale);
             await this.plugin.saveSettings();
+            refreshRegisteredLocaleLabels(this.plugin, previousLocale);
             this.display();
           });
       });

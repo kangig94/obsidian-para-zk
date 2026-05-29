@@ -20,6 +20,8 @@ Notable changes for PARA-ZK are tracked here.
   prior Meta Bind button dependency.
 - Added native PARA-ZK props controls with `para-zk-props` and `PZK_INPUT[...]`,
   replacing Meta Bind input controls while writing frontmatter directly.
+- Added native PARA-ZK ribbon actions for project, area, resource, ZK, daily
+  note, and quick memo workflows, replacing Commander-managed QuickAdd shortcuts.
 - Added native Home dashboard action rendering with `para-zk-dashboard-actions`.
 - Added native dashboard summary card rendering with `para-zk-dashboard-summary`.
 - Added a first-read project intent document for LLM agents and contributors.
@@ -47,6 +49,12 @@ Notable changes for PARA-ZK are tracked here.
   `force=true` select the sync behavior when passed by automation.
 - The default locale is now English when no locale is configured or supplied;
   Korean output is still available with `locale=ko`.
+- GUI locale changes now refresh command palette and ribbon labels in place so
+  the selected language is visible immediately without moving ribbon icons.
+- Native PARA-ZK ribbon actions now keep a stable order below Obsidian's default
+  ribbon actions even after plugin reloads.
+- The disposable-vault smoke test now validates GUI command labels, ribbon
+  labels, and ribbon ordering across English and Korean locale changes.
 
 ### Removed
 

@@ -35,6 +35,7 @@ CLI ergonomics.
 | Templater | Template variable expansion and hooks | `src/templates.ts` and `src/workflows.ts` render and post-process managed files | improved | Generated vault no longer requires Templater. |
 | Meta Bind | Buttons and inline/frontmatter controls | `PZK[...]`, `PZK_INPUT[...]`, and `para-zk-props` | improved | Native renderers call the same workflow layer as CLI. |
 | js-engine | Runs Overmind button scripts | Native TypeScript workflow functions | improved | Scripts are absorbed into plugin code. |
+| Commander | Adds QuickAdd choices to the left ribbon | Native PARA-ZK ribbon actions | improved | Project, area, resource, ZK, daily note, and quick memo shortcuts are plugin-owned; unrelated command hiding and explorer tweaks stay out of scope. |
 | Dataview | Lists, tables, dashboards | Required dependency; query blocks remain Dataview/DataviewJS | ported | PARA-ZK configures DataviewJS when needed. |
 | Tasks | Task queries | Required dependency; task blocks remain Tasks queries | ported | PARA-ZK does not replace Tasks. |
 | Tabs | Split open/done task views | Required dependency; generated area task sections may use Tabs | ported | Kept where it matches Overmind UX. |

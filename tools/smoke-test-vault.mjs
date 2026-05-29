@@ -14,6 +14,8 @@ const vaultPath = resolve(args.vault ?? inferVaultPath());
 const pluginDir = resolve(args.pluginDir ?? join(vaultPath, ".obsidian/plugins/para-zk"));
 const installDeps = args.installDeps !== false;
 const stamp = args.stamp ?? timestamp();
+const ribbonLabelsEn = ["New project", "New area", "New ZK", "New resource", "Open daily note", "Quick memo"];
+const ribbonLabelsKo = ["새 프로젝트", "새 영역", "새 ZK", "새 자료", "일일노트", "빠른 메모"];
 
 assertVault(vaultPath);
 mkdirSync(pluginDir, { recursive: true });
@@ -43,6 +45,25 @@ assertDependency(init, "dataview");
 assertDependency(init, "obsidian-tasks-plugin");
 assertDependency(init, "tabs");
 assertDependency(init, "folder-notes");
+assertGuiLocaleLabels(ribbonLabelsEn, "PARA-ZK: Create project");
+
+const koInit = cliJson("para-zk:init", [
+  "locale=ko",
+  "force=true",
+  `installDeps=${installDeps}`,
+  "format=json"
+]);
+assert(koInit.ok === true, "ko locale init failed");
+assertGuiLocaleLabels(ribbonLabelsKo, "PARA-ZK: 새 프로젝트 만들기");
+
+const enInit = cliJson("para-zk:init", [
+  "locale=en",
+  "force=true",
+  `installDeps=${installDeps}`,
+  "format=json"
+]);
+assert(enInit.ok === true, "en locale init failed");
+assertGuiLocaleLabels(ribbonLabelsEn, "PARA-ZK: Create project");
 
 const today = todayIso();
 const dailyJournalPath = `Journal/${today.slice(0, 7)}/${today}.md`;
@@ -376,6 +397,45 @@ function cliJson(command, commandArgs) {
   } catch (error) {
     throw new Error(`Command did not return JSON: ${command}\n${result.stdout}\n${result.stderr}`);
   }
+}
+
+function guiJson(code) {
+  const result = run("optsidian", ["eval", `code=${code}`]);
+  try {
+    return JSON.parse(result.stdout);
+  } catch (error) {
+    throw new Error(`Obsidian eval did not return JSON\n${result.stdout}\n${result.stderr}`);
+  }
+}
+
+function assertGuiLocaleLabels(expectedRibbonLabels, expectedCreateProjectCommandName) {
+  const snapshot = guiJson(`console.log(JSON.stringify({
+    ribbon: Array.from(document.querySelectorAll(".para-zk-ribbon-action"))
+      .map((el) => ({
+        label: el.getAttribute("aria-label"),
+        order: Number(getComputedStyle(el).order),
+        top: el.getBoundingClientRect().top
+      }))
+      .sort((left, right) => left.top - right.top),
+    createProjectCommandName: app.commands.commands["para-zk:create-project"]?.name
+  }))`);
+
+  assert(Array.isArray(snapshot.ribbon), "ribbon snapshot is not an array");
+  assert(
+    snapshot.ribbon.length === expectedRibbonLabels.length,
+    `expected ${expectedRibbonLabels.length} PARA-ZK ribbon actions, got ${snapshot.ribbon.length}`
+  );
+
+  for (const [index, expectedLabel] of expectedRibbonLabels.entries()) {
+    const action = snapshot.ribbon[index];
+    assert(action.label === expectedLabel, `ribbon label ${index} expected ${expectedLabel}, got ${action.label}`);
+    assert(action.order === 100 + index, `ribbon order ${index} expected ${100 + index}, got ${action.order}`);
+  }
+
+  assert(
+    snapshot.createProjectCommandName === expectedCreateProjectCommandName,
+    `create-project command name expected ${expectedCreateProjectCommandName}, got ${snapshot.createProjectCommandName}`
+  );
 }
 
 function run(command, commandArgs, options = {}) {

@@ -22,6 +22,9 @@ GUI commands:
 - `PARA-ZK: Promote resource to ZK`
 - `PARA-ZK: Promote fleeting note`
 
+PARA-ZK also adds left-ribbon shortcuts for the main human workflows:
+project, area, resource, ZK, daily note, and quick memo.
+
 `PARA-ZK: Initialize PARA-ZK vault` opens an options modal in the Obsidian GUI.
 When invoked through Obsidian's command passthrough, it also accepts command
 arguments. Use `force=true` to regenerate managed files instead of exposing a
@@ -49,6 +52,8 @@ localized label inside the generated note.
 
 When `locale` is omitted, PARA-ZK defaults to English. Pass `locale=ko` when a
 Korean vault UI and generated Markdown are desired.
+Changing the locale from the GUI settings or init command refreshes command
+palette and ribbon labels in place, without moving existing ribbon icons.
 
 `para-zk:init` creates the PARA/ZK vault layout, managed template reference files under
 `Templates/para-zk`, Dataview/Tasks dashboard files under `Dashboard`, and a root vault guide. It
