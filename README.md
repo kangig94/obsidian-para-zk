@@ -83,6 +83,7 @@ to replace those plugins.
 Start with [docs/FIRST_READ.md](docs/FIRST_READ.md) for the project intent,
 reference-vault rules, and the GUI/CLI contract.
 
+See [docs/CLI.md](docs/CLI.md) for the LLM-facing native CLI contract.
 See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the current development changelog.
 
 ```bash
@@ -100,6 +101,13 @@ For local auto-sync, copy `.env.example` to `.env` and set `OBSIDIAN_PLUGIN_DIR`
 ```bash
 npm run watch
 npm run sync
+```
+
+For disposable-vault smoke testing:
+
+```bash
+npm run smoke:vault -- --vault /path/to/test-vault
+npm run smoke:vault -- --vault /path/to/test-vault --clean
 ```
 
 `npm run lint` runs the structural architecture guard and TypeScript check. The

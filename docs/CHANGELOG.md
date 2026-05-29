@@ -23,6 +23,7 @@ Notable changes for PARA-ZK are tracked here.
 - Added native Home dashboard action rendering with `para-zk-dashboard-actions`.
 - Added native dashboard summary card rendering with `para-zk-dashboard-summary`.
 - Added a first-read project intent document for LLM agents and contributors.
+- Added LLM-facing CLI contract documentation and disposable-vault smoke test tooling.
 
 ### Changed
 

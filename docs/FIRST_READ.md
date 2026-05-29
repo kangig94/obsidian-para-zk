@@ -71,6 +71,8 @@ The core behavior belongs in `src/workflows.ts`. GUI commands, inline buttons,
 dashboard action blocks, and native CLI handlers should call this workflow layer
 instead of duplicating business logic.
 
+The LLM-facing CLI contract is documented in `docs/CLI.md`.
+
 Important modules:
 
 - `src/workflows.ts`: canonical PARA/ZK operations and vault side effects.
@@ -131,6 +133,13 @@ OBSIDIAN_PLUGIN_DIR=/home/kang/documents/para-zk/.obsidian/plugins/para-zk npm r
 optsidian open-gui vault-path=/home/kang/documents/para-zk
 optsidian raw plugin:reload id=para-zk
 optsidian raw para-zk:init installDeps=true locale=ko format=json
+```
+
+The automated smoke test wraps the same flow and verifies generated files:
+
+```bash
+npm run smoke:vault -- --vault /home/kang/documents/para-zk
+npm run smoke:vault -- --vault /home/kang/documents/para-zk --clean
 ```
 
 When a clean test is needed, preserve `.obsidian` and clear the rest of

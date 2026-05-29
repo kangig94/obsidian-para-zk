@@ -8,6 +8,7 @@
     "dev": "node tools/build.mjs",
     "watch": "node tools/build.mjs --watch",
     "sync": "node tools/sync.mjs",
+    "smoke:vault": "node tools/smoke-test-vault.mjs",
     "typecheck": "tsc --noEmit",
     "lint:architecture": "node tools/check-architecture.mjs",
     "lint": "npm run lint:architecture && npm run typecheck"
