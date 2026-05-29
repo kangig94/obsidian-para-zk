@@ -809,124 +809,32 @@ function dataviewJs(lines: string[]): string[] {
   ]);
 }
 
-function dashboardCardsScript(cards: string[]): string[] {
-  return dataviewJs([
-    "const root = dv.container.createDiv({ cls: 'mtr-cards' });",
-    "const card = (emoji, label, value, sub = '') => {",
-    "  const c = root.createDiv({ cls: 'mtr-card' });",
-    "  c.createDiv({ cls: 'mtr-label', text: `${emoji} ${label}` });",
-    "  c.createDiv({ cls: 'mtr-value', text: String(value) });",
-    "  if (sub) c.createDiv({ cls: 'mtr-sub', text: sub });",
-    "};",
-    ...cards
-  ]);
+function dashboardHomeSummary(_t: ReturnType<typeof localePack>): string[] {
+  return dashboardSummaryBlock("home");
 }
 
-function dashboardHomeSummary(t: ReturnType<typeof localePack>): string[] {
-  return dashboardCardsScript([
-    "const projects = pages('\"PARA/Projects\"').filter(p => p.type === 'project' && !p.file.path.includes('/Archives/'));",
-    "const areas = pages('\"PARA/Areas\"').filter(p => p.type === 'area');",
-    "const resources = pages('\"PARA/Resources\"').filter(p => p.type === 'resource');",
-    "const fleeting = pages('\"ZK/Fleeting\"').filter(p => !p.file.path.includes('/Archives/'));",
-    "const literature = pages('\"ZK/Literature\"');",
-    "const permanent = pages('\"ZK/Permanent\"');",
-    `card('📦', ${jsString(t.labels.project)}, projects.length);`,
-    `card('🧱', ${jsString(t.labels.area)}, areas.length);`,
-    `card('📚', ${jsString(t.labels.references)}, resources.length);`,
-    "card('🌟', 'Fleeting', fleeting.length);",
-    "card('📚', 'Literature', literature.length);",
-    "card('🧠', 'Permanent', permanent.length);"
-  ]);
+function dashboardProjectsSummary(_t: ReturnType<typeof localePack>): string[] {
+  return dashboardSummaryBlock("projects");
 }
 
-function dashboardProjectsSummary(t: ReturnType<typeof localePack>): string[] {
-  return dashboardCardsScript([
-    "const days = (n) => 1000 * 60 * 60 * 24 * n;",
-    "const today = new Date(); today.setHours(0,0,0,0);",
-    "const all = pages('\"PARA/Projects\"').filter(p => p.type === 'project');",
-    "const active = all.filter(p => !p.file.path.includes('/Archives/'));",
-    "const withDue = active.filter(p => !!p.due_date);",
-    "const dueToday = withDue.filter(p => dayOf(p.due_date) === today.getTime());",
-    "const overdue = withDue.filter(p => dayOf(p.due_date) < today.getTime());",
-    "const soon7 = withDue.filter(p => { const diff = dayOf(p.due_date) - today.getTime(); return diff >= 0 && diff <= days(7); });",
-    "const soon30 = withDue.filter(p => { const diff = dayOf(p.due_date) - today.getTime(); return diff > days(7) && diff <= days(30); });",
-    `card('📦', ${jsString(t.labels.total)}, all.length);`,
-    `card('🟣', ${jsString(t.labels.active)}, active.length);`,
-    `card('📅', ${jsString(t.labels.dueToday)}, dueToday.length);`,
-    `card('⏰', ${jsString(t.labels.overdue)}, overdue.length);`,
-    `card('🗓️', ${jsString(t.labels.dueSoon7)}, soon7.length);`,
-    `card('📆', ${jsString(t.labels.dueSoon30)}, soon30.length);`
-  ]);
+function dashboardAreasSummary(_t: ReturnType<typeof localePack>): string[] {
+  return dashboardSummaryBlock("areas");
 }
 
-function dashboardAreasSummary(t: ReturnType<typeof localePack>): string[] {
-  return dashboardCardsScript([
-    "const areas = pages('\"PARA/Areas\"').filter(p => p.type === 'area');",
-    "const projects = pages('\"PARA/Projects\"').filter(p => p.type === 'project' && !p.file.path.includes('/Archives/'));",
-    "const linkedAreas = areas.filter(a => projects.some(p => asArray(p.areas).some(x => sameLink(x, a))));",
-    `card('📦', ${jsString(t.labels.total)}, areas.length);`,
-    `card('🔗', ${jsString(t.labels.dashboardProjects)}, linkedAreas.length);`
-  ]);
+function dashboardResourcesSummary(_t: ReturnType<typeof localePack>): string[] {
+  return dashboardSummaryBlock("resources");
 }
 
-function dashboardResourcesSummary(t: ReturnType<typeof localePack>): string[] {
-  return dashboardCardsScript([
-    "const days = (n) => 1000 * 60 * 60 * 24 * n;",
-    "const now = Date.now();",
-    "const resources = pages('\"PARA/Resources\"').filter(p => p.type === 'resource');",
-    "const inUse = resources.filter(r => asArray(r.file.inlinks).some(l => l.path.startsWith('PARA/Projects/') || l.path.startsWith('PARA/Areas/')));",
-    "const free = resources.filter(r => !asArray(r.file.inlinks).some(l => l.path.startsWith('PARA/Projects/') || l.path.startsWith('PARA/Areas/')));",
-    "const orphan = resources.filter(r => asArray(r.file.inlinks).length === 0);",
-    "const zkReferenced = resources.filter(r => asArray(r.file.inlinks).some(l => l.path.startsWith('ZK/')));",
-    "const staleFree = free.filter(r => timeOf(r.file.mtime) < now - days(30));",
-    `card('📦', ${jsString(t.labels.total)}, resources.length);`,
-    `card('🔗', ${jsString(t.labels.active)}, inUse.length);`,
-    `card('🟦', ${jsString(t.labels.unreferenced)}, free.length);`,
-    `card('🧩', ${jsString(t.labels.independentResources)}, orphan.length);`,
-    `card('🕰️', ${jsString(t.labels.draftCandidates)}, staleFree.length);`,
-    `card('🧭', ${jsString(t.labels.dashboardZk)}, zkReferenced.length);`
-  ]);
+function dashboardZkSummary(_t: ReturnType<typeof localePack>): string[] {
+  return dashboardSummaryBlock("zk");
 }
 
-function dashboardZkSummary(t: ReturnType<typeof localePack>): string[] {
-  return dashboardCardsScript([
-    "const days = (n) => 1000 * 60 * 60 * 24 * n;",
-    "const now = Date.now();",
-    "const fleeting = pages('\"ZK/Fleeting\"').filter(p => !p.file.path.includes('/Archives/'));",
-    "const literature = pages('\"ZK/Literature\"');",
-    "const permanent = pages('\"ZK/Permanent\"');",
-    "const stale = fleeting.filter(f => now - timeOf(f.file.ctime) >= days(7));",
-    `const draftLabel = ${jsString(t.maturity.draft)};`,
-    `const refinedLabel = ${jsString(t.maturity.refined)};`,
-    `const evergreenLabel = ${jsString(t.maturity.evergreen)};`,
-    "const draft = permanent.filter(p => p.maturity === 'draft');",
-    "const refined = permanent.filter(p => p.maturity === 'refined');",
-    "const evergreen = permanent.filter(p => p.maturity === 'evergreen');",
-    `card('🌟', 'Fleeting', fleeting.length, ${jsString(t.labels.staleFleeting)} + ' ' + stale.length);`,
-    "card('📚', 'Literature', literature.length);",
-    "card('🧠', 'Permanent', permanent.length);",
-    "card('📝', draftLabel, draft.length);",
-    "card('✨', refinedLabel, refined.length);",
-    "card('🍃', evergreenLabel, evergreen.length);"
-  ]);
+function dashboardReviewSummary(_t: ReturnType<typeof localePack>): string[] {
+  return dashboardSummaryBlock("review");
 }
 
-function dashboardReviewSummary(t: ReturnType<typeof localePack>): string[] {
-  return dashboardCardsScript([
-    "const startOfWeek = (() => { const d = new Date(); const day = (d.getDay() + 6) % 7; d.setHours(0,0,0,0); d.setDate(d.getDate() - day); return d; })();",
-    "const since = startOfWeek.getTime();",
-    "const resources = pages('\"PARA/Resources\"');",
-    "const fleeting = pages('\"ZK/Fleeting\"').filter(p => !p.file.path.includes('/Archives/'));",
-    "const literature = pages('\"ZK/Literature\"');",
-    "const permanent = pages('\"ZK/Permanent\"');",
-    "const created = (items) => items.filter(p => timeOf(p.file.ctime) >= since).length;",
-    "const updated = (items) => items.filter(p => timeOf(p.file.mtime) >= since).length;",
-    `card('📄', ${jsString(t.labels.createdThisWeek)}, created(resources));`,
-    `card('✏️', ${jsString(t.labels.updatedThisWeek)}, updated(resources));`,
-    "card('🌟', 'Fleeting', created(fleeting));",
-    "card('📚', 'Literature', created(literature));",
-    "card('🧠', 'Permanent', created(permanent));"
-  ]);
+function dashboardSummaryBlock(type: "home" | "projects" | "areas" | "resources" | "zk" | "review"): string[] {
+  return fenced("para-zk-dashboard-summary", [`type: ${type}`]);
 }
 
 function dashboardDueProjects(t: ReturnType<typeof localePack>, limit: number): string[] {

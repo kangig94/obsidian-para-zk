@@ -59,6 +59,8 @@ workflow implementation as the matching CLI handler.
 
 The generated Home dashboard uses a native `para-zk-dashboard-actions` block to render
 grouped action buttons and dashboard navigation without Meta Bind or callout wrappers.
+Dashboard summary cards use native `para-zk-dashboard-summary` blocks so card layout
+and metric calculation are owned by PARA-ZK instead of DataviewJS snippets.
 
 Generated templates also use native PARA-ZK props controls:
 

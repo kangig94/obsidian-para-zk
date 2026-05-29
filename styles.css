@@ -65,15 +65,17 @@
 .para-zk-dashboard-actions {
   display: grid;
   gap: 12px;
-  margin: 1em 0;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin: 8px 0 16px;
 }
 
 .para-zk-action-panel {
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 12px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, .06);
-  padding: 12px 14px;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .05);
+  min-width: 0;
+  padding: 10px 12px;
 }
 
 .para-zk-action-panel-title {
@@ -88,22 +90,22 @@
 }
 
 .para-zk-action-panel-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
 }
 
 .para-zk-dashboard-action {
   box-shadow: 0 1px 1px rgba(0, 0, 0, .04);
-  flex: 0 0 auto;
   font-size: var(--font-ui-small);
   font-weight: 600;
   justify-content: center;
   line-height: 1.1;
   min-height: 34px;
-  min-width: 128px;
-  padding: 8px 14px;
+  min-width: 0;
+  padding: 8px 10px;
   text-align: center;
+  width: 100%;
 }
 
 .para-zk-dashboard-action-primary {
@@ -125,6 +127,55 @@
 .para-zk-dashboard-action-secondary:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
+}
+
+.para-zk-summary-cards {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin: 8px 0 16px;
+}
+
+.para-zk-summary-card {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .05);
+  column-gap: 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 10px 12px;
+  row-gap: 4px;
+}
+
+.para-zk-summary-label {
+  align-items: center;
+  color: var(--text-muted);
+  display: flex;
+  font-size: var(--font-ui-smaller);
+  gap: 6px;
+  grid-column: 1;
+  line-height: var(--line-height-tight);
+}
+
+.para-zk-summary-value {
+  color: var(--text-accent);
+  font-size: 22px;
+  font-weight: 800;
+  grid-column: 2;
+  justify-self: end;
+  line-height: 1.1;
+}
+
+.para-zk-summary-sub {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  grid-column: 1 / -1;
+}
+
+.para-zk-summary-muted {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
 }
 
 .para-zk-props {
