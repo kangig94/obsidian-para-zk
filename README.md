@@ -57,6 +57,9 @@ The generated templates use native inline action tokens such as
 token is rendered as a compact button inside the Markdown heading and calls the same
 workflow implementation as the matching CLI handler.
 
+The generated Home dashboard uses a native `para-zk-dashboard-actions` block to render
+grouped action buttons and dashboard navigation without Meta Bind or callout wrappers.
+
 Generated templates also use native PARA-ZK props controls:
 
 ````markdown

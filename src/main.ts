@@ -2,6 +2,7 @@ import { Plugin } from "obsidian";
 import { registerNativeCliHandlers } from "./cli/handlers";
 import { loadSettings as loadRuntimeSettings, saveSettings as saveRuntimeSettings } from "./runtime/settings";
 import { DEFAULT_SETTINGS, type InitOptions, type InitResult, type ParaZkSettings } from "./types";
+import { registerDashboardActionRenderers } from "./ux/dashboard-actions";
 import { registerInlineActionRenderers } from "./ux/inline-actions";
 import { registerPropsControlRenderers } from "./ux/props-controls";
 import { ParaZkSettingTab } from "./ux/settings";
@@ -18,6 +19,7 @@ export default class ParaZkPlugin extends Plugin {
 
     registerStatusAndInitCommands(this);
     registerWorkflowCommands(this);
+    registerDashboardActionRenderers(this);
     registerInlineActionRenderers(this);
     registerPropsControlRenderers(this);
 

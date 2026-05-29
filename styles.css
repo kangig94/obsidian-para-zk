@@ -62,6 +62,71 @@
   text-align: left;
 }
 
+.para-zk-dashboard-actions {
+  display: grid;
+  gap: 12px;
+  margin: 1em 0;
+}
+
+.para-zk-action-panel {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .06);
+  padding: 12px 14px;
+}
+
+.para-zk-action-panel-title {
+  align-items: center;
+  color: var(--text-normal);
+  display: flex;
+  font-size: var(--font-ui-medium);
+  font-weight: 700;
+  gap: 8px;
+  line-height: var(--line-height-tight);
+  margin-bottom: 10px;
+}
+
+.para-zk-action-panel-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.para-zk-dashboard-action {
+  box-shadow: 0 1px 1px rgba(0, 0, 0, .04);
+  flex: 0 0 auto;
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+  justify-content: center;
+  line-height: 1.1;
+  min-height: 34px;
+  min-width: 128px;
+  padding: 8px 14px;
+  text-align: center;
+}
+
+.para-zk-dashboard-action-primary {
+  background: color-mix(in srgb, var(--interactive-accent) 92%, white 8%);
+  border-color: transparent;
+  color: var(--text-on-accent, #fff);
+}
+
+.para-zk-dashboard-action-primary:hover {
+  background: var(--interactive-accent);
+}
+
+.para-zk-dashboard-action-secondary {
+  background: color-mix(in srgb, var(--background-secondary) 92%, black 8%);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+.para-zk-dashboard-action-secondary:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
 .para-zk-props {
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;

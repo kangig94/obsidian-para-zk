@@ -42,7 +42,6 @@ export async function initializeVault(
     await writeManagedFile(app, artifact.path, artifact.content, result, {
       dryRun,
       force,
-      managedTemplatesFolder: nextSettings.paths.managedTemplatesFolder,
       managedFiles: nextSettings.managedFiles
     });
   }
@@ -97,7 +96,6 @@ async function writeManagedFile(
   options: {
     dryRun: boolean;
     force: boolean;
-    managedTemplatesFolder: string;
     managedFiles: Record<string, ManagedFileState>;
   }
 ): Promise<void> {
@@ -130,7 +128,6 @@ async function writeManagedFile(
   const current = await app.vault.read(existing);
   const currentHash = hashText(current);
   const known = options.managedFiles[normalized];
-  const conventionManaged = isUnderManagedTemplatesFolder(normalized, options.managedTemplatesFolder);
 
   if (current === content) {
     addUnique(result.existing, normalized);
@@ -140,7 +137,7 @@ async function writeManagedFile(
     return;
   }
 
-  if (!known && !(options.force && conventionManaged)) {
+  if (!known && !options.force) {
     addUnique(result.skipped, normalized);
     addUnique(result.warnings, `Skipped user-managed file at ${normalized}`);
     return;
@@ -169,11 +166,6 @@ function parentFolder(path: string): string {
   const normalized = normalizeVaultPath(path);
   const index = normalized.lastIndexOf("/");
   return index === -1 ? "" : normalized.slice(0, index);
-}
-
-function isUnderManagedTemplatesFolder(path: string, managedTemplatesFolder: string): boolean {
-  const folder = normalizeVaultPath(managedTemplatesFolder);
-  return path === folder || path.startsWith(`${folder}/`);
 }
 
 function addUnique(items: string[], value: string): void {

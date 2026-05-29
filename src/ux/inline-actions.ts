@@ -68,7 +68,7 @@ function renderInlineParaZkActions(plugin: ParaZkPluginContext, el: HTMLElement,
   }
 }
 
-function createWorkflowButton(
+export function createWorkflowButton(
   plugin: ParaZkPluginContext,
   label: string,
   command: string | undefined,

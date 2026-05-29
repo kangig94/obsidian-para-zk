@@ -637,11 +637,7 @@ function renderDashboardBody(
   switch (kind) {
     case "home":
       return [
-        `## ${t.labels.createNew}`,
-        `${paraZkInlineAction("create-project", t.labels.createProjectCommandName)} ${paraZkInlineAction("create-area", t.labels.createAreaCommandName)} ${paraZkInlineAction("create-resource", t.labels.createResourceCommandName)} ${paraZkInlineAction("create-zk", t.labels.createZkCommandName)} ${paraZkInlineAction("capture-journal", t.labels.captureJournalCommandName)}`,
-        "",
-        `## ${t.labels.openDashboards}`,
-        `[[Dashboard/Projects|${t.labels.dashboardProjects}]] · [[Dashboard/Areas|${t.labels.dashboardAreas}]] · [[Dashboard/Resources|${t.labels.dashboardResources}]] · [[Dashboard/ZK|${t.labels.dashboardZk}]] · [[Dashboard/Tasks|${t.labels.dashboardTasks}]] · [[Dashboard/Review|${t.labels.dashboardReview}]]`,
+        ...fenced("para-zk-dashboard-actions", []),
         "",
         `## ${t.labels.summary}`,
         ...dashboardHomeSummary(t),
