@@ -327,7 +327,6 @@ function inferVaultPath() {
   const candidates = [
     process.env.PARA_ZK_TEST_VAULT,
     process.env.OPTSIDIAN_VAULT_PATH,
-    "/home/kang/documents/para-zk",
     join(process.env.HOME ?? "", "documents/para-zk"),
     join(process.env.HOME ?? "", "Documents/para-zk")
   ].filter(Boolean);

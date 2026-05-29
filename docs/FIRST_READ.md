@@ -23,13 +23,13 @@ keep the resulting frontmatter and backlinks coherent.
 
 Use these vaults with different trust levels:
 
-- `/home/kang/documents/para-zk` is the usual disposable test vault, but the
-  exact test vault name or path may vary between machines and sessions. Infer it
-  from local context when needed: look for a vault that has `.obsidian`, a
-  `para-zk` plugin install, or is clearly named for PARA-ZK testing. It may be
-  cleared, reinitialized, and filled with smoke-test notes to validate this
-  plugin. Do not treat its current contents as a specification; older generated
-  files may not match the current source.
+- The disposable test vault path may vary between machines and sessions. Prefer
+  `$PARA_ZK_TEST_VAULT` when it is set; otherwise infer the vault from local
+  context by looking for a vault that has `.obsidian`, a `para-zk` plugin
+  install, or a name clearly meant for PARA-ZK testing. It may be cleared,
+  reinitialized, and filled with smoke-test notes to validate this plugin. Do
+  not treat its current contents as a specification; older generated files may
+  not match the current source.
 - This repository is the implementation source of truth. Generated vault output
   must be judged against current source code, not against stale test-vault
   artifacts.
@@ -127,14 +127,13 @@ Promotion behavior should preserve traceability:
 
 ## Verification Workflow
 
-For local validation, use the disposable test vault. The examples below use the
-common local path `/home/kang/documents/para-zk`; if the test vault has a
-different name, infer the correct path from the local Obsidian vaults and plugin
-install directories.
+For local validation, use the disposable test vault. Set `PARA_ZK_TEST_VAULT` or
+replace `/path/to/para-zk-test-vault` with the local disposable vault path.
 
 ```bash
-OBSIDIAN_PLUGIN_DIR=/home/kang/documents/para-zk/.obsidian/plugins/para-zk npm run build
-optsidian open-gui vault-path=/home/kang/documents/para-zk
+export PARA_ZK_TEST_VAULT=/path/to/para-zk-test-vault
+OBSIDIAN_PLUGIN_DIR="$PARA_ZK_TEST_VAULT/.obsidian/plugins/para-zk" npm run build
+optsidian open-gui vault-path="$PARA_ZK_TEST_VAULT"
 optsidian raw plugin:reload id=para-zk
 optsidian raw para-zk:init installDeps=true format=json
 ```
@@ -145,14 +144,14 @@ generated headings, labels, and tags.
 The automated smoke test wraps the same flow and verifies generated files:
 
 ```bash
-npm run smoke:vault -- --vault /home/kang/documents/para-zk
-npm run smoke:vault -- --vault /home/kang/documents/para-zk --clean
+npm run smoke:vault -- --vault "$PARA_ZK_TEST_VAULT"
+npm run smoke:vault -- --vault "$PARA_ZK_TEST_VAULT" --clean
 ```
 
 When a clean test is needed, preserve `.obsidian` and clear the rest of
-`/home/kang/documents/para-zk`, then remove
-`/home/kang/documents/para-zk/.obsidian/plugins/para-zk/data.json` before
-running `para-zk:init`.
+the disposable vault, then remove
+`$PARA_ZK_TEST_VAULT/.obsidian/plugins/para-zk/data.json` before running
+`para-zk:init`.
 
 Representative CLI smoke tests should cover:
 
