@@ -80,6 +80,8 @@ to replace those plugins.
 
 ## Development
 
+See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the current development changelog.
+
 ```bash
 npm install
 npm run lint
