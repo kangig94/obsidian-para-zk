@@ -11,9 +11,13 @@ Notable changes for PARA-ZK are tracked here.
   journal capture, and note promotion.
 - Added idempotent vault initialization for PARA, ZK, Journal, Dashboard, Templates,
   and managed PARA-ZK template files.
-- Added dependency checks for Dataview, Tasks, Tabs, and Folder notes during initialization.
-  `installDeps=true` installs and enables missing dependencies, and DataviewJS is
-  enabled when Dataview is present.
+- Added dependency checks for Dataview, Tasks, Tabs, Folder notes, and Update
+  time on edit during initialization. `installDeps=true` installs and enables
+  missing dependencies, DataviewJS is enabled when Dataview is present, and
+  Update time on edit is configured for `created`/`updated` frontmatter.
+- Added Obsidian core configuration to vault initialization, including automatic
+  link updates, the `assets` attachment folder, ignored generated/reference paths,
+  hidden document properties, and the core Templates folder.
 - Added locale-neutral workflow arguments for CLI automation while keeping localized
   labels in the Obsidian GUI.
 - Added native PARA-ZK inline action buttons with `PZK[...]` tokens, replacing the

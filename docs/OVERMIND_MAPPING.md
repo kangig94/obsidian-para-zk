@@ -40,6 +40,9 @@ CLI ergonomics.
 | Tasks | Task queries | Required dependency; task blocks remain Tasks queries | ported | PARA-ZK does not replace Tasks. |
 | Tabs | Split open/done task views | Required dependency; generated area task sections may use Tabs | ported | Kept where it matches Overmind UX. |
 | Folder Notes | Folder-style project/area navigation | Required dependency | ported | Needed because projects and areas are folder-style notes. |
+| Update time on edit | Maintain `created` and `updated` frontmatter on human edits | Required dependency; `para-zk:init` configures its frontmatter keys and ignored paths | ported | Runtime hash state is preserved when settings are merged; managed generated files are excluded. |
+| Obsidian app settings | Link updates, attachment folder, hidden properties, and ignored generated/reference paths | `para-zk:init` merges `.obsidian/app.json` | ported | Existing unrelated app settings are preserved. |
+| Core Templates plugin | Default template folder | `para-zk:init` merges `.obsidian/templates.json` | ported | Sets the folder to `Templates`. |
 
 ## QuickAdd Choice Mapping
 

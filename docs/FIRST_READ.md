@@ -86,7 +86,8 @@ Important modules:
 - `src/ux/dashboard-actions.ts`: native Home dashboard action block.
 - `src/ux/dashboard-summary.ts`: native dashboard summary cards.
 - `src/runtime/init.ts`: idempotent vault initialization and managed file writes.
-- `src/runtime/dependencies.ts`: Dataview, Tasks, Tabs, and Folder Notes dependency handling.
+- `src/runtime/dependencies.ts`: Dataview, Tasks, Tabs, Folder Notes, and
+  Update time on edit dependency handling.
 
 The architecture lint intentionally rejects content-blank modules and enforces
 layer boundaries. Keep core workflow/template modules independent from CLI, UX,
@@ -111,6 +112,8 @@ Dataview and Tasks remain query engines. PARA-ZK should not try to replace them.
 Tabs may still be used for generated task views where it matches the Overmind
 experience. Folder Notes is required because PARA-ZK uses folder-style project
 and area notes, where a folder and its main note share the same name.
+Update time on edit is required to keep `created` and `updated` frontmatter
+current after human edits in Obsidian.
 
 Folder-style notes are part of the workflow. Projects and areas are created as
 folders containing their main note. Child documents and child areas should link

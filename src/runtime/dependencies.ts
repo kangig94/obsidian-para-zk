@@ -1,6 +1,7 @@
 import { App, requestUrl, type PluginManifest } from "obsidian";
 import { isRecord } from "../records";
-import type { DependencyAction, DependencyResult } from "../types";
+import type { DependencyAction, DependencyResult, ParaZkSettings } from "../types";
+import { normalizeVaultPath } from "../vault/paths";
 
 type RequiredDependency = {
   id: string;
@@ -43,6 +44,12 @@ const REQUIRED_DEPENDENCIES: RequiredDependency[] = [
     name: "Folder notes",
     repo: "LostPaul/obsidian-folder-notes",
     reason: "PARA-ZK uses folder-style project and area notes that should open from folder clicks"
+  },
+  {
+    id: "update-time-on-edit",
+    name: "Update time on edit",
+    repo: "beaussan/update-time-on-edit-obsidian",
+    reason: "PARA-ZK relies on created and updated frontmatter staying current after human edits"
   }
 ];
 
@@ -50,12 +57,17 @@ const COMMUNITY_PLUGINS_CONFIG = ".obsidian/community-plugins.json";
 const DATAVIEW_PLUGIN_ID = "dataview";
 const DATAVIEW_PLUGIN_DIR = ".obsidian/plugins/dataview";
 const DATAVIEW_SETTINGS_PATH = `${DATAVIEW_PLUGIN_DIR}/data.json`;
+const UPDATE_TIME_PLUGIN_ID = "update-time-on-edit";
+const UPDATE_TIME_PLUGIN_DIR = ".obsidian/plugins/update-time-on-edit";
+const UPDATE_TIME_SETTINGS_PATH = `${UPDATE_TIME_PLUGIN_DIR}/data.json`;
+const ATTACHMENT_FOLDER = "assets";
 
 export async function resolveDependencies(
   app: App,
   options: {
     installDeps: boolean;
     dryRun: boolean;
+    settings: ParaZkSettings;
     warnings: string[];
   }
 ): Promise<DependencyResult[]> {
@@ -121,13 +133,28 @@ async function configureDependency(
   result: DependencyResult,
   options: {
     dryRun: boolean;
+    settings: ParaZkSettings;
     warnings: string[];
   }
 ): Promise<void> {
-  if (dependency.id !== DATAVIEW_PLUGIN_ID) return;
+  if (dependency.id !== DATAVIEW_PLUGIN_ID && dependency.id !== UPDATE_TIME_PLUGIN_ID) return;
   if (!result.installed && !options.dryRun) return;
 
   try {
+    if (dependency.id === UPDATE_TIME_PLUGIN_ID) {
+      if (options.dryRun) {
+        if (!await isUpdateTimeOnEditConfigured(app, manager, options.settings)) {
+          addConfigured(result, "would_configure_update_time_on_edit");
+        }
+        return;
+      }
+
+      if (await ensureUpdateTimeOnEditConfigured(app, manager, options.settings)) {
+        addConfigured(result, "configured_update_time_on_edit");
+      }
+      return;
+    }
+
     if (options.dryRun) {
       if (!await isDataviewJsEnabled(app, manager)) addConfigured(result, "would_enable_dataview_js");
       return;
@@ -336,6 +363,119 @@ async function updateRunningDataviewSettings(
     ...currentSettings,
     ...settings
   };
+
+  const saveData = plugin.saveData;
+  if (typeof saveData === "function") {
+    await saveData.call(plugin, plugin.settings);
+  }
+}
+
+async function isUpdateTimeOnEditConfigured(
+  app: App,
+  manager: PluginManager,
+  settings: ParaZkSettings
+): Promise<boolean> {
+  const currentSettings = await readUpdateTimeOnEditSettings(app);
+  const nextSettings = mergeUpdateTimeOnEditSettings(currentSettings, settings);
+  if (JSON.stringify(currentSettings) !== JSON.stringify(nextSettings)) return false;
+
+  const runtimeSettings = readRuntimePluginSettings(manager, UPDATE_TIME_PLUGIN_ID);
+  if (!runtimeSettings) return true;
+  return JSON.stringify(runtimeSettings) === JSON.stringify(mergeUpdateTimeOnEditSettings(runtimeSettings, settings));
+}
+
+async function ensureUpdateTimeOnEditConfigured(
+  app: App,
+  manager: PluginManager,
+  settings: ParaZkSettings
+): Promise<boolean> {
+  const currentSettings = await readUpdateTimeOnEditSettings(app);
+  const nextSettings = mergeUpdateTimeOnEditSettings(currentSettings, settings);
+  const runtimeSettings = readRuntimePluginSettings(manager, UPDATE_TIME_PLUGIN_ID);
+  const runtimeChanged = runtimeSettings
+    ? JSON.stringify(runtimeSettings) !== JSON.stringify(mergeUpdateTimeOnEditSettings(runtimeSettings, settings))
+    : false;
+  const changed = JSON.stringify(currentSettings) !== JSON.stringify(nextSettings) || runtimeChanged;
+  if (!changed) return false;
+
+  await ensureAdapterFolder(app, UPDATE_TIME_PLUGIN_DIR);
+  await app.vault.adapter.write(UPDATE_TIME_SETTINGS_PATH, `${JSON.stringify(nextSettings, null, 2)}\n`);
+  await updateRunningPluginSettings(manager, UPDATE_TIME_PLUGIN_ID, nextSettings);
+  return true;
+}
+
+async function readUpdateTimeOnEditSettings(app: App): Promise<Record<string, unknown>> {
+  if (!await app.vault.adapter.exists(UPDATE_TIME_SETTINGS_PATH)) return {};
+  const raw = await app.vault.adapter.read(UPDATE_TIME_SETTINGS_PATH);
+  if (!raw.trim()) return {};
+  const parsed = JSON.parse(raw) as unknown;
+  if (!isRecord(parsed)) throw new Error(`${UPDATE_TIME_SETTINGS_PATH} is not a JSON object`);
+  return parsed;
+}
+
+function mergeUpdateTimeOnEditSettings(
+  current: Record<string, unknown>,
+  settings: ParaZkSettings
+): Record<string, unknown> {
+  return {
+    ...current,
+    dateFormat: "yyyy-MM-dd'T'HH:mm",
+    enableCreateTime: true,
+    headerUpdated: "updated",
+    headerCreated: "created",
+    minMinutesBetweenSaves: 1,
+    ignoreGlobalFolder: mergeStringList(current.ignoreGlobalFolder, [
+      settings.paths.templatesFolder,
+      settings.paths.dashboardFolder,
+      ATTACHMENT_FOLDER,
+      "README"
+    ]),
+    ignoreCreatedFolder: mergeStringList(current.ignoreCreatedFolder, [
+      settings.paths.templatesFolder,
+      settings.paths.dashboardFolder,
+      "README"
+    ]),
+    enableExperimentalHash: true
+  };
+}
+
+function mergeStringList(current: unknown, desired: string[]): string[] {
+  const merged = Array.isArray(current)
+    ? current.filter((item): item is string => typeof item === "string")
+    : [];
+
+  for (const item of desired.map(normalizeVaultPath).filter(Boolean)) {
+    if (!merged.includes(item)) merged.push(item);
+  }
+
+  return merged;
+}
+
+function readRuntimePluginSettings(manager: PluginManager, id: string): Record<string, unknown> | undefined {
+  const plugin = manager.plugins?.[id];
+  if (!isRecord(plugin)) return undefined;
+  return isRecord(plugin.settings) ? plugin.settings : undefined;
+}
+
+async function updateRunningPluginSettings(
+  manager: PluginManager,
+  id: string,
+  settings: Record<string, unknown>
+): Promise<void> {
+  const plugin = manager.plugins?.[id];
+  if (!isRecord(plugin)) return;
+
+  if (isRecord(plugin.settings)) {
+    Object.assign(plugin.settings, settings);
+  } else {
+    plugin.settings = { ...settings };
+  }
+
+  const saveSettings = plugin.saveSettings;
+  if (typeof saveSettings === "function") {
+    await saveSettings.call(plugin);
+    return;
+  }
 
   const saveData = plugin.saveData;
   if (typeof saveData === "function") {

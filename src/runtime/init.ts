@@ -8,6 +8,7 @@ import {
 } from "../types";
 import { normalizeVaultPath } from "../vault/paths";
 import { resolveDependencies } from "./dependencies";
+import { configureObsidianCoreSettings } from "./obsidian-core-config";
 
 export async function initializeVault(
   app: App,
@@ -38,6 +39,15 @@ export async function initializeVault(
     await ensureFolder(app, folder, result, dryRun);
   }
 
+  await configureObsidianCoreSettings(app, nextSettings, result, dryRun);
+
+  result.dependencies = await resolveDependencies(app, {
+    installDeps: options.installDeps ?? false,
+    dryRun,
+    settings: nextSettings,
+    warnings: result.warnings
+  });
+
   for (const artifact of managedArtifacts(nextSettings)) {
     await writeManagedFile(app, artifact.path, artifact.content, result, {
       dryRun,
@@ -45,12 +55,6 @@ export async function initializeVault(
       managedFiles: nextSettings.managedFiles
     });
   }
-
-  result.dependencies = await resolveDependencies(app, {
-    installDeps: options.installDeps ?? false,
-    dryRun,
-    warnings: result.warnings
-  });
 
   if (!dryRun) {
     return {

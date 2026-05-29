@@ -45,6 +45,9 @@ assertDependency(init, "dataview");
 assertDependency(init, "obsidian-tasks-plugin");
 assertDependency(init, "tabs");
 assertDependency(init, "folder-notes");
+assertDependency(init, "update-time-on-edit");
+assertObsidianCoreConfig();
+assertUpdateTimeOnEditConfig();
 assertGuiLocaleLabels(ribbonLabelsEn, "PARA-ZK: Create project");
 
 const koInit = cliJson("para-zk:init", [
@@ -470,6 +473,45 @@ function assertDependency(initPayload, id) {
     assert(dependency.installed === true, `${id} is not installed`);
     assert(dependency.enabled === true, `${id} is not enabled`);
   }
+}
+
+function assertObsidianCoreConfig() {
+  const appConfig = readVaultJson(".obsidian/app.json");
+  assert(appConfig.alwaysUpdateLinks === true, "app.json alwaysUpdateLinks was not enabled");
+  assert(appConfig.attachmentFolderPath === "assets", "app.json attachmentFolderPath is not assets");
+  assert(appConfig.propertiesInDocument === "hidden", "app.json propertiesInDocument is not hidden");
+
+  const ignoreFilters = appConfig.userIgnoreFilters;
+  assert(Array.isArray(ignoreFilters), "app.json userIgnoreFilters is not an array");
+  for (const filter of ["Templates/", "Dashboard/", "README"]) {
+    assert(ignoreFilters.includes(filter), `app.json userIgnoreFilters is missing ${filter}`);
+  }
+
+  const templatesConfig = readVaultJson(".obsidian/templates.json");
+  assert(templatesConfig.folder === "Templates", "templates.json folder is not Templates");
+}
+
+function assertUpdateTimeOnEditConfig() {
+  if (!installDeps) return;
+
+  const config = readVaultJson(".obsidian/plugins/update-time-on-edit/data.json");
+  assert(config.dateFormat === "yyyy-MM-dd'T'HH:mm", "update-time-on-edit dateFormat is not configured");
+  assert(config.enableCreateTime === true, "update-time-on-edit enableCreateTime is not enabled");
+  assert(config.headerUpdated === "updated", "update-time-on-edit headerUpdated is not updated");
+  assert(config.headerCreated === "created", "update-time-on-edit headerCreated is not created");
+  assert(config.minMinutesBetweenSaves === 1, "update-time-on-edit minMinutesBetweenSaves is not 1");
+  assert(config.enableExperimentalHash === true, "update-time-on-edit enableExperimentalHash is not enabled");
+
+  for (const folder of ["Templates", "Dashboard", "assets", "README"]) {
+    assert(config.ignoreGlobalFolder?.includes(folder), `update-time-on-edit ignoreGlobalFolder is missing ${folder}`);
+  }
+  for (const folder of ["Templates", "Dashboard", "README"]) {
+    assert(config.ignoreCreatedFolder?.includes(folder), `update-time-on-edit ignoreCreatedFolder is missing ${folder}`);
+  }
+}
+
+function readVaultJson(path) {
+  return JSON.parse(readFileSync(join(vaultPath, path), "utf8"));
 }
 
 function assertCreated(payload, label) {
