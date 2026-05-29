@@ -82,7 +82,15 @@ Successful workflow commands return JSON like:
   "command": "para-zk:create-project",
   "path": "PARA/Projects/Example/Example.md",
   "title": "Example",
-  "created": true
+  "created": true,
+  "areas": [
+    {
+      "title": "AI",
+      "path": "PARA/Areas/AI/AI.md",
+      "link": "[[PARA/Areas/AI/AI.md|AI]]",
+      "created": false
+    }
+  ]
 }
 ```
 
@@ -188,6 +196,7 @@ Options:
 | --- | --- | --- |
 | `title` | string | Required. Also accepted as `name`. |
 | `areas` | JSON array or comma list | Store area links in frontmatter. |
+| `area_titles` | JSON array or comma list | Reuse or create areas by title, then store links in frontmatter. `areaTitles` is also accepted. |
 | `status` | project status code | Defaults to `idea`. |
 | `priority` | priority code | Defaults to `low`. |
 | `open` | boolean | Default `false`. |
@@ -197,7 +206,7 @@ Example:
 ```bash
 optsidian raw para-zk:create-project \
   title="Model Evaluation" \
-  areas='["[[PARA/Areas/AI/AI.md|AI]]"]' \
+  area_titles='["AI","Software"]' \
   status=in_progress \
   priority=high \
   open=false \
@@ -208,6 +217,8 @@ Side effects:
 
 - Creates `PARA/Projects/<title>/<title>.md`.
 - Stores `status`, `priority`, `areas`, `type: project`, and a localized project tag.
+- For each `area_titles` item, reuses an existing area when possible or creates
+  `PARA/Areas/<area>/<area>.md` when missing.
 
 ### `para-zk:create-resource`
 
@@ -458,3 +469,8 @@ running the smoke test.
 ```bash
 npm run smoke:vault -- --vault /path/to/test-vault --clean
 ```
+
+On Linux, the smoke test opens the target vault with `open-gui no-wait` and
+uses `xdotool` when available to focus the matching Obsidian vault window before
+running native CLI commands. This keeps the test pointed at the disposable vault
+even when the Overmind reference vault is also open.

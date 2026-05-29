@@ -44,7 +44,7 @@ CLI ergonomics.
 
 | Overmind QuickAdd choice | Overmind behavior | PARA-ZK command/workflow | Status | Notes |
 | --- | --- | --- | --- | --- |
-| `새 프로젝트 만들기` | Create `PARA/Projects/<name>/<name>.md` from `template_project.md` | `para-zk:create-project`; GUI `Create project`; `createProject()` | improved | CLI also accepts `areas`, `status`, and `priority`. |
+| `새 프로젝트 만들기` | Create `PARA/Projects/<name>/<name>.md` from `template_project.md` | `para-zk:create-project`; GUI `Create project`; `createProject()` | improved | CLI also accepts `areas`, `area_titles`, `status`, and `priority`; missing `area_titles` are created automatically. |
 | `새 영역 만들기` | Create `PARA/Areas/<name>/<name>.md` from `template_area.md` | `para-zk:create-area`; GUI `Create area`; `createArea()` | improved | CLI can set `parent`. |
 | `새 회고 만들기` | Create weekly retro under `PARA/Retros/<week>` | `para-zk:create-retro`; GUI `Create retro`; `createRetro()` | improved | CLI can set `file_path`, `name`, and `date`. |
 | `새 자료 만들기` | Create resource under `PARA/Resources` | `para-zk:create-resource`; GUI `Create resource`; `createResource()` | improved | CLI can link from a source note in one call. |
@@ -106,7 +106,6 @@ CLI ergonomics.
 | --- | --- | --- |
 | Dedicated daily-note open/create command | pending | Current `captureJournal()` creates the journal when appending a memo. |
 | Folder Notes settings enforcement | pending | Dependency is installed/enabled; decide whether `init` should enforce settings such as `folderNoteName`, `storageLocation`, and `hideFolderNote`. |
-| CLI area-title convenience | pending | `create-project` currently accepts explicit `areas` links. A richer LLM command could accept `area_titles` and create/link missing areas. |
 | Batch workflow command | pending | Useful for LLMs that need to create a project, areas, resources, and first subnotes in one atomic-ish call. |
 | Automated GUI renderer screenshot checks | pending | Smoke test validates CLI side effects, not visual rendering of Obsidian Markdown processors. |
 | Broader regression fixtures | pending | `tools/smoke-test-vault.mjs` is end-to-end smoke coverage; unit-level workflow fixtures could catch smaller changes faster. |

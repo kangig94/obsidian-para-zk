@@ -52,9 +52,17 @@ export type WorkflowContext = {
 export type CreateProjectOptions = {
   title: string;
   areas?: string[];
+  areaTitles?: string[];
   status?: string;
   priority?: string;
   open?: boolean;
+};
+
+export type ProjectAreaResult = {
+  title: string;
+  path: string;
+  link: string;
+  created: boolean;
 };
 
 export type CreateAreaOptions = {
@@ -124,7 +132,9 @@ export type PromoteFleetingOptions = {
 
 type TemplateVariables = Record<string, string | undefined>;
 
-export async function createProject(ctx: WorkflowContext, options: CreateProjectOptions): Promise<NoteResult> {
+export async function createProject(ctx: WorkflowContext, options: CreateProjectOptions): Promise<NoteResult & {
+  areas?: ProjectAreaResult[];
+}> {
   const title = requireTitle(options.title, "project title");
   const folder = joinVaultPath(ctx.settings.paths.projectsFolder, title);
   await ensureFolder(ctx.app, folder);
@@ -134,11 +144,16 @@ export async function createProject(ctx: WorkflowContext, options: CreateProject
   const priorityCode = readOptionalCode(options.priority, parsePriorityCode, "priority", PRIORITY_CODE_HELP);
   const status = statusCode ?? "idea";
   const priority = priorityCode ?? "low";
+  const resolvedAreas = await resolveProjectAreas(ctx, options.areaTitles);
+  const areaLinks = uniqueStrings([
+    ...(options.areas ?? []),
+    ...resolvedAreas.map((area) => area.link)
+  ]);
   const path = await uniqueMarkdownPath(ctx.app, joinVaultPath(folder, `${title}.md`));
   const file = await createMarkdownFile(ctx, "project", path, {
     created: createdAt,
     slug: slugify(title),
-    areas: inlineList(options.areas),
+    areas: inlineList(areaLinks),
     status,
     priority,
     cursor: ""
@@ -147,7 +162,7 @@ export async function createProject(ctx: WorkflowContext, options: CreateProject
   const tags = localePack(ctx.settings.locale).tags;
   await ctx.app.fileManager.processFrontMatter(file, (fm) => {
     fm.type = "project";
-    if (options.areas && options.areas.length > 0) fm.areas = options.areas;
+    if (areaLinks.length > 0) fm.areas = areaLinks;
     fm.status = fm.status ?? status;
     fm.priority = fm.priority ?? priority;
     fm.tags = [`${tags.project}/${slugify(title)}`];
@@ -156,7 +171,10 @@ export async function createProject(ctx: WorkflowContext, options: CreateProject
   });
 
   await openIfRequested(ctx, file, options.open);
-  return noteResult(file, true, options.open);
+  return {
+    ...noteResult(file, true, options.open),
+    areas: resolvedAreas.length > 0 ? resolvedAreas : undefined
+  };
 }
 
 export async function createArea(ctx: WorkflowContext, options: CreateAreaOptions): Promise<NoteResult> {
@@ -741,6 +759,72 @@ function noteResult(file: TFile, created: boolean, open?: boolean): NoteResult {
   };
 }
 
+async function resolveProjectAreas(ctx: WorkflowContext, areaTitles: string[] | undefined): Promise<ProjectAreaResult[]> {
+  const results: ProjectAreaResult[] = [];
+  const seen = new Set<string>();
+
+  for (const rawTitle of areaTitles ?? []) {
+    const title = requireTitle(rawTitle, "area title");
+    const key = title.toLocaleLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const existing = findAreaByTitle(ctx, title);
+    if (existing) {
+      results.push(areaResult(existing, false));
+      continue;
+    }
+
+    const created = await createArea(ctx, { title, open: false });
+    const file = ctx.app.vault.getFileByPath(created.path);
+    if (!file) throw new Error(`created area file not found: ${created.path}`);
+    results.push(areaResult(file, true));
+  }
+
+  return results;
+}
+
+function findAreaByTitle(ctx: WorkflowContext, title: string): TFile | undefined {
+  const canonicalPaths = [
+    joinVaultPath(ctx.settings.paths.areasFolder, title, `${title}.md`),
+    joinVaultPath(ctx.settings.paths.areasFolder, `${title}.md`)
+  ];
+
+  for (const path of canonicalPaths) {
+    const file = ctx.app.vault.getFileByPath(path);
+    if (file) return file;
+  }
+
+  const areaFiles = ctx.app.vault.getMarkdownFiles().filter((file) => {
+    const frontmatter = ctx.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+    return frontmatter.type === "area" && isInFolder(file, ctx.settings.paths.areasFolder);
+  });
+  const exactMatches = areaFiles.filter((file) => file.basename === title);
+  if (exactMatches.length === 1) return exactMatches[0];
+  if (exactMatches.length > 1) throw new Error(`area title is ambiguous: ${title}`);
+
+  const foldedTitle = title.toLocaleLowerCase();
+  const foldedMatches = areaFiles.filter((file) => file.basename.toLocaleLowerCase() === foldedTitle);
+  if (foldedMatches.length === 1) return foldedMatches[0];
+  if (foldedMatches.length > 1) throw new Error(`area title is ambiguous: ${title}`);
+
+  return undefined;
+}
+
+function areaResult(file: TFile, created: boolean): ProjectAreaResult {
+  return {
+    title: file.basename,
+    path: file.path,
+    link: linkToFile(file),
+    created
+  };
+}
+
+function isInFolder(file: TFile, folder: string): boolean {
+  const normalized = normalizeVaultPath(folder);
+  return file.path === normalized || file.path.startsWith(`${normalized}/`);
+}
+
 async function openIfRequested(ctx: WorkflowContext, file: TFile, open?: boolean): Promise<void> {
   if (!open) return;
   await ctx.app.workspace.getLeaf(true).openFile(file);
@@ -760,6 +844,10 @@ function frontmatterListBlock(values: string[] | undefined): string {
 
 function inlineList(values: string[] | undefined): string {
   return values?.map((value) => value.trim()).filter(Boolean).join(", ") ?? "";
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
 function escapeRegExp(value: string): string {

@@ -29,7 +29,7 @@ if (args.build !== false) {
   });
 }
 
-run("optsidian", ["open-gui", `vault-path=${vaultPath}`, "format=json"]);
+ensureGuiVault(vaultPath);
 run("optsidian", ["raw", "plugin:enable", "id=para-zk"], { allowFailure: true });
 run("optsidian", ["raw", "plugin:reload", "id=para-zk"]);
 
@@ -46,6 +46,7 @@ assertDependency(init, "tabs");
 assertDependency(init, "folder-notes");
 
 const areaTitle = `Smoke Area ${stamp}`;
+const linkedAreaTitle = `Smoke Linked Area ${stamp}`;
 const projectTitle = `Smoke Project ${stamp}`;
 const resourceTitle = `Smoke Resource ${stamp}`;
 const fleetingTitle = `Smoke Fleeting ${stamp}`;
@@ -57,16 +58,23 @@ const area = cliJson("para-zk:create-area", [
 ]);
 assertCreated(area, "area");
 
-const areaLink = `[[${area.path}|${area.title}]]`;
 const project = cliJson("para-zk:create-project", [
   `title=${projectTitle}`,
-  `areas=${JSON.stringify([areaLink])}`,
+  `area_titles=${JSON.stringify([areaTitle, linkedAreaTitle])}`,
   "status=in_progress",
   "priority=high",
   "open=false",
   "format=json"
 ]);
 assertCreated(project, "project");
+assert(Array.isArray(project.areas), "project did not return resolved areas");
+const reusedArea = project.areas.find((item) => item.title === areaTitle);
+const createdArea = project.areas.find((item) => item.title === linkedAreaTitle);
+assert(reusedArea, "project did not return reused area");
+assert(createdArea, "project did not return created linked area");
+assert(reusedArea.created === false, "project did not reuse existing area");
+assert(createdArea.created === true, "project did not create missing area");
+assert(existsSync(join(vaultPath, createdArea.path)), `created linked area does not exist: ${createdArea.path}`);
 
 const subnote = cliJson("para-zk:create-subnote", [
   `title=Smoke Meeting ${stamp}`,
@@ -165,6 +173,7 @@ assertFileContains(project.path, [
   "status: in_progress",
   "priority: high",
   area.path,
+  createdArea.path,
   `[[${resource.path}|${resource.title}]]`
 ]);
 assertFileContains(subnote.path, [
@@ -308,6 +317,51 @@ function cleanVault(path, paraZkPluginDir) {
   rmSync(join(paraZkPluginDir, "data.json"), { force: true });
 }
 
+function ensureGuiVault(path) {
+  run("optsidian", ["open-gui", `vault-path=${path}`, "no-wait", "format=json"]);
+  if (waitForActiveVault(path, 2000)) return;
+
+  focusVaultWindow(path);
+  if (waitForActiveVault(path, 5000)) return;
+
+  const current = activeVaultPath() ?? "unknown";
+  throw new Error(`Timed out waiting for active Obsidian vault: expected ${path}, got ${current}`);
+}
+
+function waitForActiveVault(path, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() <= deadline) {
+    if (samePath(activeVaultPath(), path)) return true;
+    sleepMs(250);
+  }
+  return false;
+}
+
+function activeVaultPath() {
+  const result = run("optsidian", ["vault", "info=path"], { allowFailure: true });
+  return result.status === 0 ? result.stdout : undefined;
+}
+
+function focusVaultWindow(path) {
+  const targetVaultName = basename(path).toLowerCase();
+  const targetTitleSegment = ` - ${targetVaultName} - obsidian`;
+  const ids = run("xdotool", ["search", "--onlyvisible", "--class", "obsidian"], { allowFailure: true })
+    .stdout
+    .split(/\s+/)
+    .filter(Boolean);
+
+  for (const id of ids) {
+    const title = run("xdotool", ["getwindowname", id], { allowFailure: true }).stdout.toLowerCase();
+    if (!title.includes(targetTitleSegment)) continue;
+    run("xdotool", ["windowactivate", "--sync", id], { allowFailure: true });
+    run("xdotool", ["windowfocus", "--sync", id], { allowFailure: true });
+    sleepMs(300);
+    return true;
+  }
+
+  return false;
+}
+
 function cliJson(command, commandArgs) {
   const result = run("optsidian", ["raw", command, ...commandArgs]);
   try {
@@ -369,6 +423,15 @@ function assertFileContains(path, needles) {
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+function samePath(left, right) {
+  if (!left || !right) return false;
+  return resolve(left) === resolve(right);
+}
+
+function sleepMs(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
 function timestamp() {

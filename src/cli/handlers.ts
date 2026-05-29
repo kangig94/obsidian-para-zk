@@ -78,6 +78,7 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
     {
       title: { value: "<title>", description: "Project title." },
       areas: { value: "<json|comma-list>", description: "Area links to store in frontmatter." },
+      area_titles: { value: "<json|comma-list>", description: "Area titles to reuse or create and link." },
       status: { value: `<${PROJECT_STATUS_CODE_HELP}>`, description: "Locale-neutral project status code." },
       priority: { value: `<${PRIORITY_CODE_HELP}>`, description: "Locale-neutral project priority code." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
@@ -88,6 +89,7 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
       const result = await createProject(workflowContext(plugin), {
         title: readCliTitle(args),
         areas: parseList(readCliString(args, "areas")),
+        areaTitles: parseList(readCliString(args, "area_titles") ?? readCliString(args, "areaTitles")),
         status: readCliString(args, "status"),
         priority: readCliString(args, "priority"),
         open: readCliBoolean(args, "open") ?? false
