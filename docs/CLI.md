@@ -145,6 +145,7 @@ Required dependencies:
 - Folder Notes
 - Update time on edit
 - Trash Explorer
+- Custom File Explorer sorting
 
 Dataview JavaScript queries are enabled when Dataview is installed.
 Update time on edit is configured to maintain `created` and `updated`
@@ -152,6 +153,8 @@ frontmatter fields while ignoring generated templates, dashboards, assets, and
 the managed root guide.
 Trash Explorer is installed and enabled so local `.trash` contents can be
 reviewed or emptied through the Obsidian GUI.
+Custom File Explorer sorting is configured for bookmark-based ordering with a
+baseline `sortspec` bookmarks group. Existing `sortspec` groups are preserved.
 
 Obsidian core settings are merged into existing config files without deleting
 unrelated user settings:

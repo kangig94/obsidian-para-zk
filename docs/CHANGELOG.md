@@ -12,9 +12,11 @@ Notable changes for PARA-ZK are tracked here.
 - Added idempotent vault initialization for PARA, ZK, Journal, Dashboard, Templates,
   and managed PARA-ZK template files.
 - Added dependency checks for Dataview, Tasks, Tabs, Folder notes, Update time
-  on edit, and Trash Explorer during initialization. `installDeps=true` installs
-  and enables missing dependencies, DataviewJS is enabled when Dataview is present,
-  and Update time on edit is configured for `created`/`updated` frontmatter.
+  on edit, Trash Explorer, and Custom File Explorer sorting during initialization.
+  `installDeps=true` installs and enables missing dependencies, DataviewJS is
+  enabled when Dataview is present, Update time on edit is configured for
+  `created`/`updated` frontmatter, and Custom File Explorer sorting is configured
+  with a baseline `sortspec` bookmarks group.
 - Added a native file-explorer empty-trash action that calls Trash Explorer,
   replacing the Commander-managed explorer shortcut.
 - Added Obsidian core configuration to vault initialization, including automatic

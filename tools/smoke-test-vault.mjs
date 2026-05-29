@@ -49,8 +49,10 @@ assertDependency(init, "tabs");
 assertDependency(init, "folder-notes");
 assertDependency(init, "update-time-on-edit");
 assertDependency(init, "obsidian-trash-explorer");
+assertDependency(init, "custom-sort");
 assertObsidianCoreConfig();
 assertUpdateTimeOnEditConfig();
+assertCustomSortConfig();
 assertGuiLocaleLabels(ribbonLabelsEn, "PARA-ZK: Create project", emptyTrashLabelEn);
 
 const koInit = cliJson("para-zk:init", [
@@ -520,6 +522,29 @@ function assertUpdateTimeOnEditConfig() {
   }
   for (const folder of ["Templates", "Dashboard", "README"]) {
     assert(config.ignoreCreatedFolder?.includes(folder), `update-time-on-edit ignoreCreatedFolder is missing ${folder}`);
+  }
+}
+
+function assertCustomSortConfig() {
+  if (!installDeps) return;
+
+  const config = readVaultJson(".obsidian/plugins/custom-sort/data.json");
+  assert(config.suspended === false, "custom-sort is suspended");
+  assert(config.statusBarEntryEnabled === false, "custom-sort status bar entry should be disabled");
+  assert(config.notificationsEnabled === false, "custom-sort notifications should be disabled");
+  assert(config.mobileNotificationsEnabled === false, "custom-sort mobile notifications should be disabled");
+  assert(config.customSortContextSubmenu === true, "custom-sort context submenu is not enabled");
+  assert(config.automaticBookmarksIntegration === true, "custom-sort bookmarks integration is not enabled");
+  assert(config.bookmarksContextMenus === true, "custom-sort bookmark context menus are not enabled");
+  assert(config.bookmarksGroupToConsumeAsOrderingReference === "sortspec", "custom-sort bookmark group is not sortspec");
+  assert(config.delayForInitialApplication === 1000, "custom-sort delayForInitialApplication is not 1000");
+
+  const bookmarks = readVaultJson(".obsidian/bookmarks.json");
+  const sortspec = bookmarks.items?.find((item) => item.type === "group" && item.title === "sortspec");
+  assert(sortspec, "bookmarks.json is missing sortspec group");
+  const topLevelTitles = sortspec.items?.map((item) => item.title);
+  for (const title of ["Dashboard", "PARA", "ZK", "Journal", "Templates"]) {
+    assert(topLevelTitles?.includes(title), `sortspec bookmark group is missing ${title}`);
   }
 }
 

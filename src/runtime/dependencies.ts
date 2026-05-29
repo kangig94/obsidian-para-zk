@@ -56,6 +56,12 @@ const REQUIRED_DEPENDENCIES: RequiredDependency[] = [
     name: "Trash Explorer",
     repo: "proog/obsidian-trash-explorer",
     reason: "PARA-ZK uses Obsidian's local trash and exposes a native empty-trash explorer action"
+  },
+  {
+    id: "custom-sort",
+    name: "Custom File Explorer sorting",
+    repo: "SebastianMC/obsidian-custom-sort",
+    reason: "PARA-ZK uses a stable PARA/ZK folder order in Obsidian's file explorer"
   }
 ];
 
@@ -66,6 +72,11 @@ const DATAVIEW_SETTINGS_PATH = `${DATAVIEW_PLUGIN_DIR}/data.json`;
 const UPDATE_TIME_PLUGIN_ID = "update-time-on-edit";
 const UPDATE_TIME_PLUGIN_DIR = ".obsidian/plugins/update-time-on-edit";
 const UPDATE_TIME_SETTINGS_PATH = `${UPDATE_TIME_PLUGIN_DIR}/data.json`;
+const CUSTOM_SORT_PLUGIN_ID = "custom-sort";
+const CUSTOM_SORT_PLUGIN_DIR = ".obsidian/plugins/custom-sort";
+const CUSTOM_SORT_SETTINGS_PATH = `${CUSTOM_SORT_PLUGIN_DIR}/data.json`;
+const BOOKMARKS_CONFIG_PATH = ".obsidian/bookmarks.json";
+const CUSTOM_SORT_BOOKMARKS_GROUP = "sortspec";
 const ATTACHMENT_FOLDER = "assets";
 
 export async function resolveDependencies(
@@ -143,10 +154,28 @@ async function configureDependency(
     warnings: string[];
   }
 ): Promise<void> {
-  if (dependency.id !== DATAVIEW_PLUGIN_ID && dependency.id !== UPDATE_TIME_PLUGIN_ID) return;
+  if (
+    dependency.id !== DATAVIEW_PLUGIN_ID
+    && dependency.id !== UPDATE_TIME_PLUGIN_ID
+    && dependency.id !== CUSTOM_SORT_PLUGIN_ID
+  ) return;
   if (!result.installed && !options.dryRun) return;
 
   try {
+    if (dependency.id === CUSTOM_SORT_PLUGIN_ID) {
+      if (options.dryRun) {
+        if (!await isCustomSortConfigured(app, manager, options.settings)) {
+          addConfigured(result, "would_configure_custom_sort");
+        }
+        return;
+      }
+
+      if (await ensureCustomSortConfigured(app, manager, options.settings)) {
+        addConfigured(result, "configured_custom_sort");
+      }
+      return;
+    }
+
     if (dependency.id === UPDATE_TIME_PLUGIN_ID) {
       if (options.dryRun) {
         if (!await isUpdateTimeOnEditConfigured(app, manager, options.settings)) {
@@ -171,7 +200,7 @@ async function configureDependency(
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    options.warnings.push(`Failed to enable Dataview JavaScript queries: ${message}`);
+    options.warnings.push(`Failed to configure dependency ${dependency.name} (${dependency.id}): ${message}`);
   }
 }
 
@@ -374,6 +403,165 @@ async function updateRunningDataviewSettings(
   if (typeof saveData === "function") {
     await saveData.call(plugin, plugin.settings);
   }
+}
+
+async function isCustomSortConfigured(
+  app: App,
+  manager: PluginManager,
+  settings: ParaZkSettings
+): Promise<boolean> {
+  const currentSettings = await readCustomSortSettings(app);
+  const nextSettings = mergeCustomSortSettings(currentSettings);
+  if (JSON.stringify(currentSettings) !== JSON.stringify(nextSettings)) return false;
+  if (!await hasCustomSortBookmarksGroup(app)) return false;
+
+  const runtimeSettings = readRuntimePluginSettings(manager, CUSTOM_SORT_PLUGIN_ID);
+  if (!runtimeSettings) return true;
+  return JSON.stringify(runtimeSettings) === JSON.stringify(mergeCustomSortSettings(runtimeSettings));
+}
+
+async function ensureCustomSortConfigured(
+  app: App,
+  manager: PluginManager,
+  settings: ParaZkSettings
+): Promise<boolean> {
+  const currentSettings = await readCustomSortSettings(app);
+  const nextSettings = mergeCustomSortSettings(currentSettings);
+  const runtimeSettings = readRuntimePluginSettings(manager, CUSTOM_SORT_PLUGIN_ID);
+  const runtimeChanged = runtimeSettings
+    ? JSON.stringify(runtimeSettings) !== JSON.stringify(mergeCustomSortSettings(runtimeSettings))
+    : false;
+  const settingsChanged = JSON.stringify(currentSettings) !== JSON.stringify(nextSettings) || runtimeChanged;
+  const bookmarksChanged = await ensureCustomSortBookmarksGroup(app, settings);
+
+  if (settingsChanged) {
+    await ensureAdapterFolder(app, CUSTOM_SORT_PLUGIN_DIR);
+    await app.vault.adapter.write(CUSTOM_SORT_SETTINGS_PATH, `${JSON.stringify(nextSettings, null, 2)}\n`);
+    await updateRunningPluginSettings(manager, CUSTOM_SORT_PLUGIN_ID, nextSettings);
+  }
+
+  return settingsChanged || bookmarksChanged;
+}
+
+async function readCustomSortSettings(app: App): Promise<Record<string, unknown>> {
+  if (!await app.vault.adapter.exists(CUSTOM_SORT_SETTINGS_PATH)) return {};
+  const raw = await app.vault.adapter.read(CUSTOM_SORT_SETTINGS_PATH);
+  if (!raw.trim()) return {};
+  const parsed = JSON.parse(raw) as unknown;
+  if (!isRecord(parsed)) throw new Error(`${CUSTOM_SORT_SETTINGS_PATH} is not a JSON object`);
+  return parsed;
+}
+
+function mergeCustomSortSettings(current: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...current,
+    additionalSortspecFile: "",
+    indexNoteNameForFolderNotes: "",
+    suspended: false,
+    statusBarEntryEnabled: false,
+    notificationsEnabled: false,
+    mobileNotificationsEnabled: false,
+    customSortContextSubmenu: true,
+    automaticBookmarksIntegration: true,
+    bookmarksContextMenus: true,
+    bookmarksGroupToConsumeAsOrderingReference: CUSTOM_SORT_BOOKMARKS_GROUP,
+    delayForInitialApplication: 1000
+  };
+}
+
+async function hasCustomSortBookmarksGroup(app: App): Promise<boolean> {
+  const bookmarks = await readBookmarksConfig(app);
+  return bookmarks.items.some((item) => isBookmarkGroup(item, CUSTOM_SORT_BOOKMARKS_GROUP));
+}
+
+async function ensureCustomSortBookmarksGroup(app: App, settings: ParaZkSettings): Promise<boolean> {
+  const bookmarks = await readBookmarksConfig(app);
+  if (bookmarks.items.some((item) => isBookmarkGroup(item, CUSTOM_SORT_BOOKMARKS_GROUP))) return false;
+
+  bookmarks.items.push(createCustomSortBookmarksGroup(settings));
+  await app.vault.adapter.write(BOOKMARKS_CONFIG_PATH, `${JSON.stringify(bookmarks, null, 2)}\n`);
+  return true;
+}
+
+async function readBookmarksConfig(app: App): Promise<{ items: BookmarkItem[] }> {
+  if (!await app.vault.adapter.exists(BOOKMARKS_CONFIG_PATH)) return { items: [] };
+  const raw = await app.vault.adapter.read(BOOKMARKS_CONFIG_PATH);
+  if (!raw.trim()) return { items: [] };
+  const parsed = JSON.parse(raw) as unknown;
+  if (!isRecord(parsed)) throw new Error(`${BOOKMARKS_CONFIG_PATH} is not a JSON object`);
+  const items = Array.isArray(parsed.items) ? parsed.items.filter(isBookmarkItem) : [];
+  return { ...parsed, items };
+}
+
+function createCustomSortBookmarksGroup(settings: ParaZkSettings): BookmarkItem {
+  const nextCtime = bookmarkCtimeGenerator();
+  return bookmarkGroup(CUSTOM_SORT_BOOKMARKS_GROUP, nextCtime, [
+    bookmarkGroup(folderName(settings.paths.dashboardFolder), nextCtime, [
+      bookmarkFile(`${settings.paths.dashboardFolder}/HomePage.md`, nextCtime),
+      bookmarkFile(`${settings.paths.dashboardFolder}/Review.md`, nextCtime),
+      bookmarkFile(`${settings.paths.dashboardFolder}/Projects.md`, nextCtime),
+      bookmarkFile(`${settings.paths.dashboardFolder}/Areas.md`, nextCtime),
+      bookmarkFile(`${settings.paths.dashboardFolder}/Resources.md`, nextCtime),
+      bookmarkFile(`${settings.paths.dashboardFolder}/ZK.md`, nextCtime),
+      bookmarkFile(`${settings.paths.dashboardFolder}/Tasks.md`, nextCtime)
+    ]),
+    bookmarkGroup(folderName(settings.paths.projectsFolder, 0), nextCtime, [
+      bookmarkGroup(folderName(settings.paths.projectsFolder), nextCtime),
+      bookmarkGroup(folderName(settings.paths.areasFolder), nextCtime),
+      bookmarkGroup(folderName(settings.paths.resourcesFolder), nextCtime),
+      bookmarkGroup(folderName(settings.paths.archivesFolder), nextCtime, [
+        bookmarkGroup(folderName(settings.paths.projectsFolder), nextCtime),
+        bookmarkGroup(folderName(settings.paths.areasFolder), nextCtime),
+        bookmarkGroup(folderName(settings.paths.resourcesFolder), nextCtime)
+      ]),
+      bookmarkGroup(folderName(settings.paths.retrosFolder), nextCtime)
+    ]),
+    bookmarkGroup(folderName(settings.paths.zkFolder), nextCtime, [
+      bookmarkGroup(folderName(settings.paths.fleetingFolder), nextCtime),
+      bookmarkGroup(folderName(settings.paths.literatureFolder), nextCtime),
+      bookmarkGroup(folderName(settings.paths.permanentFolder), nextCtime)
+    ]),
+    bookmarkGroup(folderName(settings.paths.journalFolder), nextCtime),
+    bookmarkGroup(folderName(settings.paths.templatesFolder), nextCtime)
+  ]);
+}
+
+type BookmarkItem = Record<string, unknown>;
+
+function bookmarkGroup(title: string, nextCtime: () => number, items: BookmarkItem[] = []): BookmarkItem {
+  return {
+    type: "group",
+    ctime: nextCtime(),
+    items,
+    title
+  };
+}
+
+function bookmarkFile(path: string, nextCtime: () => number): BookmarkItem {
+  return {
+    type: "file",
+    ctime: nextCtime(),
+    path: normalizeVaultPath(path),
+    subpath: "#^-"
+  };
+}
+
+function bookmarkCtimeGenerator(): () => number {
+  let ctime = Date.now();
+  return () => ctime += 1;
+}
+
+function isBookmarkItem(value: unknown): value is BookmarkItem {
+  return isRecord(value) && typeof value.type === "string";
+}
+
+function isBookmarkGroup(value: unknown, title: string): boolean {
+  return isRecord(value) && value.type === "group" && value.title === title;
+}
+
+function folderName(path: string, indexFromRoot?: number): string {
+  const parts = normalizeVaultPath(path).split("/").filter(Boolean);
+  return parts[indexFromRoot ?? parts.length - 1] ?? "";
 }
 
 async function isUpdateTimeOnEditConfigured(

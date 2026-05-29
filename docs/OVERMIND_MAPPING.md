@@ -42,6 +42,7 @@ CLI ergonomics.
 | Folder Notes | Folder-style project/area navigation | Required dependency | ported | Needed because projects and areas are folder-style notes. |
 | Update time on edit | Maintain `created` and `updated` frontmatter on human edits | Required dependency; `para-zk:init` configures its frontmatter keys and ignored paths | ported | Runtime hash state is preserved when settings are merged; managed generated files are excluded. |
 | Trash Explorer | Restore and permanently delete files in `.trash` | Required dependency; PARA-ZK adds a native file-explorer empty-trash button | ported | Replaces Commander's explorer shortcut for `obsidian-trash-explorer:empty-trash`. |
+| Custom File Explorer sorting | Stable explorer ordering through bookmark-based sortspec | Required dependency; `para-zk:init` configures Custom Sort and creates a baseline `sortspec` bookmarks group | ported | Existing user-managed `sortspec` bookmark groups are preserved. |
 | Obsidian app settings | Link updates, attachment folder, local trash, hidden properties, and ignored generated/reference paths | `para-zk:init` merges `.obsidian/app.json` | ported | Existing unrelated app settings are preserved. |
 | Core Templates plugin | Default template folder | `para-zk:init` merges `.obsidian/templates.json` | ported | Sets the folder to `Templates`. |
 
