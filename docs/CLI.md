@@ -405,6 +405,61 @@ Result fields:
 - `fromPath` and `toPath`: source and final note paths.
 - `fromTitle` and `toTitle`: source and final titles.
 
+### Delete Commands
+
+Delete commands move notes to Obsidian trash with core Obsidian APIs. They do
+not require Trash Explorer to be installed or enabled. Trash Explorer is still a
+useful GUI dependency for reviewing and emptying `.trash`, but PARA-ZK delete
+workflows do not call it.
+
+Body backlinks are intentionally preserved. The JSON result reports incoming
+links observed before deletion so an LLM can decide whether follow-up edits are
+needed. PARA-ZK only cleans relationships it owns directly:
+
+- frontmatter links in keys such as `areas`, `project`, `parent`, and
+  `promoted_to`
+- standalone wikilink lines inside generated References/Links sections
+
+| Command | Selector | Notes |
+| --- | --- | --- |
+| `para-zk:delete-project` | `title` or `path`; optional `archived` | Deletes the folder-style project container. Requires `force=true` if child files are inside. |
+| `para-zk:delete-area` | `title` or `path`; optional `archived` | Deletes the folder-style area container. Requires `force=true` if child files are inside. |
+| `para-zk:delete-resource` | `title` or `path`; optional `archived` | Deletes the resource note and removes safe References-section links to it. |
+| `para-zk:delete-zk` | `title` plus optional `kind`, or `path` | Deletes the selected ZK note and removes safe References-section links to it. |
+| `para-zk:delete-journal` | `date` or `path` | Deletes a daily journal note. |
+| `para-zk:delete-retro` | `title` plus optional `date`, or `path` | Deletes a retro note. |
+
+Options:
+
+| Option | Values | Notes |
+| --- | --- | --- |
+| `title` | string | Current note title. Used when `path` is omitted. |
+| `path` | path | Optional exact note path. |
+| `archived` | boolean | PARA delete commands only; same title lookup behavior as reads. |
+| `kind` | ZK kind code | `delete-zk` only; narrows title lookup. |
+| `date` | `YYYY-MM-DD` | `delete-journal` and `delete-retro` only. |
+| `force` | boolean | Required when a folder-style project or area contains child files. |
+
+Examples:
+
+```bash
+optsidian raw para-zk:delete-resource title="Source Paper" format=json
+optsidian raw para-zk:delete-area title="Unused Area" format=json
+optsidian raw para-zk:delete-project title="Prototype" force=true format=json
+optsidian raw para-zk:delete-zk title="Draft idea" kind=fleeting format=json
+optsidian raw para-zk:delete-journal date=2026-05-30 format=json
+```
+
+Important result fields:
+
+- `containerPath`: file or folder path moved to trash.
+- `deletedPaths`: paths that were inside the deleted container before trashing.
+- `incomingLinks`: backlink counts observed before deletion; body links are not
+  modified.
+- `cleaned.frontmatter`: count of PARA-ZK frontmatter keys cleaned.
+- `cleaned.references`: count of standalone References/Links lines removed.
+- `trashMethod`: core Obsidian method used, normally `fileManager.trashFile`.
+
 ### `para-zk:create-project`
 
 Creates a folder-style project note.

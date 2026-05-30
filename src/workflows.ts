@@ -1,4 +1,4 @@
-import { App, TFile, TFolder } from "obsidian";
+import { App, TAbstractFile, TFile, TFolder } from "obsidian";
 import { localePack } from "./i18n";
 import { renderTemplate, type TemplateName } from "./templates";
 import {
@@ -230,6 +230,54 @@ export type RenameResult = {
   toTitle: string;
 };
 
+export type DeleteByTitleOptions = {
+  path?: string;
+  title?: string;
+  archived?: boolean;
+  force?: boolean;
+};
+
+export type DeleteZkOptions = {
+  path?: string;
+  title?: string;
+  kind?: string;
+  force?: boolean;
+};
+
+export type DeleteJournalOptions = {
+  path?: string;
+  date?: string;
+  force?: boolean;
+};
+
+export type DeleteRetroOptions = DeleteByTitleOptions & {
+  date?: string;
+};
+
+export type IncomingLink = {
+  sourcePath: string;
+  targetPath: string;
+  count: number;
+};
+
+export type DeleteCleanupResult = {
+  frontmatter: number;
+  references: number;
+};
+
+export type DeleteResult = {
+  path: string;
+  title: string;
+  type: string;
+  deleted: true;
+  trashed: true;
+  trashMethod: string;
+  containerPath: string;
+  deletedPaths: string[];
+  incomingLinks: IncomingLink[];
+  cleaned: DeleteCleanupResult;
+};
+
 type TemplateVariables = Record<string, string | undefined>;
 type Frontmatter = Record<string, unknown>;
 type ReadMap = Record<string, unknown>;
@@ -376,6 +424,30 @@ export async function renameZk(ctx: WorkflowContext, options: RenameZkOptions): 
     requireTitle(options.newTitle, "new_title"),
     "knowledge"
   );
+}
+
+export async function deleteProject(ctx: WorkflowContext, options: DeleteByTitleOptions): Promise<DeleteResult> {
+  return deleteDomainNote(ctx, resolveRequiredProject(ctx, options), options);
+}
+
+export async function deleteArea(ctx: WorkflowContext, options: DeleteByTitleOptions): Promise<DeleteResult> {
+  return deleteDomainNote(ctx, resolveRequiredArea(ctx, options), options);
+}
+
+export async function deleteResource(ctx: WorkflowContext, options: DeleteByTitleOptions): Promise<DeleteResult> {
+  return deleteDomainNote(ctx, resolveRequiredResource(ctx, options), options);
+}
+
+export async function deleteZk(ctx: WorkflowContext, options: DeleteZkOptions): Promise<DeleteResult> {
+  return deleteDomainNote(ctx, resolveRequiredZk(ctx, options), options);
+}
+
+export async function deleteJournal(ctx: WorkflowContext, options: DeleteJournalOptions): Promise<DeleteResult> {
+  return deleteDomainNote(ctx, resolveRequiredJournal(ctx, options), options);
+}
+
+export async function deleteRetro(ctx: WorkflowContext, options: DeleteRetroOptions): Promise<DeleteResult> {
+  return deleteDomainNote(ctx, resolveRequiredRetro(ctx, options), options);
 }
 
 export async function createArea(ctx: WorkflowContext, options: CreateAreaOptions): Promise<NoteResult> {
@@ -2049,6 +2121,294 @@ function renameTagNamespace(tag: string, namespaceMoves: TagNamespaceMove[]): st
     return prefixed ? `#${renamed}` : renamed;
   }
   return tag;
+}
+
+async function deleteDomainNote(
+  ctx: WorkflowContext,
+  file: TFile,
+  options: { force?: boolean }
+): Promise<DeleteResult> {
+  const type = readType(fileFrontmatter(ctx, file));
+  const container = deleteContainer(ctx, file);
+  const containerPath = container.path;
+  const deletedPaths = collectAbstractPaths(container);
+  const deletedPathSet = new Set(deletedPaths);
+  const deletedFiles = deletedMarkdownFiles(ctx, container);
+  const deletedFilePaths = new Set(deletedFiles.map((item) => item.path));
+  const extraPaths = deletedPaths.filter((path) => path !== containerPath && path !== file.path);
+  if (extraPaths.length > 0 && !options.force) {
+    throw new Error(`delete target contains child files; pass force=true to delete: ${extraPaths.join(", ")}`);
+  }
+
+  const incomingLinks = incomingLinksForPaths(ctx, deletedFilePaths, deletedPathSet);
+  const cleaned = await cleanupStructuredReferences(ctx, deletedFiles, deletedPathSet);
+  const trashMethod = await trashAbstractFile(ctx, container);
+
+  return {
+    path: file.path,
+    title: file.basename,
+    type,
+    deleted: true,
+    trashed: true,
+    trashMethod,
+    containerPath,
+    deletedPaths,
+    incomingLinks,
+    cleaned
+  };
+}
+
+function deleteContainer(ctx: WorkflowContext, file: TFile): TAbstractFile {
+  const type = readType(fileFrontmatter(ctx, file));
+  if (type !== "project" && type !== "area") return file;
+  return folderStyleContainer(file) ?? file;
+}
+
+function collectAbstractPaths(file: TAbstractFile): string[] {
+  if (file instanceof TFile) return [file.path];
+  if (!(file instanceof TFolder)) return [file.path];
+  const paths = [file.path];
+  for (const child of file.children) {
+    paths.push(...collectAbstractPaths(child));
+  }
+  return paths;
+}
+
+function deletedMarkdownFiles(ctx: WorkflowContext, container: TAbstractFile): TFile[] {
+  if (container instanceof TFile) return [container];
+  return ctx.app.vault.getMarkdownFiles().filter((file) => isInFolder(file, container.path));
+}
+
+async function trashAbstractFile(ctx: WorkflowContext, file: TAbstractFile): Promise<string> {
+  const fileManager = ctx.app.fileManager as typeof ctx.app.fileManager & {
+    trashFile?: (target: TAbstractFile) => Promise<void>;
+  };
+  if (typeof fileManager.trashFile === "function") {
+    await fileManager.trashFile(file);
+    return "fileManager.trashFile";
+  }
+
+  await ctx.app.vault.trash(file, false);
+  return "vault.trash.local";
+}
+
+function incomingLinksForPaths(
+  ctx: WorkflowContext,
+  targetPaths: Set<string>,
+  deletedPathSet: Set<string>
+): IncomingLink[] {
+  const resolvedLinks = ctx.app.metadataCache.resolvedLinks;
+  const incoming: IncomingLink[] = [];
+  for (const [sourcePath, targets] of Object.entries(resolvedLinks)) {
+    if (deletedPathSet.has(sourcePath)) continue;
+    for (const [targetPath, count] of Object.entries(targets)) {
+      if (!targetPaths.has(targetPath)) continue;
+      incoming.push({
+        sourcePath,
+        targetPath,
+        count
+      });
+    }
+  }
+  return incoming.sort((left, right) => left.sourcePath.localeCompare(right.sourcePath)
+    || left.targetPath.localeCompare(right.targetPath));
+}
+
+async function cleanupStructuredReferences(
+  ctx: WorkflowContext,
+  targets: TFile[],
+  deletedPathSet: Set<string>
+): Promise<DeleteCleanupResult> {
+  return {
+    frontmatter: await cleanupFrontmatterReferences(ctx, targets, deletedPathSet),
+    references: await cleanupReferenceSectionLinks(ctx, targets, deletedPathSet)
+  };
+}
+
+async function cleanupFrontmatterReferences(
+  ctx: WorkflowContext,
+  targets: TFile[],
+  deletedPathSet: Set<string>
+): Promise<number> {
+  let changedKeys = 0;
+  const keys = ["areas", "project", "parent", "promoted_to"];
+  for (const file of ctx.app.vault.getMarkdownFiles()) {
+    if (deletedPathSet.has(file.path)) continue;
+    const frontmatter = fileFrontmatter(ctx, file);
+    if (!keys.some((key) => frontmatterNeedsTargetCleanup(ctx, file.path, frontmatter[key], targets))) continue;
+    await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+      for (const key of keys) {
+        if (!Object.prototype.hasOwnProperty.call(fm, key)) continue;
+        const next = removeTargetFrontmatterLinks(ctx, file.path, fm[key], targets);
+        if (!next.changed) continue;
+        changedKeys += 1;
+        if (next.value === undefined) {
+          delete fm[key];
+        } else {
+          fm[key] = next.value;
+        }
+      }
+    });
+  }
+  return changedKeys;
+}
+
+function frontmatterNeedsTargetCleanup(
+  ctx: WorkflowContext,
+  sourcePath: string,
+  value: unknown,
+  targets: TFile[]
+): boolean {
+  if (Array.isArray(value)) {
+    return value.some((item) => typeof item === "string" && stringReferencesAnyTarget(ctx, sourcePath, item, targets));
+  }
+  return typeof value === "string" && stringReferencesAnyTarget(ctx, sourcePath, value, targets);
+}
+
+function removeTargetFrontmatterLinks(
+  ctx: WorkflowContext,
+  sourcePath: string,
+  value: unknown,
+  targets: TFile[]
+): { changed: boolean; value?: unknown } {
+  if (Array.isArray(value)) {
+    const next = value.filter((item) => {
+      return typeof item !== "string" || !stringReferencesAnyTarget(ctx, sourcePath, item, targets);
+    });
+    if (next.length === value.length) return { changed: false, value };
+    return {
+      changed: true,
+      value: next.length > 0 ? next : undefined
+    };
+  }
+
+  if (typeof value === "string" && stringReferencesAnyTarget(ctx, sourcePath, value, targets)) {
+    return { changed: true };
+  }
+  return { changed: false, value };
+}
+
+async function cleanupReferenceSectionLinks(
+  ctx: WorkflowContext,
+  targets: TFile[],
+  deletedPathSet: Set<string>
+): Promise<number> {
+  let removed = 0;
+  for (const file of ctx.app.vault.getMarkdownFiles()) {
+    if (deletedPathSet.has(file.path)) continue;
+    const count = await removeSafeReferenceLines(ctx, file, targets);
+    removed += count;
+  }
+  return removed;
+}
+
+async function removeSafeReferenceLines(
+  ctx: WorkflowContext,
+  source: TFile,
+  targets: TFile[]
+): Promise<number> {
+  const content = await ctx.app.vault.read(source);
+  const range = referenceCleanupRange(content);
+  if (!range) return 0;
+
+  const spans: TextRange[] = [];
+  let cursor = range.start;
+  while (cursor < range.end) {
+    const span = lineTextRangeAt(content, cursor, range.end);
+    if (!span) break;
+    const text = content.slice(span.start, span.endWithoutBreak);
+    const linkPath = standaloneReferenceLinkPath(text);
+    if (linkPath && linkReferencesAnyTarget(ctx, source.path, linkPath, targets)) {
+      spans.push({
+        start: span.start,
+        end: span.end
+      });
+    }
+    cursor = span.end;
+  }
+  if (spans.length === 0) return 0;
+
+  const updated = removeTextRanges(content, spans);
+  if (updated !== content) await ctx.app.vault.modify(source, updated);
+  return spans.length;
+}
+
+function referenceCleanupRange(content: string): TextRange | undefined {
+  const sections: ReadSectionSpec[] = [
+    { key: "references", labelKey: "references" },
+    { key: "links", labelKey: "links", includeSubsections: true },
+    { key: "links", labels: ["Links", "링크"], includeSubsections: true }
+  ];
+  for (const section of sections) {
+    const range = findSectionContentRange(content, section);
+    if (range) return range;
+  }
+  return undefined;
+}
+
+function standaloneReferenceLinkPath(line: string): string | undefined {
+  let text = line.trim();
+  text = text.replace(/^(?:>\s*)+/, "").trim();
+  text = text.replace(/^(?:[-*+]\s+|\d+[.)]\s+)/, "").trim();
+  if (!text) return undefined;
+  return readWikiLinkPath(text);
+}
+
+function lineTextRangeAt(
+  content: string,
+  start: number,
+  maxEnd: number
+): (TextRange & { endWithoutBreak: number }) | undefined {
+  if (start >= maxEnd) return undefined;
+  const newline = content.indexOf("\n", start);
+  const end = newline === -1 || newline + 1 > maxEnd ? maxEnd : newline + 1;
+  const endWithoutBreak = newline === -1 || newline >= maxEnd ? maxEnd : newline;
+  return {
+    start,
+    end,
+    endWithoutBreak
+  };
+}
+
+function removeTextRanges(content: string, ranges: TextRange[]): string {
+  let result = content;
+  const ordered = [...ranges].sort((left, right) => right.start - left.start);
+  for (const range of ordered) {
+    result = `${result.slice(0, range.start)}${result.slice(range.end)}`;
+  }
+  return result;
+}
+
+function stringReferencesAnyTarget(
+  ctx: WorkflowContext,
+  sourcePath: string,
+  value: string,
+  targets: TFile[]
+): boolean {
+  const wikiTarget = readWikiLinkPath(value);
+  if (wikiTarget) return linkReferencesAnyTarget(ctx, sourcePath, wikiTarget, targets);
+
+  const normalized = normalizeVaultPath(value);
+  return targets.some((target) => normalized === target.path || normalized === target.basename);
+}
+
+function linkReferencesAnyTarget(
+  ctx: WorkflowContext,
+  sourcePath: string,
+  linkPath: string,
+  targets: TFile[]
+): boolean {
+  const targetPaths = new Set(targets.map((target) => target.path));
+  const resolved = ctx.app.metadataCache.getFirstLinkpathDest(linkPath, sourcePath);
+  if (resolved && targetPaths.has(resolved.path)) return true;
+
+  const normalized = normalizeVaultPath(linkPath.split("#")[0]);
+  return targets.some((target) => normalized === target.path || normalized === target.basename);
+}
+
+function readWikiLinkPath(value: string): string | undefined {
+  const match = value.trim().match(/^\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]$/);
+  return match?.[1]?.trim();
 }
 
 function folderStyleContainer(file: TFile): TFolder | undefined {

@@ -73,6 +73,13 @@ status-driven: setting `frontmatter/status` to `archived` moves the project into
 `PARA/Archives/Projects`, and setting a non-archived status on the archived copy
 restores it to the active Projects folder.
 
+Delete commands should also stay domain-specific and use Obsidian core trash
+APIs. Do not depend on Trash Explorer for deletion; Trash Explorer is only a GUI
+helper for reviewing or emptying `.trash`. Body backlinks should remain in place
+as historical context and be reported in JSON. Only PARA-ZK-owned relationships,
+such as `areas`, `project`, `parent`, `promoted_to`, and standalone
+References-section link lines, should be cleaned automatically.
+
 "GUI and CLI behave the same" means they call the same core workflow functions
 and produce the same kind of vault side effects. It does not mean the CLI should
 copy the GUI prompts or limit itself to human-oriented interaction.
@@ -192,6 +199,8 @@ Representative CLI smoke tests should cover:
   scoped set/append/replace operations
 - project archive and restore through `update-project key=frontmatter/status`
 - `para-zk:rename-project`, `rename-area`, `rename-resource`, and `rename-zk`
+- `para-zk:delete-project`, `delete-area`, `delete-resource`, `delete-zk`,
+  `delete-journal`, and `delete-retro`, including Trash Explorer disabled
 - `para-zk:add-reference` with a vault-relative source `path` and URL/file/note target
 - `para-zk:create-subnote`
 - `para-zk:create-subarea`

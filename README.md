@@ -55,8 +55,10 @@ obsidian para-zk:rename-project title="Project name" new_title="Renamed project"
 obsidian para-zk:add-reference path="PARA/Projects/Project name/Project name.md" target="https://example.com/source" label="Source" format=json
 obsidian para-zk:create-resource path="PARA/Projects/Project name/Project name.md" title="Source" format=json
 obsidian para-zk:rename-resource title="Source" new_title="Renamed source" format=json
+obsidian para-zk:delete-resource title="Source" format=json
 obsidian para-zk:create-subnote path="PARA/Projects/Project name/Project name.md" title="Meeting notes" subnote_type=meeting format=json
 obsidian para-zk:create-zk title="Idea" kind=fleeting format=json
+obsidian para-zk:delete-zk title="Idea" kind=fleeting format=json
 obsidian para-zk:promote-fleeting path="ZK/Fleeting/Idea.md" kind=permanent maturity=evergreen title="Evergreen idea" format=json
 obsidian para-zk:capture-journal content="Quick memo" energy=normal format=json
 ```
@@ -73,6 +75,10 @@ frontmatter keys use `op=set`, while section/body keys support `set`, `append`,
 Changing a project with `key=frontmatter/status op=set value=archived` moves the
 project into `PARA/Archives/Projects`; setting a non-archived status on the
 archived copy restores it to the active Projects folder.
+Delete commands move notes or folder-style note containers to Obsidian trash
+using core APIs, not Trash Explorer. Body backlinks are preserved and reported;
+PARA-ZK only cleans owned frontmatter relationships and standalone References
+section link lines.
 
 When `locale` is omitted, PARA-ZK defaults to English. Pass `locale=ko` when a
 Korean vault UI and generated Markdown are desired.

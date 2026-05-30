@@ -141,10 +141,16 @@ function runWorkflowScenario(today) {
   const resourceTitle = `Smoke Resource ${stamp}`;
   const renameResourceTitle = `Smoke Rename Resource ${stamp}`;
   const renamedResourceTitle = `Smoke Renamed Resource ${stamp}`;
+  const deleteAreaTitle = `Smoke Delete Area ${stamp}`;
+  const deleteAreaProjectTitle = `Smoke Delete Area Project ${stamp}`;
+  const deleteResourceTitle = `Smoke Delete Resource ${stamp}`;
+  const deleteProjectTitle = `Smoke Delete Project ${stamp}`;
+  const deleteZkTitle = `Smoke Delete Permanent ${stamp}`;
   const fleetingTitle = `Smoke Fleeting ${stamp}`;
   const permanentTitle = `Smoke Permanent ${stamp}`;
   const renameZkTitle = `Smoke Rename Permanent ${stamp}`;
   const renamedZkTitle = `Smoke Renamed Permanent ${stamp}`;
+  const deleteJournalDate = "2026-01-15";
 
   const area = cliJson("para-zk:create-area", [
     `title=${areaTitle}`,
@@ -345,6 +351,39 @@ function runWorkflowScenario(today) {
   assertFileExists(renamedProjectChildPath, "renamed project child did not move with folder");
   assert(!existsSync(join(vaultPath, renameProject.path)), "rename-project left the old project file behind");
 
+  const deleteProject = cliJson("para-zk:create-project", [
+    `title=${deleteProjectTitle}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(deleteProject, "delete project");
+  const deleteProjectChild = cliJson("para-zk:create-subnote", [
+    `title=Smoke Delete Child ${stamp}`,
+    `path=${deleteProject.path}`,
+    "subnote_type=free",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(deleteProjectChild, "delete project child");
+  const deleteProjectRejected = cliJson("para-zk:delete-project", [
+    `title=${deleteProjectTitle}`,
+    "format=json"
+  ]);
+  assert(deleteProjectRejected.ok === false, "delete-project accepted child files without force=true");
+  assert(
+    typeof deleteProjectRejected.error === "string" && deleteProjectRejected.error.includes("force=true"),
+    `delete-project force error was not explicit: ${JSON.stringify(deleteProjectRejected)}`
+  );
+  const deletedProject = cliJson("para-zk:delete-project", [
+    `title=${deleteProjectTitle}`,
+    "force=true",
+    "format=json"
+  ]);
+  assert(deletedProject.ok === true && deletedProject.trashed === true, "delete-project force failed");
+  assert(deletedProject.trashMethod !== "trash-explorer", "delete-project depended on Trash Explorer");
+  assertFileMissing(deleteProject.path, "delete-project left project file behind");
+  assertFileMissing(deleteProjectChild.path, "delete-project left child file behind");
+
   const projectPriorityUpdate = cliJson("para-zk:update-project", [
     `title=${projectTitle}`,
     "key=frontmatter/priority",
@@ -496,6 +535,41 @@ function runWorkflowScenario(today) {
     `  - area/${renamedNestedAreaSlug}`
   ]);
 
+  const deleteArea = cliJson("para-zk:create-area", [
+    `title=${deleteAreaTitle}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(deleteArea, "delete area");
+  const deleteAreaProject = cliJson("para-zk:create-project", [
+    `title=${deleteAreaProjectTitle}`,
+    `area_titles=${JSON.stringify([deleteAreaTitle])}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(deleteAreaProject, "delete area project");
+  const deleteAreaBodyLink = cliJson("para-zk:update-project", [
+    `title=${deleteAreaProjectTitle}`,
+    "key=summary",
+    "op=set",
+    `value=Body mention [[${deleteAreaTitle}]]`,
+    "format=json"
+  ]);
+  assert(deleteAreaBodyLink.ok === true, "delete area body link setup failed");
+  const deletedArea = cliJson("para-zk:delete-area", [
+    `title=${deleteAreaTitle}`,
+    "format=json"
+  ]);
+  assert(deletedArea.ok === true && deletedArea.trashed === true, "delete-area failed");
+  assert(deletedArea.cleaned?.frontmatter >= 1, "delete-area did not clean project areas frontmatter");
+  assertFileMissing(deleteArea.path, "delete-area left area file behind");
+  assertFileNotContains(deleteAreaProject.path, [
+    "areas:"
+  ]);
+  assertFileContains(deleteAreaProject.path, [
+    `Body mention [[${deleteAreaTitle}]]`
+  ]);
+
   const resource = cliJson("para-zk:create-resource", [
     `title=${resourceTitle}`,
     `path=${project.path}`,
@@ -563,6 +637,31 @@ function runWorkflowScenario(today) {
   assertFileExists(renamedResourcePath, "renamed resource file is missing");
   assert(!existsSync(join(vaultPath, renameResource.path)), "rename-resource left the old resource file behind");
 
+  const deleteResource = cliJson("para-zk:create-resource", [
+    `title=${deleteResourceTitle}`,
+    `path=${project.path}`,
+    "link=true",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(deleteResource, "delete resource");
+  assertFileContains(project.path, [
+    deleteResource.path
+  ]);
+  run("optsidian", ["raw", "plugin:disable", "id=obsidian-trash-explorer"], { allowFailure: true });
+  const deletedResource = cliJson("para-zk:delete-resource", [
+    `title=${deleteResourceTitle}`,
+    "format=json"
+  ]);
+  run("optsidian", ["raw", "plugin:enable", "id=obsidian-trash-explorer"], { allowFailure: true });
+  assert(deletedResource.ok === true && deletedResource.trashed === true, "delete-resource failed");
+  assert(deletedResource.trashMethod !== "trash-explorer", "delete-resource depended on Trash Explorer");
+  assert(deletedResource.cleaned?.references >= 1, "delete-resource did not clean source References line");
+  assertFileMissing(deleteResource.path, "delete-resource left resource file behind");
+  assertFileNotContains(project.path, [
+    deleteResource.path
+  ]);
+
   const fleeting = cliJson("para-zk:create-zk", [
     `title=${fleetingTitle}`,
     "kind=fleeting",
@@ -617,6 +716,44 @@ function runWorkflowScenario(today) {
   assertFileExists(renamedZkPath, "renamed ZK file is missing");
   assert(!existsSync(join(vaultPath, renameZk.path)), "rename-zk left the old ZK file behind");
 
+  const deleteZk = cliJson("para-zk:create-zk", [
+    `title=${deleteZkTitle}`,
+    "kind=permanent",
+    "maturity=draft",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(deleteZk, "delete ZK");
+  const deleteZkReference = cliJson("para-zk:add-reference", [
+    `path=${project.path}`,
+    `target=${deleteZk.path}`,
+    "format=json"
+  ]);
+  assert(deleteZkReference.ok === true, "delete ZK reference setup failed");
+  const deletedZk = cliJson("para-zk:delete-zk", [
+    `title=${deleteZkTitle}`,
+    "kind=permanent",
+    "format=json"
+  ]);
+  assert(deletedZk.ok === true && deletedZk.cleaned?.references >= 1, "delete-zk failed to clean source reference");
+  assertFileMissing(deleteZk.path, "delete-zk left ZK file behind");
+  assertFileNotContains(project.path, [
+    deleteZk.path
+  ]);
+
+  const deleteJournal = cliJson("para-zk:capture-journal", [
+    `content=Delete journal memo ${stamp}`,
+    `date=${deleteJournalDate}`,
+    "format=json"
+  ]);
+  assert(deleteJournal.ok === true, "delete journal setup failed");
+  const deletedJournal = cliJson("para-zk:delete-journal", [
+    `date=${deleteJournalDate}`,
+    "format=json"
+  ]);
+  assert(deletedJournal.ok === true && deletedJournal.trashed === true, "delete-journal failed");
+  assertFileMissing(deleteJournal.path, "delete-journal left journal file behind");
+
   const journal = cliJson("para-zk:capture-journal", [
     `content=Smoke memo ${stamp}`,
     `date=${today}`,
@@ -650,6 +787,21 @@ function runWorkflowScenario(today) {
     "format=json"
   ]);
   assertCreated(retro, "retro");
+
+  const deleteRetro = cliJson("para-zk:create-retro", [
+    `name=Delete Retro ${stamp}`,
+    `date=${today}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(deleteRetro, "delete retro");
+  const deletedRetro = cliJson("para-zk:delete-retro", [
+    `title=${deleteRetro.title}`,
+    `date=${today}`,
+    "format=json"
+  ]);
+  assert(deletedRetro.ok === true && deletedRetro.trashed === true, "delete-retro failed");
+  assertFileMissing(deleteRetro.path, "delete-retro left retro file behind");
 
   const retroRead = cliJson("para-zk:read-retro", [
     `path=${retro.path}`,
@@ -1261,6 +1413,16 @@ function assertFileExists(path, message) {
   const deadline = Date.now() + 3000;
   while (Date.now() <= deadline) {
     if (existsSync(absolute)) return;
+    sleepMs(100);
+  }
+  assert(false, `${message}: ${path}`);
+}
+
+function assertFileMissing(path, message) {
+  const absolute = join(vaultPath, path);
+  const deadline = Date.now() + 3000;
+  while (Date.now() <= deadline) {
+    if (!existsSync(absolute)) return;
     sleepMs(100);
   }
   assert(false, `${message}: ${path}`);

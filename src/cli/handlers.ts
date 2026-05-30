@@ -48,6 +48,13 @@ const RENAME_OPTIONS: Record<string, CliOptionSpec> = {
   format: { value: "<text|json>", description: "Output format (default: text)." }
 };
 
+const DELETE_OPTIONS: Record<string, CliOptionSpec> = {
+  title: { value: "<title>", description: "Current note title. Used when path is omitted." },
+  path: { value: "<path>", description: "Exact note path." },
+  force: { value: "<true|false>", description: "Required when deleting a folder-style note that contains child files." },
+  format: { value: "<text|json>", description: "Output format (default: text)." }
+};
+
 const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
   {
     command: "para-zk:ping",
@@ -417,6 +424,123 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
         path: readCliPath(args),
         kind: readCliRenameKind(args),
         newTitle: readCliNewTitle(args)
+      });
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:delete-project",
+    description: "Move a project note to Obsidian trash and clean PARA-ZK-owned references",
+    options: {
+      ...DELETE_OPTIONS,
+      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." }
+    },
+    text: "project deleted",
+    run: async (plugin, args) => {
+      const { deleteProject } = await import("../workflows");
+      const result = await deleteProject(workflowContext(plugin), {
+        title: readCanonicalCliTitle(args),
+        path: readCliPath(args),
+        archived: readCliBoolean(args, "archived"),
+        force: readCliBoolean(args, "force") ?? false
+      });
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:delete-area",
+    description: "Move an area note to Obsidian trash and clean PARA-ZK-owned references",
+    options: {
+      ...DELETE_OPTIONS,
+      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." }
+    },
+    text: "area deleted",
+    run: async (plugin, args) => {
+      const { deleteArea } = await import("../workflows");
+      const result = await deleteArea(workflowContext(plugin), {
+        title: readCanonicalCliTitle(args),
+        path: readCliPath(args),
+        archived: readCliBoolean(args, "archived"),
+        force: readCliBoolean(args, "force") ?? false
+      });
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:delete-resource",
+    description: "Move a resource note to Obsidian trash and clean PARA-ZK-owned references",
+    options: {
+      ...DELETE_OPTIONS,
+      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." }
+    },
+    text: "resource deleted",
+    run: async (plugin, args) => {
+      const { deleteResource } = await import("../workflows");
+      const result = await deleteResource(workflowContext(plugin), {
+        title: readCanonicalCliTitle(args),
+        path: readCliPath(args),
+        archived: readCliBoolean(args, "archived"),
+        force: readCliBoolean(args, "force") ?? false
+      });
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:delete-zk",
+    description: "Move a ZK note to Obsidian trash and clean PARA-ZK-owned references",
+    options: {
+      ...DELETE_OPTIONS,
+      kind: { value: `<${ZK_KIND_CODE_HELP}>`, description: "Optional ZK kind filter." }
+    },
+    text: "ZK deleted",
+    run: async (plugin, args) => {
+      const { deleteZk } = await import("../workflows");
+      const result = await deleteZk(workflowContext(plugin), {
+        title: readCanonicalCliTitle(args),
+        path: readCliPath(args),
+        kind: readCliRenameKind(args),
+        force: readCliBoolean(args, "force") ?? false
+      });
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:delete-journal",
+    description: "Move a daily journal note to Obsidian trash and report incoming links",
+    options: {
+      date: { value: "<YYYY-MM-DD>", description: "Journal date. Defaults to today." },
+      path: { value: "<path>", description: "Exact journal note path." },
+      force: { value: "<true|false>", description: "Reserved for consistency with other delete commands." },
+      format: { value: "<text|json>", description: "Output format (default: text)." }
+    },
+    text: "journal deleted",
+    run: async (plugin, args) => {
+      const { deleteJournal } = await import("../workflows");
+      const result = await deleteJournal(workflowContext(plugin), {
+        date: readCliString(args, "date"),
+        path: readCliPath(args),
+        force: readCliBoolean(args, "force") ?? false
+      });
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:delete-retro",
+    description: "Move a retro note to Obsidian trash and clean PARA-ZK-owned references",
+    options: {
+      ...DELETE_OPTIONS,
+      date: { value: "<YYYY-MM-DD>", description: "Optional date used to narrow the ISO week folder." },
+      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." }
+    },
+    text: "retro deleted",
+    run: async (plugin, args) => {
+      const { deleteRetro } = await import("../workflows");
+      const result = await deleteRetro(workflowContext(plugin), {
+        title: readCanonicalCliTitle(args),
+        path: readCliPath(args),
+        date: readCliString(args, "date"),
+        archived: readCliBoolean(args, "archived"),
+        force: readCliBoolean(args, "force") ?? false
       });
       return { ...result };
     }

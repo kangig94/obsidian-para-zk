@@ -42,6 +42,9 @@ Notable changes for PARA-ZK are tracked here.
   the same stable map keys as read commands.
 - Added `para-zk:rename-project`, `rename-area`, `rename-resource`, and
   `rename-zk` for explicit domain-safe title/path changes.
+- Added `para-zk:delete-project`, `delete-area`, `delete-resource`,
+  `delete-zk`, `delete-journal`, and `delete-retro` for domain-safe trash
+  deletion using Obsidian core APIs without depending on Trash Explorer.
 - Added `archived=true` lookup for PARA read commands so projects, areas,
   resources, and retros can be read from `PARA/Archives` without using exact
   paths.
@@ -86,6 +89,9 @@ Notable changes for PARA-ZK are tracked here.
 - Updating a project's `frontmatter/status` to `archived` now moves the project
   into `PARA/Archives/Projects`; updating the archived copy to a non-archived
   status restores it to the active Projects folder.
+- Delete workflows now preserve body backlinks, report incoming links, and only
+  clean PARA-ZK-owned frontmatter relationships and standalone References-section
+  link lines.
 
 ### Removed
 
