@@ -144,7 +144,46 @@ export type PromoteFleetingOptions = {
   open?: boolean;
 };
 
+export type ReadByTitleOptions = {
+  path?: string;
+  title?: string;
+  key?: string;
+};
+
+export type ReadProjectOptions = ReadByTitleOptions;
+export type ReadAreaOptions = ReadByTitleOptions;
+export type ReadResourceOptions = ReadByTitleOptions;
+
+export type ReadZkOptions = ReadByTitleOptions & {
+  kind?: string;
+};
+
+export type ReadJournalOptions = {
+  path?: string;
+  date?: string;
+  key?: string;
+};
+
+export type ReadRetroOptions = ReadByTitleOptions & {
+  date?: string;
+};
+
 type TemplateVariables = Record<string, string | undefined>;
+type Frontmatter = Record<string, unknown>;
+type ReadMap = Record<string, unknown>;
+type ReadSectionSpec = {
+  key: string;
+  labelKey?: string;
+  labels?: string[];
+  includeSubsections?: boolean;
+  transform?: (content: string) => string;
+};
+type ReadSurfaceSpec = {
+  frontmatter: string[];
+  sections?: ReadSectionSpec[];
+  body?: boolean;
+  children?: boolean;
+};
 
 export async function createProject(ctx: WorkflowContext, options: CreateProjectOptions): Promise<NoteResult & {
   areas?: ProjectAreaResult[];
@@ -188,6 +227,31 @@ export async function createProject(ctx: WorkflowContext, options: CreateProject
     ...noteResult(file, true, options.open),
     areas: resolvedAreas.length > 0 ? resolvedAreas : undefined
   };
+}
+
+export async function readProject(ctx: WorkflowContext, options: ReadProjectOptions): Promise<Record<string, unknown>> {
+  return readSurface(ctx, resolveRequiredProject(ctx, options), PROJECT_READ_SPEC, options.key);
+}
+
+export async function readArea(ctx: WorkflowContext, options: ReadAreaOptions): Promise<Record<string, unknown>> {
+  return readSurface(ctx, resolveRequiredArea(ctx, options), AREA_READ_SPEC, options.key);
+}
+
+export async function readResource(ctx: WorkflowContext, options: ReadResourceOptions): Promise<Record<string, unknown>> {
+  return readSurface(ctx, resolveRequiredResource(ctx, options), RESOURCE_READ_SPEC, options.key);
+}
+
+export async function readZk(ctx: WorkflowContext, options: ReadZkOptions): Promise<Record<string, unknown>> {
+  const file = resolveRequiredZk(ctx, options);
+  return readSurface(ctx, file, specForType(readType(fileFrontmatter(ctx, file))), options.key);
+}
+
+export async function readJournal(ctx: WorkflowContext, options: ReadJournalOptions): Promise<Record<string, unknown>> {
+  return readSurface(ctx, resolveRequiredJournal(ctx, options), JOURNAL_READ_SPEC, options.key);
+}
+
+export async function readRetro(ctx: WorkflowContext, options: ReadRetroOptions): Promise<Record<string, unknown>> {
+  return readSurface(ctx, resolveRequiredRetro(ctx, options), RETRO_READ_SPEC, options.key);
 }
 
 export async function createArea(ctx: WorkflowContext, options: CreateAreaOptions): Promise<NoteResult> {
@@ -755,6 +819,381 @@ function countListItems(section: string, prefix: string): number {
   return section.split(/\n/).filter((line) => numberRe.test(line) || bulletRe.test(line)).length;
 }
 
+const PROJECT_READ_SPEC: ReadSurfaceSpec = {
+  frontmatter: ["areas", "status", "priority", "start_date", "due_date", "done_date"],
+  sections: [
+    { key: "summary", labelKey: "summary", transform: stripProjectSummaryManagedBlock },
+    { key: "goals", labelKey: "goals" },
+    { key: "tasks", labelKey: "tasks" },
+    { key: "references", labelKey: "references" }
+  ],
+  children: true
+};
+
+const AREA_READ_SPEC: ReadSurfaceSpec = {
+  frontmatter: ["parent"],
+  sections: [
+    { key: "overview", labelKey: "overview" },
+    { key: "references", labelKey: "references" }
+  ],
+  children: true
+};
+
+const RESOURCE_READ_SPEC: ReadSurfaceSpec = {
+  frontmatter: [],
+  sections: [
+    { key: "overview", labelKey: "overview" },
+    { key: "body", labelKey: "body" },
+    { key: "references", labelKey: "references" }
+  ]
+};
+
+const JOURNAL_READ_SPEC: ReadSurfaceSpec = {
+  frontmatter: ["date", "energy"],
+  sections: [
+    { key: "focus", labelKey: "focus" },
+    { key: "quick_memo", labelKey: "quickMemo" },
+    { key: "timeline", labelKey: "timeline" },
+    { key: "today_tasks", labelKey: "todayTasks" },
+    { key: "short_review", labelKey: "shortReview" },
+    { key: "links", labelKey: "links" }
+  ]
+};
+
+const RETRO_READ_SPEC: ReadSurfaceSpec = {
+  frontmatter: ["project", "areas", "date", "week_iso", "week_start", "week_end"],
+  sections: [
+    { key: "week_progress", labelKey: "weekProgress" },
+    { key: "good", labelKey: "good" },
+    { key: "improve", labelKey: "improve" },
+    { key: "risks", labelKey: "risks" },
+    { key: "next_actions", labelKey: "nextActions" },
+    { key: "retro_summary", labelKey: "retroSummary" },
+    { key: "links", labels: ["Links", "링크"], includeSubsections: true }
+  ]
+};
+
+const DOC_READ_SPEC: ReadSurfaceSpec = {
+  frontmatter: ["subnote_type"],
+  body: true
+};
+
+const ZK_FLEETING_READ_SPEC: ReadSurfaceSpec = {
+  frontmatter: ["processed"],
+  sections: [
+    { key: "thought_summary", labelKey: "thoughtSummary" },
+    { key: "memo", labelKey: "memo" },
+    { key: "references", labelKey: "references" }
+  ]
+};
+
+const ZK_LITERATURE_READ_SPEC: ReadSurfaceSpec = {
+  frontmatter: ["sourceTitle", "authors", "published", "url"],
+  sections: [
+    { key: "highlight_block", labelKey: "highlightBlock" },
+    { key: "summary", labelKey: "summary" },
+    { key: "insight", labelKey: "insight" },
+    { key: "evidence", labelKey: "evidence" },
+    { key: "references", labelKey: "references" }
+  ]
+};
+
+const ZK_PERMANENT_READ_SPEC: ReadSurfaceSpec = {
+  frontmatter: ["maturity", "aliases"],
+  sections: [
+    { key: "one_sentence_summary", labelKey: "oneSentenceSummary" },
+    { key: "body", labelKey: "body" },
+    { key: "limitations", labelKey: "limitations" },
+    { key: "related_questions", labelKey: "relatedQuestions" },
+    { key: "references", labelKey: "references" }
+  ]
+};
+
+const NOTE_READ_SPEC: ReadSurfaceSpec = {
+  frontmatter: [],
+  body: true
+};
+
+async function readSurface(
+  ctx: WorkflowContext,
+  file: TFile,
+  spec: ReadSurfaceSpec,
+  rawKey: string | undefined
+): Promise<Record<string, unknown>> {
+  const frontmatter = fileFrontmatter(ctx, file);
+  const type = readType(frontmatter);
+  const surface = await readSurfaceMap(ctx, file, spec);
+  const key = rawKey?.trim();
+
+  if (!key) {
+    return {
+      path: file.path,
+      title: file.basename,
+      type,
+      keys: Object.keys(surface),
+      ...surface
+    };
+  }
+
+  return {
+    path: file.path,
+    title: file.basename,
+    type,
+    key,
+    value: await readSurfaceKey(ctx, file, surface, key)
+  };
+}
+
+async function readSurfaceMap(ctx: WorkflowContext, file: TFile, spec: ReadSurfaceSpec): Promise<ReadMap> {
+  const content = await ctx.app.vault.read(file);
+  const frontmatter = fileFrontmatter(ctx, file);
+  const surface: ReadMap = {
+    frontmatter: pickFrontmatter(frontmatter, spec.frontmatter)
+  };
+
+  if (spec.body) surface.body = stripManagedPrelude(content);
+
+  for (const section of spec.sections ?? []) {
+    const value = readSection(content, sectionHeadingCandidates(section), {
+      includeSubsections: section.includeSubsections ?? false
+    });
+    surface[section.key] = section.transform ? section.transform(value) : value;
+  }
+
+  if (spec.children) surface.children = childIndex(ctx, file);
+  return surface;
+}
+
+async function readSurfaceKey(
+  ctx: WorkflowContext,
+  source: TFile,
+  surface: ReadMap,
+  key: string
+): Promise<unknown> {
+  const parts = keyParts(key);
+  if (parts.length === 0) throw new Error("key is required");
+
+  if (parts[0] !== "children") {
+    return readMapPath(surface, parts, key);
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(surface, "children")) {
+    throw new Error(`unknown read key: ${key}`);
+  }
+  if (parts.length === 1) return surface.children;
+
+  const childTitle = parts[1];
+  const child = findChild(ctx, source, childTitle);
+  if (!child) throw new Error(`child not found: ${childTitle}`);
+
+  const childSurface = await readSurfaceMap(ctx, child, specForType(readType(fileFrontmatter(ctx, child))));
+  if (parts.length === 2) {
+    return {
+      path: child.path,
+      title: child.basename,
+      type: readType(fileFrontmatter(ctx, child)),
+      keys: Object.keys(childSurface),
+      ...childSurface
+    };
+  }
+  return readMapPath(childSurface, parts.slice(2), key);
+}
+
+function childIndex(ctx: WorkflowContext, parent: TFile): Record<string, unknown> {
+  const entries: Record<string, unknown> = {};
+  for (const file of childFiles(ctx, parent)) {
+    const frontmatter = fileFrontmatter(ctx, file);
+    const spec = specForType(readType(frontmatter));
+    const item: Record<string, unknown> = {
+      path: file.path,
+      type: readType(frontmatter),
+      key: `children/${file.basename}`,
+      keys: keysForSpec(spec)
+    };
+    const subnoteType = frontmatter.subnote_type;
+    if (subnoteType !== undefined) item.subnote_type = subnoteType;
+    entries[file.basename] = item;
+  }
+  return entries;
+}
+
+function childFiles(ctx: WorkflowContext, parent: TFile): TFile[] {
+  const directFolder = parent.parent?.path ?? parentFolder(parent.path);
+  const parentLink = linkToFile(parent);
+  const byPath = new Map<string, TFile>();
+
+  for (const file of ctx.app.vault.getMarkdownFiles()) {
+    if (file.path === parent.path) continue;
+    const frontmatter = fileFrontmatter(ctx, file);
+    if (file.parent?.path === directFolder || frontmatter.parent === parentLink) {
+      byPath.set(file.path, file);
+    }
+  }
+
+  return Array.from(byPath.values()).sort((left, right) => left.path.localeCompare(right.path));
+}
+
+function findChild(ctx: WorkflowContext, parent: TFile, title: string): TFile | undefined {
+  const matches = childFiles(ctx, parent).filter((file) => file.basename === title);
+  if (matches.length === 1) return matches[0];
+  if (matches.length > 1) throw new Error(`child title is ambiguous: ${title}`);
+  return undefined;
+}
+
+function keysForSpec(spec: ReadSurfaceSpec): string[] {
+  return [
+    "frontmatter",
+    ...(spec.body ? ["body"] : []),
+    ...(spec.sections?.map((section) => section.key) ?? []),
+    ...(spec.children ? ["children"] : [])
+  ];
+}
+
+function specForType(type: string): ReadSurfaceSpec {
+  if (type === "project") return PROJECT_READ_SPEC;
+  if (type === "area") return AREA_READ_SPEC;
+  if (type === "resource") return RESOURCE_READ_SPEC;
+  if (type === "journal") return JOURNAL_READ_SPEC;
+  if (type === "retro") return RETRO_READ_SPEC;
+  if (type === "doc") return DOC_READ_SPEC;
+  if (type === "zk_fleeting") return ZK_FLEETING_READ_SPEC;
+  if (type === "zk_literature") return ZK_LITERATURE_READ_SPEC;
+  if (type === "zk_permanent") return ZK_PERMANENT_READ_SPEC;
+  return NOTE_READ_SPEC;
+}
+
+function readMapPath(map: ReadMap, parts: string[], originalKey: string): unknown {
+  let current: unknown = map;
+  for (const part of parts) {
+    if (!isRecord(current) || !Object.prototype.hasOwnProperty.call(current, part)) {
+      throw new Error(`unknown read key: ${originalKey}`);
+    }
+    current = current[part];
+  }
+  return current;
+}
+
+function keyParts(key: string): string[] {
+  return key.split("/").map((part) => part.trim()).filter(Boolean);
+}
+
+function readSection(
+  content: string,
+  labels: string[],
+  options: { includeSubsections?: boolean } = {}
+): string {
+  const body = stripYamlFrontmatter(content);
+  for (const label of labels) {
+    const section = readSectionByHeading(body, label, options);
+    if (section !== undefined) return section;
+  }
+  return "";
+}
+
+function readSectionByHeading(
+  content: string,
+  heading: string,
+  options: { includeSubsections?: boolean } = {}
+): string | undefined {
+  const headingPattern = escapeRegExp(heading).replace(/\s+/g, "\\s+");
+  const headerRe = new RegExp(`^\\s*(?<hashes>#{1,6})\\s+${headingPattern}(?=\\s|$).*?$`, "im");
+  const match = content.match(headerRe);
+  if (!match) return undefined;
+
+  const level = match.groups?.hashes.length ?? 6;
+  const headerEnd = (match.index ?? 0) + match[0].length;
+  const sectionStart = content.charAt(headerEnd) === "\n" ? headerEnd + 1 : headerEnd;
+  const after = content.slice(sectionStart);
+  const nextBoundaryRel = nextSectionBoundary(after, options.includeSubsections ? level : undefined);
+  const sectionEnd = nextBoundaryRel === -1 ? content.length : sectionStart + nextBoundaryRel;
+  return trimMarkdownBlock(content.slice(sectionStart, sectionEnd));
+}
+
+function nextSectionBoundary(content: string, maxHeadingLevel: number | undefined): number {
+  const headingRe = maxHeadingLevel
+    ? new RegExp(`^\\s*#{1,${maxHeadingLevel}}\\s+`, "m")
+    : /^\s*#{1,6}\s+/m;
+  const thematicBreakRe = /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/m;
+  return minFoundIndex(content.search(headingRe), content.search(thematicBreakRe));
+}
+
+function minFoundIndex(left: number, right: number): number {
+  if (left === -1) return right;
+  if (right === -1) return left;
+  return Math.min(left, right);
+}
+
+function stripProjectSummaryManagedBlock(content: string): string {
+  const lines = content.split("\n");
+  if (!lines[0]?.trim().startsWith("> [!tip]")) return content;
+
+  let fenceCount = 0;
+  let index = 0;
+  for (; index < lines.length; index += 1) {
+    if (lines[index].trim() === "> ```") fenceCount += 1;
+    if (fenceCount === 2) {
+      index += 1;
+      break;
+    }
+  }
+
+  while (lines[index]?.trim() === "") index += 1;
+  return trimMarkdownBlock(lines.slice(index).join("\n"));
+}
+
+function stripManagedPrelude(content: string): string {
+  return trimMarkdownBlock(stripYamlFrontmatter(content).replace(/^\s*```para-zk-props\n[\s\S]*?\n```\s*/, ""));
+}
+
+function stripYamlFrontmatter(content: string): string {
+  if (!content.startsWith("---\n")) return content;
+  const end = content.indexOf("\n---", 4);
+  if (end === -1) return content;
+  const after = end + "\n---".length;
+  return content.charAt(after) === "\n" ? content.slice(after + 1) : content.slice(after);
+}
+
+function sectionLabels(labelKey: string): string[] {
+  return uniqueStrings([
+    localePack("en").labels[labelKey],
+    localePack("ko").labels[labelKey]
+  ]);
+}
+
+function sectionHeadingCandidates(section: ReadSectionSpec): string[] {
+  return uniqueStrings([
+    ...(section.labelKey ? sectionLabels(section.labelKey) : []),
+    ...(section.labels ?? [])
+  ]);
+}
+
+function trimMarkdownBlock(value: string): string {
+  return value
+    .replace(/^(?:[ \t]*\n)+/, "")
+    .replace(/(?:\n[ \t]*)+$/, "");
+}
+
+function pickFrontmatter(frontmatter: Frontmatter, keys: string[]): Frontmatter {
+  const result: Frontmatter = {};
+  for (const key of keys) {
+    if (frontmatter[key] !== undefined) result[key] = frontmatter[key];
+  }
+  return result;
+}
+
+function fileFrontmatter(ctx: WorkflowContext, file: TFile): Frontmatter {
+  return ctx.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+}
+
+function readType(frontmatter: Frontmatter): string {
+  const type = frontmatter.type;
+  return typeof type === "string" && type.trim() ? type : "note";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 async function ensureFolderStyleParent(ctx: WorkflowContext, file: TFile): Promise<{
   file: TFile;
   childFolder: string;
@@ -824,6 +1263,74 @@ function folderForZkKind(settings: ParaZkSettings, kind: ZkKind | PromotionZkKin
   return settings.paths.fleetingFolder;
 }
 
+function resolveRequiredProject(ctx: WorkflowContext, options: ReadProjectOptions): TFile {
+  const file = options.path
+    ? resolveRequiredFile(ctx, options.path, "project note")
+    : findProjectByTitle(ctx, requireTitle(options.title, "project title"));
+  if (!file) throw new Error(`project not found: ${options.title}`);
+
+  const type = readType(fileFrontmatter(ctx, file));
+  if (type !== "project") throw new Error(`file is not a project note: ${file.path}`);
+  return file;
+}
+
+function resolveRequiredArea(ctx: WorkflowContext, options: ReadAreaOptions): TFile {
+  const file = options.path
+    ? resolveRequiredFile(ctx, options.path, "area note")
+    : findAreaByTitle(ctx, requireTitle(options.title, "area title"));
+  if (!file) throw new Error(`area not found: ${options.title}`);
+
+  const type = readType(fileFrontmatter(ctx, file));
+  if (type !== "area") throw new Error(`file is not an area note: ${file.path}`);
+  return file;
+}
+
+function resolveRequiredResource(ctx: WorkflowContext, options: ReadResourceOptions): TFile {
+  const file = options.path
+    ? resolveRequiredFile(ctx, options.path, "resource note")
+    : findResourceByTitle(ctx, requireTitle(options.title, "resource title"));
+  if (!file) throw new Error(`resource not found: ${options.title}`);
+
+  const type = readType(fileFrontmatter(ctx, file));
+  if (type !== "resource") throw new Error(`file is not a resource note: ${file.path}`);
+  return file;
+}
+
+function resolveRequiredZk(ctx: WorkflowContext, options: ReadZkOptions): TFile {
+  const kind = readOptionalCode(options.kind, parseZkKind, "kind", ZK_KIND_CODE_HELP);
+  const file = options.path
+    ? resolveRequiredFile(ctx, options.path, "ZK note")
+    : findZkByTitle(ctx, requireTitle(options.title, "ZK title"), kind);
+  if (!file) throw new Error(`ZK note not found: ${options.title}`);
+
+  const type = readType(fileFrontmatter(ctx, file));
+  if (!type.startsWith("zk_")) throw new Error(`file is not a ZK note: ${file.path}`);
+  if (kind && type !== typeForZkKind(kind)) throw new Error(`file is not a ${kind} ZK note: ${file.path}`);
+  return file;
+}
+
+function resolveRequiredJournal(ctx: WorkflowContext, options: ReadJournalOptions): TFile {
+  const file = options.path
+    ? resolveRequiredFile(ctx, options.path, "journal note")
+    : ctx.app.vault.getFileByPath(journalPath(ctx, options.date));
+  if (!file) throw new Error(`journal not found: ${localDate(dateFromCli(options.date))}`);
+
+  const type = readType(fileFrontmatter(ctx, file));
+  if (type !== "journal") throw new Error(`file is not a journal note: ${file.path}`);
+  return file;
+}
+
+function resolveRequiredRetro(ctx: WorkflowContext, options: ReadRetroOptions): TFile {
+  const file = options.path
+    ? resolveRequiredFile(ctx, options.path, "retro note")
+    : findRetroByTitle(ctx, requireTitle(options.title, "retro title"), options.date);
+  if (!file) throw new Error(`retro not found: ${options.title}`);
+
+  const type = readType(fileFrontmatter(ctx, file));
+  if (type !== "retro") throw new Error(`file is not a retro note: ${file.path}`);
+  return file;
+}
+
 function resolveRequiredFile(ctx: WorkflowContext, path: string | undefined, label: string): TFile {
   const file = resolveOptionalFile(ctx, path) ?? ctx.app.workspace.getActiveFile();
   if (!file) throw new Error(`${label} is required`);
@@ -836,6 +1343,115 @@ function resolveOptionalFile(ctx: WorkflowContext, path: string | undefined): TF
   const file = ctx.app.vault.getFileByPath(normalized);
   if (!file) throw new Error(`file not found: ${normalized}`);
   return file;
+}
+
+function findProjectByTitle(ctx: WorkflowContext, title: string): TFile | undefined {
+  const canonicalPaths = [
+    joinVaultPath(ctx.settings.paths.projectsFolder, title, `${title}.md`),
+    joinVaultPath(ctx.settings.paths.projectsFolder, `${title}.md`)
+  ];
+
+  for (const path of canonicalPaths) {
+    const file = ctx.app.vault.getFileByPath(path);
+    if (file) return file;
+  }
+
+  const projectFiles = ctx.app.vault.getMarkdownFiles().filter((file) => {
+    const frontmatter = fileFrontmatter(ctx, file);
+    return frontmatter.type === "project" && isInFolder(file, ctx.settings.paths.projectsFolder);
+  });
+  const exactMatches = projectFiles.filter((file) => file.basename === title);
+  if (exactMatches.length === 1) return exactMatches[0];
+  if (exactMatches.length > 1) throw new Error(`project title is ambiguous: ${title}`);
+
+  const foldedTitle = title.toLocaleLowerCase();
+  const foldedMatches = projectFiles.filter((file) => file.basename.toLocaleLowerCase() === foldedTitle);
+  if (foldedMatches.length === 1) return foldedMatches[0];
+  if (foldedMatches.length > 1) throw new Error(`project title is ambiguous: ${title}`);
+
+  return undefined;
+}
+
+function findResourceByTitle(ctx: WorkflowContext, title: string): TFile | undefined {
+  const canonicalPath = joinVaultPath(ctx.settings.paths.resourcesFolder, `${title}.md`);
+  const canonical = ctx.app.vault.getFileByPath(canonicalPath);
+  if (canonical) return canonical;
+
+  return findUniqueNoteByTitle(ctx, {
+    title,
+    folder: ctx.settings.paths.resourcesFolder,
+    type: "resource",
+    label: "resource"
+  });
+}
+
+function findZkByTitle(ctx: WorkflowContext, title: string, kind: ZkKind | undefined): TFile | undefined {
+  const folders = kind
+    ? [folderForZkKind(ctx.settings, kind)]
+    : [ctx.settings.paths.fleetingFolder, ctx.settings.paths.literatureFolder, ctx.settings.paths.permanentFolder];
+
+  for (const folder of folders) {
+    const file = ctx.app.vault.getFileByPath(joinVaultPath(folder, `${title}.md`));
+    if (file) return file;
+  }
+
+  const expectedType = kind ? typeForZkKind(kind) : undefined;
+  return findUniqueNoteByTitle(ctx, {
+    title,
+    folder: ctx.settings.paths.zkFolder,
+    type: expectedType,
+    typePrefix: expectedType ? undefined : "zk_",
+    label: "ZK note"
+  });
+}
+
+function findRetroByTitle(ctx: WorkflowContext, title: string, date: string | undefined): TFile | undefined {
+  const folder = date
+    ? joinVaultPath(ctx.settings.paths.retrosFolder, isoWeekInfo(dateFromCli(date)).weekIso.replace("-", "_"))
+    : ctx.settings.paths.retrosFolder;
+  return findUniqueNoteByTitle(ctx, {
+    title,
+    folder,
+    type: "retro",
+    label: "retro"
+  });
+}
+
+function findUniqueNoteByTitle(
+  ctx: WorkflowContext,
+  options: {
+    title: string;
+    folder: string;
+    type?: string;
+    typePrefix?: string;
+    label: string;
+  }
+): TFile | undefined {
+  const files = ctx.app.vault.getMarkdownFiles().filter((file) => {
+    const type = readType(fileFrontmatter(ctx, file));
+    return isInFolder(file, options.folder)
+      && (!options.type || type === options.type)
+      && (!options.typePrefix || type.startsWith(options.typePrefix));
+  });
+  const exactMatches = files.filter((file) => file.basename === options.title);
+  if (exactMatches.length === 1) return exactMatches[0];
+  if (exactMatches.length > 1) throw new Error(`${options.label} title is ambiguous: ${options.title}`);
+
+  const foldedTitle = options.title.toLocaleLowerCase();
+  const foldedMatches = files.filter((file) => file.basename.toLocaleLowerCase() === foldedTitle);
+  if (foldedMatches.length === 1) return foldedMatches[0];
+  if (foldedMatches.length > 1) throw new Error(`${options.label} title is ambiguous: ${options.title}`);
+
+  return undefined;
+}
+
+function journalPath(ctx: WorkflowContext, date: string | undefined): string {
+  const dateText = localDate(dateFromCli(date));
+  return joinVaultPath(ctx.settings.paths.journalFolder, dateText.slice(0, 7), `${dateText}.md`);
+}
+
+function typeForZkKind(kind: ZkKind): string {
+  return `zk_${kind.toLowerCase()}`;
 }
 
 function requireTitle(value: string | undefined, label: string): string {

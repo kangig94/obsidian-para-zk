@@ -41,6 +41,12 @@ obsidian para-zk:init dryRun=true force=true locale=en format=json
 obsidian para-zk:init locale=ko format=json
 obsidian para-zk:init installDeps=true format=json
 obsidian para-zk:create-project title="Project name" area_titles='["AI","Software"]' status=in_progress priority=high format=json
+obsidian para-zk:read-project title="Project name" key=frontmatter/status format=json
+obsidian para-zk:read-project title="Project name" key="children/Meeting notes/body" format=json
+obsidian para-zk:read-area title="AI" key=children format=json
+obsidian para-zk:read-resource title="Source" key=body format=json
+obsidian para-zk:read-zk title="Idea" kind=fleeting key=memo format=json
+obsidian para-zk:read-journal date=2026-05-30 key=quick_memo format=json
 obsidian para-zk:add-reference path="PARA/Projects/Project name/Project name.md" target="https://example.com/source" label="Source" format=json
 obsidian para-zk:create-resource path="PARA/Projects/Project name/Project name.md" title="Source" format=json
 obsidian para-zk:create-subnote path="PARA/Projects/Project name/Project name.md" title="Meeting notes" subnote_type=meeting format=json
@@ -52,6 +58,9 @@ obsidian para-zk:capture-journal content="Quick memo" energy=normal format=json
 CLI option values use locale-neutral codes only. For example, pass
 `status=in_progress` instead of `status="1. 진행중"`; the plugin renders the
 localized label inside the generated note.
+Read commands use the same rule: `key=frontmatter/status`, `key=summary`, and
+`key="children/Meeting notes/body"` are stable CLI map paths and do not depend
+on the generated Markdown locale.
 
 When `locale` is omitted, PARA-ZK defaults to English. Pass `locale=ko` when a
 Korean vault UI and generated Markdown are desired.

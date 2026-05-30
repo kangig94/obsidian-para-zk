@@ -212,6 +212,90 @@ Side effects:
 - Sets a localized area tag.
 - Sets `parent` if `parent` was provided.
 
+### `para-zk:read-project`
+
+Reads a project note through PARA-ZK's stable editable-surface map. This is not
+a raw file read. It returns the parts that LLMs should reason about without
+requiring locale-specific headings or template internals.
+
+Options:
+
+| Option | Values | Notes |
+| --- | --- | --- |
+| `title` | string | Project title. Used when `path` is omitted. |
+| `path` | path | Optional exact project note path. |
+| `key` | map path | Optional stable key path. |
+
+Top-level keys:
+
+```text
+frontmatter | summary | goals | tasks | references | children
+```
+
+Examples:
+
+```bash
+optsidian raw para-zk:read-project title="Model Evaluation" format=json
+optsidian raw para-zk:read-project title="Model Evaluation" key=frontmatter/status format=json
+optsidian raw para-zk:read-project title="Model Evaluation" key=children format=json
+optsidian raw para-zk:read-project title="Model Evaluation" key="children/Planning Meeting/body" format=json
+```
+
+`children` is a map keyed by child note title. Child entries expose their own
+stable keys, so automation can read a returned path without guessing:
+
+```json
+{
+  "children": {
+    "Planning Meeting": {
+      "path": "PARA/Projects/Model Evaluation/Planning Meeting.md",
+      "type": "doc",
+      "key": "children/Planning Meeting",
+      "subnote_type": "meeting",
+      "keys": ["frontmatter", "body"]
+    }
+  }
+}
+```
+
+Important fields:
+
+- `frontmatter`: editable project fields only, such as `status`, `priority`,
+  `areas`, `start_date`, `due_date`, and `done_date`.
+- `children`: child-note index; child bodies are read only when requested with
+  a `children/<title>/...` key.
+- `value`: present when `key` is provided.
+
+The same map-path read algorithm is used by the other domain read commands. The
+command selects the target note, builds that note type's stable surface map, and
+then resolves `key` as a `/`-separated map path.
+
+| Command | Selector | Top-level keys |
+| --- | --- | --- |
+| `para-zk:read-area` | `title` or `path` | `frontmatter`, `overview`, `references`, `children` |
+| `para-zk:read-resource` | `title` or `path` | `frontmatter`, `overview`, `body`, `references` |
+| `para-zk:read-zk` | `title` plus optional `kind`, or `path` | depends on ZK type |
+| `para-zk:read-journal` | `date` or `path` | `frontmatter`, `focus`, `quick_memo`, `timeline`, `today_tasks`, `short_review`, `links` |
+| `para-zk:read-retro` | `title` plus optional `date`, or `path` | `frontmatter`, `week_progress`, `good`, `improve`, `risks`, `next_actions`, `retro_summary`, `links` |
+
+ZK top-level keys:
+
+```text
+zk_fleeting: frontmatter | thought_summary | memo | references
+zk_literature: frontmatter | highlight_block | summary | insight | evidence | references
+zk_permanent: frontmatter | one_sentence_summary | body | limitations | related_questions | references
+```
+
+Examples:
+
+```bash
+optsidian raw para-zk:read-area title="AI" key=children format=json
+optsidian raw para-zk:read-resource title="Source Paper" key=body format=json
+optsidian raw para-zk:read-zk title="Stable Interface Contracts" kind=permanent key=frontmatter/maturity format=json
+optsidian raw para-zk:read-journal date=2026-05-30 key=quick_memo format=json
+optsidian raw para-zk:read-retro path="PARA/Retros/2026_W22/Retro-General-2026_W22.md" key=retro_summary format=json
+```
+
 ### `para-zk:create-project`
 
 Creates a folder-style project note.

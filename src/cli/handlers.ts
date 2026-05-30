@@ -70,6 +70,130 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     }
   },
   {
+    command: "para-zk:read-project",
+    description: "Read a project note's stable PARA-ZK surface, optionally by map key",
+    options: {
+      title: { value: "<title>", description: "Project title. Used when path is omitted." },
+      path: { value: "<path>", description: "Project note path for exact selection." },
+      key: { value: "<map-path>", description: "Optional stable key such as frontmatter/status, summary, children, or children/<title>/body." },
+      format: { value: "<text|json>", description: "Output format (default: text)." }
+    },
+    text: "project read",
+    run: async (plugin, args) => {
+      const { readProject } = await import("../workflows");
+      const result = await readProject(workflowContext(plugin), {
+        title: readCliTitle(args),
+        path: readCliPath(args),
+        key: readCliString(args, "key")
+      });
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:read-area",
+    description: "Read an area note's stable PARA-ZK surface, optionally by map key",
+    options: {
+      title: { value: "<title>", description: "Area title. Used when path is omitted." },
+      path: { value: "<path>", description: "Area note path for exact selection." },
+      key: { value: "<map-path>", description: "Optional stable key such as overview, references, children, or children/<title>/overview." },
+      format: { value: "<text|json>", description: "Output format (default: text)." }
+    },
+    text: "area read",
+    run: async (plugin, args) => {
+      const { readArea } = await import("../workflows");
+      const result = await readArea(workflowContext(plugin), {
+        title: readCliTitle(args),
+        path: readCliPath(args),
+        key: readCliString(args, "key")
+      });
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:read-resource",
+    description: "Read a resource note's stable PARA-ZK surface, optionally by map key",
+    options: {
+      title: { value: "<title>", description: "Resource title. Used when path is omitted." },
+      path: { value: "<path>", description: "Resource note path for exact selection." },
+      key: { value: "<map-path>", description: "Optional stable key such as overview, body, or references." },
+      format: { value: "<text|json>", description: "Output format (default: text)." }
+    },
+    text: "resource read",
+    run: async (plugin, args) => {
+      const { readResource } = await import("../workflows");
+      const result = await readResource(workflowContext(plugin), {
+        title: readCliTitle(args),
+        path: readCliPath(args),
+        key: readCliString(args, "key")
+      });
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:read-zk",
+    description: "Read a ZK note's stable PARA-ZK surface, optionally by map key",
+    options: {
+      title: { value: "<title>", description: "ZK note title. Used when path is omitted." },
+      path: { value: "<path>", description: "ZK note path for exact selection." },
+      kind: { value: `<${ZK_KIND_CODE_HELP}>`, description: "Optional ZK kind filter." },
+      key: { value: "<map-path>", description: "Optional stable key such as summary, body, frontmatter/maturity, or references." },
+      format: { value: "<text|json>", description: "Output format (default: text)." }
+    },
+    text: "ZK read",
+    run: async (plugin, args) => {
+      const { readZk } = await import("../workflows");
+      const result = await readZk(workflowContext(plugin), {
+        title: readCliTitle(args),
+        path: readCliPath(args),
+        kind: readCliString(args, "kind") ?? readCliString(args, "type"),
+        key: readCliString(args, "key")
+      });
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:read-journal",
+    description: "Read a daily journal note's stable PARA-ZK surface, optionally by map key",
+    options: {
+      date: { value: "<YYYY-MM-DD>", description: "Journal date. Defaults to today." },
+      path: { value: "<path>", description: "Journal note path for exact selection." },
+      key: { value: "<map-path>", description: "Optional stable key such as focus, quick_memo, timeline, or today_tasks." },
+      format: { value: "<text|json>", description: "Output format (default: text)." }
+    },
+    text: "journal read",
+    run: async (plugin, args) => {
+      const { readJournal } = await import("../workflows");
+      const result = await readJournal(workflowContext(plugin), {
+        date: readCliString(args, "date"),
+        path: readCliPath(args),
+        key: readCliString(args, "key")
+      });
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:read-retro",
+    description: "Read a retro note's stable PARA-ZK surface, optionally by map key",
+    options: {
+      title: { value: "<title>", description: "Retro note title. Used when path is omitted." },
+      path: { value: "<path>", description: "Retro note path for exact selection." },
+      date: { value: "<YYYY-MM-DD>", description: "Optional date used to narrow the ISO week folder." },
+      key: { value: "<map-path>", description: "Optional stable key such as week_progress, next_actions, or retro_summary." },
+      format: { value: "<text|json>", description: "Output format (default: text)." }
+    },
+    text: "retro read",
+    run: async (plugin, args) => {
+      const { readRetro } = await import("../workflows");
+      const result = await readRetro(workflowContext(plugin), {
+        title: readCliTitle(args),
+        path: readCliPath(args),
+        date: readCliString(args, "date"),
+        key: readCliString(args, "key")
+      });
+      return { ...result };
+    }
+  },
+  {
     command: "para-zk:create-project",
     description: "Create a PARA project note",
     options: {

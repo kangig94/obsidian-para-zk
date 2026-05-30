@@ -50,6 +50,13 @@ that let an LLM satisfy the user's request in one call. CLI output should be
 token-efficient JSON with stable fields such as `ok`, `command`, `path`,
 `created`, `sourcePath`, `archivedPath`, `warnings`, and `error`.
 
+Read commands should expose PARA-ZK editable surfaces, not raw Markdown files.
+Their `key` arguments are stable map paths such as `frontmatter/status`,
+`summary`, `children`, and `children/<child note title>/body`. They must not
+depend on localized generated headings. Raw file reads, arbitrary patches, and
+generic vault search belong to Optsidian; PARA-ZK read/update commands should
+focus on template-safe PARA/ZK surfaces.
+
 "GUI and CLI behave the same" means they call the same core workflow functions
 and produce the same kind of vault side effects. It does not mean the CLI should
 copy the GUI prompts or limit itself to human-oriented interaction.
@@ -157,6 +164,11 @@ Representative CLI smoke tests should cover:
 
 - `para-zk:create-area`
 - `para-zk:create-project` with `areas`, `status`, and `priority`
+- `para-zk:read-project` with no `key`, a frontmatter key, `children`, and a
+  child-note key path
+- `para-zk:read-area`, `para-zk:read-resource`, `para-zk:read-zk`,
+  `para-zk:read-journal`, and `para-zk:read-retro` using the same stable map
+  key algorithm
 - `para-zk:add-reference` with a vault-relative source `path` and URL/file/note target
 - `para-zk:create-subnote`
 - `para-zk:create-subarea`

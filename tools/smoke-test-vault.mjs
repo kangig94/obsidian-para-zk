@@ -132,6 +132,7 @@ function runWorkflowScenario(today) {
   const projectTitle = `Smoke Project ${stamp}`;
   const resourceTitle = `Smoke Resource ${stamp}`;
   const fleetingTitle = `Smoke Fleeting ${stamp}`;
+  const permanentTitle = `Smoke Permanent ${stamp}`;
 
   const area = cliJson("para-zk:create-area", [
     `title=${areaTitle}`,
@@ -179,6 +180,36 @@ function runWorkflowScenario(today) {
   ]);
   assertCreated(subnote, "subnote");
 
+  const projectRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    "format=json"
+  ]);
+  assert(projectRead.ok === true, "project read failed");
+  assert(projectRead.frontmatter?.status === "in_progress", "project read did not expose stable frontmatter");
+  assert(projectRead.children?.[`Smoke Meeting ${stamp}`]?.path === subnote.path, "project read did not expose child map");
+  assert(projectRead.children?.[`Smoke Meeting ${stamp}`]?.key === `children/Smoke Meeting ${stamp}`, "project read did not expose child key path");
+
+  const projectStatusRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    "key=frontmatter/status",
+    "format=json"
+  ]);
+  assert(projectStatusRead.value === "in_progress", "project frontmatter/status key read failed");
+
+  const projectChildrenRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    "key=children",
+    "format=json"
+  ]);
+  assert(projectChildrenRead.value?.[`Smoke Meeting ${stamp}`]?.path === subnote.path, "project children key read failed");
+
+  const subnoteTypeRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    `key=children/Smoke Meeting ${stamp}/frontmatter/subnote_type`,
+    "format=json"
+  ]);
+  assert(subnoteTypeRead.value === "meeting", "project child frontmatter key read failed");
+
   const subarea = cliJson("para-zk:create-subarea", [
     `title=Smoke Subarea ${stamp}`,
     `path=${area.path}`,
@@ -187,6 +218,20 @@ function runWorkflowScenario(today) {
     "format=json"
   ]);
   assertCreated(subarea, "subarea");
+
+  const areaChildrenRead = cliJson("para-zk:read-area", [
+    `title=${areaTitle}`,
+    "key=children",
+    "format=json"
+  ]);
+  assert(areaChildrenRead.value?.[`Smoke Subarea ${stamp}`]?.path === subarea.path, "area children key read failed");
+
+  const subareaOverviewRead = cliJson("para-zk:read-area", [
+    `title=${areaTitle}`,
+    `key=children/Smoke Subarea ${stamp}/overview`,
+    "format=json"
+  ]);
+  assert(subareaOverviewRead.ok === true, "area child overview key read failed");
 
   const resource = cliJson("para-zk:create-resource", [
     `title=${resourceTitle}`,
@@ -198,6 +243,13 @@ function runWorkflowScenario(today) {
   assertCreated(resource, "resource");
   assert(resource.linkedFromSource === true, "resource was not linked from source");
 
+  const resourceRead = cliJson("para-zk:read-resource", [
+    `title=${resourceTitle}`,
+    "key=body",
+    "format=json"
+  ]);
+  assert(resourceRead.ok === true && typeof resourceRead.value === "string", "resource body key read failed");
+
   const fleeting = cliJson("para-zk:create-zk", [
     `title=${fleetingTitle}`,
     "kind=fleeting",
@@ -207,13 +259,21 @@ function runWorkflowScenario(today) {
   assertCreated(fleeting, "fleeting");
 
   const permanent = cliJson("para-zk:create-zk", [
-    `title=Smoke Permanent ${stamp}`,
+    `title=${permanentTitle}`,
     "kind=permanent",
     "maturity=refined",
     "open=false",
     "format=json"
   ]);
   assertCreated(permanent, "permanent");
+
+  const zkRead = cliJson("para-zk:read-zk", [
+    `title=${permanentTitle}`,
+    "kind=permanent",
+    "key=frontmatter/maturity",
+    "format=json"
+  ]);
+  assert(zkRead.value === "refined", "ZK frontmatter/maturity key read failed");
 
   const journal = cliJson("para-zk:capture-journal", [
     `content=Smoke memo ${stamp}`,
@@ -225,6 +285,13 @@ function runWorkflowScenario(today) {
   ]);
   assert(journal.ok === true, "journal capture failed");
 
+  const journalRead = cliJson("para-zk:read-journal", [
+    `date=${today}`,
+    "key=quick_memo",
+    "format=json"
+  ]);
+  assert(typeof journalRead.value === "string" && journalRead.value.includes(`Smoke memo ${stamp}`), "journal quick_memo key read failed");
+
   const retro = cliJson("para-zk:create-retro", [
     `path=${project.path}`,
     `date=${today}`,
@@ -232,6 +299,13 @@ function runWorkflowScenario(today) {
     "format=json"
   ]);
   assertCreated(retro, "retro");
+
+  const retroRead = cliJson("para-zk:read-retro", [
+    `path=${retro.path}`,
+    "key=frontmatter/week_iso",
+    "format=json"
+  ]);
+  assert(typeof retroRead.value === "string" && retroRead.value.length > 0, "retro week_iso key read failed");
 
   const promotedResource = cliJson("para-zk:promote-resource", [
     `path=${resource.path}`,

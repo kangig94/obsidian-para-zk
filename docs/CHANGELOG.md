@@ -33,6 +33,10 @@ Notable changes for PARA-ZK are tracked here.
   note, and quick memo workflows, replacing Commander-managed QuickAdd shortcuts.
 - Added an `add-reference` workflow/CLI command for adding existing vault files,
   wikilinks, markdown links, or URLs to a note's References section.
+- Added `para-zk:read-project`, `read-area`, `read-resource`, `read-zk`,
+  `read-journal`, and `read-retro` for reading editable surfaces by stable map
+  keys such as `frontmatter/status`, `children`, and
+  `children/<child note title>/body`.
 - Added native Home dashboard action rendering with `para-zk-dashboard-actions`.
 - Added native dashboard summary card rendering with `para-zk-dashboard-summary`.
 - Added a first-read project intent document for LLM agents and contributors.
