@@ -79,6 +79,13 @@ export type CreateResourceOptions = {
   open?: boolean;
 };
 
+export type AddReferenceOptions = {
+  sourcePath?: string;
+  target: string;
+  label?: string;
+  open?: boolean;
+};
+
 export type CreateSubnoteOptions = {
   title: string;
   sourcePath?: string;
@@ -240,6 +247,32 @@ export async function createResource(ctx: WorkflowContext, options: CreateResour
     ...noteResult(file, true, options.open),
     sourcePath: source?.path,
     linkedFromSource
+  };
+}
+
+export async function addReference(ctx: WorkflowContext, options: AddReferenceOptions): Promise<{
+  path: string;
+  title: string;
+  reference: string;
+  target: string;
+  added: boolean;
+  opened?: boolean;
+}> {
+  const source = resolveRequiredFile(ctx, options.sourcePath, "source note");
+  const reference = resolveReferenceTarget(ctx, options.target, options.label);
+  const added = await appendReferenceLine(ctx, source, reference.line, {
+    ordered: true,
+    dedupeTargetPath: reference.targetPath,
+    dedupeText: reference.dedupeText
+  });
+  await openIfRequested(ctx, source, options.open);
+  return {
+    path: source.path,
+    title: source.basename,
+    reference: reference.line,
+    target: reference.target,
+    added,
+    opened: options.open || undefined
   };
 }
 
@@ -570,21 +603,31 @@ function applyTemplateVariables(content: string, variables: TemplateVariables): 
 }
 
 async function appendReferenceLink(ctx: WorkflowContext, source: TFile, target: TFile): Promise<boolean> {
-  const label = localePack(ctx.settings.locale).labels.references;
   const link = wikiLink(target.path, target.basename);
-  return appendLineUnderHeader(ctx.app, source, label, link, {
-    createHeadingLevel: 2,
+  return appendReferenceLine(ctx, source, link, {
     ordered: true,
     dedupeTargetPath: target.path
   });
 }
 
-async function appendReferenceLine(ctx: WorkflowContext, file: TFile, line: string): Promise<boolean> {
+async function appendReferenceLine(
+  ctx: WorkflowContext,
+  file: TFile,
+  line: string,
+  options: {
+    ordered?: boolean;
+    dedupe?: boolean;
+    dedupeTargetPath?: string;
+    dedupeText?: string;
+  } = {}
+): Promise<boolean> {
   const label = localePack(ctx.settings.locale).labels.references;
   return appendLineUnderHeader(ctx.app, file, label, line, {
     createHeadingLevel: 2,
-    ordered: false,
-    dedupe: true
+    ordered: options.ordered ?? false,
+    dedupe: options.dedupe ?? true,
+    dedupeTargetPath: options.dedupeTargetPath,
+    dedupeText: options.dedupeText
   });
 }
 
@@ -598,6 +641,7 @@ async function appendLineUnderHeader(
     ordered: boolean;
     dedupe?: boolean;
     dedupeTargetPath?: string;
+    dedupeText?: string;
   }
 ): Promise<boolean> {
   const content = await app.vault.read(file);
@@ -624,6 +668,7 @@ async function appendLineUnderHeader(
     const linkTargetRe = new RegExp(`\\[\\[${escapeRegExp(options.dedupeTargetPath)}(?:\\|[^\\]]*)?\\]\\]`, "i");
     if (linkTargetRe.test(section)) return false;
   }
+  if (options.dedupeText && section.includes(options.dedupeText)) return false;
   if (options.dedupe && section.includes(line)) return false;
 
   const firstNonEmpty = section.split(/\n/).find((item) => item.trim());
@@ -635,6 +680,72 @@ async function appendLineUnderHeader(
   const updated = content.slice(0, sectionStart) + section + gap + newLine + "\n" + content.slice(sectionEnd);
   await app.vault.modify(file, updated);
   return true;
+}
+
+function resolveReferenceTarget(ctx: WorkflowContext, target: string, label: string | undefined): {
+  line: string;
+  target: string;
+  targetPath?: string;
+  dedupeText?: string;
+} {
+  const value = target.trim();
+  if (!value) throw new Error("reference target is required");
+
+  const wikiTarget = readWikiTarget(value);
+  if (wikiTarget) {
+    return {
+      line: value,
+      target: wikiTarget,
+      targetPath: wikiTarget
+    };
+  }
+
+  const markdownTarget = readMarkdownLinkTarget(value);
+  if (markdownTarget) {
+    return {
+      line: value,
+      target: markdownTarget,
+      dedupeText: markdownTarget
+    };
+  }
+
+  if (isExternalReference(value)) {
+    return {
+      line: label ? `[${escapeMarkdownLinkLabel(label)}](${value})` : value,
+      target: value,
+      dedupeText: value
+    };
+  }
+
+  const normalized = normalizeVaultPath(value);
+  const file = ctx.app.vault.getAbstractFileByPath(normalized);
+  if (file instanceof TFile) {
+    return {
+      line: wikiLink(file.path, label?.trim() || file.basename),
+      target: file.path,
+      targetPath: file.path
+    };
+  }
+
+  throw new Error(`reference target must be an existing vault file, URL, wikilink, or markdown link: ${value}`);
+}
+
+function readWikiTarget(value: string): string | undefined {
+  const match = value.match(/^\[\[([^\]|]+)(?:\|[^\]]*)?\]\]$/);
+  return match ? normalizeVaultPath(match[1]) : undefined;
+}
+
+function readMarkdownLinkTarget(value: string): string | undefined {
+  const match = value.match(/^\[[^\]]+\]\(([^)]+)\)$/);
+  return match?.[1]?.trim() || undefined;
+}
+
+function isExternalReference(value: string): boolean {
+  return /^[A-Za-z][A-Za-z0-9+.-]*:/.test(value);
+}
+
+function escapeMarkdownLinkLabel(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/\[/g, "\\[").replace(/\]/g, "\\]");
 }
 
 function countListItems(section: string, prefix: string): number {

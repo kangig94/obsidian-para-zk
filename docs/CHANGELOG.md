@@ -31,6 +31,8 @@ Notable changes for PARA-ZK are tracked here.
   replacing Meta Bind input controls while writing frontmatter directly.
 - Added native PARA-ZK ribbon actions for project, area, resource, ZK, daily
   note, and quick memo workflows, replacing Commander-managed QuickAdd shortcuts.
+- Added an `add-reference` workflow/CLI command for adding existing vault files,
+  wikilinks, markdown links, or URLs to a note's References section.
 - Added native Home dashboard action rendering with `para-zk-dashboard-actions`.
 - Added native dashboard summary card rendering with `para-zk-dashboard-summary`.
 - Added a first-read project intent document for LLM agents and contributors.

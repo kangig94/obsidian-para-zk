@@ -128,7 +128,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         ...dataviewProjectRetros(),
         "",
         "---",
-        `## ${t.labels.references} ${paraZkInlineAction("create-resource", t.labels.createResource)}`,
+        `## ${t.labels.references} ${referenceActions(t)}`,
         "",
         ""
       ].join("\n");
@@ -171,7 +171,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         ...dataviewAreaRetros(t),
         "",
         "---",
-        `## ${t.labels.references} ${paraZkInlineAction("create-resource", t.labels.createResource)}`,
+        `## ${t.labels.references} ${referenceActions(t)}`,
         "",
         ""
       ].join("\n");
@@ -199,7 +199,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         ...dataviewResourceZkLinks(),
         "",
         "---",
-        `## ${t.labels.references} ${paraZkInlineAction("create-resource", t.labels.createResource)}`,
+        `## ${t.labels.references} ${referenceActions(t)}`,
         "",
         ""
       ].join("\n");
@@ -415,6 +415,13 @@ function paraZkPropsBlock(type: PropsViewType): string {
 
 function paraZkInlineAction(command: string, label: string): string {
   return `\`PZK[${command}|${label}]\``;
+}
+
+function referenceActions(t: ReturnType<typeof localePack>): string {
+  return [
+    paraZkInlineAction("add-reference", t.labels.addReference),
+    paraZkInlineAction("create-resource", t.labels.createResource)
+  ].join(" ");
 }
 
 function latestRetroSummaryTip(t: ReturnType<typeof localePack>): string[] {

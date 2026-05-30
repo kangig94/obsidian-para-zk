@@ -72,6 +72,7 @@ export function workflowCommandEntries(labels: Labels): Array<readonly [string, 
   return [
     ["create-project", labels.createProjectCommandName],
     ["create-area", labels.createAreaCommandName],
+    ["add-reference", labels.addReferenceCommandName],
     ["create-resource", labels.createResourceCommandName],
     ["create-subnote", labels.createSubnoteCommandName],
     ["create-subarea", labels.createSubareaCommandName],

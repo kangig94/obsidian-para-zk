@@ -160,6 +160,16 @@ function runWorkflowScenario(today) {
   assert(existsSync(join(vaultPath, createdArea.path)), `created linked area does not exist: ${createdArea.path}`);
   assertLegacyPathAliasRejected(project.path);
 
+  const reference = cliJson("para-zk:add-reference", [
+    `path=${project.path}`,
+    "target=https://example.com/reference",
+    "label=Reference URL",
+    "open=false",
+    "format=json"
+  ]);
+  assert(reference.ok === true, "reference add failed");
+  assert(reference.added === true, "reference was not added");
+
   const subnote = cliJson("para-zk:create-subnote", [
     `title=Smoke Meeting ${stamp}`,
     `path=${project.path}`,
@@ -245,6 +255,7 @@ function runWorkflowScenario(today) {
   return {
     area,
     createdArea,
+    reference,
     project,
     subnote,
     subarea,
@@ -289,6 +300,7 @@ function assertWorkflowFiles(result) {
     "priority: high",
     result.area.path,
     result.createdArea.path,
+    "[Reference URL](https://example.com/reference)",
     `[[${result.resource.path}|${result.resource.title}]]`
   ]);
   assertFileContains(result.subnote.path, [

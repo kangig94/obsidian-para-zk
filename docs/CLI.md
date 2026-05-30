@@ -248,8 +248,9 @@ Side effects:
 
 ### `para-zk:create-resource`
 
-Creates a resource note and optionally links it from a source note's references
-section.
+Creates a resource note and optionally links it from a source note's References
+section. Use this when the reference needs its own note, summary, metadata, or
+future reuse. For an existing file, note, or URL, use `para-zk:add-reference`.
 
 Options:
 
@@ -274,6 +275,42 @@ Important fields:
 
 - `sourcePath`
 - `linkedFromSource`
+
+### `para-zk:add-reference`
+
+Adds an existing vault file, wikilink, markdown link, or URL to a note's
+References section.
+
+Options:
+
+| Option | Values | Notes |
+| --- | --- | --- |
+| `path` | path | Required for deterministic CLI use. Source note receiving the reference. |
+| `target` | path, URL, wikilink, or markdown link | Required. Existing vault files are written as wikilinks. URLs are written directly or as markdown links when `label` is present. |
+| `label` | string | Optional display label for file paths and URLs. |
+| `open` | boolean | Default `false`. |
+
+Examples:
+
+```bash
+optsidian raw para-zk:add-reference \
+  path="PARA/Projects/Model Evaluation/Model Evaluation.md" \
+  target="assets/model-eval.pdf" \
+  format=json
+
+optsidian raw para-zk:add-reference \
+  path="PARA/Projects/Model Evaluation/Model Evaluation.md" \
+  target="https://example.com/paper" \
+  label="Source paper" \
+  format=json
+```
+
+Important fields:
+
+- `path`
+- `reference`
+- `target`
+- `added`
 
 ### `para-zk:create-subnote`
 

@@ -139,6 +139,28 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     }
   },
   {
+    command: "para-zk:add-reference",
+    description: "Add an existing vault file, wikilink, markdown link, or URL to a note's References section",
+    options: {
+      path: { value: "<path>", description: "Source note path that receives the reference." },
+      target: { value: "<path|url|wikilink|markdown-link>", description: "Reference target to add." },
+      label: { value: "<label>", description: "Optional display label for file paths and URLs." },
+      open: { value: "<true|false>", description: "Open the source note in Obsidian." },
+      format: { value: "<text|json>", description: "Output format (default: text)." }
+    },
+    text: "reference added",
+    run: async (plugin, args) => {
+      const { addReference } = await import("../workflows");
+      const result = await addReference(workflowContext(plugin), {
+        sourcePath: readCliPath(args),
+        target: readRequiredCliString(args, "target"),
+        label: readCliString(args, "label"),
+        open: readCliBoolean(args, "open") ?? false
+      });
+      return { ...result };
+    }
+  },
+  {
     command: "para-zk:create-subnote",
     description: "Create a child document under a project or area note",
     options: {
@@ -364,6 +386,12 @@ function renderCli(args: CliArgs, payload: Record<string, unknown>, text: string
 function readCliString(args: CliArgs, key: string): string | undefined {
   const value = args[key];
   return typeof value === "string" ? value : undefined;
+}
+
+function readRequiredCliString(args: CliArgs, key: string): string {
+  const value = readCliString(args, key)?.trim();
+  if (!value) throw new Error(`${key} is required`);
+  return value;
 }
 
 function readCliBoolean(args: CliArgs, key: string): boolean | undefined {

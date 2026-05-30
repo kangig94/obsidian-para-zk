@@ -87,6 +87,7 @@ export function workflowButtonLabel(plugin: ParaZkPluginContext, command: string
   const labelByCommand: Record<string, string> = {
     "create-project": labels.createProjectCommandName,
     "create-area": labels.createAreaCommandName,
+    "add-reference": labels.addReference,
     "create-resource": labels.createResource,
     "create-subnote": labels.createSubnote,
     "create-subarea": labels.createSubarea,
@@ -107,6 +108,8 @@ export function normalizeWorkflowCommand(value: string | undefined): string | un
     "create-project-subnote": "create-subnote",
     "daily-journal": "open-journal",
     "open-daily-journal": "open-journal",
+    "connect-reference": "add-reference",
+    "connect-references": "add-reference",
     "promote-to-zk": "promote-resource"
   };
   return aliases[command] ?? command;
@@ -127,6 +130,10 @@ async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: 
     case "create-area": {
       const title = await prompt(plugin, labels.createAreaCommandName, labels.promptAreaTitle);
       return title ? workflows.createArea(ctx, { title, open: true }) : undefined;
+    }
+    case "add-reference": {
+      const target = await prompt(plugin, labels.addReferenceCommandName, labels.promptReferenceTarget);
+      return target ? workflows.addReference(ctx, { sourcePath: activePath, target, open: false }) : undefined;
     }
     case "create-resource": {
       const title = await prompt(plugin, labels.createResourceCommandName, labels.promptResourceTitle);

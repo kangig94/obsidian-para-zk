@@ -41,6 +41,7 @@ obsidian para-zk:init dryRun=true force=true locale=en format=json
 obsidian para-zk:init locale=ko format=json
 obsidian para-zk:init installDeps=true format=json
 obsidian para-zk:create-project title="Project name" area_titles='["AI","Software"]' status=in_progress priority=high format=json
+obsidian para-zk:add-reference path="PARA/Projects/Project name/Project name.md" target="https://example.com/source" label="Source" format=json
 obsidian para-zk:create-resource path="PARA/Projects/Project name/Project name.md" title="Source" format=json
 obsidian para-zk:create-subnote path="PARA/Projects/Project name/Project name.md" title="Meeting notes" subnote_type=meeting format=json
 obsidian para-zk:create-zk title="Idea" kind=fleeting format=json
