@@ -56,8 +56,23 @@ Their `key` arguments are stable map paths such as `frontmatter/status`,
 depend on localized generated headings. Raw file reads, arbitrary patches, and
 generic vault search belong to Optsidian; PARA-ZK read/update commands should
 focus on template-safe PARA/ZK surfaces.
+Full read payloads should be compact by default. Do not return static schema
+keys, `archived: false`, null frontmatter values, empty sections, or
+template-only scaffold content such as blank checkboxes, empty bullet lists, and
+empty markdown tables. Full reads may compact frontmatter wikilinks to their
+display titles; a `key` read may return exact stored values or an explicit empty
+value because the user requested that exact surface.
+Large collections such as `tasks` and `references` should use compact
+`count` summaries in full reads and full id-keyed maps in exact `key` reads.
+Full read payloads must include `mode: "compact"` and exact key reads must
+include `mode: "exact"` so automation can reason about omitted data.
+Project `tasks` reads are already structured: `read-project key=tasks` returns
+an id-keyed task map with each task's literal checkbox status character, name,
+and parsed Tasks metadata instead of returning the raw task section string. Task
+lifecycle commands should build on that shape.
 PARA read commands may select archived notes with `archived=true`; the returned
-`archived` field is the single code-level indicator for that state.
+`archived: true` field, when present, is the single code-level indicator for
+that state.
 
 Update commands should use the same stable map-path keys as read commands, but
 only writable leaves are mutable. `frontmatter/<key>` uses structured Obsidian
@@ -191,6 +206,8 @@ Representative CLI smoke tests should cover:
 - `para-zk:create-project` with `areas`, `status`, and `priority`
 - `para-zk:read-project` with no `key`, a frontmatter key, `children`, and a
   child-note key path
+- `para-zk:read-project key=tasks` with structured task ids, literal checkbox
+  status characters, names, due dates, and priority
 - `para-zk:read-area`, `para-zk:read-resource`, `para-zk:read-zk`,
   `para-zk:read-journal`, and `para-zk:read-retro` using the same stable map
   key algorithm

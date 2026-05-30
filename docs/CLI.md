@@ -238,12 +238,21 @@ Examples:
 ```bash
 optsidian raw para-zk:read-project title="Model Evaluation" format=json
 optsidian raw para-zk:read-project title="Model Evaluation" key=frontmatter/status format=json
+optsidian raw para-zk:read-project title="Model Evaluation" key=tasks format=json
 optsidian raw para-zk:read-project title="Model Evaluation" key=children format=json
 optsidian raw para-zk:read-project title="Model Evaluation" key="children/Planning Meeting/body" format=json
 ```
 
-`children` is a map keyed by child note title. Child entries expose their own
-stable keys, so automation can read a returned path without guessing:
+Full read responses include `mode: "compact"` and `omits_empty: true`. Static
+schema keys, `archived: false`, null frontmatter values, empty sections, and
+template-only placeholders are omitted.
+Frontmatter wikilinks are shown by display title in full reads; read the exact
+`frontmatter/<key>` when the stored wikilink path is needed.
+Use a `key` read when you need to distinguish an explicitly empty section from
+an omitted one. Key reads include `mode: "exact"`.
+
+`children` is a map keyed by child note title. Child entries include only the
+selector and type information needed for follow-up reads:
 
 ```json
 {
@@ -251,11 +260,25 @@ stable keys, so automation can read a returned path without guessing:
     "Planning Meeting": {
       "path": "PARA/Projects/Model Evaluation/Planning Meeting.md",
       "type": "doc",
-      "archived": false,
-      "key": "children/Planning Meeting",
-      "subnote_type": "meeting",
-      "keys": ["frontmatter", "body"]
+      "subnote_type": "meeting"
     }
+  }
+}
+```
+
+`tasks` and `references` are structured collections rather than raw Markdown.
+Full compact reads return only `count`; collection items are omitted by design.
+Blank template checkboxes are ignored. Exact `key=tasks` and `key=references`
+reads return the full id-keyed map.
+
+```json
+{
+  "mode": "compact",
+  "tasks": {
+    "count": 42
+  },
+  "references": {
+    "count": 12
   }
 }
 ```
@@ -265,6 +288,11 @@ Important fields:
 - `archived`: true when the selected note is under `PARA/Archives`.
 - `frontmatter`: editable project fields only, such as `status`, `priority`,
   `areas`, `start_date`, `due_date`, and `done_date`.
+- `tasks`: structured project task map. The map key is the task id. `checkbox`
+  is the literal status character from `[ ]`, `[x]`, `[-]`, `[/]`, and other
+  Tasks-compatible statuses.
+- `references`: structured reference map. Items expose `kind`, `label`,
+  `target`, `path`, or `text` depending on the source line.
 - `children`: child-note index; child bodies are read only when requested with
   a `children/<title>/...` key.
 - `value`: present when `key` is provided.
@@ -327,9 +355,11 @@ Options:
 Writable keys are a subset of read keys. `frontmatter/<key>` supports `op=set`
 only and uses Obsidian frontmatter mutation. Section/body keys support
 `set`, `append`, `prepend`, and exact literal `replace`.
+`update-project key=tasks` still edits the underlying Tasks section text. Use
+the structured `read-project key=tasks` result for inspection until dedicated
+task lifecycle commands exist.
 
-Read-only keys include `children`, `path`, `title`, `type`, `archived`, and
-`keys`.
+Read-only keys include `children`, `path`, `title`, `type`, and `archived`.
 
 Examples:
 

@@ -14,6 +14,8 @@ const vaultPath = resolve(args.vault ?? inferVaultPath());
 const pluginDir = resolve(args.pluginDir ?? join(vaultPath, ".obsidian/plugins/para-zk"));
 const installDeps = args.installDeps !== false;
 const stamp = args.stamp ?? timestamp();
+const taskDueMarker = String.fromCodePoint(0x1F4C5);
+const taskHighPriorityMarker = String.fromCodePoint(0x23EB);
 const requiredDependencyIds = [
   "dataview",
   "obsidian-tasks-plugin",
@@ -205,7 +207,11 @@ function runWorkflowScenario(today) {
   assert(projectRead.ok === true, "project read failed");
   assert(projectRead.frontmatter?.status === "in_progress", "project read did not expose stable frontmatter");
   assert(projectRead.children?.[`Smoke Meeting ${stamp}`]?.path === subnote.path, "project read did not expose child map");
-  assert(projectRead.children?.[`Smoke Meeting ${stamp}`]?.key === `children/Smoke Meeting ${stamp}`, "project read did not expose child key path");
+  assert(!("keys" in projectRead), "project read should not return static schema keys");
+  assert(projectRead.mode === "compact" && projectRead.omits_empty === true, "project read did not expose compact mode metadata");
+  assert(projectRead.children?.[`Smoke Meeting ${stamp}`]?.key === undefined, "project child read should not repeat derived key paths");
+  assert(projectRead.tasks === undefined, "project read should omit the blank task placeholder");
+  assert(projectRead.references?.count === 1, "project read did not summarize references");
 
   const projectStatusRead = cliJson("para-zk:read-project", [
     `title=${projectTitle}`,
@@ -213,6 +219,7 @@ function runWorkflowScenario(today) {
     "format=json"
   ]);
   assert(projectStatusRead.value === "in_progress", "project frontmatter/status key read failed");
+  assert(projectStatusRead.mode === "exact", "project key read did not expose exact mode");
 
   const projectChildrenRead = cliJson("para-zk:read-project", [
     `title=${projectTitle}`,
@@ -419,6 +426,67 @@ function runWorkflowScenario(today) {
   ]);
   assert(projectSummaryRead.value === `Smoke summary updated ${stamp}`, "project summary update read failed");
 
+  const projectTaskAppend = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    "key=tasks",
+    "op=append",
+    `value=- [ ] Smoke structured task ${stamp} ${taskDueMarker} 2026-06-05 ${taskHighPriorityMarker}`,
+    "format=json"
+  ]);
+  assert(projectTaskAppend.changed === true, "project task append failed");
+
+  const projectTasksRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    "key=tasks",
+    "format=json"
+  ]);
+  const structuredTaskEntry = Object.entries(projectTasksRead.value ?? {})
+    .find(([, task]) => task.name === `Smoke structured task ${stamp}`);
+  const structuredTaskId = structuredTaskEntry?.[0];
+  const structuredTask = structuredTaskEntry?.[1];
+  assert(structuredTask, `project task read did not expose the appended task: ${JSON.stringify(projectTasksRead.value)}`);
+  assert(typeof structuredTaskId === "string" && structuredTaskId.length > 0, "project task read did not expose a task id");
+  assert(structuredTask.checkbox === " ", "project task read did not preserve checkbox status");
+  assert(structuredTask.due === "2026-06-05", "project task read did not parse the due date");
+  assert(structuredTask.priority === "high", "project task read did not parse the priority");
+  const projectTaskNameRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    `key=tasks/${structuredTaskId}/name`,
+    "format=json"
+  ]);
+  assert(projectTaskNameRead.value === `Smoke structured task ${stamp}`, "project task map path read failed");
+  const projectCustomCheckboxTaskAppend = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    "key=tasks",
+    "op=append",
+    `value=- [/] Smoke custom checkbox task ${stamp}`,
+    "format=json"
+  ]);
+  assert(projectCustomCheckboxTaskAppend.changed === true, "project custom checkbox task append failed");
+  const projectCustomCheckboxTasksRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    "key=tasks",
+    "format=json"
+  ]);
+  const customCheckboxTask = Object.values(projectCustomCheckboxTasksRead.value ?? {})
+    .find((task) => task.name === `Smoke custom checkbox task ${stamp}`);
+  assert(customCheckboxTask?.checkbox === "/", "project task read did not preserve custom checkbox status");
+  const bulkTaskLines = Array.from({ length: 11 }, (_, index) => `- [ ] Smoke bulk task ${index + 1} ${stamp}`).join("\n");
+  const projectBulkTaskAppend = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    "key=tasks",
+    "op=append",
+    `value=${bulkTaskLines}`,
+    "format=json"
+  ]);
+  assert(projectBulkTaskAppend.changed === true, "project bulk task append failed");
+  const projectTaskCompactRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    "format=json"
+  ]);
+  assert(projectTaskCompactRead.tasks?.count > 10, "project compact read did not summarize many tasks");
+  assert(projectTaskCompactRead.tasks.preview === undefined, "project compact read should not include task previews");
+
   const childBodyAppend = cliJson("para-zk:update-project", [
     `title=${projectTitle}`,
     `key=children/Smoke Meeting ${stamp}/body`,
@@ -579,6 +647,19 @@ function runWorkflowScenario(today) {
   ]);
   assertCreated(resource, "resource");
   assert(resource.linkedFromSource === true, "resource was not linked from source");
+  const projectReferencesRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    "key=references",
+    "format=json"
+  ]);
+  assert(
+    Object.values(projectReferencesRead.value ?? {}).some((item) => item.target === "https://example.com/reference"),
+    "project references key read did not expose URL reference"
+  );
+  assert(
+    Object.values(projectReferencesRead.value ?? {}).some((item) => item.path === resource.path),
+    "project references key read did not expose resource reference path"
+  );
 
   const resourceRead = cliJson("para-zk:read-resource", [
     `title=${resourceTitle}`,

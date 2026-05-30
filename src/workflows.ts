@@ -281,19 +281,53 @@ export type DeleteResult = {
 type TemplateVariables = Record<string, string | undefined>;
 type Frontmatter = Record<string, unknown>;
 type ReadMap = Record<string, unknown>;
+type SectionTransformContext = {
+  ctx: WorkflowContext;
+  file: TFile;
+  content: string;
+  range?: TextRange;
+  section: ReadSectionSpec;
+};
 type ReadSectionSpec = {
   key: string;
   labelKey?: string;
   labels?: string[];
   includeSubsections?: boolean;
   skipManagedPrelude?: boolean;
-  transform?: (content: string) => string;
+  transform?: (content: string, context: SectionTransformContext) => unknown;
 };
 type ReadSurfaceSpec = {
   frontmatter: string[];
   sections?: ReadSectionSpec[];
   body?: boolean;
   children?: boolean;
+};
+type ProjectTaskRead = {
+  checkbox: string;
+  name: string;
+  due?: string;
+  scheduled?: string;
+  start?: string;
+  created?: string;
+  done?: string;
+  cancelled?: string;
+  priority?: string;
+};
+type ProjectTaskLineRead = {
+  id: string;
+  task: ProjectTaskRead;
+};
+type TaskMetadata = Pick<ProjectTaskRead, "due" | "scheduled" | "start" | "created" | "done" | "cancelled" | "priority">;
+type ReferenceRead = {
+  kind: "url" | "note" | "file" | "wiki" | "markdown" | "text";
+  label?: string;
+  target?: string;
+  path?: string;
+  text?: string;
+};
+type ReferenceLineRead = {
+  id: string;
+  reference: ReferenceRead;
 };
 
 export async function createProject(ctx: WorkflowContext, options: CreateProjectOptions): Promise<NoteResult & {
@@ -984,6 +1018,17 @@ function readWikiTarget(value: string): string | undefined {
   return match ? normalizeVaultPath(match[1]) : undefined;
 }
 
+function readWikiLinkLabel(value: string): string | undefined {
+  const match = value.match(/^\[\[([^\]|]+)(?:\|([^\]]+))?\]\]$/);
+  if (!match) return undefined;
+  return (match[2]?.trim() || pathBasenameWithoutExtension(match[1])).trim();
+}
+
+function pathBasenameWithoutExtension(path: string): string {
+  const last = path.split("/").filter(Boolean).pop() ?? path;
+  return last.replace(/\.md$/i, "");
+}
+
 function readMarkdownLinkTarget(value: string): string | undefined {
   const match = value.match(/^\[[^\]]+\]\(([^)]+)\)$/);
   return match?.[1]?.trim() || undefined;
@@ -1009,8 +1054,8 @@ const PROJECT_READ_SPEC: ReadSurfaceSpec = {
   sections: [
     { key: "summary", labelKey: "summary", skipManagedPrelude: true, transform: stripProjectSummaryManagedBlock },
     { key: "goals", labelKey: "goals" },
-    { key: "tasks", labelKey: "tasks" },
-    { key: "references", labelKey: "references" }
+    { key: "tasks", labelKey: "tasks", transform: readProjectTasks },
+    { key: "references", labelKey: "references", transform: readReferences }
   ],
   children: true
 };
@@ -1019,7 +1064,7 @@ const AREA_READ_SPEC: ReadSurfaceSpec = {
   frontmatter: ["parent"],
   sections: [
     { key: "overview", labelKey: "overview" },
-    { key: "references", labelKey: "references" }
+    { key: "references", labelKey: "references", transform: readReferences }
   ],
   children: true
 };
@@ -1029,7 +1074,7 @@ const RESOURCE_READ_SPEC: ReadSurfaceSpec = {
   sections: [
     { key: "overview", labelKey: "overview" },
     { key: "body", labelKey: "body" },
-    { key: "references", labelKey: "references" }
+    { key: "references", labelKey: "references", transform: readReferences }
   ]
 };
 
@@ -1068,7 +1113,7 @@ const ZK_FLEETING_READ_SPEC: ReadSurfaceSpec = {
   sections: [
     { key: "thought_summary", labelKey: "thoughtSummary" },
     { key: "memo", labelKey: "memo" },
-    { key: "references", labelKey: "references" }
+    { key: "references", labelKey: "references", transform: readReferences }
   ]
 };
 
@@ -1079,7 +1124,7 @@ const ZK_LITERATURE_READ_SPEC: ReadSurfaceSpec = {
     { key: "summary", labelKey: "summary" },
     { key: "insight", labelKey: "insight" },
     { key: "evidence", labelKey: "evidence" },
-    { key: "references", labelKey: "references" }
+    { key: "references", labelKey: "references", transform: readReferences }
   ]
 };
 
@@ -1090,7 +1135,7 @@ const ZK_PERMANENT_READ_SPEC: ReadSurfaceSpec = {
     { key: "body", labelKey: "body" },
     { key: "limitations", labelKey: "limitations" },
     { key: "related_questions", labelKey: "relatedQuestions" },
-    { key: "references", labelKey: "references" }
+    { key: "references", labelKey: "references", transform: readReferences }
   ]
 };
 
@@ -1110,22 +1155,14 @@ async function readSurface(
   const surface = await readSurfaceMap(ctx, file, spec);
   const key = rawKey?.trim();
 
-  if (!key) {
-    return {
-      path: file.path,
-      title: file.basename,
-      type,
-      archived: isArchivedFile(ctx, file),
-      keys: Object.keys(surface),
-      ...surface
-    };
-  }
+  if (!key) return compactReadEnvelope(ctx, file, type, surface);
 
   return {
     path: file.path,
     title: file.basename,
     type,
-    archived: isArchivedFile(ctx, file),
+    mode: "exact",
+    ...archivedReadFlag(ctx, file),
     key,
     value: await readSurfaceKey(ctx, file, surface, key)
   };
@@ -1144,11 +1181,105 @@ async function readSurfaceMap(ctx: WorkflowContext, file: TFile, spec: ReadSurfa
     const value = readSection(content, sectionHeadingCandidates(section), {
       includeSubsections: section.includeSubsections ?? false
     });
-    surface[section.key] = section.transform ? section.transform(value) : value;
+    surface[section.key] = section.transform
+      ? section.transform(value, {
+        ctx,
+        file,
+        content,
+        range: findSectionContentRange(content, section),
+        section
+      })
+      : value;
   }
 
   if (spec.children) surface.children = childIndex(ctx, file);
   return surface;
+}
+
+function compactReadEnvelope(
+  ctx: WorkflowContext,
+  file: TFile,
+  type: string,
+  surface: ReadMap
+): Record<string, unknown> {
+  return {
+    mode: "compact",
+    omits_empty: true,
+    path: file.path,
+    title: file.basename,
+    type,
+    ...archivedReadFlag(ctx, file),
+    ...compactReadMap(surface)
+  };
+}
+
+function archivedReadFlag(ctx: WorkflowContext, file: TFile): { archived?: true } {
+  return isArchivedFile(ctx, file) ? { archived: true } : {};
+}
+
+function compactReadMap(value: ReadMap): ReadMap {
+  const result: ReadMap = {};
+  for (const [key, item] of Object.entries(value)) {
+    const compact = key === "frontmatter"
+      ? compactFrontmatter(item)
+      : key === "tasks" || key === "references"
+        ? compactCollectionCount(item)
+        : compactReadValue(item);
+    if (compact !== undefined) result[key] = compact;
+  }
+  return result;
+}
+
+function compactCollectionCount(value: unknown): unknown {
+  if (!isRecord(value)) return compactReadValue(value);
+  const entries = Object.entries(value);
+  if (entries.length === 0) return undefined;
+  return {
+    count: entries.length
+  };
+}
+
+function compactFrontmatter(value: unknown): unknown {
+  if (!isRecord(value)) return compactReadValue(value);
+  const result: Frontmatter = {};
+  for (const [key, item] of Object.entries(value)) {
+    const compact = compactFrontmatterValue(item);
+    if (compact !== undefined) result[key] = compact;
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function compactFrontmatterValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    const items = value.map(compactFrontmatterValue).filter((item) => item !== undefined);
+    return items.length > 0 ? items : undefined;
+  }
+  if (typeof value === "string") {
+    const linkLabel = readWikiLinkLabel(value);
+    return compactReadValue(linkLabel ?? value);
+  }
+  return compactReadValue(value);
+}
+
+function compactReadValue(value: unknown): unknown {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value === "string") {
+    const trimmed = trimMarkdownBlock(value);
+    return isMarkdownScaffold(trimmed) ? undefined : trimmed;
+  }
+  if (Array.isArray(value)) {
+    const items = value.map(compactReadValue).filter((item) => item !== undefined);
+    return items.length > 0 ? items : undefined;
+  }
+  if (isRecord(value)) {
+    const result: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value)) {
+      const compact = compactReadValue(item);
+      if (compact !== undefined) result[key] = compact;
+    }
+    return Object.keys(result).length > 0 ? result : undefined;
+  }
+  return value;
 }
 
 async function readSurfaceKey(
@@ -1175,14 +1306,7 @@ async function readSurfaceKey(
 
   const childSurface = await readSurfaceMap(ctx, child, specForType(readType(fileFrontmatter(ctx, child))));
   if (parts.length === 2) {
-    return {
-      path: child.path,
-      title: child.basename,
-      type: readType(fileFrontmatter(ctx, child)),
-      archived: isArchivedFile(ctx, child),
-      keys: Object.keys(childSurface),
-      ...childSurface
-    };
+    return compactReadEnvelope(ctx, child, readType(fileFrontmatter(ctx, child)), childSurface);
   }
   return readMapPath(childSurface, parts.slice(2), key);
 }
@@ -1701,13 +1825,11 @@ function childIndex(ctx: WorkflowContext, parent: TFile): Record<string, unknown
   const entries: Record<string, unknown> = {};
   for (const file of childFiles(ctx, parent)) {
     const frontmatter = fileFrontmatter(ctx, file);
-    const spec = specForType(readType(frontmatter));
+    const type = readType(frontmatter);
     const item: Record<string, unknown> = {
       path: file.path,
-      type: readType(frontmatter),
-      archived: isArchivedFile(ctx, file),
-      key: `children/${file.basename}`,
-      keys: keysForSpec(spec)
+      type,
+      ...archivedReadFlag(ctx, file)
     };
     const subnoteType = frontmatter.subnote_type;
     if (subnoteType !== undefined) item.subnote_type = subnoteType;
@@ -1739,15 +1861,6 @@ function findChild(ctx: WorkflowContext, parent: TFile, title: string): TFile | 
   return undefined;
 }
 
-function keysForSpec(spec: ReadSurfaceSpec): string[] {
-  return [
-    "frontmatter",
-    ...(spec.body ? ["body"] : []),
-    ...(spec.sections?.map((section) => section.key) ?? []),
-    ...(spec.children ? ["children"] : [])
-  ];
-}
-
 function specForType(type: string): ReadSurfaceSpec {
   if (type === "project") return PROJECT_READ_SPEC;
   if (type === "area") return AREA_READ_SPEC;
@@ -1774,6 +1887,317 @@ function readMapPath(map: ReadMap, parts: string[], originalKey: string): unknow
 
 function keyParts(key: string): string[] {
   return key.split("/").map((part) => part.trim()).filter(Boolean);
+}
+
+function isMarkdownScaffold(value: string): boolean {
+  const text = value.trim();
+  if (!text) return true;
+  if (text === "-" || text === "*" || text === "+") return true;
+  if (isEmptyMarkdownTable(text)) return true;
+  if (isPlaceholderBulletBlock(text)) return true;
+  if (isHeadingOnlyBlock(text)) return true;
+  return /^>\s*#{1,6}\s+\(.+\)\s*$/.test(text);
+}
+
+function isEmptyMarkdownTable(value: string): boolean {
+  const lines = value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (lines.length < 2 || !lines.every((line) => line.includes("|"))) return false;
+  const separatorIndex = lines.findIndex((line) => /^\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?$/.test(line));
+  if (separatorIndex === -1) return false;
+  const body = lines.slice(separatorIndex + 1);
+  if (body.length === 0) return true;
+  return body.every((line) => {
+    const cells = line.replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+    return cells.every((cell) => cell === "");
+  });
+}
+
+function isPlaceholderBulletBlock(value: string): boolean {
+  const lines = value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (lines.length === 0) return true;
+  return lines.every((line) => {
+    const match = line.match(/^(?:[-*+]|\d+[.)])\s+(.*)$/);
+    if (!match) return false;
+    let body = (match[1] ?? "").trim();
+    body = body.replace(/^\[[^\]\r\n]?\]\s*/, "").trim();
+    return body === "" || body === "-" || /^\d{1,2}:\d{2}$/.test(body) || /^[^:]{1,80}:\s*$/.test(body);
+  });
+}
+
+function isHeadingOnlyBlock(value: string): boolean {
+  const lines = value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  return lines.length > 0 && lines.every((line) => /^#{1,6}\s+\S/.test(line));
+}
+
+function readReferences(_content: string, context: SectionTransformContext): Record<string, ReferenceRead> {
+  const items: Record<string, ReferenceRead> = {};
+  if (!context.range) return items;
+
+  let cursor = context.range.start;
+  let line = lineNumberAt(context.content, context.range.start);
+  while (cursor < context.range.end) {
+    const span = readLineSpan(context.content, cursor, context.range.end);
+    if (!span) break;
+
+    const reference = readReferenceLine(context.ctx, context.file.path, line, span.text);
+    if (reference) {
+      const id = uniqueReadId(reference.id, items);
+      items[id] = reference.reference;
+    }
+
+    cursor = span.next;
+    line += 1;
+  }
+
+  return items;
+}
+
+function readReferenceLine(ctx: WorkflowContext, sourcePath: string, line: number, text: string): ReferenceLineRead | undefined {
+  const body = stripReferenceLineMarker(text);
+  if (!body) return undefined;
+
+  const reference = parseReferenceBody(ctx, sourcePath, body);
+  const idSource = reference.path ?? reference.target ?? reference.text ?? body;
+  return {
+    id: `ref-${hashReadId(idSource || `${sourcePath}:${line}:${body}`)}`,
+    reference
+  };
+}
+
+function stripReferenceLineMarker(value: string): string {
+  let text = value.trim();
+  text = text.replace(/^(?:>\s*)+/, "").trim();
+  text = text.replace(/^(?:[-*+]\s+|\d+[.)]\s+)/, "").trim();
+  return text;
+}
+
+function parseReferenceBody(ctx: WorkflowContext, sourcePath: string, value: string): ReferenceRead {
+  const wiki = value.match(/^\[\[([^\]|]+)(?:\|([^\]]+))?\]\]$/);
+  if (wiki) return readWikiReference(ctx, sourcePath, wiki[1], wiki[2]);
+
+  const markdown = value.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+  if (markdown) return readMarkdownReference(ctx, markdown[1], markdown[2]);
+
+  if (isExternalReference(value)) {
+    return {
+      kind: "url",
+      target: value
+    };
+  }
+
+  return {
+    kind: "text",
+    text: value
+  };
+}
+
+function readWikiReference(
+  ctx: WorkflowContext,
+  sourcePath: string,
+  rawTarget: string,
+  rawLabel: string | undefined
+): ReferenceRead {
+  const target = rawTarget.trim();
+  const dest = ctx.app.metadataCache.getFirstLinkpathDest(target, sourcePath);
+  const path = dest?.path ?? normalizeVaultPath(target.split("#")[0]);
+  return {
+    kind: path.endsWith(".md") ? "note" : "wiki",
+    path,
+    label: rawLabel?.trim() || pathBasenameWithoutExtension(path)
+  };
+}
+
+function readMarkdownReference(ctx: WorkflowContext, rawLabel: string, rawTarget: string): ReferenceRead {
+  const label = rawLabel.trim();
+  const target = rawTarget.trim();
+  if (isExternalReference(target)) {
+    return {
+      kind: "url",
+      label,
+      target
+    };
+  }
+
+  const path = normalizeVaultPath(target);
+  const file = ctx.app.vault.getAbstractFileByPath(path);
+  if (file instanceof TFile) {
+    return {
+      kind: path.endsWith(".md") ? "note" : "file",
+      label,
+      path
+    };
+  }
+
+  return {
+    kind: "markdown",
+    label,
+    target
+  };
+}
+
+const TASK_DATE_FIELDS: Array<{ key: keyof TaskMetadata; re: RegExp }> = [
+  { key: "due", re: /\u{1F4C5}\s*(\d{4}-\d{2}-\d{2})/gu },
+  { key: "scheduled", re: /\u{23F3}\s*(\d{4}-\d{2}-\d{2})/gu },
+  { key: "start", re: /\u{1F6EB}\s*(\d{4}-\d{2}-\d{2})/gu },
+  { key: "created", re: /\u{2795}\s*(\d{4}-\d{2}-\d{2})/gu },
+  { key: "done", re: /\u{2705}\s*(\d{4}-\d{2}-\d{2})/gu },
+  { key: "cancelled", re: /\u{274C}\s*(\d{4}-\d{2}-\d{2})/gu }
+];
+
+const TASK_PRIORITY_FIELDS: Array<{ value: string; re: RegExp }> = [
+  { value: "highest", re: /\u{1F53A}/gu },
+  { value: "high", re: /\u{23EB}/gu },
+  { value: "medium", re: /\u{1F53C}/gu },
+  { value: "low", re: /\u{1F53D}/gu },
+  { value: "lowest", re: /\u{23EC}/gu }
+];
+
+function readProjectTasks(_content: string, context: SectionTransformContext): Record<string, ProjectTaskRead> {
+  const items: Record<string, ProjectTaskRead> = {};
+
+  if (!context.range) return items;
+
+  let cursor = context.range.start;
+  let line = lineNumberAt(context.content, context.range.start);
+  while (cursor < context.range.end) {
+    const span = readLineSpan(context.content, cursor, context.range.end);
+    if (!span) break;
+
+    const task = readProjectTaskLine(context.file.path, line, span.text);
+    if (task) {
+      const id = uniqueReadId(task.id, items);
+      items[id] = task.task;
+    }
+
+    cursor = span.next;
+    line += 1;
+  }
+
+  return items;
+}
+
+function readProjectTaskLine(path: string, line: number, text: string): ProjectTaskLineRead | undefined {
+  const match = text.match(/^\s*(?:[-*+]|\d+[.)])\s+\[([^\]\r\n]?)\]\s*(.*)$/);
+  if (!match) return undefined;
+
+  const checkbox = match[1] ?? " ";
+  const parsed = parseTaskBody(match[2] ?? "");
+  if (!parsed.name) return undefined;
+
+  const id = parsed.blockId ?? syntheticTaskReadId(path, line, text);
+  return {
+    id,
+    task: {
+      checkbox,
+      name: parsed.name,
+      ...parsed.metadata
+    }
+  };
+}
+
+function parseTaskBody(value: string): { name: string; blockId?: string; metadata: TaskMetadata } {
+  let body = value.trim();
+  const blockId = readTrailingBlockId(body);
+  if (blockId) body = body.replace(/\s+\^[A-Za-z0-9_-]+\s*$/, "").trim();
+
+  const metadata: TaskMetadata = {};
+  body = stripDataviewTaskFields(body, metadata);
+  body = stripEmojiTaskDates(body, metadata);
+  body = stripEmojiTaskPriority(body, metadata);
+
+  return {
+    name: body.replace(/\s{2,}/g, " ").trim(),
+    blockId,
+    metadata
+  };
+}
+
+function readTrailingBlockId(value: string): string | undefined {
+  return value.match(/\s+\^([A-Za-z0-9_-]+)\s*$/)?.[1];
+}
+
+function stripDataviewTaskFields(value: string, metadata: TaskMetadata): string {
+  return value.replace(/\[(due|scheduled|start|created|completion|done|cancelled|priority)::\s*([^\]]+)\]/gi, (
+    _match,
+    rawKey: string,
+    rawValue: string
+  ) => {
+    const key = normalizeTaskMetadataKey(rawKey);
+    const taskValue = rawValue.trim();
+    if (key && taskValue && metadata[key] === undefined) metadata[key] = normalizeTaskMetadataValue(key, taskValue);
+    return " ";
+  });
+}
+
+function stripEmojiTaskDates(value: string, metadata: TaskMetadata): string {
+  let result = value;
+  for (const field of TASK_DATE_FIELDS) {
+    result = result.replace(field.re, (_match, rawDate: string) => {
+      if (metadata[field.key] === undefined) metadata[field.key] = rawDate;
+      return " ";
+    });
+  }
+  return result;
+}
+
+function stripEmojiTaskPriority(value: string, metadata: TaskMetadata): string {
+  let result = value;
+  for (const priority of TASK_PRIORITY_FIELDS) {
+    result = result.replace(priority.re, () => {
+      if (metadata.priority === undefined) metadata.priority = priority.value;
+      return " ";
+    });
+  }
+  return result;
+}
+
+function normalizeTaskMetadataKey(value: string): keyof TaskMetadata | undefined {
+  const key = value.trim().toLowerCase();
+  if (key === "completion") return "done";
+  if (
+    key === "due"
+    || key === "scheduled"
+    || key === "start"
+    || key === "created"
+    || key === "done"
+    || key === "cancelled"
+    || key === "priority"
+  ) {
+    return key;
+  }
+  return undefined;
+}
+
+function normalizeTaskMetadataValue(key: keyof TaskMetadata, value: string): string {
+  return key === "priority" ? value.toLowerCase() : value;
+}
+
+function uniqueReadId(id: string, items: Record<string, unknown>): string {
+  if (!Object.prototype.hasOwnProperty.call(items, id)) return id;
+  let index = 2;
+  while (Object.prototype.hasOwnProperty.call(items, `${id}-${index}`)) index += 1;
+  return `${id}-${index}`;
+}
+
+function syntheticTaskReadId(path: string, line: number, text: string): string {
+  return `task-${hashReadId(`${path}:${line}:${text.trim()}`)}`;
+}
+
+function hashReadId(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function lineNumberAt(content: string, index: number): number {
+  let line = 1;
+  for (let cursor = 0; cursor < index; cursor += 1) {
+    if (content.charCodeAt(cursor) === 10) line += 1;
+  }
+  return line;
 }
 
 function readSection(
