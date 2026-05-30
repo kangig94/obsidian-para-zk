@@ -159,7 +159,7 @@ Representative CLI smoke tests should cover:
 - `para-zk:create-project` with `areas`, `status`, and `priority`
 - `para-zk:create-subnote`
 - `para-zk:create-subarea`
-- `para-zk:create-resource` with `file_path` and link insertion
+- `para-zk:create-resource` with `path` and link insertion
 - `para-zk:create-retro`
 - `para-zk:create-zk`
 - `para-zk:capture-journal`

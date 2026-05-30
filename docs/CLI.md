@@ -19,9 +19,9 @@ optsidian raw para-zk:ping format=json
 Use `format=json` for automation. Text output is for humans and may omit fields
 that JSON includes.
 
-All paths are vault-relative. Prefer explicit `file_path` values over relying on
-the active file. The aliases `filePath`, `source`, `sourcePath`, `path`, and
-`file` are accepted by workflow commands, but `file_path` is the canonical name.
+All paths are vault-relative. Use the canonical `path` option when a command
+needs an existing note. Legacy aliases such as `file_path`, `filePath`,
+`source`, `sourcePath`, and `file` are rejected.
 
 ## Stable Codes
 
@@ -256,8 +256,8 @@ Options:
 | Option | Values | Notes |
 | --- | --- | --- |
 | `title` | string | Required. Also accepted as `name`. |
-| `file_path` | path | Optional source note receiving the resource link. |
-| `link` | boolean | Defaults to `true` when `file_path` is present. |
+| `path` | path | Optional source note receiving the resource link. |
+| `link` | boolean | Defaults to `true` when `path` is present. |
 | `open` | boolean | Default `false`. |
 
 Example:
@@ -265,7 +265,7 @@ Example:
 ```bash
 optsidian raw para-zk:create-resource \
   title="Source Paper" \
-  file_path="PARA/Projects/Model Evaluation/Model Evaluation.md" \
+  path="PARA/Projects/Model Evaluation/Model Evaluation.md" \
   link=true \
   format=json
 ```
@@ -284,7 +284,7 @@ Options:
 | Option | Values | Notes |
 | --- | --- | --- |
 | `title` | string | Required. Also accepted as `name`. |
-| `file_path` | path | Required for deterministic CLI use. Parent project or area note. |
+| `path` | path | Required for deterministic CLI use. Parent project or area note. |
 | `subnote_type` | subnote type code | Defaults to `free`. Also accepted as `subnoteType` or `type`. |
 | `open` | boolean | Default `false`. |
 
@@ -293,7 +293,7 @@ Example:
 ```bash
 optsidian raw para-zk:create-subnote \
   title="Planning Meeting" \
-  file_path="PARA/Projects/Model Evaluation/Model Evaluation.md" \
+  path="PARA/Projects/Model Evaluation/Model Evaluation.md" \
   subnote_type=meeting \
   format=json
 ```
@@ -313,7 +313,7 @@ Options:
 | Option | Values | Notes |
 | --- | --- | --- |
 | `title` | string | Required. Also accepted as `name`. |
-| `file_path` | path | Required for deterministic CLI use. Parent area note. |
+| `path` | path | Required for deterministic CLI use. Parent area note. |
 | `inheritParentTag` | boolean | Defaults to `true`. |
 | `open` | boolean | Default `false`. |
 
@@ -322,7 +322,7 @@ Example:
 ```bash
 optsidian raw para-zk:create-subarea \
   title="LLM Tooling" \
-  file_path="PARA/Areas/AI/AI.md" \
+  path="PARA/Areas/AI/AI.md" \
   inheritParentTag=true \
   format=json
 ```
@@ -335,7 +335,7 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `file_path` | path | Optional project or area source note. |
+| `path` | path | Optional project or area source note. |
 | `name` | string | Optional retro name segment. `title` is also accepted. |
 | `date` | `YYYY-MM-DD` | Date used for ISO week calculation. Defaults to today. |
 | `open` | boolean | Default `false`. |
@@ -344,7 +344,7 @@ Example:
 
 ```bash
 optsidian raw para-zk:create-retro \
-  file_path="PARA/Projects/Model Evaluation/Model Evaluation.md" \
+  path="PARA/Projects/Model Evaluation/Model Evaluation.md" \
   date=2026-05-29 \
   format=json
 ```
@@ -422,7 +422,7 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `file_path` | path | Required for deterministic CLI use. Source resource note. |
+| `path` | path | Required for deterministic CLI use. Source resource note. |
 | `title` | string | Optional. Defaults to source basename. `name` is also accepted. |
 | `kind` | ZK kind code | Defaults to `permanent`. `type` is also accepted. |
 | `maturity` | maturity code | Used for permanent notes. |
@@ -432,7 +432,7 @@ Example:
 
 ```bash
 optsidian raw para-zk:promote-resource \
-  file_path="PARA/Resources/Source Paper.md" \
+  path="PARA/Resources/Source Paper.md" \
   title="Paper Insight" \
   kind=literature \
   format=json
@@ -451,7 +451,7 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `file_path` | path | Required for deterministic CLI use. Source fleeting note. |
+| `path` | path | Required for deterministic CLI use. Source fleeting note. |
 | `title` | string | Optional. Defaults to source basename. `name` is also accepted. |
 | `kind` | promotion target kind code | Defaults to `permanent`. `type` is also accepted. |
 | `maturity` | maturity code | Used for permanent notes. |
@@ -461,7 +461,7 @@ Example:
 
 ```bash
 optsidian raw para-zk:promote-fleeting \
-  file_path="ZK/Fleeting/Raw Thought.md" \
+  path="ZK/Fleeting/Raw Thought.md" \
   title="Durable Thought" \
   kind=permanent \
   maturity=evergreen \

@@ -120,7 +120,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     description: "Create a PARA resource note and optionally link it from a source note",
     options: {
       title: { value: "<title>", description: "Resource title." },
-      file_path: { value: "<path>", description: "Source note path to receive the resource link." },
+      path: { value: "<path>", description: "Source note path to receive the resource link." },
       link: { value: "<true|false>", description: "Whether to add the link to the source note." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
@@ -143,7 +143,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     description: "Create a child document under a project or area note",
     options: {
       title: { value: "<title>", description: "Subnote title." },
-      file_path: { value: "<path>", description: "Parent note path." },
+      path: { value: "<path>", description: "Parent note path." },
       subnote_type: { value: `<${SUBNOTE_TYPE_CODE_HELP}>`, description: "Locale-neutral subnote type code." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
@@ -165,7 +165,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     description: "Create a child area under an area note",
     options: {
       title: { value: "<title>", description: "Subarea title." },
-      file_path: { value: "<path>", description: "Parent area path." },
+      path: { value: "<path>", description: "Parent area path." },
       inheritParentTag: { value: "<true|false>", description: "Include parent area tag as well as child tag." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
@@ -186,7 +186,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     command: "para-zk:create-retro",
     description: "Create a weekly retro note, optionally scoped to a project or area",
     options: {
-      file_path: { value: "<path>", description: "Project or area note path." },
+      path: { value: "<path>", description: "Project or area note path." },
       name: { value: "<name>", description: "Retro name segment." },
       date: { value: "<YYYY-MM-DD>", description: "Date used for ISO week calculation." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
@@ -254,7 +254,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     command: "para-zk:promote-resource",
     description: "Promote a resource note to a ZK note",
     options: {
-      file_path: { value: "<path>", description: "Source resource path." },
+      path: { value: "<path>", description: "Source resource path." },
       title: { value: "<title>", description: "New ZK note title." },
       kind: { value: `<${ZK_KIND_CODE_HELP}>`, description: "Locale-neutral target ZK kind." },
       maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
@@ -278,7 +278,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     command: "para-zk:promote-fleeting",
     description: "Promote a fleeting note to Literature or Permanent and archive the source",
     options: {
-      file_path: { value: "<path>", description: "Source fleeting note path." },
+      path: { value: "<path>", description: "Source fleeting note path." },
       title: { value: "<title>", description: "New ZK note title." },
       kind: { value: `<${PROMOTION_ZK_KIND_CODE_HELP}>`, description: "Locale-neutral target ZK kind." },
       maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
@@ -381,12 +381,12 @@ function readCliTitle(args: CliArgs): string {
 }
 
 function readCliPath(args: CliArgs): string | undefined {
-  return readCliString(args, "file_path")
-    ?? readCliString(args, "filePath")
-    ?? readCliString(args, "source")
-    ?? readCliString(args, "sourcePath")
-    ?? readCliString(args, "path")
-    ?? readCliString(args, "file");
+  for (const key of ["file_path", "filePath", "source", "sourcePath", "file"]) {
+    if (Object.prototype.hasOwnProperty.call(args, key)) {
+      throw new Error(`Use path instead of ${key}`);
+    }
+  }
+  return readCliString(args, "path");
 }
 
 function readCliContent(args: CliArgs): string {

@@ -158,10 +158,11 @@ function runWorkflowScenario(today) {
   assert(reusedArea.created === false, "project did not reuse existing area");
   assert(createdArea.created === true, "project did not create missing area");
   assert(existsSync(join(vaultPath, createdArea.path)), `created linked area does not exist: ${createdArea.path}`);
+  assertLegacyPathAliasRejected(project.path);
 
   const subnote = cliJson("para-zk:create-subnote", [
     `title=Smoke Meeting ${stamp}`,
-    `file_path=${project.path}`,
+    `path=${project.path}`,
     "subnote_type=meeting",
     "open=false",
     "format=json"
@@ -170,7 +171,7 @@ function runWorkflowScenario(today) {
 
   const subarea = cliJson("para-zk:create-subarea", [
     `title=Smoke Subarea ${stamp}`,
-    `file_path=${area.path}`,
+    `path=${area.path}`,
     "inheritParentTag=true",
     "open=false",
     "format=json"
@@ -179,7 +180,7 @@ function runWorkflowScenario(today) {
 
   const resource = cliJson("para-zk:create-resource", [
     `title=${resourceTitle}`,
-    `file_path=${project.path}`,
+    `path=${project.path}`,
     "link=true",
     "open=false",
     "format=json"
@@ -215,7 +216,7 @@ function runWorkflowScenario(today) {
   assert(journal.ok === true, "journal capture failed");
 
   const retro = cliJson("para-zk:create-retro", [
-    `file_path=${project.path}`,
+    `path=${project.path}`,
     `date=${today}`,
     "open=false",
     "format=json"
@@ -223,7 +224,7 @@ function runWorkflowScenario(today) {
   assertCreated(retro, "retro");
 
   const promotedResource = cliJson("para-zk:promote-resource", [
-    `file_path=${resource.path}`,
+    `path=${resource.path}`,
     `title=Smoke Resource Promoted ${stamp}`,
     "kind=literature",
     "open=false",
@@ -232,7 +233,7 @@ function runWorkflowScenario(today) {
   assertCreated(promotedResource, "promoted resource");
 
   const promotedFleeting = cliJson("para-zk:promote-fleeting", [
-    `file_path=${fleeting.path}`,
+    `path=${fleeting.path}`,
     `title=Smoke Fleeting Promoted ${stamp}`,
     "kind=permanent",
     "maturity=evergreen",
@@ -255,6 +256,19 @@ function runWorkflowScenario(today) {
     promotedResource,
     promotedFleeting
   };
+}
+
+function assertLegacyPathAliasRejected(projectPath) {
+  const rejected = cliJson("para-zk:create-subnote", [
+    `title=Legacy Alias ${stamp}`,
+    `file_path=${projectPath}`,
+    "format=json"
+  ]);
+  assert(rejected.ok === false, "legacy file_path alias was accepted");
+  assert(
+    typeof rejected.error === "string" && rejected.error.includes("Use path instead of file_path"),
+    `legacy file_path alias error was not explicit: ${JSON.stringify(rejected)}`
+  );
 }
 
 function assertDryRunInit() {
