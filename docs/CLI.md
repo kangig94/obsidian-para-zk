@@ -303,6 +303,62 @@ optsidian raw para-zk:read-journal date=2026-05-30 key=quick_memo format=json
 optsidian raw para-zk:read-retro path="PARA/Retros/2026_W22/Retro-General-2026_W22.md" key=retro_summary format=json
 ```
 
+### `para-zk:update-project`
+
+Updates a writable PARA-ZK surface by the same stable map keys used for reads.
+The command is scoped to a domain note first, then applies the edit only inside
+the selected key. It is not a raw file edit.
+
+Options:
+
+| Option | Values | Notes |
+| --- | --- | --- |
+| `title` | string | Project title. Used when `path` is omitted. |
+| `path` | path | Optional exact project note path. |
+| `archived` | boolean | Same title lookup behavior as `read-project`. |
+| `key` | writable map path | Required. Examples: `frontmatter/status`, `summary`, `children/Planning Meeting/body`. |
+| `op` | `set`, `append`, `prepend`, `replace` | Required update operation. |
+| `value` | text | Required for `set`, `append`, and `prepend`. |
+| `value_json` | JSON | Structured value for frontmatter updates. |
+| `match` | text | Required for `replace`. Exact literal text inside the selected key. |
+| `with` | text | Replacement text for `replace`. Empty is allowed. |
+| `all` | boolean | For `replace`, replace all matches. Without it, multiple matches fail. |
+
+Writable keys are a subset of read keys. `frontmatter/<key>` supports `op=set`
+only and uses Obsidian frontmatter mutation. Section/body keys support
+`set`, `append`, `prepend`, and exact literal `replace`.
+
+Read-only keys include `children`, `path`, `title`, `type`, `archived`, and
+`keys`.
+
+Examples:
+
+```bash
+optsidian raw para-zk:update-project title="Model Evaluation" key=frontmatter/status op=set value=done format=json
+optsidian raw para-zk:update-project title="Model Evaluation" key=summary op=replace match="old claim" with="new claim" format=json
+optsidian raw para-zk:update-project title="Model Evaluation" key=tasks op=append value="- [ ] Review evaluation set" format=json
+optsidian raw para-zk:update-project title="Model Evaluation" key="children/Planning Meeting/body" op=append value="Decision: ship the baseline." format=json
+```
+
+Result fields:
+
+- `path`: the actual file that was updated. For `children/<title>/...`, this is
+  the child note path.
+- `key`: the original requested key.
+- `operation`: the applied operation.
+- `changed`: false when the requested `set` value already matched.
+- `matches`: present for `replace`.
+
+The same update algorithm is used by the other domain update commands:
+
+| Command | Selector | Notes |
+| --- | --- | --- |
+| `para-zk:update-area` | `title` or `path` | Supports area surface keys and `children/<title>/...`. |
+| `para-zk:update-resource` | `title` or `path` | Supports resource surface keys such as `overview`, `body`, and `references`. |
+| `para-zk:update-zk` | `title` plus optional `kind`, or `path` | Supports the selected ZK type's surface keys. |
+| `para-zk:update-journal` | `date` or `path` | Supports journal surface keys such as `quick_memo` and `today_tasks`. |
+| `para-zk:update-retro` | `title` plus optional `date`, or `path` | Supports retro surface keys such as `next_actions`. |
+
 ### `para-zk:create-project`
 
 Creates a folder-style project note.

@@ -59,6 +59,13 @@ focus on template-safe PARA/ZK surfaces.
 PARA read commands may select archived notes with `archived=true`; the returned
 `archived` field is the single code-level indicator for that state.
 
+Update commands should use the same stable map-path keys as read commands, but
+only writable leaves are mutable. `frontmatter/<key>` uses structured Obsidian
+frontmatter mutation and supports `op=set`. Section/body keys support
+`op=set`, `op=append`, `op=prepend`, and exact literal `op=replace` scoped to
+the selected key. Do not expose raw line/range editing through PARA-ZK; that is
+Optsidian's responsibility.
+
 "GUI and CLI behave the same" means they call the same core workflow functions
 and produce the same kind of vault side effects. It does not mean the CLI should
 copy the GUI prompts or limit itself to human-oriented interaction.
@@ -173,6 +180,9 @@ Representative CLI smoke tests should cover:
 - `para-zk:read-area`, `para-zk:read-resource`, `para-zk:read-zk`,
   `para-zk:read-journal`, and `para-zk:read-retro` using the same stable map
   key algorithm
+- `para-zk:update-project`, `update-area`, `update-resource`, `update-zk`,
+  `update-journal`, and `update-retro` using writable stable map keys and
+  scoped set/append/replace operations
 - `para-zk:add-reference` with a vault-relative source `path` and URL/file/note target
 - `para-zk:create-subnote`
 - `para-zk:create-subarea`

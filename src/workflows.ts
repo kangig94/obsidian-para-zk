@@ -172,6 +172,37 @@ export type ReadRetroOptions = ReadByTitleOptions & {
   date?: string;
 };
 
+export type UpdateOperation = "set" | "append" | "prepend" | "replace";
+
+export type UpdatePayloadOptions = {
+  key?: string;
+  operation?: string;
+  value?: unknown;
+  match?: string;
+  replacement?: string;
+  all?: boolean;
+};
+
+export type UpdateByTitleOptions = ReadByTitleOptions & UpdatePayloadOptions;
+export type UpdateProjectOptions = UpdateByTitleOptions;
+export type UpdateAreaOptions = UpdateByTitleOptions;
+export type UpdateResourceOptions = UpdateByTitleOptions;
+
+export type UpdateZkOptions = ReadZkOptions & UpdatePayloadOptions;
+export type UpdateJournalOptions = ReadJournalOptions & UpdatePayloadOptions;
+export type UpdateRetroOptions = ReadRetroOptions & UpdatePayloadOptions;
+
+export type UpdateSurfaceResult = {
+  path: string;
+  title: string;
+  type: string;
+  archived: boolean;
+  key: string;
+  operation: UpdateOperation;
+  changed: boolean;
+  matches?: number;
+};
+
 type TemplateVariables = Record<string, string | undefined>;
 type Frontmatter = Record<string, unknown>;
 type ReadMap = Record<string, unknown>;
@@ -180,6 +211,7 @@ type ReadSectionSpec = {
   labelKey?: string;
   labels?: string[];
   includeSubsections?: boolean;
+  skipManagedPrelude?: boolean;
   transform?: (content: string) => string;
 };
 type ReadSurfaceSpec = {
@@ -256,6 +288,31 @@ export async function readJournal(ctx: WorkflowContext, options: ReadJournalOpti
 
 export async function readRetro(ctx: WorkflowContext, options: ReadRetroOptions): Promise<Record<string, unknown>> {
   return readSurface(ctx, resolveRequiredRetro(ctx, options), RETRO_READ_SPEC, options.key);
+}
+
+export async function updateProject(ctx: WorkflowContext, options: UpdateProjectOptions): Promise<UpdateSurfaceResult> {
+  return updateSurface(ctx, resolveRequiredProject(ctx, options), PROJECT_READ_SPEC, options);
+}
+
+export async function updateArea(ctx: WorkflowContext, options: UpdateAreaOptions): Promise<UpdateSurfaceResult> {
+  return updateSurface(ctx, resolveRequiredArea(ctx, options), AREA_READ_SPEC, options);
+}
+
+export async function updateResource(ctx: WorkflowContext, options: UpdateResourceOptions): Promise<UpdateSurfaceResult> {
+  return updateSurface(ctx, resolveRequiredResource(ctx, options), RESOURCE_READ_SPEC, options);
+}
+
+export async function updateZk(ctx: WorkflowContext, options: UpdateZkOptions): Promise<UpdateSurfaceResult> {
+  const file = resolveRequiredZk(ctx, options);
+  return updateSurface(ctx, file, specForType(readType(fileFrontmatter(ctx, file))), options);
+}
+
+export async function updateJournal(ctx: WorkflowContext, options: UpdateJournalOptions): Promise<UpdateSurfaceResult> {
+  return updateSurface(ctx, resolveRequiredJournal(ctx, options), JOURNAL_READ_SPEC, options);
+}
+
+export async function updateRetro(ctx: WorkflowContext, options: UpdateRetroOptions): Promise<UpdateSurfaceResult> {
+  return updateSurface(ctx, resolveRequiredRetro(ctx, options), RETRO_READ_SPEC, options);
 }
 
 export async function createArea(ctx: WorkflowContext, options: CreateAreaOptions): Promise<NoteResult> {
@@ -815,7 +872,7 @@ function countListItems(section: string, prefix: string): number {
 const PROJECT_READ_SPEC: ReadSurfaceSpec = {
   frontmatter: ["areas", "status", "priority", "start_date", "due_date", "done_date"],
   sections: [
-    { key: "summary", labelKey: "summary", transform: stripProjectSummaryManagedBlock },
+    { key: "summary", labelKey: "summary", skipManagedPrelude: true, transform: stripProjectSummaryManagedBlock },
     { key: "goals", labelKey: "goals" },
     { key: "tasks", labelKey: "tasks" },
     { key: "references", labelKey: "references" }
@@ -993,6 +1050,419 @@ async function readSurfaceKey(
     };
   }
   return readMapPath(childSurface, parts.slice(2), key);
+}
+
+type WritableSurfaceTarget =
+  | {
+    kind: "frontmatter";
+    file: TFile;
+    frontmatterKey: string;
+  }
+  | {
+    kind: "text";
+    file: TFile;
+    range: TextRange;
+  };
+
+type TextRange = {
+  start: number;
+  end: number;
+};
+
+type TextUpdateResult = {
+  changed: boolean;
+  matches?: number;
+};
+
+async function updateSurface(
+  ctx: WorkflowContext,
+  file: TFile,
+  spec: ReadSurfaceSpec,
+  options: UpdatePayloadOptions
+): Promise<UpdateSurfaceResult> {
+  const key = requireUpdateKey(options.key);
+  const operation = parseUpdateOperation(options.operation);
+  const target = await resolveWritableSurfaceTarget(ctx, file, spec, key, key);
+  const type = readType(fileFrontmatter(ctx, target.file));
+  const result = target.kind === "frontmatter"
+    ? await updateFrontmatterSurface(ctx, target, operation, options)
+    : await updateTextSurface(ctx, target, operation, options);
+
+  return {
+    path: target.file.path,
+    title: target.file.basename,
+    type,
+    archived: isArchivedFile(ctx, target.file),
+    key,
+    operation,
+    changed: result.changed,
+    matches: result.matches
+  };
+}
+
+async function resolveWritableSurfaceTarget(
+  ctx: WorkflowContext,
+  file: TFile,
+  spec: ReadSurfaceSpec,
+  key: string,
+  originalKey: string
+): Promise<WritableSurfaceTarget> {
+  const parts = keyParts(key);
+  if (parts.length === 0) throw new Error("key is required");
+
+  if (parts[0] === "children") {
+    if (!spec.children) throw new Error(`unknown update key: ${originalKey}`);
+    if (parts.length < 3) throw new Error(`children map is read-only; use children/<title>/<key>`);
+
+    const childTitle = parts[1];
+    const child = findChild(ctx, file, childTitle);
+    if (!child) throw new Error(`child not found: ${childTitle}`);
+
+    return resolveWritableSurfaceTarget(
+      ctx,
+      child,
+      specForType(readType(fileFrontmatter(ctx, child))),
+      parts.slice(2).join("/"),
+      originalKey
+    );
+  }
+
+  if (parts[0] === "frontmatter") {
+    if (parts.length !== 2) throw new Error(`frontmatter map is read-only; use frontmatter/<key>`);
+    const frontmatterKey = parts[1];
+    if (!spec.frontmatter.includes(frontmatterKey)) throw new Error(`unknown update key: ${originalKey}`);
+    return {
+      kind: "frontmatter",
+      file,
+      frontmatterKey
+    };
+  }
+
+  if (parts[0] === "body" && parts.length === 1 && spec.body) {
+    const content = await ctx.app.vault.read(file);
+    return {
+      kind: "text",
+      file,
+      range: writableBodyRange(content)
+    };
+  }
+
+  const section = spec.sections?.find((item) => item.key === parts[0]);
+  if (!section || parts.length !== 1) throw new Error(`unknown update key: ${originalKey}`);
+
+  const content = await ctx.app.vault.read(file);
+  return {
+    kind: "text",
+    file,
+    range: writableSectionRange(content, section, originalKey)
+  };
+}
+
+async function updateFrontmatterSurface(
+  ctx: WorkflowContext,
+  target: Extract<WritableSurfaceTarget, { kind: "frontmatter" }>,
+  operation: UpdateOperation,
+  options: UpdatePayloadOptions
+): Promise<TextUpdateResult> {
+  if (operation !== "set") throw new Error("frontmatter keys only support op=set");
+
+  const value = normalizeFrontmatterUpdateValue(
+    readType(fileFrontmatter(ctx, target.file)),
+    target.frontmatterKey,
+    requireUpdateValue(options)
+  );
+  const before = fileFrontmatter(ctx, target.file)[target.frontmatterKey];
+  if (frontmatterValuesEqual(before, value)) return { changed: false };
+
+  await ctx.app.fileManager.processFrontMatter(target.file, (fm) => {
+    fm[target.frontmatterKey] = value;
+  });
+  return { changed: true };
+}
+
+async function updateTextSurface(
+  ctx: WorkflowContext,
+  target: Extract<WritableSurfaceTarget, { kind: "text" }>,
+  operation: UpdateOperation,
+  options: UpdatePayloadOptions
+): Promise<TextUpdateResult> {
+  const before = await ctx.app.vault.read(target.file);
+  const current = before.slice(target.range.start, target.range.end);
+  const update = applyTextOperation(current, operation, options);
+  if (!update.changed) return update;
+
+  const after = spliceTextRange(before, target.range, update.value);
+  if (before !== after) await ctx.app.vault.modify(target.file, after);
+  return {
+    changed: before !== after,
+    matches: update.matches
+  };
+}
+
+function applyTextOperation(
+  current: string,
+  operation: UpdateOperation,
+  options: UpdatePayloadOptions
+): TextUpdateResult & { value: string } {
+  switch (operation) {
+    case "set": {
+      const value = requireUpdateText(options, { allowEmpty: true });
+      return {
+        changed: current !== value,
+        value
+      };
+    }
+    case "append": {
+      const value = requireUpdateText(options, { allowEmpty: false });
+      const next = current.trim() ? `${current}${current.endsWith("\n") ? "" : "\n"}${value}` : value;
+      return {
+        changed: current !== next,
+        value: next
+      };
+    }
+    case "prepend": {
+      const value = requireUpdateText(options, { allowEmpty: false });
+      const next = current.trim() ? `${value}${value.endsWith("\n") ? "" : "\n"}${current}` : value;
+      return {
+        changed: current !== next,
+        value: next
+      };
+    }
+    case "replace": {
+      const match = requireReplaceMatch(options);
+      const replacement = requireReplacementText(options);
+      const matches = literalOccurrences(current, match);
+      if (matches === 0) throw new Error("replace text was not found");
+      if (matches > 1 && !options.all) {
+        throw new Error(`replace text matched ${matches} times; pass all=true to replace all`);
+      }
+      const value = options.all
+        ? current.split(match).join(replacement)
+        : replaceFirstLiteral(current, match, replacement);
+      return {
+        changed: current !== value,
+        matches,
+        value
+      };
+    }
+  }
+}
+
+function spliceTextRange(content: string, range: TextRange, value: string): string {
+  const before = content.slice(0, range.start);
+  const after = content.slice(range.end);
+  let replacement = value;
+  if (replacement && after && !replacement.endsWith("\n") && !after.startsWith("\n") && !after.startsWith("\r\n")) {
+    replacement = `${replacement}\n`;
+  }
+  return `${before}${replacement}${after}`;
+}
+
+function writableSectionRange(content: string, section: ReadSectionSpec, originalKey: string): TextRange {
+  const range = findSectionContentRange(content, section);
+  if (!range) throw new Error(`section not found for update key: ${originalKey}`);
+  const editableStart = section.skipManagedPrelude
+    ? skipProjectSummaryManagedBlock(content, range.start, range.end)
+    : range.start;
+  return trimTextRange(content, editableStart, range.end);
+}
+
+function writableBodyRange(content: string): TextRange {
+  const body = markdownBodyRange(content);
+  const prelude = content.slice(body.start, body.end).match(/^\s*```para-zk-props\r?\n[\s\S]*?\r?\n```\s*/);
+  const start = body.start + (prelude?.[0].length ?? 0);
+  return trimTextRange(content, start, body.end);
+}
+
+function findSectionContentRange(content: string, section: ReadSectionSpec): TextRange | undefined {
+  const body = markdownBodyRange(content);
+  const markdown = content.slice(body.start, body.end);
+
+  for (const label of sectionHeadingCandidates(section)) {
+    const range = findSectionContentRangeByHeading(markdown, label, {
+      includeSubsections: section.includeSubsections ?? false,
+      offset: body.start
+    });
+    if (range) return range;
+  }
+  return undefined;
+}
+
+function findSectionContentRangeByHeading(
+  content: string,
+  heading: string,
+  options: {
+    includeSubsections: boolean;
+    offset: number;
+  }
+): TextRange | undefined {
+  const headingPattern = escapeRegExp(heading).replace(/\s+/g, "\\s+");
+  const headerRe = new RegExp(`^\\s*(?<hashes>#{1,6})\\s+${headingPattern}(?=\\s|$).*?$`, "im");
+  const match = content.match(headerRe);
+  if (!match) return undefined;
+
+  const level = match.groups?.hashes.length ?? 6;
+  const headerEnd = (match.index ?? 0) + match[0].length;
+  const sectionStart = headerEnd + lineBreakLengthAt(content, headerEnd);
+  const after = content.slice(sectionStart);
+  const nextBoundaryRel = nextSectionBoundary(after, options.includeSubsections ? level : undefined);
+  const sectionEnd = nextBoundaryRel === -1 ? content.length : sectionStart + nextBoundaryRel;
+  return {
+    start: options.offset + sectionStart,
+    end: options.offset + sectionEnd
+  };
+}
+
+function markdownBodyRange(content: string): TextRange {
+  if (!content.startsWith("---\n") && !content.startsWith("---\r\n")) {
+    return { start: 0, end: content.length };
+  }
+
+  const delimiter = content.match(/\r?\n---(?:\r?\n|$)/);
+  if (!delimiter || delimiter.index === undefined) return { start: 0, end: content.length };
+  return {
+    start: delimiter.index + delimiter[0].length,
+    end: content.length
+  };
+}
+
+function skipProjectSummaryManagedBlock(content: string, start: number, end: number): number {
+  let cursor = start;
+  const first = readLineSpan(content, cursor, end);
+  if (!first?.text.trim().startsWith("> [!tip]")) return start;
+
+  let fenceCount = 0;
+  while (cursor < end) {
+    const line = readLineSpan(content, cursor, end);
+    if (!line) break;
+    cursor = line.next;
+    if (line.text.trim() === "> ```") fenceCount += 1;
+    if (fenceCount === 2) break;
+  }
+  if (fenceCount < 2) return start;
+
+  while (cursor < end) {
+    const line = readLineSpan(content, cursor, end);
+    if (!line || line.text.trim() !== "") break;
+    cursor = line.next;
+  }
+  return cursor;
+}
+
+function readLineSpan(text: string, start: number, end: number): { text: string; next: number } | undefined {
+  if (start >= end) return undefined;
+  const lf = text.indexOf("\n", start);
+  const rawEnd = lf === -1 || lf >= end ? end : lf;
+  const lineEnd = rawEnd > start && text.charAt(rawEnd - 1) === "\r" ? rawEnd - 1 : rawEnd;
+  return {
+    text: text.slice(start, lineEnd),
+    next: lf === -1 || lf >= end ? end : lf + 1
+  };
+}
+
+function trimTextRange(content: string, start: number, end: number): TextRange {
+  let trimmedStart = start;
+  let trimmedEnd = end;
+  while (trimmedStart < trimmedEnd && /\s/.test(content.charAt(trimmedStart))) trimmedStart += 1;
+  while (trimmedEnd > trimmedStart && /\s/.test(content.charAt(trimmedEnd - 1))) trimmedEnd -= 1;
+  return {
+    start: trimmedStart,
+    end: trimmedEnd
+  };
+}
+
+function lineBreakLengthAt(content: string, index: number): number {
+  if (content.slice(index, index + 2) === "\r\n") return 2;
+  return content.charAt(index) === "\n" ? 1 : 0;
+}
+
+function requireUpdateKey(value: string | undefined): string {
+  const key = value?.trim() ?? "";
+  if (!key) throw new Error("key is required");
+  return key;
+}
+
+function parseUpdateOperation(value: string | undefined): UpdateOperation {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "set" || normalized === "append" || normalized === "prepend" || normalized === "replace") {
+    return normalized;
+  }
+  throw new Error("op must be one of: set|append|prepend|replace");
+}
+
+function requireUpdateValue(options: UpdatePayloadOptions): unknown {
+  if (!Object.prototype.hasOwnProperty.call(options, "value")) throw new Error("value is required");
+  return options.value;
+}
+
+function requireUpdateText(options: UpdatePayloadOptions, config: { allowEmpty: boolean }): string {
+  const value = requireUpdateValue(options);
+  if (typeof value !== "string") throw new Error("section/body value must be a string");
+  if (!config.allowEmpty && !value) throw new Error("value must not be empty");
+  return value;
+}
+
+function requireReplaceMatch(options: UpdatePayloadOptions): string {
+  const match = options.match;
+  if (typeof match !== "string" || match.length === 0) throw new Error("match is required for op=replace");
+  return match;
+}
+
+function requireReplacementText(options: UpdatePayloadOptions): string {
+  if (!Object.prototype.hasOwnProperty.call(options, "replacement")) {
+    throw new Error("with is required for op=replace");
+  }
+  const replacement = options.replacement;
+  if (typeof replacement !== "string") throw new Error("with must be a string");
+  return replacement;
+}
+
+function normalizeFrontmatterUpdateValue(type: string, key: string, value: unknown): unknown {
+  if (type === "project" && key === "status") {
+    return readOptionalCode(String(value), parseProjectStatusCode, "status", PROJECT_STATUS_CODE_HELP);
+  }
+  if (type === "project" && key === "priority") {
+    return readOptionalCode(String(value), parsePriorityCode, "priority", PRIORITY_CODE_HELP);
+  }
+  if (type === "journal" && key === "energy") {
+    return readOptionalCode(String(value), parseEnergyCode, "energy", ENERGY_CODE_HELP);
+  }
+  if (type === "doc" && key === "subnote_type") {
+    return readOptionalCode(String(value), parseSubnoteTypeCode, "subnote_type", SUBNOTE_TYPE_CODE_HELP);
+  }
+  if (type === "zk_permanent" && key === "maturity") {
+    return readOptionalCode(String(value), parseMaturityCode, "maturity", MATURITY_CODE_HELP);
+  }
+  if (type === "zk_fleeting" && key === "processed") {
+    if (typeof value === "boolean") return value;
+    const normalized = String(value).trim().toLowerCase();
+    if (["true", "1", "yes", "on"].includes(normalized)) return true;
+    if (["false", "0", "no", "off"].includes(normalized)) return false;
+    throw new Error("processed must be a boolean");
+  }
+  return value;
+}
+
+function frontmatterValuesEqual(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function literalOccurrences(text: string, needle: string): number {
+  if (!needle) throw new Error("replace text must not be empty");
+  let count = 0;
+  let index = 0;
+  while (true) {
+    const found = text.indexOf(needle, index);
+    if (found === -1) return count;
+    count += 1;
+    index = found + needle.length;
+  }
+}
+
+function replaceFirstLiteral(text: string, needle: string, replacement: string): string {
+  const index = text.indexOf(needle);
+  if (index === -1) return text;
+  return `${text.slice(0, index)}${replacement}${text.slice(index + needle.length)}`;
 }
 
 function childIndex(ctx: WorkflowContext, parent: TFile): Record<string, unknown> {

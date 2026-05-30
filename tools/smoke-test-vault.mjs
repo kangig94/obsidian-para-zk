@@ -203,6 +203,32 @@ function runWorkflowScenario(today) {
   ]);
   assert(projectChildrenRead.value?.[`Smoke Meeting ${stamp}`]?.path === subnote.path, "project children key read failed");
 
+  const projectChildrenUpdateRejected = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    "key=children",
+    "op=set",
+    "value=should fail",
+    "format=json"
+  ]);
+  assert(projectChildrenUpdateRejected.ok === false, "project children map update was accepted");
+  assert(
+    typeof projectChildrenUpdateRejected.error === "string" && projectChildrenUpdateRejected.error.includes("read-only"),
+    `project children map update error was not explicit: ${JSON.stringify(projectChildrenUpdateRejected)}`
+  );
+
+  const projectUpdateAliasRejected = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    "key=summary",
+    "operation=set",
+    "value=should fail",
+    "format=json"
+  ]);
+  assert(projectUpdateAliasRejected.ok === false, "update operation alias was accepted");
+  assert(
+    typeof projectUpdateAliasRejected.error === "string" && projectUpdateAliasRejected.error.includes("Use op instead of operation"),
+    `update operation alias error was not explicit: ${JSON.stringify(projectUpdateAliasRejected)}`
+  );
+
   const subnoteTypeRead = cliJson("para-zk:read-project", [
     `title=${projectTitle}`,
     `key=children/Smoke Meeting ${stamp}/frontmatter/subnote_type`,
@@ -227,6 +253,57 @@ function runWorkflowScenario(today) {
   ]);
   assert(archivedProjectStatusRead.value === "archived", "archived project status key read failed");
 
+  const projectPriorityUpdate = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    "key=frontmatter/priority",
+    "op=set",
+    "value=medium",
+    "format=json"
+  ]);
+  assert(projectPriorityUpdate.changed === true, "project priority update did not report a change");
+
+  const projectSummarySet = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    "key=summary",
+    "op=set",
+    `value=Smoke summary draft ${stamp}`,
+    "format=json"
+  ]);
+  assert(projectSummarySet.changed === true, "project summary set did not report a change");
+
+  const projectSummaryReplace = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    "key=summary",
+    "op=replace",
+    `match=summary draft ${stamp}`,
+    `with=summary updated ${stamp}`,
+    "format=json"
+  ]);
+  assert(projectSummaryReplace.matches === 1, "project summary replace did not report one match");
+
+  const projectSummaryRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    "key=summary",
+    "format=json"
+  ]);
+  assert(projectSummaryRead.value === `Smoke summary updated ${stamp}`, "project summary update read failed");
+
+  const childBodyAppend = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    `key=children/Smoke Meeting ${stamp}/body`,
+    "op=append",
+    `value=Smoke child body update ${stamp}`,
+    "format=json"
+  ]);
+  assert(childBodyAppend.path === subnote.path && childBodyAppend.changed === true, "project child body update failed");
+
+  const childBodyRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    `key=children/Smoke Meeting ${stamp}/body`,
+    "format=json"
+  ]);
+  assert(String(childBodyRead.value).includes(`Smoke child body update ${stamp}`), "project child body update read failed");
+
   const subarea = cliJson("para-zk:create-subarea", [
     `title=Smoke Subarea ${stamp}`,
     `path=${area.path}`,
@@ -250,6 +327,15 @@ function runWorkflowScenario(today) {
   ]);
   assert(subareaOverviewRead.ok === true, "area child overview key read failed");
 
+  const areaChildOverviewUpdate = cliJson("para-zk:update-area", [
+    `title=${areaTitle}`,
+    `key=children/Smoke Subarea ${stamp}/overview`,
+    "op=set",
+    `value=Smoke subarea overview ${stamp}`,
+    "format=json"
+  ]);
+  assert(areaChildOverviewUpdate.path === subarea.path && areaChildOverviewUpdate.changed === true, "area child overview update failed");
+
   const resource = cliJson("para-zk:create-resource", [
     `title=${resourceTitle}`,
     `path=${project.path}`,
@@ -266,6 +352,40 @@ function runWorkflowScenario(today) {
     "format=json"
   ]);
   assert(resourceRead.ok === true && typeof resourceRead.value === "string", "resource body key read failed");
+
+  const resourceBodySet = cliJson("para-zk:update-resource", [
+    `title=${resourceTitle}`,
+    "key=body",
+    "op=set",
+    `value=repeat ${stamp}\\nrepeat ${stamp}`,
+    "format=json"
+  ]);
+  assert(resourceBodySet.changed === true, "resource body set failed");
+
+  const resourceDuplicateReplace = cliJson("para-zk:update-resource", [
+    `title=${resourceTitle}`,
+    "key=body",
+    "op=replace",
+    `match=repeat ${stamp}`,
+    `with=Smoke resource body updated ${stamp}`,
+    "format=json"
+  ]);
+  assert(resourceDuplicateReplace.ok === false, "duplicate resource body replace was accepted without all=true");
+  assert(
+    typeof resourceDuplicateReplace.error === "string" && resourceDuplicateReplace.error.includes("matched 2 times"),
+    `duplicate resource body replace error was not explicit: ${JSON.stringify(resourceDuplicateReplace)}`
+  );
+
+  const resourceBodyReplace = cliJson("para-zk:update-resource", [
+    `title=${resourceTitle}`,
+    "key=body",
+    "op=replace",
+    `match=repeat ${stamp}`,
+    `with=Smoke resource body updated ${stamp}`,
+    "all=true",
+    "format=json"
+  ]);
+  assert(resourceBodyReplace.matches === 2, "resource body replace all did not report two matches");
 
   const fleeting = cliJson("para-zk:create-zk", [
     `title=${fleetingTitle}`,
@@ -292,6 +412,16 @@ function runWorkflowScenario(today) {
   ]);
   assert(zkRead.value === "refined", "ZK frontmatter/maturity key read failed");
 
+  const zkMaturityUpdate = cliJson("para-zk:update-zk", [
+    `title=${permanentTitle}`,
+    "kind=permanent",
+    "key=frontmatter/maturity",
+    "op=set",
+    "value=evergreen",
+    "format=json"
+  ]);
+  assert(zkMaturityUpdate.changed === true, "ZK maturity update failed");
+
   const journal = cliJson("para-zk:capture-journal", [
     `content=Smoke memo ${stamp}`,
     `date=${today}`,
@@ -309,6 +439,15 @@ function runWorkflowScenario(today) {
   ]);
   assert(typeof journalRead.value === "string" && journalRead.value.includes(`Smoke memo ${stamp}`), "journal quick_memo key read failed");
 
+  const journalUpdate = cliJson("para-zk:update-journal", [
+    `date=${today}`,
+    "key=quick_memo",
+    "op=append",
+    `value=Smoke journal update ${stamp}`,
+    "format=json"
+  ]);
+  assert(journalUpdate.changed === true, "journal quick_memo update failed");
+
   const retro = cliJson("para-zk:create-retro", [
     `path=${project.path}`,
     `date=${today}`,
@@ -323,6 +462,15 @@ function runWorkflowScenario(today) {
     "format=json"
   ]);
   assert(typeof retroRead.value === "string" && retroRead.value.length > 0, "retro week_iso key read failed");
+
+  const retroUpdate = cliJson("para-zk:update-retro", [
+    `path=${retro.path}`,
+    "key=next_actions",
+    "op=set",
+    `value=- [ ] Smoke retro action ${stamp}`,
+    "format=json"
+  ]);
+  assert(retroUpdate.changed === true, "retro next_actions update failed");
 
   const promotedResource = cliJson("para-zk:promote-resource", [
     `path=${resource.path}`,
@@ -428,7 +576,8 @@ function assertDryRunInit() {
 function assertWorkflowFiles(result) {
   assertFileContains(result.project.path, [
     "status: in_progress",
-    "priority: high",
+    "priority: medium",
+    `Smoke summary updated ${stamp}`,
     result.area.path,
     result.createdArea.path,
     "[Reference URL](https://example.com/reference)",
@@ -440,15 +589,20 @@ function assertWorkflowFiles(result) {
   assertFileContains(result.subnote.path, [
     "type: doc",
     "subnote_type: meeting",
-    result.project.path
+    result.project.path,
+    `Smoke child body update ${stamp}`
   ]);
   assertFileContains(result.subarea.path, [
     "type: area",
-    result.area.path
+    result.area.path,
+    `Smoke subarea overview ${stamp}`
+  ]);
+  assertFileContains(result.resource.path, [
+    `Smoke resource body updated ${stamp}`
   ]);
   assertFileContains(result.permanent.path, [
     "type: zk_permanent",
-    "maturity: refined"
+    "maturity: evergreen"
   ]);
   assertFileContains(result.promotedResource.path, [
     "type: zk_literature",
@@ -464,10 +618,14 @@ function assertWorkflowFiles(result) {
     result.promotedFleeting.path
   ]);
   assert(existsSync(join(vaultPath, result.fleeting.path)), "fleeting source should remain in place after promotion");
-  assertFileContains(result.journal.path, [`Smoke memo ${stamp}`]);
+  assertFileContains(result.journal.path, [
+    `Smoke memo ${stamp}`,
+    `Smoke journal update ${stamp}`
+  ]);
   assertFileContains(result.retro.path, [
     "type: retro",
-    result.project.path
+    result.project.path,
+    `Smoke retro action ${stamp}`
   ]);
 }
 

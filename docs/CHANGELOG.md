@@ -37,6 +37,9 @@ Notable changes for PARA-ZK are tracked here.
   `read-journal`, and `read-retro` for reading editable surfaces by stable map
   keys such as `frontmatter/status`, `children`, and
   `children/<child note title>/body`.
+- Added `para-zk:update-project`, `update-area`, `update-resource`, `update-zk`,
+  `update-journal`, and `update-retro` for scoped template-safe updates using
+  the same stable map keys as read commands.
 - Added `archived=true` lookup for PARA read commands so projects, areas,
   resources, and retros can be read from `PARA/Archives` without using exact
   paths.

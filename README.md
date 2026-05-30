@@ -48,6 +48,8 @@ obsidian para-zk:read-area title="AI" key=children format=json
 obsidian para-zk:read-resource title="Source" key=body format=json
 obsidian para-zk:read-zk title="Idea" kind=fleeting key=memo format=json
 obsidian para-zk:read-journal date=2026-05-30 key=quick_memo format=json
+obsidian para-zk:update-project title="Project name" key=summary op=replace match="old" with="new" format=json
+obsidian para-zk:update-project title="Project name" key="children/Meeting notes/body" op=append value="Decision: continue." format=json
 obsidian para-zk:add-reference path="PARA/Projects/Project name/Project name.md" target="https://example.com/source" label="Source" format=json
 obsidian para-zk:create-resource path="PARA/Projects/Project name/Project name.md" title="Source" format=json
 obsidian para-zk:create-subnote path="PARA/Projects/Project name/Project name.md" title="Meeting notes" subnote_type=meeting format=json
@@ -62,6 +64,9 @@ localized label inside the generated note.
 Read commands use the same rule: `key=frontmatter/status`, `key=summary`, and
 `key="children/Meeting notes/body"` are stable CLI map paths and do not depend
 on the generated Markdown locale.
+Update commands use the same stable keys, but only for writable leaves:
+frontmatter keys use `op=set`, while section/body keys support `set`, `append`,
+`prepend`, and exact literal `replace`.
 
 When `locale` is omitted, PARA-ZK defaults to English. Pass `locale=ko` when a
 Korean vault UI and generated Markdown are desired.

@@ -30,6 +30,17 @@ type NativeCliCommand = {
   run: (plugin: ParaZkPluginContext, args: CliArgs) => Promise<Record<string, unknown>>;
 };
 
+const UPDATE_OPTIONS: Record<string, CliOptionSpec> = {
+  key: { value: "<map-path>", description: "Stable writable key such as summary, body, frontmatter/status, or children/<title>/body." },
+  op: { value: "<set|append|prepend|replace>", description: "Update operation." },
+  value: { value: "<text>", description: "Text value for set, append, or prepend. Also used as a scalar frontmatter value." },
+  value_json: { value: "<json>", description: "Structured value for frontmatter updates." },
+  match: { value: "<text>", description: "Exact text to match inside the selected key for op=replace." },
+  with: { value: "<text>", description: "Replacement text for op=replace." },
+  all: { value: "<true|false>", description: "For op=replace, replace all matches instead of requiring a single match." },
+  format: { value: "<text|json>", description: "Output format (default: text)." }
+};
+
 const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
   {
     command: "para-zk:ping",
@@ -197,6 +208,132 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
         date: readCliString(args, "date"),
         archived: readCliBoolean(args, "archived"),
         key: readCliString(args, "key")
+      });
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:update-project",
+    description: "Update a project note's stable PARA-ZK surface by map key",
+    options: {
+      title: { value: "<title>", description: "Project title. Used when path is omitted." },
+      path: { value: "<path>", description: "Project note path for exact selection." },
+      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
+      ...UPDATE_OPTIONS
+    },
+    text: "project updated",
+    run: async (plugin, args) => {
+      const { updateProject } = await import("../workflows");
+      const result = await updateProject(workflowContext(plugin), {
+        title: readCliTitle(args),
+        path: readCliPath(args),
+        archived: readCliBoolean(args, "archived"),
+        ...readCliUpdateOptions(args)
+      });
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:update-area",
+    description: "Update an area note's stable PARA-ZK surface by map key",
+    options: {
+      title: { value: "<title>", description: "Area title. Used when path is omitted." },
+      path: { value: "<path>", description: "Area note path for exact selection." },
+      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
+      ...UPDATE_OPTIONS
+    },
+    text: "area updated",
+    run: async (plugin, args) => {
+      const { updateArea } = await import("../workflows");
+      const result = await updateArea(workflowContext(plugin), {
+        title: readCliTitle(args),
+        path: readCliPath(args),
+        archived: readCliBoolean(args, "archived"),
+        ...readCliUpdateOptions(args)
+      });
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:update-resource",
+    description: "Update a resource note's stable PARA-ZK surface by map key",
+    options: {
+      title: { value: "<title>", description: "Resource title. Used when path is omitted." },
+      path: { value: "<path>", description: "Resource note path for exact selection." },
+      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
+      ...UPDATE_OPTIONS
+    },
+    text: "resource updated",
+    run: async (plugin, args) => {
+      const { updateResource } = await import("../workflows");
+      const result = await updateResource(workflowContext(plugin), {
+        title: readCliTitle(args),
+        path: readCliPath(args),
+        archived: readCliBoolean(args, "archived"),
+        ...readCliUpdateOptions(args)
+      });
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:update-zk",
+    description: "Update a ZK note's stable PARA-ZK surface by map key",
+    options: {
+      title: { value: "<title>", description: "ZK note title. Used when path is omitted." },
+      path: { value: "<path>", description: "ZK note path for exact selection." },
+      kind: { value: `<${ZK_KIND_CODE_HELP}>`, description: "Optional ZK kind filter." },
+      ...UPDATE_OPTIONS
+    },
+    text: "ZK updated",
+    run: async (plugin, args) => {
+      const { updateZk } = await import("../workflows");
+      const result = await updateZk(workflowContext(plugin), {
+        title: readCliTitle(args),
+        path: readCliPath(args),
+        kind: readCliString(args, "kind") ?? readCliString(args, "type"),
+        ...readCliUpdateOptions(args)
+      });
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:update-journal",
+    description: "Update a daily journal note's stable PARA-ZK surface by map key",
+    options: {
+      date: { value: "<YYYY-MM-DD>", description: "Journal date. Defaults to today." },
+      path: { value: "<path>", description: "Journal note path for exact selection." },
+      ...UPDATE_OPTIONS
+    },
+    text: "journal updated",
+    run: async (plugin, args) => {
+      const { updateJournal } = await import("../workflows");
+      const result = await updateJournal(workflowContext(plugin), {
+        date: readCliString(args, "date"),
+        path: readCliPath(args),
+        ...readCliUpdateOptions(args)
+      });
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:update-retro",
+    description: "Update a retro note's stable PARA-ZK surface by map key",
+    options: {
+      title: { value: "<title>", description: "Retro note title. Used when path is omitted." },
+      path: { value: "<path>", description: "Retro note path for exact selection." },
+      date: { value: "<YYYY-MM-DD>", description: "Optional date used to narrow the ISO week folder." },
+      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
+      ...UPDATE_OPTIONS
+    },
+    text: "retro updated",
+    run: async (plugin, args) => {
+      const { updateRetro } = await import("../workflows");
+      const result = await updateRetro(workflowContext(plugin), {
+        title: readCliTitle(args),
+        path: readCliPath(args),
+        date: readCliString(args, "date"),
+        archived: readCliBoolean(args, "archived"),
+        ...readCliUpdateOptions(args)
       });
       return { ...result };
     }
@@ -549,9 +686,85 @@ function readCliPath(args: CliArgs): string | undefined {
   return readCliString(args, "path");
 }
 
+function readCliUpdateOptions(args: CliArgs): {
+  key?: string;
+  operation?: string;
+  value?: unknown;
+  match?: string;
+  replacement?: string;
+  all?: boolean;
+} {
+  rejectCliAliases(args, {
+    operation: "op",
+    valueJson: "value_json",
+    content: "value",
+    text: "value",
+    replacement: "with"
+  });
+  const value = readCliUpdateValue(args);
+  const match = readDecodedCliString(args, "match");
+  const replacement = readCliReplacement(args);
+  return {
+    key: readCliString(args, "key"),
+    operation: readCliString(args, "op"),
+    ...(value.present ? { value: value.value } : {}),
+    ...(match !== undefined ? { match } : {}),
+    ...(replacement.present ? { replacement: replacement.value } : {}),
+    all: readCliBoolean(args, "all") ?? false
+  };
+}
+
+function readCliUpdateValue(args: CliArgs): { present: boolean; value?: unknown } {
+  const hasJson = Object.prototype.hasOwnProperty.call(args, "value_json");
+  const hasText = Object.prototype.hasOwnProperty.call(args, "value");
+
+  if (hasJson && hasText) throw new Error("Use only one of value or value_json");
+  if (hasJson) {
+    const raw = readCliString(args, "value_json") ?? "";
+    try {
+      return {
+        present: true,
+        value: JSON.parse(raw)
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`invalid value_json: ${message}`);
+    }
+  }
+
+  if (!hasText) return { present: false };
+  return {
+    present: true,
+    value: decodeCliEscapes(readCliString(args, "value") ?? "")
+  };
+}
+
+function readDecodedCliString(args: CliArgs, key: string): string | undefined {
+  if (!Object.prototype.hasOwnProperty.call(args, key)) return undefined;
+  return decodeCliEscapes(readCliString(args, key) ?? "");
+}
+
+function readCliReplacement(args: CliArgs): { present: boolean; value?: string } {
+  return Object.prototype.hasOwnProperty.call(args, "with")
+    ? { present: true, value: decodeCliEscapes(readCliString(args, "with") ?? "") }
+    : { present: false };
+}
+
+function rejectCliAliases(args: CliArgs, aliases: Record<string, string>): void {
+  for (const [alias, canonical] of Object.entries(aliases)) {
+    if (Object.prototype.hasOwnProperty.call(args, alias)) {
+      throw new Error(`Use ${canonical} instead of ${alias}`);
+    }
+  }
+}
+
 function readCliContent(args: CliArgs): string {
   return readCliString(args, "content")
     ?? readCliString(args, "text")
     ?? readCliString(args, "memo")
     ?? "";
+}
+
+function decodeCliEscapes(value: string): string {
+  return value.replace(/\\n/g, "\n").replace(/\\t/g, "\t");
 }
