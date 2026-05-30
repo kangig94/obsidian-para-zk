@@ -12,6 +12,9 @@ export function registerRibbonActions(plugin: ParaZkPluginContext): void {
     });
     button.addClass("para-zk-ribbon-action", `para-zk-ribbon-action-${action.id}`);
     button.style.setProperty("--para-zk-ribbon-color", action.color);
+    if (action.lightColor) {
+      button.style.setProperty("--para-zk-ribbon-color-light", action.lightColor);
+    }
     button.style.setProperty("--para-zk-ribbon-order", String(100 + index));
   }
 }

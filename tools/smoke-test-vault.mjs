@@ -14,260 +14,322 @@ const vaultPath = resolve(args.vault ?? inferVaultPath());
 const pluginDir = resolve(args.pluginDir ?? join(vaultPath, ".obsidian/plugins/para-zk"));
 const installDeps = args.installDeps !== false;
 const stamp = args.stamp ?? timestamp();
-const ribbonLabelsEn = ["New project", "New area", "New ZK", "New resource", "Open daily note", "Quick memo"];
-const ribbonLabelsKo = ["새 프로젝트", "새 영역", "새 ZK", "새 자료", "일일노트", "빠른 메모"];
-const emptyTrashLabelEn = "Empty trash";
-const emptyTrashLabelKo = "휴지통 비우기";
-
-assertVault(vaultPath);
-mkdirSync(pluginDir, { recursive: true });
-
-if (args.clean) cleanVault(vaultPath, pluginDir);
-
-if (args.build !== false) {
-  run("npm", ["run", "build"], {
-    env: {
-      ...process.env,
-      OBSIDIAN_PLUGIN_DIR: pluginDir
-    }
-  });
-}
-
-ensureGuiVault(vaultPath);
-run("optsidian", ["raw", "plugin:enable", "id=para-zk"], { allowFailure: true });
-run("optsidian", ["raw", "plugin:reload", "id=para-zk"]);
-simulateMissedHomepageStartup();
-
-const init = cliJson("para-zk:init", [
-  `installDeps=${installDeps}`,
-  "format=json"
-]);
-assert(init.ok === true, "init failed");
-assert(Array.isArray(init.warnings) && init.warnings.length === 0, `init warnings: ${JSON.stringify(init.warnings)}`);
-assertDependency(init, "dataview");
-assertDependency(init, "obsidian-tasks-plugin");
-assertDependency(init, "tabs");
-assertDependency(init, "folder-notes");
-assertDependency(init, "update-time-on-edit");
-assertDependency(init, "obsidian-trash-explorer");
-assertDependency(init, "custom-sort");
-assertDependency(init, "homepage");
-assertObsidianCoreConfig();
-assertUpdateTimeOnEditConfig();
-assertCustomSortConfig();
-assertHomepageConfig();
-assertHomepageRuntime();
-assertGuiLocaleLabels(ribbonLabelsEn, "PARA-ZK: Create project", emptyTrashLabelEn);
-
-const koInit = cliJson("para-zk:init", [
-  "locale=ko",
-  "force=true",
-  `installDeps=${installDeps}`,
-  "format=json"
-]);
-assert(koInit.ok === true, "ko locale init failed");
-assertGuiLocaleLabels(ribbonLabelsKo, "PARA-ZK: 새 프로젝트 만들기", emptyTrashLabelKo);
-
-const enInit = cliJson("para-zk:init", [
-  "locale=en",
-  "force=true",
-  `installDeps=${installDeps}`,
-  "format=json"
-]);
-assert(enInit.ok === true, "en locale init failed");
-assertGuiLocaleLabels(ribbonLabelsEn, "PARA-ZK: Create project", emptyTrashLabelEn);
-
-const today = todayIso();
-const dailyJournalPath = `Journal/${today.slice(0, 7)}/${today}.md`;
-run("optsidian", ["raw", "command", "id=para-zk:open-journal"]);
-assertFileExists(dailyJournalPath, "daily journal command did not create journal");
-assertFileContains(dailyJournalPath, [
-  "type: journal",
-  `date: ${today}`
-]);
-
-const areaTitle = `Smoke Area ${stamp}`;
-const linkedAreaTitle = `Smoke Linked Area ${stamp}`;
-const projectTitle = `Smoke Project ${stamp}`;
-const resourceTitle = `Smoke Resource ${stamp}`;
-const fleetingTitle = `Smoke Fleeting ${stamp}`;
-
-const area = cliJson("para-zk:create-area", [
-  `title=${areaTitle}`,
-  "open=false",
-  "format=json"
-]);
-assertCreated(area, "area");
-
-const project = cliJson("para-zk:create-project", [
-  `title=${projectTitle}`,
-  `area_titles=${JSON.stringify([areaTitle, linkedAreaTitle])}`,
-  "status=in_progress",
-  "priority=high",
-  "open=false",
-  "format=json"
-]);
-assertCreated(project, "project");
-assert(Array.isArray(project.areas), "project did not return resolved areas");
-const reusedArea = project.areas.find((item) => item.title === areaTitle);
-const createdArea = project.areas.find((item) => item.title === linkedAreaTitle);
-assert(reusedArea, "project did not return reused area");
-assert(createdArea, "project did not return created linked area");
-assert(reusedArea.created === false, "project did not reuse existing area");
-assert(createdArea.created === true, "project did not create missing area");
-assert(existsSync(join(vaultPath, createdArea.path)), `created linked area does not exist: ${createdArea.path}`);
-
-const subnote = cliJson("para-zk:create-subnote", [
-  `title=Smoke Meeting ${stamp}`,
-  `file_path=${project.path}`,
-  "subnote_type=meeting",
-  "open=false",
-  "format=json"
-]);
-assertCreated(subnote, "subnote");
-
-const subarea = cliJson("para-zk:create-subarea", [
-  `title=Smoke Subarea ${stamp}`,
-  `file_path=${area.path}`,
-  "inheritParentTag=true",
-  "open=false",
-  "format=json"
-]);
-assertCreated(subarea, "subarea");
-
-const resource = cliJson("para-zk:create-resource", [
-  `title=${resourceTitle}`,
-  `file_path=${project.path}`,
-  "link=true",
-  "open=false",
-  "format=json"
-]);
-assertCreated(resource, "resource");
-assert(resource.linkedFromSource === true, "resource was not linked from source");
-
-const fleeting = cliJson("para-zk:create-zk", [
-  `title=${fleetingTitle}`,
-  "kind=fleeting",
-  "open=false",
-  "format=json"
-]);
-assertCreated(fleeting, "fleeting");
-
-const permanent = cliJson("para-zk:create-zk", [
-  `title=Smoke Permanent ${stamp}`,
-  "kind=permanent",
-  "maturity=refined",
-  "open=false",
-  "format=json"
-]);
-assertCreated(permanent, "permanent");
-
-const journal = cliJson("para-zk:capture-journal", [
-  `content=Smoke memo ${stamp}`,
-  `date=${today}`,
-  "time=09:01",
-  "energy=high",
-  "open=false",
-  "format=json"
-]);
-assert(journal.ok === true, "journal capture failed");
-
-const retro = cliJson("para-zk:create-retro", [
-  `file_path=${project.path}`,
-  `date=${today}`,
-  "open=false",
-  "format=json"
-]);
-assertCreated(retro, "retro");
-
-const promotedResource = cliJson("para-zk:promote-resource", [
-  `file_path=${resource.path}`,
-  `title=Smoke Resource Promoted ${stamp}`,
-  "kind=literature",
-  "open=false",
-  "format=json"
-]);
-assertCreated(promotedResource, "promoted resource");
-
-const promotedFleeting = cliJson("para-zk:promote-fleeting", [
-  `file_path=${fleeting.path}`,
-  `title=Smoke Fleeting Promoted ${stamp}`,
-  "kind=permanent",
-  "maturity=evergreen",
-  "open=false",
-  "format=json"
-]);
-assertCreated(promotedFleeting, "promoted fleeting");
-
-const dryRun = cliJson("para-zk:init", [
-  "dryRun=true",
-  "format=json"
-]);
-assert(dryRun.ok === true, "dry-run init failed");
-assert(Array.isArray(dryRun.created) && dryRun.created.length === 0, "dry-run init reported created files");
-assert(Array.isArray(dryRun.updated) && dryRun.updated.length === 0, "dry-run init reported updated files");
-assert(Array.isArray(dryRun.skipped) && dryRun.skipped.length === 0, "dry-run init reported skipped files");
-assert(Array.isArray(dryRun.warnings) && dryRun.warnings.length === 0, "dry-run init reported warnings");
-
-assertFileContains(project.path, [
-  "status: in_progress",
-  "priority: high",
-  area.path,
-  createdArea.path,
-  `[[${resource.path}|${resource.title}]]`
-]);
-assertFileContains(subnote.path, [
-  "type: doc",
-  "subnote_type: meeting",
-  project.path
-]);
-assertFileContains(subarea.path, [
-  "type: area",
-  area.path
-]);
-assertFileContains(permanent.path, [
-  "type: zk_permanent",
-  "maturity: refined"
-]);
-assertFileContains(promotedResource.path, [
-  "type: zk_literature",
-  `[[${resource.path}]]`
-]);
-assertFileContains(promotedFleeting.path, [
-  "type: zk_permanent",
-  "maturity: evergreen",
-  `[[${promotedFleeting.archivedPath}]]`
-]);
-assertFileContains(promotedFleeting.archivedPath, [
-  "processed: true",
-  promotedFleeting.path
-]);
-assert(!existsSync(join(vaultPath, fleeting.path)), "fleeting source was not archived");
-assertFileContains(journal.path, [`Smoke memo ${stamp}`]);
-assertFileContains(retro.path, [
-  "type: retro",
-  project.path
-]);
-
-const summary = {
-  ok: true,
-  vaultPath,
-  stamp,
-  paths: {
-    area: area.path,
-    project: project.path,
-    subnote: subnote.path,
-    subarea: subarea.path,
-    resource: resource.path,
-    fleetingArchive: promotedFleeting.archivedPath,
-    promotedResource: promotedResource.path,
-    promotedFleeting: promotedFleeting.path,
-    journal: journal.path,
-    retro: retro.path
+const requiredDependencyIds = [
+  "dataview",
+  "obsidian-tasks-plugin",
+  "tabs",
+  "folder-notes",
+  "update-time-on-edit",
+  "obsidian-trash-explorer",
+  "custom-sort",
+  "homepage"
+];
+const guiLocaleExpectations = {
+  en: {
+    ribbonLabels: ["New project", "New area", "New ZK", "New resource", "Open daily note", "Quick memo"],
+    createProjectCommandName: "PARA-ZK: Create project",
+    emptyTrashLabel: "Empty trash"
+  },
+  ko: {
+    ribbonLabels: ["새 프로젝트", "새 영역", "새 ZK", "새 자료", "일일노트", "빠른 메모"],
+    createProjectCommandName: "PARA-ZK: 새 프로젝트 만들기",
+    emptyTrashLabel: "휴지통 비우기"
   }
 };
 
-console.log(JSON.stringify(summary, null, 2));
+prepareVault();
+
+const init = initializeVaultCli([], "init");
+assertInitializedEnvironment(init);
+assertGuiLocale("en");
+
+initializeVaultCli(["locale=ko", "force=true"], "ko locale init");
+assertGuiLocale("ko");
+
+initializeVaultCli(["locale=en", "force=true"], "en locale init");
+assertGuiLocale("en");
+
+const today = todayIso();
+assertGuiJournalCommand(today);
+
+const scenario = runWorkflowScenario(today);
+assertDryRunInit();
+assertWorkflowFiles(scenario);
+
+console.log(JSON.stringify(smokeSummary(scenario), null, 2));
+
+function prepareVault() {
+  assertVault(vaultPath);
+  mkdirSync(pluginDir, { recursive: true });
+
+  if (args.clean) cleanVault(vaultPath, pluginDir);
+
+  if (args.build !== false) {
+    run("npm", ["run", "build"], {
+      env: {
+        ...process.env,
+        OBSIDIAN_PLUGIN_DIR: pluginDir
+      }
+    });
+  }
+
+  ensureGuiVault(vaultPath);
+  run("optsidian", ["raw", "plugin:enable", "id=para-zk"], { allowFailure: true });
+  run("optsidian", ["raw", "plugin:reload", "id=para-zk"]);
+  simulateMissedHomepageStartup();
+}
+
+function initializeVaultCli(extraArgs = [], label = "init") {
+  const payload = cliJson("para-zk:init", [
+    ...extraArgs,
+    `installDeps=${installDeps}`,
+    "format=json"
+  ]);
+  assert(payload.ok === true, `${label} failed`);
+  return payload;
+}
+
+function assertInitializedEnvironment(initPayload) {
+  assert(
+    Array.isArray(initPayload.warnings) && initPayload.warnings.length === 0,
+    `init warnings: ${JSON.stringify(initPayload.warnings)}`
+  );
+
+  for (const id of requiredDependencyIds) {
+    assertDependency(initPayload, id);
+  }
+
+  assertObsidianCoreConfig();
+  assertUpdateTimeOnEditConfig();
+  assertCustomSortConfig();
+  assertHomepageConfig();
+  assertHomepageRuntime();
+}
+
+function assertGuiLocale(locale) {
+  const expected = guiLocaleExpectations[locale];
+  assert(expected, `unsupported GUI locale expectation: ${locale}`);
+  assertGuiLocaleLabels(
+    expected.ribbonLabels,
+    expected.createProjectCommandName,
+    expected.emptyTrashLabel
+  );
+}
+
+function assertGuiJournalCommand(today) {
+  const dailyJournalPath = `Journal/${today.slice(0, 7)}/${today}.md`;
+  run("optsidian", ["raw", "command", "id=para-zk:open-journal"]);
+  assertFileExists(dailyJournalPath, "daily journal command did not create journal");
+  assertFileContains(dailyJournalPath, [
+    "type: journal",
+    `date: ${today}`
+  ]);
+}
+
+function runWorkflowScenario(today) {
+  const areaTitle = `Smoke Area ${stamp}`;
+  const linkedAreaTitle = `Smoke Linked Area ${stamp}`;
+  const projectTitle = `Smoke Project ${stamp}`;
+  const resourceTitle = `Smoke Resource ${stamp}`;
+  const fleetingTitle = `Smoke Fleeting ${stamp}`;
+
+  const area = cliJson("para-zk:create-area", [
+    `title=${areaTitle}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(area, "area");
+
+  const project = cliJson("para-zk:create-project", [
+    `title=${projectTitle}`,
+    `area_titles=${JSON.stringify([areaTitle, linkedAreaTitle])}`,
+    "status=in_progress",
+    "priority=high",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(project, "project");
+  assert(Array.isArray(project.areas), "project did not return resolved areas");
+
+  const reusedArea = project.areas.find((item) => item.title === areaTitle);
+  const createdArea = project.areas.find((item) => item.title === linkedAreaTitle);
+  assert(reusedArea, "project did not return reused area");
+  assert(createdArea, "project did not return created linked area");
+  assert(reusedArea.created === false, "project did not reuse existing area");
+  assert(createdArea.created === true, "project did not create missing area");
+  assert(existsSync(join(vaultPath, createdArea.path)), `created linked area does not exist: ${createdArea.path}`);
+
+  const subnote = cliJson("para-zk:create-subnote", [
+    `title=Smoke Meeting ${stamp}`,
+    `file_path=${project.path}`,
+    "subnote_type=meeting",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(subnote, "subnote");
+
+  const subarea = cliJson("para-zk:create-subarea", [
+    `title=Smoke Subarea ${stamp}`,
+    `file_path=${area.path}`,
+    "inheritParentTag=true",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(subarea, "subarea");
+
+  const resource = cliJson("para-zk:create-resource", [
+    `title=${resourceTitle}`,
+    `file_path=${project.path}`,
+    "link=true",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(resource, "resource");
+  assert(resource.linkedFromSource === true, "resource was not linked from source");
+
+  const fleeting = cliJson("para-zk:create-zk", [
+    `title=${fleetingTitle}`,
+    "kind=fleeting",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(fleeting, "fleeting");
+
+  const permanent = cliJson("para-zk:create-zk", [
+    `title=Smoke Permanent ${stamp}`,
+    "kind=permanent",
+    "maturity=refined",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(permanent, "permanent");
+
+  const journal = cliJson("para-zk:capture-journal", [
+    `content=Smoke memo ${stamp}`,
+    `date=${today}`,
+    "time=09:01",
+    "energy=high",
+    "open=false",
+    "format=json"
+  ]);
+  assert(journal.ok === true, "journal capture failed");
+
+  const retro = cliJson("para-zk:create-retro", [
+    `file_path=${project.path}`,
+    `date=${today}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(retro, "retro");
+
+  const promotedResource = cliJson("para-zk:promote-resource", [
+    `file_path=${resource.path}`,
+    `title=Smoke Resource Promoted ${stamp}`,
+    "kind=literature",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(promotedResource, "promoted resource");
+
+  const promotedFleeting = cliJson("para-zk:promote-fleeting", [
+    `file_path=${fleeting.path}`,
+    `title=Smoke Fleeting Promoted ${stamp}`,
+    "kind=permanent",
+    "maturity=evergreen",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(promotedFleeting, "promoted fleeting");
+
+  return {
+    area,
+    createdArea,
+    project,
+    subnote,
+    subarea,
+    resource,
+    fleeting,
+    permanent,
+    journal,
+    retro,
+    promotedResource,
+    promotedFleeting
+  };
+}
+
+function assertDryRunInit() {
+  const dryRun = cliJson("para-zk:init", [
+    "dryRun=true",
+    "format=json"
+  ]);
+  assert(dryRun.ok === true, "dry-run init failed");
+  assert(Array.isArray(dryRun.created) && dryRun.created.length === 0, "dry-run init reported created files");
+  assert(Array.isArray(dryRun.updated) && dryRun.updated.length === 0, "dry-run init reported updated files");
+  assert(Array.isArray(dryRun.skipped) && dryRun.skipped.length === 0, "dry-run init reported skipped files");
+  assert(Array.isArray(dryRun.warnings) && dryRun.warnings.length === 0, "dry-run init reported warnings");
+}
+
+function assertWorkflowFiles(result) {
+  assertFileContains(result.project.path, [
+    "status: in_progress",
+    "priority: high",
+    result.area.path,
+    result.createdArea.path,
+    `[[${result.resource.path}|${result.resource.title}]]`
+  ]);
+  assertFileContains(result.subnote.path, [
+    "type: doc",
+    "subnote_type: meeting",
+    result.project.path
+  ]);
+  assertFileContains(result.subarea.path, [
+    "type: area",
+    result.area.path
+  ]);
+  assertFileContains(result.permanent.path, [
+    "type: zk_permanent",
+    "maturity: refined"
+  ]);
+  assertFileContains(result.promotedResource.path, [
+    "type: zk_literature",
+    `[[${result.resource.path}]]`
+  ]);
+  assertFileContains(result.promotedFleeting.path, [
+    "type: zk_permanent",
+    "maturity: evergreen",
+    `[[${result.promotedFleeting.archivedPath}]]`
+  ]);
+  assertFileContains(result.promotedFleeting.archivedPath, [
+    "processed: true",
+    result.promotedFleeting.path
+  ]);
+  assert(!existsSync(join(vaultPath, result.fleeting.path)), "fleeting source was not archived");
+  assertFileContains(result.journal.path, [`Smoke memo ${stamp}`]);
+  assertFileContains(result.retro.path, [
+    "type: retro",
+    result.project.path
+  ]);
+}
+
+function smokeSummary(result) {
+  return {
+    ok: true,
+    vaultPath,
+    stamp,
+    paths: {
+      area: result.area.path,
+      project: result.project.path,
+      subnote: result.subnote.path,
+      subarea: result.subarea.path,
+      resource: result.resource.path,
+      fleetingArchive: result.promotedFleeting.archivedPath,
+      promotedResource: result.promotedResource.path,
+      promotedFleeting: result.promotedFleeting.path,
+      journal: result.journal.path,
+      retro: result.retro.path
+    }
+  };
+}
 
 function parseArgs(rawArgs) {
   const parsed = {

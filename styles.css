@@ -18,6 +18,11 @@
   color: var(--para-zk-ribbon-color, var(--icon-color));
 }
 
+.theme-light .workspace-ribbon .para-zk-ribbon-action,
+.theme-light .workspace-ribbon .para-zk-ribbon-action svg {
+  color: var(--para-zk-ribbon-color-light, var(--para-zk-ribbon-color, var(--icon-color)));
+}
+
 .workspace-ribbon .para-zk-ribbon-action {
   order: var(--para-zk-ribbon-order, 100);
 }
@@ -25,6 +30,11 @@
 .workspace-ribbon .para-zk-ribbon-action:hover,
 .workspace-ribbon .para-zk-ribbon-action:hover svg {
   color: var(--para-zk-ribbon-color, var(--interactive-accent));
+}
+
+.theme-light .workspace-ribbon .para-zk-ribbon-action:hover,
+.theme-light .workspace-ribbon .para-zk-ribbon-action:hover svg {
+  color: var(--para-zk-ribbon-color-light, var(--para-zk-ribbon-color, var(--interactive-accent)));
 }
 
 .para-zk-block-button,

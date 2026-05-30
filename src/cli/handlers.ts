@@ -22,36 +22,40 @@ type CliCapablePlugin = Plugin & {
   ) => void;
 };
 
-export function registerNativeCliHandlers(plugin: ParaZkPluginContext): void {
-  const cliPlugin = plugin as CliCapablePlugin;
-  if (!cliPlugin.registerCliHandler) return;
+type NativeCliCommand = {
+  command: string;
+  description: string;
+  options: Record<string, CliOptionSpec>;
+  text: string;
+  run: (plugin: ParaZkPluginContext, args: CliArgs) => Promise<Record<string, unknown>>;
+};
 
-  cliPlugin.registerCliHandler(
-    "para-zk:ping",
-    "Check that the PARA-ZK native CLI handler is loaded",
-    {
+const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
+  {
+    command: "para-zk:ping",
+    description: "Check that the PARA-ZK native CLI handler is loaded",
+    options: {
       format: { value: "<text|json>", description: "Output format (default: text)" }
     },
-    async (args = {}) => withCliErrors(plugin, args, "para-zk:ping", async () => ({
-      ok: true,
-      command: "para-zk:ping",
+    text: "pong",
+    run: async (plugin) => ({
       pluginId: plugin.manifest.id,
       message: localePack(plugin.settings.locale).messages.pong,
       settings: plugin.settings
-    }), "pong")
-  );
-
-  cliPlugin.registerCliHandler(
-    "para-zk:init",
-    "Initialize the PARA-ZK vault layout and managed files",
-    {
+    })
+  },
+  {
+    command: "para-zk:init",
+    description: "Initialize the PARA-ZK vault layout and managed files",
+    options: {
       locale: { value: "<ko|en>", description: "Language for UI, generated files, and tags." },
       dryRun: { value: "<true|false>", description: "Plan changes without writing." },
       force: { value: "<true|false>", description: "Overwrite PARA-ZK managed files when content differs." },
       installDeps: { value: "<true|false>", description: "Install and enable required community plugins." },
       format: { value: "<text|json>", description: "Output format (default: text)" }
     },
-    async (args = {}) => withCliErrors(plugin, args, "para-zk:init", async () => {
+    text: "vault initialized",
+    run: async (plugin, args) => {
       const locale = normalizeLocale(readCliString(args, "locale"), plugin.settings.locale);
       const result = await plugin.initializeVault({
         locale,
@@ -60,22 +64,15 @@ export function registerNativeCliHandlers(plugin: ParaZkPluginContext): void {
         installDeps: readCliBoolean(args, "installDeps") ?? false
       });
       return {
-        ok: true,
-        command: "para-zk:init",
         message: localePack(locale).messages.initReady,
         ...result
       };
-    }, "vault initialized")
-  );
-
-  registerWorkflowCliHandlers(plugin, cliPlugin);
-}
-
-function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: CliCapablePlugin): void {
-  cliPlugin.registerCliHandler(
-    "para-zk:create-project",
-    "Create a PARA project note",
-    {
+    }
+  },
+  {
+    command: "para-zk:create-project",
+    description: "Create a PARA project note",
+    options: {
       title: { value: "<title>", description: "Project title." },
       areas: { value: "<json|comma-list>", description: "Area links to store in frontmatter." },
       area_titles: { value: "<json|comma-list>", description: "Area titles to reuse or create and link." },
@@ -84,7 +81,8 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
-    async (args = {}) => withCliErrors(plugin, args, "para-zk:create-project", async () => {
+    text: "project created",
+    run: async (plugin, args) => {
       const { createProject } = await import("../workflows");
       const result = await createProject(workflowContext(plugin), {
         title: readCliTitle(args),
@@ -94,41 +92,41 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
         priority: readCliString(args, "priority"),
         open: readCliBoolean(args, "open") ?? false
       });
-      return { ok: true, command: "para-zk:create-project", ...result };
-    }, "project created")
-  );
-
-  cliPlugin.registerCliHandler(
-    "para-zk:create-area",
-    "Create a PARA area note",
-    {
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:create-area",
+    description: "Create a PARA area note",
+    options: {
       title: { value: "<title>", description: "Area title." },
       parent: { value: "<path>", description: "Optional parent area path." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
-    async (args = {}) => withCliErrors(plugin, args, "para-zk:create-area", async () => {
+    text: "area created",
+    run: async (plugin, args) => {
       const { createArea } = await import("../workflows");
       const result = await createArea(workflowContext(plugin), {
         title: readCliTitle(args),
         parentPath: readCliString(args, "parent"),
         open: readCliBoolean(args, "open") ?? false
       });
-      return { ok: true, command: "para-zk:create-area", ...result };
-    }, "area created")
-  );
-
-  cliPlugin.registerCliHandler(
-    "para-zk:create-resource",
-    "Create a PARA resource note and optionally link it from a source note",
-    {
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:create-resource",
+    description: "Create a PARA resource note and optionally link it from a source note",
+    options: {
       title: { value: "<title>", description: "Resource title." },
       file_path: { value: "<path>", description: "Source note path to receive the resource link." },
       link: { value: "<true|false>", description: "Whether to add the link to the source note." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
-    async (args = {}) => withCliErrors(plugin, args, "para-zk:create-resource", async () => {
+    text: "resource created",
+    run: async (plugin, args) => {
       const { createResource } = await import("../workflows");
       const sourcePath = readCliPath(args);
       const result = await createResource(workflowContext(plugin), {
@@ -137,21 +135,21 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
         linkToSource: readCliBoolean(args, "link") ?? Boolean(sourcePath),
         open: readCliBoolean(args, "open") ?? false
       });
-      return { ok: true, command: "para-zk:create-resource", ...result };
-    }, "resource created")
-  );
-
-  cliPlugin.registerCliHandler(
-    "para-zk:create-subnote",
-    "Create a child document under a project or area note",
-    {
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:create-subnote",
+    description: "Create a child document under a project or area note",
+    options: {
       title: { value: "<title>", description: "Subnote title." },
       file_path: { value: "<path>", description: "Parent note path." },
       subnote_type: { value: `<${SUBNOTE_TYPE_CODE_HELP}>`, description: "Locale-neutral subnote type code." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
-    async (args = {}) => withCliErrors(plugin, args, "para-zk:create-subnote", async () => {
+    text: "subnote created",
+    run: async (plugin, args) => {
       const { createSubnote } = await import("../workflows");
       const result = await createSubnote(workflowContext(plugin), {
         title: readCliTitle(args),
@@ -159,21 +157,21 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
         subnoteType: readCliString(args, "subnote_type") ?? readCliString(args, "subnoteType") ?? readCliString(args, "type"),
         open: readCliBoolean(args, "open") ?? false
       });
-      return { ok: true, command: "para-zk:create-subnote", ...result };
-    }, "subnote created")
-  );
-
-  cliPlugin.registerCliHandler(
-    "para-zk:create-subarea",
-    "Create a child area under an area note",
-    {
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:create-subarea",
+    description: "Create a child area under an area note",
+    options: {
       title: { value: "<title>", description: "Subarea title." },
       file_path: { value: "<path>", description: "Parent area path." },
       inheritParentTag: { value: "<true|false>", description: "Include parent area tag as well as child tag." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
-    async (args = {}) => withCliErrors(plugin, args, "para-zk:create-subarea", async () => {
+    text: "subarea created",
+    run: async (plugin, args) => {
       const { createSubarea } = await import("../workflows");
       const result = await createSubarea(workflowContext(plugin), {
         title: readCliTitle(args),
@@ -181,21 +179,21 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
         inheritParentTag: readCliBoolean(args, "inheritParentTag") ?? true,
         open: readCliBoolean(args, "open") ?? false
       });
-      return { ok: true, command: "para-zk:create-subarea", ...result };
-    }, "subarea created")
-  );
-
-  cliPlugin.registerCliHandler(
-    "para-zk:create-retro",
-    "Create a weekly retro note, optionally scoped to a project or area",
-    {
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:create-retro",
+    description: "Create a weekly retro note, optionally scoped to a project or area",
+    options: {
       file_path: { value: "<path>", description: "Project or area note path." },
       name: { value: "<name>", description: "Retro name segment." },
       date: { value: "<YYYY-MM-DD>", description: "Date used for ISO week calculation." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
-    async (args = {}) => withCliErrors(plugin, args, "para-zk:create-retro", async () => {
+    text: "retro created",
+    run: async (plugin, args) => {
       const { createRetro } = await import("../workflows");
       const result = await createRetro(workflowContext(plugin), {
         sourcePath: readCliPath(args),
@@ -203,21 +201,21 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
         date: readCliString(args, "date"),
         open: readCliBoolean(args, "open") ?? false
       });
-      return { ok: true, command: "para-zk:create-retro", ...result };
-    }, "retro created")
-  );
-
-  cliPlugin.registerCliHandler(
-    "para-zk:create-zk",
-    "Create a ZK note",
-    {
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:create-zk",
+    description: "Create a ZK note",
+    options: {
       title: { value: "<title>", description: "ZK note title." },
       kind: { value: `<${ZK_KIND_CODE_HELP}>`, description: "Locale-neutral ZK note kind." },
       maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
-    async (args = {}) => withCliErrors(plugin, args, "para-zk:create-zk", async () => {
+    text: "ZK note created",
+    run: async (plugin, args) => {
       const { createZk } = await import("../workflows");
       const result = await createZk(workflowContext(plugin), {
         title: readCliTitle(args),
@@ -225,14 +223,13 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
         maturity: readCliString(args, "maturity"),
         open: readCliBoolean(args, "open") ?? false
       });
-      return { ok: true, command: "para-zk:create-zk", ...result };
-    }, "ZK note created")
-  );
-
-  cliPlugin.registerCliHandler(
-    "para-zk:capture-journal",
-    "Append a quick memo to the daily journal",
-    {
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:capture-journal",
+    description: "Append a quick memo to the daily journal",
+    options: {
       content: { value: "<content>", description: "Memo content." },
       date: { value: "<YYYY-MM-DD>", description: "Journal date." },
       time: { value: "<HH:mm>", description: "Memo time." },
@@ -240,7 +237,8 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
       open: { value: "<true|false>", description: "Open the journal note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
-    async (args = {}) => withCliErrors(plugin, args, "para-zk:capture-journal", async () => {
+    text: "journal captured",
+    run: async (plugin, args) => {
       const { captureJournal } = await import("../workflows");
       const result = await captureJournal(workflowContext(plugin), {
         content: readCliContent(args),
@@ -249,14 +247,13 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
         energy: readCliString(args, "energy"),
         open: readCliBoolean(args, "open") ?? false
       });
-      return { ok: true, command: "para-zk:capture-journal", ...result };
-    }, "journal captured")
-  );
-
-  cliPlugin.registerCliHandler(
-    "para-zk:promote-resource",
-    "Promote a resource note to a ZK note",
-    {
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:promote-resource",
+    description: "Promote a resource note to a ZK note",
+    options: {
       file_path: { value: "<path>", description: "Source resource path." },
       title: { value: "<title>", description: "New ZK note title." },
       kind: { value: `<${ZK_KIND_CODE_HELP}>`, description: "Locale-neutral target ZK kind." },
@@ -264,7 +261,8 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
-    async (args = {}) => withCliErrors(plugin, args, "para-zk:promote-resource", async () => {
+    text: "resource promoted",
+    run: async (plugin, args) => {
       const { promoteResource } = await import("../workflows");
       const result = await promoteResource(workflowContext(plugin), {
         sourcePath: readCliPath(args),
@@ -273,14 +271,13 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
         maturity: readCliString(args, "maturity"),
         open: readCliBoolean(args, "open") ?? false
       });
-      return { ok: true, command: "para-zk:promote-resource", ...result };
-    }, "resource promoted")
-  );
-
-  cliPlugin.registerCliHandler(
-    "para-zk:promote-fleeting",
-    "Promote a fleeting note to Literature or Permanent and archive the source",
-    {
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:promote-fleeting",
+    description: "Promote a fleeting note to Literature or Permanent and archive the source",
+    options: {
       file_path: { value: "<path>", description: "Source fleeting note path." },
       title: { value: "<title>", description: "New ZK note title." },
       kind: { value: `<${PROMOTION_ZK_KIND_CODE_HELP}>`, description: "Locale-neutral target ZK kind." },
@@ -288,7 +285,8 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
-    async (args = {}) => withCliErrors(plugin, args, "para-zk:promote-fleeting", async () => {
+    text: "fleeting promoted",
+    run: async (plugin, args) => {
       const { promoteFleeting } = await import("../workflows");
       const result = await promoteFleeting(workflowContext(plugin), {
         sourcePath: readCliPath(args),
@@ -297,9 +295,29 @@ function registerWorkflowCliHandlers(plugin: ParaZkPluginContext, cliPlugin: Cli
         maturity: readCliString(args, "maturity"),
         open: readCliBoolean(args, "open") ?? false
       });
-      return { ok: true, command: "para-zk:promote-fleeting", ...result };
-    }, "fleeting promoted")
-  );
+      return { ...result };
+    }
+  }
+];
+
+export function registerNativeCliHandlers(plugin: ParaZkPluginContext): void {
+  const cliPlugin = plugin as CliCapablePlugin;
+  if (!cliPlugin.registerCliHandler) return;
+
+  for (const command of NATIVE_CLI_COMMANDS) {
+    cliPlugin.registerCliHandler(
+      command.command,
+      command.description,
+      command.options,
+      async (args = {}) => withCliErrors(
+        plugin,
+        args,
+        command.command,
+        () => command.run(plugin, args),
+        command.text
+      )
+    );
+  }
 }
 
 async function withCliErrors(
@@ -311,7 +329,11 @@ async function withCliErrors(
 ): Promise<string> {
   try {
     const payload = await fn();
-    return renderCli(args, payload, text);
+    return renderCli(args, {
+      ...payload,
+      ok: true,
+      command
+    }, text);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return renderCli(args, {

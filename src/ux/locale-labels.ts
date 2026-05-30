@@ -9,6 +9,7 @@ export type RibbonAction = {
   id: string;
   icon: string;
   color: string;
+  lightColor?: string;
   label: (labels: Labels) => string;
   command: string;
 };
@@ -32,6 +33,7 @@ export const RIBBON_ACTIONS: RibbonAction[] = [
     id: "create-zk",
     icon: "library-big",
     color: "#ffff00",
+    lightColor: "#a16207",
     label: (labels) => labels.homeNewZk,
     command: "create-zk"
   },
@@ -53,6 +55,7 @@ export const RIBBON_ACTIONS: RibbonAction[] = [
     id: "capture-journal",
     icon: "fast-forward",
     color: "#ffffff",
+    lightColor: "#0f766e",
     label: (labels) => labels.captureJournalCommandName,
     command: "capture-journal"
   }

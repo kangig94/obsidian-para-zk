@@ -173,8 +173,7 @@ export async function createProject(ctx: WorkflowContext, options: CreateProject
     fm.status = fm.status ?? status;
     fm.priority = fm.priority ?? priority;
     fm.tags = [`${tags.project}/${slugify(title)}`];
-    fm.created = fm.created || createdAt;
-    if (fm.updated === undefined) fm.updated = "";
+    applyCreatedUpdatedDefaults(fm, createdAt);
   });
 
   await openIfRequested(ctx, file, options.open);
@@ -203,8 +202,7 @@ export async function createArea(ctx: WorkflowContext, options: CreateAreaOption
     fm.type = "area";
     fm.tags = [`${tags.area}/${slugify(title)}`];
     if (parent) fm.parent = linkToFile(parent);
-    fm.created = fm.created || createdAt;
-    if (fm.updated === undefined) fm.updated = "";
+    applyCreatedUpdatedDefaults(fm, createdAt);
   });
 
   await openIfRequested(ctx, file, options.open);
@@ -229,8 +227,7 @@ export async function createResource(ctx: WorkflowContext, options: CreateResour
   await ctx.app.fileManager.processFrontMatter(file, (fm) => {
     fm.type = "resource";
     fm.tags = [`${tags.resource}/${slugify(title)}`];
-    fm.created = fm.created || createdAt;
-    if (fm.updated === undefined) fm.updated = "";
+    applyCreatedUpdatedDefaults(fm, createdAt);
   });
 
   let linkedFromSource = false;
@@ -268,8 +265,7 @@ export async function createSubnote(ctx: WorkflowContext, options: CreateSubnote
       fm.type = fm.type || "doc";
       fm.parent = linkToFile(parent.file);
       fm.subnote_type = fm.subnote_type ?? subnoteType;
-      fm.created = fm.created || createdAt;
-      if (fm.updated === undefined) fm.updated = "";
+      applyCreatedUpdatedDefaults(fm, createdAt);
     });
   } else {
     created = false;
@@ -314,8 +310,7 @@ export async function createSubarea(ctx: WorkflowContext, options: CreateSubarea
     fm.tags = options.inheritParentTag === false
       ? [childNamespace]
       : Array.from(new Set([parentNamespace, childNamespace]));
-    fm.created = fm.created || createdAt;
-    if (fm.updated === undefined) fm.updated = "";
+    applyCreatedUpdatedDefaults(fm, createdAt);
   });
 
   await openIfRequested(ctx, file, options.open);
@@ -382,8 +377,7 @@ export async function createRetro(ctx: WorkflowContext, options: CreateRetroOpti
     fm.week_start = fm.week_start || week.weekStart;
     fm.week_end = fm.week_end || week.weekEnd;
     fm.tags = fm.tags || [tags.retro];
-    fm.created = fm.created || createdAt;
-    if (fm.updated === undefined) fm.updated = "";
+    applyCreatedUpdatedDefaults(fm, createdAt);
   });
 
   await openIfRequested(ctx, file, options.open);
@@ -511,6 +505,7 @@ async function createZkFile(
   title: string,
   options: { maturityCode?: MaturityCode } = {}
 ): Promise<TFile> {
+  const createdAt = localDateTimeSpace();
   const templateName: TemplateName = kind === "Fleeting"
     ? "zk_fleeting"
     : kind === "Literature"
@@ -518,7 +513,7 @@ async function createZkFile(
       : "zk_permanent";
   const maturity = options.maturityCode ?? "draft";
   const file = await createMarkdownFile(ctx, templateName, path, {
-    created: localDateTimeSpace(),
+    created: createdAt,
     slug: slugify(title),
     maturity,
     cursor: ""
@@ -528,10 +523,9 @@ async function createZkFile(
   await ctx.app.fileManager.processFrontMatter(file, (fm) => {
     fm.type = `zk_${kind.toLowerCase()}`;
     fm.tags = [`${tags.knowledge}/${slugify(title)}`];
-    fm.created = fm.created || localDateTimeSpace();
+    applyCreatedUpdatedDefaults(fm, createdAt);
     if (kind === "Fleeting" && fm.processed === undefined) fm.processed = false;
     if (kind === "Permanent") fm.maturity = fm.maturity ?? maturity;
-    if (fm.updated === undefined) fm.updated = "";
   });
   return file;
 }
@@ -752,6 +746,14 @@ function noteResult(file: TFile, created: boolean, open?: boolean): NoteResult {
   };
 }
 
+function applyCreatedUpdatedDefaults(frontmatter: {
+  created?: unknown;
+  updated?: unknown;
+}, createdAt: string): void {
+  frontmatter.created = frontmatter.created || createdAt;
+  if (frontmatter.updated === undefined) frontmatter.updated = "";
+}
+
 async function ensureJournal(ctx: WorkflowContext, options: OpenJournalOptions): Promise<{
   file: TFile;
   created: boolean;
@@ -785,8 +787,7 @@ async function ensureJournal(ctx: WorkflowContext, options: OpenJournalOptions):
     fm.date = fm.date || dateText;
     fm.energy = fm.energy ?? energy;
     fm.tags = fm.tags || [tags.journal];
-    fm.created = fm.created || createdAt;
-    if (fm.updated === undefined) fm.updated = "";
+    applyCreatedUpdatedDefaults(fm, createdAt);
   });
 
   return {
