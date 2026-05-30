@@ -440,11 +440,13 @@ function runWorkflowScenario(today) {
     "key=tasks",
     "format=json"
   ]);
-  const structuredTaskEntry = Object.entries(projectTasksRead.value ?? {})
+  const projectTasks = projectTasksRead.value?.items ?? {};
+  const structuredTaskEntry = Object.entries(projectTasks)
     .find(([, task]) => task.name === `Smoke structured task ${stamp}`);
   const structuredTaskId = structuredTaskEntry?.[0];
   const structuredTask = structuredTaskEntry?.[1];
   assert(structuredTask, `project task read did not expose the appended task: ${JSON.stringify(projectTasksRead.value)}`);
+  assert(projectTasksRead.value?.count >= 1 && projectTasksRead.value?.returned >= 1, "project task collection read did not expose page metadata");
   assert(typeof structuredTaskId === "string" && structuredTaskId.length > 0, "project task read did not expose a task id");
   assert(structuredTask.checkbox === " ", "project task read did not preserve checkbox status");
   assert(structuredTask.due === "2026-06-05", "project task read did not parse the due date");
@@ -466,9 +468,10 @@ function runWorkflowScenario(today) {
   const projectCustomCheckboxTasksRead = cliJson("para-zk:read-project", [
     `title=${projectTitle}`,
     "key=tasks",
+    "checkbox=/",
     "format=json"
   ]);
-  const customCheckboxTask = Object.values(projectCustomCheckboxTasksRead.value ?? {})
+  const customCheckboxTask = Object.values(projectCustomCheckboxTasksRead.value?.items ?? {})
     .find((task) => task.name === `Smoke custom checkbox task ${stamp}`);
   assert(customCheckboxTask?.checkbox === "/", "project task read did not preserve custom checkbox status");
   const bulkTaskLines = Array.from({ length: 11 }, (_, index) => `- [ ] Smoke bulk task ${index + 1} ${stamp}`).join("\n");
@@ -486,6 +489,25 @@ function runWorkflowScenario(today) {
   ]);
   assert(projectTaskCompactRead.tasks?.count > 10, "project compact read did not summarize many tasks");
   assert(projectTaskCompactRead.tasks.preview === undefined, "project compact read should not include task previews");
+  const projectTaskPageRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    "key=tasks",
+    "offset=5",
+    "limit=3",
+    "format=json"
+  ]);
+  assert(projectTaskPageRead.value?.offset === 5, "project task page did not preserve offset");
+  assert(projectTaskPageRead.value?.limit === 3, "project task page did not preserve limit");
+  assert(projectTaskPageRead.value?.returned === 3, "project task page did not return the requested page size");
+  assert(Object.keys(projectTaskPageRead.value?.items ?? {}).length === 3, "project task page items size mismatch");
+  assert(projectTaskPageRead.value?.has_more === true, "project task page did not report additional items");
+  const projectTaskQueryRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    "key=tasks",
+    `query=Smoke bulk task 10 ${stamp}`,
+    "format=json"
+  ]);
+  assert(projectTaskQueryRead.value?.count === 1, "project task query did not filter collection");
 
   const childBodyAppend = cliJson("para-zk:update-project", [
     `title=${projectTitle}`,
@@ -653,12 +675,23 @@ function runWorkflowScenario(today) {
     "format=json"
   ]);
   assert(
-    Object.values(projectReferencesRead.value ?? {}).some((item) => item.target === "https://example.com/reference"),
+    Object.values(projectReferencesRead.value?.items ?? {}).some((item) => item.target === "https://example.com/reference"),
     "project references key read did not expose URL reference"
   );
   assert(
-    Object.values(projectReferencesRead.value ?? {}).some((item) => item.path === resource.path),
+    Object.values(projectReferencesRead.value?.items ?? {}).some((item) => item.path === resource.path),
     "project references key read did not expose resource reference path"
+  );
+  const projectUrlReferencesRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    "key=references",
+    "ref_kind=url",
+    "format=json"
+  ]);
+  assert(projectUrlReferencesRead.value?.count === 1, "project references kind filter did not narrow to URL references");
+  assert(
+    Object.values(projectUrlReferencesRead.value?.items ?? {}).some((item) => item.target === "https://example.com/reference"),
+    "project references kind filter did not expose URL reference"
   );
 
   const resourceRead = cliJson("para-zk:read-resource", [
@@ -860,6 +893,23 @@ function runWorkflowScenario(today) {
     "format=json"
   ]);
   assert(journalUpdate.changed === true, "journal quick_memo update failed");
+  const journalTaskUpdate = cliJson("para-zk:update-journal", [
+    `date=${today}`,
+    "key=today_tasks",
+    "op=append",
+    `value=- [ ] Smoke journal task ${stamp}`,
+    "format=json"
+  ]);
+  assert(journalTaskUpdate.changed === true, "journal today_tasks update failed");
+  const journalTasksRead = cliJson("para-zk:read-journal", [
+    `date=${today}`,
+    "key=today_tasks",
+    "format=json"
+  ]);
+  assert(
+    Object.values(journalTasksRead.value?.items ?? {}).some((task) => task.name === `Smoke journal task ${stamp}`),
+    "journal task collection read failed"
+  );
 
   const retro = cliJson("para-zk:create-retro", [
     `path=${project.path}`,
@@ -899,6 +949,15 @@ function runWorkflowScenario(today) {
     "format=json"
   ]);
   assert(retroUpdate.changed === true, "retro next_actions update failed");
+  const retroActionsRead = cliJson("para-zk:read-retro", [
+    `path=${retro.path}`,
+    "key=next_actions",
+    "format=json"
+  ]);
+  assert(
+    Object.values(retroActionsRead.value?.items ?? {}).some((task) => task.name === `Smoke retro action ${stamp}`),
+    "retro next_actions collection read failed"
+  );
 
   const promotedResource = cliJson("para-zk:promote-resource", [
     `path=${resource.path}`,

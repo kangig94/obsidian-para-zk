@@ -226,6 +226,14 @@ Options:
 | `path` | path | Optional exact project note path. |
 | `archived` | boolean | When selecting by title, `true` restricts lookup to `PARA/Archives`; `false` restricts lookup to the active PARA folder. |
 | `key` | map path | Optional stable key path. |
+| `offset` | number | Collection key reads only. Zero-based offset, default `0`. |
+| `limit` | number or `all` | Collection key reads only. Maximum items to return, default `50`. |
+| `query` | string | Collection key reads only. Case-insensitive item text filter. |
+| `checkbox` | string | Task collection reads only. Literal checkbox status; `space`, `blank`, `todo`, and `open` match `[ ]`. |
+| `priority` | string | Task collection reads only. Parsed Tasks priority such as `high` or `medium`. |
+| `due_before` | `YYYY-MM-DD` | Task collection reads only. Includes tasks due on or before this date. |
+| `due_after` | `YYYY-MM-DD` | Task collection reads only. Includes tasks due on or after this date. |
+| `ref_kind` | `url`, `note`, `file`, `wiki`, `markdown`, `text` | Reference collection reads only. |
 
 Top-level keys:
 
@@ -238,7 +246,9 @@ Examples:
 ```bash
 optsidian raw para-zk:read-project title="Model Evaluation" format=json
 optsidian raw para-zk:read-project title="Model Evaluation" key=frontmatter/status format=json
-optsidian raw para-zk:read-project title="Model Evaluation" key=tasks format=json
+optsidian raw para-zk:read-project title="Model Evaluation" key=tasks limit=20 format=json
+optsidian raw para-zk:read-project title="Model Evaluation" key=tasks checkbox=/ query="blocked" format=json
+optsidian raw para-zk:read-project title="Model Evaluation" key=references ref_kind=url format=json
 optsidian raw para-zk:read-project title="Model Evaluation" key=children format=json
 optsidian raw para-zk:read-project title="Model Evaluation" key="children/Planning Meeting/body" format=json
 ```
@@ -266,10 +276,34 @@ selector and type information needed for follow-up reads:
 }
 ```
 
-`tasks` and `references` are structured collections rather than raw Markdown.
+Task and reference surfaces are structured collections rather than raw Markdown.
 Full compact reads return only `count`; collection items are omitted by design.
-Blank template checkboxes are ignored. Exact `key=tasks` and `key=references`
-reads return the full id-keyed map.
+Blank template checkboxes are ignored. Exact collection root reads such as
+`key=tasks`, `key=references`, `key=today_tasks`, and `key=next_actions`
+return a paged collection object:
+
+```json
+{
+  "value": {
+    "count": 42,
+    "offset": 0,
+    "limit": 20,
+    "returned": 20,
+    "has_more": true,
+    "items": {
+      "task-abc123": {
+        "checkbox": "/",
+        "name": "Review evaluation set",
+        "priority": "high"
+      }
+    }
+  }
+}
+```
+
+Use `key=<collection>/<id>` or `key=<collection>/<id>/<field>` to read one
+item or one item field without the page wrapper. When filters are provided,
+`count` is the number of matching items before pagination.
 
 ```json
 {
@@ -288,10 +322,10 @@ Important fields:
 - `archived`: true when the selected note is under `PARA/Archives`.
 - `frontmatter`: editable project fields only, such as `status`, `priority`,
   `areas`, `start_date`, `due_date`, and `done_date`.
-- `tasks`: structured project task map. The map key is the task id. `checkbox`
-  is the literal status character from `[ ]`, `[x]`, `[-]`, `[/]`, and other
-  Tasks-compatible statuses.
-- `references`: structured reference map. Items expose `kind`, `label`,
+- `tasks`: structured project task collection. Item keys are task ids.
+  `checkbox` is the literal status character from `[ ]`, `[x]`, `[-]`, `[/]`,
+  and other Tasks-compatible statuses.
+- `references`: structured reference collection. Items expose `kind`, `label`,
   `target`, `path`, or `text` depending on the source line.
 - `children`: child-note index; child bodies are read only when requested with
   a `children/<title>/...` key.
@@ -306,7 +340,7 @@ When selecting by `title`, `read-project`, `read-area`, `read-resource`, and
 
 | Command | Selector | Top-level keys |
 | --- | --- | --- |
-| `para-zk:read-area` | `title` or `path` | `frontmatter`, `overview`, `references`, `children` |
+| `para-zk:read-area` | `title` or `path` | `frontmatter`, `overview`, `tasks`, `references`, `children` |
 | `para-zk:read-resource` | `title` or `path` | `frontmatter`, `overview`, `body`, `references` |
 | `para-zk:read-zk` | `title` plus optional `kind`, or `path` | depends on ZK type |
 | `para-zk:read-journal` | `date` or `path` | `frontmatter`, `focus`, `quick_memo`, `timeline`, `today_tasks`, `short_review`, `links` |
@@ -356,8 +390,8 @@ Writable keys are a subset of read keys. `frontmatter/<key>` supports `op=set`
 only and uses Obsidian frontmatter mutation. Section/body keys support
 `set`, `append`, `prepend`, and exact literal `replace`.
 `update-project key=tasks` still edits the underlying Tasks section text. Use
-the structured `read-project key=tasks` result for inspection until dedicated
-task lifecycle commands exist.
+the structured `read-project key=tasks` collection page for inspection until
+dedicated task lifecycle commands exist.
 
 Read-only keys include `children`, `path`, `title`, `type`, and `archived`.
 

@@ -144,31 +144,51 @@ export type PromoteFleetingOptions = {
   open?: boolean;
 };
 
-export type ReadByTitleOptions = {
+export type CollectionReadOptions = {
+  offset?: number;
+  limit?: number | "all";
+  query?: string;
+  checkbox?: string;
+  priority?: string;
+  dueBefore?: string;
+  dueAfter?: string;
+  refKind?: string;
+};
+
+type ReadOptionsWithCollection = {
+  collection?: CollectionReadOptions;
+};
+
+type ByTitleSelectorOptions = {
   path?: string;
   title?: string;
   key?: string;
   archived?: boolean;
 };
 
-export type ReadProjectOptions = ReadByTitleOptions;
-export type ReadAreaOptions = ReadByTitleOptions;
-export type ReadResourceOptions = ReadByTitleOptions;
-
-export type ReadZkOptions = {
+type ZkSelectorOptions = {
   path?: string;
   title?: string;
   key?: string;
   kind?: string;
 };
 
-export type ReadJournalOptions = {
+type JournalSelectorOptions = {
   path?: string;
   date?: string;
   key?: string;
 };
 
-export type ReadRetroOptions = ReadByTitleOptions & {
+export type ReadByTitleOptions = ReadOptionsWithCollection & ByTitleSelectorOptions;
+export type ReadProjectOptions = ReadByTitleOptions;
+export type ReadAreaOptions = ReadByTitleOptions;
+export type ReadResourceOptions = ReadByTitleOptions;
+
+export type ReadZkOptions = ReadOptionsWithCollection & ZkSelectorOptions;
+
+export type ReadJournalOptions = ReadOptionsWithCollection & JournalSelectorOptions;
+
+export type ReadRetroOptions = ReadOptionsWithCollection & ByTitleSelectorOptions & {
   date?: string;
 };
 
@@ -183,14 +203,14 @@ export type UpdatePayloadOptions = {
   all?: boolean;
 };
 
-export type UpdateByTitleOptions = ReadByTitleOptions & UpdatePayloadOptions;
+export type UpdateByTitleOptions = ByTitleSelectorOptions & UpdatePayloadOptions;
 export type UpdateProjectOptions = UpdateByTitleOptions;
 export type UpdateAreaOptions = UpdateByTitleOptions;
 export type UpdateResourceOptions = UpdateByTitleOptions;
 
-export type UpdateZkOptions = ReadZkOptions & UpdatePayloadOptions;
-export type UpdateJournalOptions = ReadJournalOptions & UpdatePayloadOptions;
-export type UpdateRetroOptions = ReadRetroOptions & UpdatePayloadOptions;
+export type UpdateZkOptions = ZkSelectorOptions & UpdatePayloadOptions;
+export type UpdateJournalOptions = JournalSelectorOptions & UpdatePayloadOptions;
+export type UpdateRetroOptions = ByTitleSelectorOptions & { date?: string } & UpdatePayloadOptions;
 
 export type UpdateSurfaceResult = {
   path: string;
@@ -288,12 +308,14 @@ type SectionTransformContext = {
   range?: TextRange;
   section: ReadSectionSpec;
 };
+type ReadCollectionKind = "task" | "reference";
 type ReadSectionSpec = {
   key: string;
   labelKey?: string;
   labels?: string[];
   includeSubsections?: boolean;
   skipManagedPrelude?: boolean;
+  collection?: ReadCollectionKind;
   transform?: (content: string, context: SectionTransformContext) => unknown;
 };
 type ReadSurfaceSpec = {
@@ -302,7 +324,7 @@ type ReadSurfaceSpec = {
   body?: boolean;
   children?: boolean;
 };
-type ProjectTaskRead = {
+type TaskRead = {
   checkbox: string;
   name: string;
   due?: string;
@@ -313,11 +335,11 @@ type ProjectTaskRead = {
   cancelled?: string;
   priority?: string;
 };
-type ProjectTaskLineRead = {
+type TaskLineRead = {
   id: string;
-  task: ProjectTaskRead;
+  task: TaskRead;
 };
-type TaskMetadata = Pick<ProjectTaskRead, "due" | "scheduled" | "start" | "created" | "done" | "cancelled" | "priority">;
+type TaskMetadata = Pick<TaskRead, "due" | "scheduled" | "start" | "created" | "done" | "cancelled" | "priority">;
 type ReferenceRead = {
   kind: "url" | "note" | "file" | "wiki" | "markdown" | "text";
   label?: string;
@@ -329,6 +351,19 @@ type ReferenceLineRead = {
   id: string;
   reference: ReferenceRead;
 };
+type NormalizedCollectionReadOptions = {
+  offset: number;
+  limit: number | "all";
+  query?: string;
+  checkbox?: string;
+  priority?: string;
+  dueBefore?: string;
+  dueAfter?: string;
+  refKind?: string;
+};
+
+const DEFAULT_COLLECTION_READ_LIMIT = 50;
+const REFERENCE_KINDS = new Set(["url", "note", "file", "wiki", "markdown", "text"]);
 
 export async function createProject(ctx: WorkflowContext, options: CreateProjectOptions): Promise<NoteResult & {
   areas?: ProjectAreaResult[];
@@ -375,28 +410,28 @@ export async function createProject(ctx: WorkflowContext, options: CreateProject
 }
 
 export async function readProject(ctx: WorkflowContext, options: ReadProjectOptions): Promise<Record<string, unknown>> {
-  return readSurface(ctx, resolveRequiredProject(ctx, options), PROJECT_READ_SPEC, options.key);
+  return readSurface(ctx, resolveRequiredProject(ctx, options), PROJECT_READ_SPEC, options.key, options.collection);
 }
 
 export async function readArea(ctx: WorkflowContext, options: ReadAreaOptions): Promise<Record<string, unknown>> {
-  return readSurface(ctx, resolveRequiredArea(ctx, options), AREA_READ_SPEC, options.key);
+  return readSurface(ctx, resolveRequiredArea(ctx, options), AREA_READ_SPEC, options.key, options.collection);
 }
 
 export async function readResource(ctx: WorkflowContext, options: ReadResourceOptions): Promise<Record<string, unknown>> {
-  return readSurface(ctx, resolveRequiredResource(ctx, options), RESOURCE_READ_SPEC, options.key);
+  return readSurface(ctx, resolveRequiredResource(ctx, options), RESOURCE_READ_SPEC, options.key, options.collection);
 }
 
 export async function readZk(ctx: WorkflowContext, options: ReadZkOptions): Promise<Record<string, unknown>> {
   const file = resolveRequiredZk(ctx, options);
-  return readSurface(ctx, file, specForType(readType(fileFrontmatter(ctx, file))), options.key);
+  return readSurface(ctx, file, specForType(readType(fileFrontmatter(ctx, file))), options.key, options.collection);
 }
 
 export async function readJournal(ctx: WorkflowContext, options: ReadJournalOptions): Promise<Record<string, unknown>> {
-  return readSurface(ctx, resolveRequiredJournal(ctx, options), JOURNAL_READ_SPEC, options.key);
+  return readSurface(ctx, resolveRequiredJournal(ctx, options), JOURNAL_READ_SPEC, options.key, options.collection);
 }
 
 export async function readRetro(ctx: WorkflowContext, options: ReadRetroOptions): Promise<Record<string, unknown>> {
-  return readSurface(ctx, resolveRequiredRetro(ctx, options), RETRO_READ_SPEC, options.key);
+  return readSurface(ctx, resolveRequiredRetro(ctx, options), RETRO_READ_SPEC, options.key, options.collection);
 }
 
 export async function updateProject(ctx: WorkflowContext, options: UpdateProjectOptions): Promise<UpdateSurfaceResult> {
@@ -1054,8 +1089,8 @@ const PROJECT_READ_SPEC: ReadSurfaceSpec = {
   sections: [
     { key: "summary", labelKey: "summary", skipManagedPrelude: true, transform: stripProjectSummaryManagedBlock },
     { key: "goals", labelKey: "goals" },
-    { key: "tasks", labelKey: "tasks", transform: readProjectTasks },
-    { key: "references", labelKey: "references", transform: readReferences }
+    { key: "tasks", labelKey: "tasks", transform: readTasks, collection: "task" },
+    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" }
   ],
   children: true
 };
@@ -1064,7 +1099,8 @@ const AREA_READ_SPEC: ReadSurfaceSpec = {
   frontmatter: ["parent"],
   sections: [
     { key: "overview", labelKey: "overview" },
-    { key: "references", labelKey: "references", transform: readReferences }
+    { key: "tasks", labelKey: "tasks", transform: readTasks, collection: "task" },
+    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" }
   ],
   children: true
 };
@@ -1074,7 +1110,7 @@ const RESOURCE_READ_SPEC: ReadSurfaceSpec = {
   sections: [
     { key: "overview", labelKey: "overview" },
     { key: "body", labelKey: "body" },
-    { key: "references", labelKey: "references", transform: readReferences }
+    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" }
   ]
 };
 
@@ -1084,7 +1120,7 @@ const JOURNAL_READ_SPEC: ReadSurfaceSpec = {
     { key: "focus", labelKey: "focus" },
     { key: "quick_memo", labelKey: "quickMemo" },
     { key: "timeline", labelKey: "timeline" },
-    { key: "today_tasks", labelKey: "todayTasks" },
+    { key: "today_tasks", labelKey: "todayTasks", transform: readTasks, collection: "task" },
     { key: "short_review", labelKey: "shortReview" },
     { key: "links", labelKey: "links" }
   ]
@@ -1097,7 +1133,7 @@ const RETRO_READ_SPEC: ReadSurfaceSpec = {
     { key: "good", labelKey: "good" },
     { key: "improve", labelKey: "improve" },
     { key: "risks", labelKey: "risks" },
-    { key: "next_actions", labelKey: "nextActions" },
+    { key: "next_actions", labelKey: "nextActions", transform: readTasks, collection: "task" },
     { key: "retro_summary", labelKey: "retroSummary" },
     { key: "links", labels: ["Links", "링크"], includeSubsections: true }
   ]
@@ -1113,7 +1149,7 @@ const ZK_FLEETING_READ_SPEC: ReadSurfaceSpec = {
   sections: [
     { key: "thought_summary", labelKey: "thoughtSummary" },
     { key: "memo", labelKey: "memo" },
-    { key: "references", labelKey: "references", transform: readReferences }
+    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" }
   ]
 };
 
@@ -1124,7 +1160,7 @@ const ZK_LITERATURE_READ_SPEC: ReadSurfaceSpec = {
     { key: "summary", labelKey: "summary" },
     { key: "insight", labelKey: "insight" },
     { key: "evidence", labelKey: "evidence" },
-    { key: "references", labelKey: "references", transform: readReferences }
+    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" }
   ]
 };
 
@@ -1135,7 +1171,7 @@ const ZK_PERMANENT_READ_SPEC: ReadSurfaceSpec = {
     { key: "body", labelKey: "body" },
     { key: "limitations", labelKey: "limitations" },
     { key: "related_questions", labelKey: "relatedQuestions" },
-    { key: "references", labelKey: "references", transform: readReferences }
+    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" }
   ]
 };
 
@@ -1148,14 +1184,20 @@ async function readSurface(
   ctx: WorkflowContext,
   file: TFile,
   spec: ReadSurfaceSpec,
-  rawKey: string | undefined
+  rawKey: string | undefined,
+  collectionOptions?: CollectionReadOptions
 ): Promise<Record<string, unknown>> {
   const frontmatter = fileFrontmatter(ctx, file);
   const type = readType(frontmatter);
   const surface = await readSurfaceMap(ctx, file, spec);
   const key = rawKey?.trim();
 
-  if (!key) return compactReadEnvelope(ctx, file, type, surface);
+  if (!key) {
+    if (hasCollectionReadOptions(collectionOptions)) {
+      throw new Error("collection read options require key=<collection>");
+    }
+    return compactReadEnvelope(ctx, file, type, surface, spec);
+  }
 
   return {
     path: file.path,
@@ -1164,7 +1206,7 @@ async function readSurface(
     mode: "exact",
     ...archivedReadFlag(ctx, file),
     key,
-    value: await readSurfaceKey(ctx, file, surface, key)
+    value: await readSurfaceKey(ctx, file, surface, spec, key, collectionOptions)
   };
 }
 
@@ -1200,7 +1242,8 @@ function compactReadEnvelope(
   ctx: WorkflowContext,
   file: TFile,
   type: string,
-  surface: ReadMap
+  surface: ReadMap,
+  spec: ReadSurfaceSpec
 ): Record<string, unknown> {
   return {
     mode: "compact",
@@ -1209,7 +1252,7 @@ function compactReadEnvelope(
     title: file.basename,
     type,
     ...archivedReadFlag(ctx, file),
-    ...compactReadMap(surface)
+    ...compactReadMap(surface, spec)
   };
 }
 
@@ -1217,12 +1260,13 @@ function archivedReadFlag(ctx: WorkflowContext, file: TFile): { archived?: true 
   return isArchivedFile(ctx, file) ? { archived: true } : {};
 }
 
-function compactReadMap(value: ReadMap): ReadMap {
+function compactReadMap(value: ReadMap, spec: ReadSurfaceSpec): ReadMap {
   const result: ReadMap = {};
+  const collectionKeys = collectionKeysForSpec(spec);
   for (const [key, item] of Object.entries(value)) {
     const compact = key === "frontmatter"
       ? compactFrontmatter(item)
-      : key === "tasks" || key === "references"
+      : collectionKeys.has(key)
         ? compactCollectionCount(item)
         : compactReadValue(item);
     if (compact !== undefined) result[key] = compact;
@@ -1286,13 +1330,15 @@ async function readSurfaceKey(
   ctx: WorkflowContext,
   source: TFile,
   surface: ReadMap,
-  key: string
+  spec: ReadSurfaceSpec,
+  key: string,
+  collectionOptions?: CollectionReadOptions
 ): Promise<unknown> {
   const parts = keyParts(key);
   if (parts.length === 0) throw new Error("key is required");
 
   if (parts[0] !== "children") {
-    return readMapPath(surface, parts, key);
+    return readSurfaceMapKey(surface, spec, parts, key, collectionOptions);
   }
 
   if (!Object.prototype.hasOwnProperty.call(surface, "children")) {
@@ -1304,11 +1350,177 @@ async function readSurfaceKey(
   const child = findChild(ctx, source, childTitle);
   if (!child) throw new Error(`child not found: ${childTitle}`);
 
-  const childSurface = await readSurfaceMap(ctx, child, specForType(readType(fileFrontmatter(ctx, child))));
+  const childType = readType(fileFrontmatter(ctx, child));
+  const childSpec = specForType(childType);
+  const childSurface = await readSurfaceMap(ctx, child, childSpec);
   if (parts.length === 2) {
-    return compactReadEnvelope(ctx, child, readType(fileFrontmatter(ctx, child)), childSurface);
+    return compactReadEnvelope(ctx, child, childType, childSurface, childSpec);
   }
-  return readMapPath(childSurface, parts.slice(2), key);
+  return readSurfaceMapKey(childSurface, childSpec, parts.slice(2), key, collectionOptions);
+}
+
+function readSurfaceMapKey(
+  surface: ReadMap,
+  spec: ReadSurfaceSpec,
+  parts: string[],
+  originalKey: string,
+  collectionOptions?: CollectionReadOptions
+): unknown {
+  if (parts.length === 0) throw new Error("key is required");
+
+  const collectionKind = collectionKindForKey(spec, parts[0]);
+  if (collectionKind && parts.length === 1) {
+    return readCollectionPage(surface[parts[0]], collectionKind, collectionOptions);
+  }
+
+  if (hasCollectionReadOptions(collectionOptions)) {
+    throw new Error("collection read options require key to select a collection root");
+  }
+
+  return readMapPath(surface, parts, originalKey);
+}
+
+function hasCollectionReadOptions(options?: CollectionReadOptions): boolean {
+  return !!options && Object.values(options).some((value) => value !== undefined);
+}
+
+function collectionKeysForSpec(spec: ReadSurfaceSpec): Set<string> {
+  return new Set((spec.sections ?? [])
+    .filter((section) => section.collection)
+    .map((section) => section.key));
+}
+
+function collectionKindForKey(spec: ReadSurfaceSpec, key: string): ReadCollectionKind | undefined {
+  return (spec.sections ?? []).find((section) => section.key === key)?.collection;
+}
+
+function readCollectionPage(
+  value: unknown,
+  kind: ReadCollectionKind,
+  rawOptions?: CollectionReadOptions
+): Record<string, unknown> {
+  if (!isRecord(value)) throw new Error("collection read target is not a map");
+
+  const options = normalizeCollectionReadOptions(rawOptions);
+  const entries = Object.entries(value).filter(([, item]) => matchesCollectionItem(kind, item, options));
+  const pageEntries = options.limit === "all"
+    ? entries.slice(options.offset)
+    : entries.slice(options.offset, options.offset + options.limit);
+  return {
+    count: entries.length,
+    offset: options.offset,
+    limit: options.limit,
+    returned: pageEntries.length,
+    has_more: options.offset + pageEntries.length < entries.length,
+    items: Object.fromEntries(pageEntries)
+  };
+}
+
+function normalizeCollectionReadOptions(rawOptions?: CollectionReadOptions): NormalizedCollectionReadOptions {
+  const offset = rawOptions?.offset ?? 0;
+  if (!Number.isInteger(offset) || offset < 0) {
+    throw new Error("offset must be a non-negative integer");
+  }
+
+  const limit = rawOptions?.limit ?? DEFAULT_COLLECTION_READ_LIMIT;
+  if (limit !== "all" && (!Number.isInteger(limit) || limit < 1)) {
+    throw new Error("limit must be a positive integer or all");
+  }
+
+  const refKind = trimOptional(rawOptions?.refKind);
+  if (refKind && !REFERENCE_KINDS.has(refKind)) {
+    throw new Error(`ref_kind must be one of ${Array.from(REFERENCE_KINDS).join(", ")}`);
+  }
+
+  return {
+    offset,
+    limit,
+    query: trimOptional(rawOptions?.query),
+    checkbox: normalizeCheckboxFilter(rawOptions?.checkbox),
+    priority: trimOptional(rawOptions?.priority),
+    dueBefore: normalizeIsoDateFilter(rawOptions?.dueBefore, "due_before"),
+    dueAfter: normalizeIsoDateFilter(rawOptions?.dueAfter, "due_after"),
+    refKind
+  };
+}
+
+function matchesCollectionItem(
+  kind: ReadCollectionKind,
+  item: unknown,
+  options: NormalizedCollectionReadOptions
+): boolean {
+  if (!isRecord(item)) return false;
+
+  if (options.query && !collectionSearchText(kind, item).toLowerCase().includes(options.query.toLowerCase())) {
+    return false;
+  }
+
+  if (kind === "task") return matchesTaskCollectionItem(item, options);
+  return matchesReferenceCollectionItem(item, options);
+}
+
+function matchesTaskCollectionItem(
+  item: Record<string, unknown>,
+  options: NormalizedCollectionReadOptions
+): boolean {
+  if (options.checkbox !== undefined && readRecordString(item, "checkbox") !== options.checkbox) return false;
+  if (options.priority && readRecordString(item, "priority") !== options.priority) return false;
+  if (options.dueBefore && !dateOnOrBefore(readRecordString(item, "due"), options.dueBefore)) return false;
+  if (options.dueAfter && !dateOnOrAfter(readRecordString(item, "due"), options.dueAfter)) return false;
+  return true;
+}
+
+function matchesReferenceCollectionItem(
+  item: Record<string, unknown>,
+  options: NormalizedCollectionReadOptions
+): boolean {
+  if (options.refKind && readRecordString(item, "kind") !== options.refKind) return false;
+  return true;
+}
+
+function collectionSearchText(kind: ReadCollectionKind, item: Record<string, unknown>): string {
+  const keys = kind === "task"
+    ? ["name", "checkbox", "priority", "due", "scheduled", "start", "created", "done", "cancelled"]
+    : ["kind", "label", "target", "path", "text"];
+  return keys.map((key) => readRecordString(item, key) ?? "").join("\n");
+}
+
+function normalizeCheckboxFilter(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "space" || trimmed === "blank" || trimmed === "todo" || trimmed === "open") return " ";
+  return trimmed;
+}
+
+function normalizeIsoDateFilter(value: string | undefined, key: string): string | undefined {
+  const trimmed = trimOptional(value);
+  if (!trimmed) return undefined;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) throw new Error(`${key} must be YYYY-MM-DD`);
+  return trimmed;
+}
+
+function trimOptional(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function readRecordString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function dateOnOrBefore(value: string | undefined, limit: string): boolean {
+  const date = readIsoDate(value);
+  return !!date && date <= limit;
+}
+
+function dateOnOrAfter(value: string | undefined, limit: string): boolean {
+  const date = readIsoDate(value);
+  return !!date && date >= limit;
+}
+
+function readIsoDate(value: string | undefined): string | undefined {
+  return value?.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
 }
 
 type WritableSurfaceTarget =
@@ -2052,8 +2264,8 @@ const TASK_PRIORITY_FIELDS: Array<{ value: string; re: RegExp }> = [
   { value: "lowest", re: /\u{23EC}/gu }
 ];
 
-function readProjectTasks(_content: string, context: SectionTransformContext): Record<string, ProjectTaskRead> {
-  const items: Record<string, ProjectTaskRead> = {};
+function readTasks(_content: string, context: SectionTransformContext): Record<string, TaskRead> {
+  const items: Record<string, TaskRead> = {};
 
   if (!context.range) return items;
 
@@ -2063,7 +2275,7 @@ function readProjectTasks(_content: string, context: SectionTransformContext): R
     const span = readLineSpan(context.content, cursor, context.range.end);
     if (!span) break;
 
-    const task = readProjectTaskLine(context.file.path, line, span.text);
+    const task = readTaskLine(context.file.path, line, span.text);
     if (task) {
       const id = uniqueReadId(task.id, items);
       items[id] = task.task;
@@ -2076,7 +2288,7 @@ function readProjectTasks(_content: string, context: SectionTransformContext): R
   return items;
 }
 
-function readProjectTaskLine(path: string, line: number, text: string): ProjectTaskLineRead | undefined {
+function readTaskLine(path: string, line: number, text: string): TaskLineRead | undefined {
   const match = text.match(/^\s*(?:[-*+]|\d+[.)])\s+\[([^\]\r\n]?)\]\s*(.*)$/);
   if (!match) return undefined;
 

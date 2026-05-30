@@ -11,7 +11,7 @@ import {
 } from "../vocabulary";
 import { PROMOTION_ZK_KIND_CODE_HELP, ZK_KIND_CODE_HELP } from "../zk/kinds";
 import { parseList } from "./parse";
-import type { WorkflowContext } from "../workflows";
+import type { CollectionReadOptions, WorkflowContext } from "../workflows";
 
 type CliCapablePlugin = Plugin & {
   registerCliHandler?: (
@@ -53,6 +53,17 @@ const DELETE_OPTIONS: Record<string, CliOptionSpec> = {
   path: { value: "<path>", description: "Exact note path." },
   force: { value: "<true|false>", description: "Required when deleting a folder-style note that contains child files." },
   format: { value: "<text|json>", description: "Output format (default: text)." }
+};
+
+const READ_COLLECTION_OPTIONS: Record<string, CliOptionSpec> = {
+  offset: { value: "<number>", description: "Collection key reads only: zero-based item offset (default: 0)." },
+  limit: { value: "<number|all>", description: "Collection key reads only: maximum items to return (default: 50)." },
+  query: { value: "<text>", description: "Collection key reads only: case-insensitive item text filter." },
+  checkbox: { value: "<status>", description: "Task collection reads only: checkbox status character. Use space/blank/todo/open for [ ]." },
+  priority: { value: "<priority>", description: "Task collection reads only: parsed Tasks priority such as high or medium." },
+  due_before: { value: "<YYYY-MM-DD>", description: "Task collection reads only: include tasks due on or before this date." },
+  due_after: { value: "<YYYY-MM-DD>", description: "Task collection reads only: include tasks due on or after this date." },
+  ref_kind: { value: "<url|note|file|wiki|markdown|text>", description: "Reference collection reads only: filter references by kind." }
 };
 
 const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
@@ -102,6 +113,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       path: { value: "<path>", description: "Project note path for exact selection." },
       archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
       key: { value: "<map-path>", description: "Optional stable key such as frontmatter/status, summary, children, or children/<title>/body." },
+      ...READ_COLLECTION_OPTIONS,
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "project read",
@@ -111,7 +123,8 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
         title: readCliTitle(args),
         path: readCliPath(args),
         archived: readCliBoolean(args, "archived"),
-        key: readCliString(args, "key")
+        key: readCliString(args, "key"),
+        collection: readCliCollectionOptions(args)
       });
       return { ...result };
     }
@@ -124,6 +137,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       path: { value: "<path>", description: "Area note path for exact selection." },
       archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
       key: { value: "<map-path>", description: "Optional stable key such as overview, references, children, or children/<title>/overview." },
+      ...READ_COLLECTION_OPTIONS,
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "area read",
@@ -133,7 +147,8 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
         title: readCliTitle(args),
         path: readCliPath(args),
         archived: readCliBoolean(args, "archived"),
-        key: readCliString(args, "key")
+        key: readCliString(args, "key"),
+        collection: readCliCollectionOptions(args)
       });
       return { ...result };
     }
@@ -146,6 +161,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       path: { value: "<path>", description: "Resource note path for exact selection." },
       archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
       key: { value: "<map-path>", description: "Optional stable key such as overview, body, or references." },
+      ...READ_COLLECTION_OPTIONS,
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "resource read",
@@ -155,7 +171,8 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
         title: readCliTitle(args),
         path: readCliPath(args),
         archived: readCliBoolean(args, "archived"),
-        key: readCliString(args, "key")
+        key: readCliString(args, "key"),
+        collection: readCliCollectionOptions(args)
       });
       return { ...result };
     }
@@ -168,6 +185,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       path: { value: "<path>", description: "ZK note path for exact selection." },
       kind: { value: `<${ZK_KIND_CODE_HELP}>`, description: "Optional ZK kind filter." },
       key: { value: "<map-path>", description: "Optional stable key such as summary, body, frontmatter/maturity, or references." },
+      ...READ_COLLECTION_OPTIONS,
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "ZK read",
@@ -177,7 +195,8 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
         title: readCliTitle(args),
         path: readCliPath(args),
         kind: readCliString(args, "kind") ?? readCliString(args, "type"),
-        key: readCliString(args, "key")
+        key: readCliString(args, "key"),
+        collection: readCliCollectionOptions(args)
       });
       return { ...result };
     }
@@ -189,6 +208,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       date: { value: "<YYYY-MM-DD>", description: "Journal date. Defaults to today." },
       path: { value: "<path>", description: "Journal note path for exact selection." },
       key: { value: "<map-path>", description: "Optional stable key such as focus, quick_memo, timeline, or today_tasks." },
+      ...READ_COLLECTION_OPTIONS,
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "journal read",
@@ -197,7 +217,8 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       const result = await readJournal(workflowContext(plugin), {
         date: readCliString(args, "date"),
         path: readCliPath(args),
-        key: readCliString(args, "key")
+        key: readCliString(args, "key"),
+        collection: readCliCollectionOptions(args)
       });
       return { ...result };
     }
@@ -211,6 +232,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       date: { value: "<YYYY-MM-DD>", description: "Optional date used to narrow the ISO week folder." },
       archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
       key: { value: "<map-path>", description: "Optional stable key such as week_progress, next_actions, or retro_summary." },
+      ...READ_COLLECTION_OPTIONS,
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "retro read",
@@ -221,7 +243,8 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
         path: readCliPath(args),
         date: readCliString(args, "date"),
         archived: readCliBoolean(args, "archived"),
-        key: readCliString(args, "key")
+        key: readCliString(args, "key"),
+        collection: readCliCollectionOptions(args)
       });
       return { ...result };
     }
@@ -909,6 +932,44 @@ function readCliPath(args: CliArgs): string | undefined {
     }
   }
   return readCliString(args, "path");
+}
+
+function readCliCollectionOptions(args: CliArgs): CollectionReadOptions | undefined {
+  rejectCliAliases(args, {
+    dueBefore: "due_before",
+    dueAfter: "due_after",
+    refKind: "ref_kind"
+  });
+
+  const options: CollectionReadOptions = {
+    offset: readCliInteger(args, "offset"),
+    limit: readCliCollectionLimit(args),
+    query: readCliString(args, "query"),
+    checkbox: readCliString(args, "checkbox"),
+    priority: readCliString(args, "priority"),
+    dueBefore: readCliString(args, "due_before"),
+    dueAfter: readCliString(args, "due_after"),
+    refKind: readCliString(args, "ref_kind")
+  };
+  return Object.values(options).some((value) => value !== undefined) ? options : undefined;
+}
+
+function readCliInteger(args: CliArgs, key: string): number | undefined {
+  const raw = readCliString(args, key);
+  if (raw === undefined) return undefined;
+  const value = Number(raw);
+  if (!Number.isInteger(value)) throw new Error(`${key} must be an integer`);
+  return value;
+}
+
+function readCliCollectionLimit(args: CliArgs): number | "all" | undefined {
+  const raw = readCliString(args, "limit");
+  if (raw === undefined) return undefined;
+  const value = raw.trim();
+  if (value === "all") return "all";
+  const numberValue = Number(value);
+  if (!Number.isInteger(numberValue)) throw new Error("limit must be an integer or all");
+  return numberValue;
 }
 
 function readCliUpdateOptions(args: CliArgs): {

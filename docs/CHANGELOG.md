@@ -65,15 +65,15 @@ Notable changes for PARA-ZK are tracked here.
 - Generated templates store workflow state as stable code values such as
   `status: in_progress`, `priority: high`, and `maturity: draft`; GUI controls render
   localized labels from those codes.
-- `read-project` now returns a structured id-keyed task map with literal
-  checkbox status characters, names, and parsed Tasks metadata instead of
-  returning the project Tasks section as a raw Markdown string.
+- Task collection reads now return structured task items with literal checkbox
+  status characters, names, and parsed Tasks metadata instead of returning raw
+  Markdown task sections.
 - Full read responses now omit static schema keys, `archived: false`, null
   frontmatter values, empty sections, and template-only scaffold content to
   reduce LLM token waste.
-- Full read responses now mark compact mode and summarize large `tasks` and
-  `references` collections with `count`; exact key reads return the full
-  id-keyed maps.
+- Full read responses now mark compact mode and summarize large task/reference
+  collections with `count`; exact collection root reads return paged `items`
+  with `offset`, `limit`, `returned`, and `has_more`.
 - The Home dashboard is now designed as native PARA-ZK UI instead of mirroring
   legacy callout and Meta Bind implementations.
 - The disposable-vault smoke test now focuses the target Obsidian vault window
