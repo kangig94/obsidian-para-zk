@@ -338,7 +338,13 @@ optsidian raw para-zk:update-project title="Model Evaluation" key=frontmatter/st
 optsidian raw para-zk:update-project title="Model Evaluation" key=summary op=replace match="old claim" with="new claim" format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key=tasks op=append value="- [ ] Review evaluation set" format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key="children/Planning Meeting/body" op=append value="Decision: ship the baseline." format=json
+optsidian raw para-zk:update-project title="Model Evaluation" key=frontmatter/status op=set value=archived format=json
 ```
+
+For projects, `key=frontmatter/status op=set value=archived` is a structural
+archive operation: it moves the folder-style project from `PARA/Projects` to
+`PARA/Archives/Projects`. Updating the archived copy with `archived=true` and a
+non-archived status restores it to `PARA/Projects`.
 
 Result fields:
 
@@ -348,6 +354,8 @@ Result fields:
 - `operation`: the applied operation.
 - `changed`: false when the requested `set` value already matched.
 - `matches`: present for `replace`.
+- `moved`, `fromPath`, and `toPath`: present when a project status update moved
+  the project between active and archived folders.
 
 The same update algorithm is used by the other domain update commands:
 
@@ -358,6 +366,44 @@ The same update algorithm is used by the other domain update commands:
 | `para-zk:update-zk` | `title` plus optional `kind`, or `path` | Supports the selected ZK type's surface keys. |
 | `para-zk:update-journal` | `date` or `path` | Supports journal surface keys such as `quick_memo` and `today_tasks`. |
 | `para-zk:update-retro` | `title` plus optional `date`, or `path` | Supports retro surface keys such as `next_actions`. |
+
+### Rename Commands
+
+Renames are explicit structural commands rather than raw path edits. They update
+the note path and title-derived tag while preserving the note's other metadata.
+
+| Command | Selector | Notes |
+| --- | --- | --- |
+| `para-zk:rename-project` | `title` or `path`; optional `archived` | Renames the folder-style project folder and main note. Child notes move with the folder. |
+| `para-zk:rename-area` | `title` or `path`; optional `archived` | Renames the folder-style area folder and main note. Child areas move with the folder; area tag namespaces are updated without dropping inherited parent tags. |
+| `para-zk:rename-resource` | `title` or `path`; optional `archived` | Renames the resource note file in place. |
+| `para-zk:rename-zk` | `title` plus optional `kind`, or `path` | Renames the selected ZK note file in place. |
+
+Options:
+
+| Option | Values | Notes |
+| --- | --- | --- |
+| `title` | string | Current note title. Used when `path` is omitted. |
+| `path` | path | Optional exact note path. |
+| `new_title` | string | Required new note title. Aliases such as `newTitle` are rejected. |
+| `archived` | boolean | PARA rename commands only; same title lookup behavior as reads. |
+| `kind` | ZK kind code | `rename-zk` only; narrows title lookup. |
+
+Examples:
+
+```bash
+optsidian raw para-zk:rename-project title="Model Evaluation" new_title="Model Evaluation 2026" format=json
+optsidian raw para-zk:rename-area title="AI" new_title="Applied AI" format=json
+optsidian raw para-zk:rename-resource title="Source Paper" new_title="Source Paper Notes" format=json
+optsidian raw para-zk:rename-zk title="Stable Interface Contracts" kind=permanent new_title="Stable CLI Contracts" format=json
+```
+
+Result fields:
+
+- `path`: final note path.
+- `changed`: false when the title was already equal after sanitization.
+- `fromPath` and `toPath`: source and final note paths.
+- `fromTitle` and `toTitle`: source and final titles.
 
 ### `para-zk:create-project`
 

@@ -66,6 +66,13 @@ frontmatter mutation and supports `op=set`. Section/body keys support
 the selected key. Do not expose raw line/range editing through PARA-ZK; that is
 Optsidian's responsibility.
 
+Structural changes should stay domain-specific. Use `rename-project`,
+`rename-area`, `rename-resource`, and `rename-zk` for title/path changes instead
+of exposing a generic move command. Project archive and restore behavior is
+status-driven: setting `frontmatter/status` to `archived` moves the project into
+`PARA/Archives/Projects`, and setting a non-archived status on the archived copy
+restores it to the active Projects folder.
+
 "GUI and CLI behave the same" means they call the same core workflow functions
 and produce the same kind of vault side effects. It does not mean the CLI should
 copy the GUI prompts or limit itself to human-oriented interaction.
@@ -183,6 +190,8 @@ Representative CLI smoke tests should cover:
 - `para-zk:update-project`, `update-area`, `update-resource`, `update-zk`,
   `update-journal`, and `update-retro` using writable stable map keys and
   scoped set/append/replace operations
+- project archive and restore through `update-project key=frontmatter/status`
+- `para-zk:rename-project`, `rename-area`, `rename-resource`, and `rename-zk`
 - `para-zk:add-reference` with a vault-relative source `path` and URL/file/note target
 - `para-zk:create-subnote`
 - `para-zk:create-subarea`

@@ -50,8 +50,11 @@ obsidian para-zk:read-zk title="Idea" kind=fleeting key=memo format=json
 obsidian para-zk:read-journal date=2026-05-30 key=quick_memo format=json
 obsidian para-zk:update-project title="Project name" key=summary op=replace match="old" with="new" format=json
 obsidian para-zk:update-project title="Project name" key="children/Meeting notes/body" op=append value="Decision: continue." format=json
+obsidian para-zk:update-project title="Project name" key=frontmatter/status op=set value=archived format=json
+obsidian para-zk:rename-project title="Project name" new_title="Renamed project" format=json
 obsidian para-zk:add-reference path="PARA/Projects/Project name/Project name.md" target="https://example.com/source" label="Source" format=json
 obsidian para-zk:create-resource path="PARA/Projects/Project name/Project name.md" title="Source" format=json
+obsidian para-zk:rename-resource title="Source" new_title="Renamed source" format=json
 obsidian para-zk:create-subnote path="PARA/Projects/Project name/Project name.md" title="Meeting notes" subnote_type=meeting format=json
 obsidian para-zk:create-zk title="Idea" kind=fleeting format=json
 obsidian para-zk:promote-fleeting path="ZK/Fleeting/Idea.md" kind=permanent maturity=evergreen title="Evergreen idea" format=json
@@ -67,6 +70,9 @@ on the generated Markdown locale.
 Update commands use the same stable keys, but only for writable leaves:
 frontmatter keys use `op=set`, while section/body keys support `set`, `append`,
 `prepend`, and exact literal `replace`.
+Changing a project with `key=frontmatter/status op=set value=archived` moves the
+project into `PARA/Archives/Projects`; setting a non-archived status on the
+archived copy restores it to the active Projects folder.
 
 When `locale` is omitted, PARA-ZK defaults to English. Pass `locale=ko` when a
 Korean vault UI and generated Markdown are desired.

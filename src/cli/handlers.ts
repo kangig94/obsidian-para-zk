@@ -41,6 +41,13 @@ const UPDATE_OPTIONS: Record<string, CliOptionSpec> = {
   format: { value: "<text|json>", description: "Output format (default: text)." }
 };
 
+const RENAME_OPTIONS: Record<string, CliOptionSpec> = {
+  title: { value: "<title>", description: "Current note title. Used when path is omitted." },
+  path: { value: "<path>", description: "Exact note path." },
+  new_title: { value: "<title>", description: "New note title." },
+  format: { value: "<text|json>", description: "Output format (default: text)." }
+};
+
 const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
   {
     command: "para-zk:ping",
@@ -334,6 +341,82 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
         date: readCliString(args, "date"),
         archived: readCliBoolean(args, "archived"),
         ...readCliUpdateOptions(args)
+      });
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:rename-project",
+    description: "Rename a project note, including its folder-style parent folder",
+    options: {
+      ...RENAME_OPTIONS,
+      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." }
+    },
+    text: "project renamed",
+    run: async (plugin, args) => {
+      const { renameProject } = await import("../workflows");
+      const result = await renameProject(workflowContext(plugin), {
+        title: readCanonicalCliTitle(args),
+        path: readCliPath(args),
+        archived: readCliBoolean(args, "archived"),
+        newTitle: readCliNewTitle(args)
+      });
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:rename-area",
+    description: "Rename an area note, including its folder-style parent folder",
+    options: {
+      ...RENAME_OPTIONS,
+      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." }
+    },
+    text: "area renamed",
+    run: async (plugin, args) => {
+      const { renameArea } = await import("../workflows");
+      const result = await renameArea(workflowContext(plugin), {
+        title: readCanonicalCliTitle(args),
+        path: readCliPath(args),
+        archived: readCliBoolean(args, "archived"),
+        newTitle: readCliNewTitle(args)
+      });
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:rename-resource",
+    description: "Rename a resource note file",
+    options: {
+      ...RENAME_OPTIONS,
+      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." }
+    },
+    text: "resource renamed",
+    run: async (plugin, args) => {
+      const { renameResource } = await import("../workflows");
+      const result = await renameResource(workflowContext(plugin), {
+        title: readCanonicalCliTitle(args),
+        path: readCliPath(args),
+        archived: readCliBoolean(args, "archived"),
+        newTitle: readCliNewTitle(args)
+      });
+      return { ...result };
+    }
+  },
+  {
+    command: "para-zk:rename-zk",
+    description: "Rename a ZK note file",
+    options: {
+      ...RENAME_OPTIONS,
+      kind: { value: `<${ZK_KIND_CODE_HELP}>`, description: "Optional ZK kind filter." }
+    },
+    text: "ZK renamed",
+    run: async (plugin, args) => {
+      const { renameZk } = await import("../workflows");
+      const result = await renameZk(workflowContext(plugin), {
+        title: readCanonicalCliTitle(args),
+        path: readCliPath(args),
+        kind: readCliRenameKind(args),
+        newTitle: readCliNewTitle(args)
       });
       return { ...result };
     }
@@ -675,6 +758,24 @@ function readCliBoolean(args: CliArgs, key: string): boolean | undefined {
 
 function readCliTitle(args: CliArgs): string {
   return readCliString(args, "title") ?? readCliString(args, "name") ?? "";
+}
+
+function readCanonicalCliTitle(args: CliArgs): string {
+  rejectCliAliases(args, { name: "title" });
+  return readCliString(args, "title") ?? "";
+}
+
+function readCliNewTitle(args: CliArgs): string {
+  rejectCliAliases(args, {
+    newTitle: "new_title",
+    newName: "new_title"
+  });
+  return readCliString(args, "new_title") ?? "";
+}
+
+function readCliRenameKind(args: CliArgs): string | undefined {
+  rejectCliAliases(args, { type: "kind" });
+  return readCliString(args, "kind");
 }
 
 function readCliPath(args: CliArgs): string | undefined {

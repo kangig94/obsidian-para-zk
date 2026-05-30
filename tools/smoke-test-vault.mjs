@@ -130,9 +130,21 @@ function runWorkflowScenario(today) {
   const areaTitle = `Smoke Area ${stamp}`;
   const linkedAreaTitle = `Smoke Linked Area ${stamp}`;
   const projectTitle = `Smoke Project ${stamp}`;
+  const archiveProjectTitle = `Smoke Archive Project ${stamp}`;
+  const renameProjectTitle = `Smoke Rename Project ${stamp}`;
+  const renamedProjectTitle = `Smoke Renamed Project ${stamp}`;
+  const renameAreaTitle = `Smoke Rename Area ${stamp}`;
+  const renamedAreaTitle = `Smoke Renamed Area ${stamp}`;
+  const renameNestedAreaTitle = `Smoke Rename Nested Area ${stamp}`;
+  const renamedNestedAreaTitle = `Smoke Renamed Nested Area ${stamp}`;
+  const renameAreaLinkProjectTitle = `Smoke Area Link Project ${stamp}`;
   const resourceTitle = `Smoke Resource ${stamp}`;
+  const renameResourceTitle = `Smoke Rename Resource ${stamp}`;
+  const renamedResourceTitle = `Smoke Renamed Resource ${stamp}`;
   const fleetingTitle = `Smoke Fleeting ${stamp}`;
   const permanentTitle = `Smoke Permanent ${stamp}`;
+  const renameZkTitle = `Smoke Rename Permanent ${stamp}`;
+  const renamedZkTitle = `Smoke Renamed Permanent ${stamp}`;
 
   const area = cliJson("para-zk:create-area", [
     `title=${areaTitle}`,
@@ -253,6 +265,86 @@ function runWorkflowScenario(today) {
   ]);
   assert(archivedProjectStatusRead.value === "archived", "archived project status key read failed");
 
+  const archiveFlowProject = cliJson("para-zk:create-project", [
+    `title=${archiveProjectTitle}`,
+    "status=in_progress",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(archiveFlowProject, "archive flow project");
+  const archiveFlowArchivedPath = `PARA/Archives/Projects/${archiveProjectTitle}/${archiveProjectTitle}.md`;
+  const archiveMove = cliJson("para-zk:update-project", [
+    `title=${archiveProjectTitle}`,
+    "key=frontmatter/status",
+    "op=set",
+    "value=archived",
+    "format=json"
+  ]);
+  assert(archiveMove.moved === true, "project status archived did not move the project");
+  assert(archiveMove.fromPath === archiveFlowProject.path, "project archive move returned wrong fromPath");
+  assert(archiveMove.toPath === archiveFlowArchivedPath, "project archive move returned wrong toPath");
+  assertFileExists(archiveFlowArchivedPath, "archived project was not moved to archive folder");
+  assert(!existsSync(join(vaultPath, archiveFlowProject.path)), "project archive left the active project path behind");
+
+  const archiveFlowRead = cliJson("para-zk:read-project", [
+    `title=${archiveProjectTitle}`,
+    "archived=true",
+    "key=frontmatter/status",
+    "format=json"
+  ]);
+  assert(archiveFlowRead.value === "archived", "archived project status read after move failed");
+
+  const restoreMove = cliJson("para-zk:update-project", [
+    `title=${archiveProjectTitle}`,
+    "archived=true",
+    "key=frontmatter/status",
+    "op=set",
+    "value=in_progress",
+    "format=json"
+  ]);
+  assert(restoreMove.moved === true, "project status restore did not move the project");
+  assert(restoreMove.fromPath === archiveFlowArchivedPath, "project restore returned wrong fromPath");
+  assert(restoreMove.toPath === archiveFlowProject.path, "project restore returned wrong toPath");
+  assertFileExists(archiveFlowProject.path, "restored project was not moved back to active folder");
+  assert(!existsSync(join(vaultPath, archiveFlowArchivedPath)), "project restore left the archived project path behind");
+
+  const renameProject = cliJson("para-zk:create-project", [
+    `title=${renameProjectTitle}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(renameProject, "rename project");
+  const renameProjectSubnote = cliJson("para-zk:create-subnote", [
+    `title=Smoke Rename Child ${stamp}`,
+    `path=${renameProject.path}`,
+    "subnote_type=free",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(renameProjectSubnote, "rename project child");
+  const renameAliasRejected = cliJson("para-zk:rename-project", [
+    `title=${renameProjectTitle}`,
+    `newTitle=${renamedProjectTitle}`,
+    "format=json"
+  ]);
+  assert(renameAliasRejected.ok === false, "rename newTitle alias was accepted");
+  assert(
+    typeof renameAliasRejected.error === "string" && renameAliasRejected.error.includes("Use new_title instead of newTitle"),
+    `rename newTitle alias error was not explicit: ${JSON.stringify(renameAliasRejected)}`
+  );
+
+  const renamedProject = cliJson("para-zk:rename-project", [
+    `title=${renameProjectTitle}`,
+    `new_title=${renamedProjectTitle}`,
+    "format=json"
+  ]);
+  const renamedProjectPath = `PARA/Projects/${renamedProjectTitle}/${renamedProjectTitle}.md`;
+  const renamedProjectChildPath = `PARA/Projects/${renamedProjectTitle}/Smoke Rename Child ${stamp}.md`;
+  assert(renamedProject.path === renamedProjectPath, "rename-project returned wrong path");
+  assertFileExists(renamedProjectPath, "renamed project file is missing");
+  assertFileExists(renamedProjectChildPath, "renamed project child did not move with folder");
+  assert(!existsSync(join(vaultPath, renameProject.path)), "rename-project left the old project file behind");
+
   const projectPriorityUpdate = cliJson("para-zk:update-project", [
     `title=${projectTitle}`,
     "key=frontmatter/priority",
@@ -336,6 +428,74 @@ function runWorkflowScenario(today) {
   ]);
   assert(areaChildOverviewUpdate.path === subarea.path && areaChildOverviewUpdate.changed === true, "area child overview update failed");
 
+  const renameArea = cliJson("para-zk:create-area", [
+    `title=${renameAreaTitle}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(renameArea, "rename area");
+  const renameNestedArea = cliJson("para-zk:create-subarea", [
+    `title=${renameNestedAreaTitle}`,
+    `path=${renameArea.path}`,
+    "inheritParentTag=true",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(renameNestedArea, "rename nested area");
+  const renameAreaLinkProject = cliJson("para-zk:create-project", [
+    `title=${renameAreaLinkProjectTitle}`,
+    `area_titles=${JSON.stringify([renameAreaTitle])}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(renameAreaLinkProject, "rename area link project");
+  const renamedArea = cliJson("para-zk:rename-area", [
+    `title=${renameAreaTitle}`,
+    `new_title=${renamedAreaTitle}`,
+    "format=json"
+  ]);
+  const renamedAreaPath = `PARA/Areas/${renamedAreaTitle}/${renamedAreaTitle}.md`;
+  const movedNestedAreaPath = `PARA/Areas/${renamedAreaTitle}/${renameNestedAreaTitle}/${renameNestedAreaTitle}.md`;
+  const renamedAreaSlug = smokeSlug(renamedAreaTitle);
+  const renameAreaSlug = smokeSlug(renameAreaTitle);
+  const renameNestedAreaSlug = smokeSlug(renameNestedAreaTitle);
+  assert(renamedArea.path === renamedAreaPath, "rename-area returned wrong path");
+  assertFileExists(renamedAreaPath, "renamed area file is missing");
+  assertFileExists(movedNestedAreaPath, "nested area did not move with renamed parent area");
+  assert(!existsSync(join(vaultPath, renameArea.path)), "rename-area left the old area file behind");
+  assertFileContainsAny(renameAreaLinkProject.path, [
+    `[[PARA/Areas/${renamedAreaTitle}/${renamedAreaTitle}.md|${renamedAreaTitle}]]`,
+    `[[PARA/Areas/${renamedAreaTitle}/${renamedAreaTitle}|${renamedAreaTitle}]]`,
+    `[[${renamedAreaTitle}|${renamedAreaTitle}]]`
+  ]);
+  assertFileNotContains(renameAreaLinkProject.path, [
+    renameAreaTitle
+  ]);
+  assertFileContains(movedNestedAreaPath, [
+    `  - area/${renamedAreaSlug}`,
+    `  - area/${renamedAreaSlug}/${renameNestedAreaSlug}`
+  ]);
+  assertFileNotContains(movedNestedAreaPath, [
+    `  - area/${renameAreaSlug}`
+  ]);
+
+  const renamedNestedArea = cliJson("para-zk:rename-area", [
+    `title=${renameNestedAreaTitle}`,
+    `new_title=${renamedNestedAreaTitle}`,
+    "format=json"
+  ]);
+  const renamedNestedAreaPath = `PARA/Areas/${renamedAreaTitle}/${renamedNestedAreaTitle}/${renamedNestedAreaTitle}.md`;
+  const renamedNestedAreaSlug = smokeSlug(renamedNestedAreaTitle);
+  assert(renamedNestedArea.path === renamedNestedAreaPath, "rename nested area returned wrong path");
+  assertFileExists(renamedNestedAreaPath, "renamed nested area file is missing");
+  assertFileContains(renamedNestedAreaPath, [
+    `  - area/${renamedAreaSlug}`,
+    `  - area/${renamedAreaSlug}/${renamedNestedAreaSlug}`
+  ]);
+  assertFileNotContains(renamedNestedAreaPath, [
+    `  - area/${renamedNestedAreaSlug}`
+  ]);
+
   const resource = cliJson("para-zk:create-resource", [
     `title=${resourceTitle}`,
     `path=${project.path}`,
@@ -387,6 +547,22 @@ function runWorkflowScenario(today) {
   ]);
   assert(resourceBodyReplace.matches === 2, "resource body replace all did not report two matches");
 
+  const renameResource = cliJson("para-zk:create-resource", [
+    `title=${renameResourceTitle}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(renameResource, "rename resource");
+  const renamedResource = cliJson("para-zk:rename-resource", [
+    `title=${renameResourceTitle}`,
+    `new_title=${renamedResourceTitle}`,
+    "format=json"
+  ]);
+  const renamedResourcePath = `PARA/Resources/${renamedResourceTitle}.md`;
+  assert(renamedResource.path === renamedResourcePath, "rename-resource returned wrong path");
+  assertFileExists(renamedResourcePath, "renamed resource file is missing");
+  assert(!existsSync(join(vaultPath, renameResource.path)), "rename-resource left the old resource file behind");
+
   const fleeting = cliJson("para-zk:create-zk", [
     `title=${fleetingTitle}`,
     "kind=fleeting",
@@ -421,6 +597,25 @@ function runWorkflowScenario(today) {
     "format=json"
   ]);
   assert(zkMaturityUpdate.changed === true, "ZK maturity update failed");
+
+  const renameZk = cliJson("para-zk:create-zk", [
+    `title=${renameZkTitle}`,
+    "kind=permanent",
+    "maturity=draft",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(renameZk, "rename ZK");
+  const renamedZk = cliJson("para-zk:rename-zk", [
+    `title=${renameZkTitle}`,
+    "kind=permanent",
+    `new_title=${renamedZkTitle}`,
+    "format=json"
+  ]);
+  const renamedZkPath = `ZK/Permanent/${renamedZkTitle}.md`;
+  assert(renamedZk.path === renamedZkPath, "rename-zk returned wrong path");
+  assertFileExists(renamedZkPath, "renamed ZK file is missing");
+  assert(!existsSync(join(vaultPath, renameZk.path)), "rename-zk left the old ZK file behind");
 
   const journal = cliJson("para-zk:capture-journal", [
     `content=Smoke memo ${stamp}`,
@@ -496,12 +691,25 @@ function runWorkflowScenario(today) {
     createdArea,
     reference,
     project,
+    archiveFlowProject,
+    renamedProject,
+    renamedProjectPath,
+    renamedProjectChildPath,
     archivedProject,
     subnote,
     subarea,
+    renamedArea,
+    renamedAreaPath,
+    renamedNestedArea,
+    renamedNestedAreaPath,
+    renameAreaLinkProject,
     resource,
+    renamedResource,
+    renamedResourcePath,
     fleeting,
     permanent,
+    renamedZk,
+    renamedZkPath,
     journal,
     retro,
     promotedResource,
@@ -583,6 +791,16 @@ function assertWorkflowFiles(result) {
     "[Reference URL](https://example.com/reference)",
     `[[${result.resource.path}|${result.resource.title}]]`
   ]);
+  assertFileContains(result.archiveFlowProject.path, [
+    "status: in_progress"
+  ]);
+  assertFileContains(result.renamedProjectPath, [
+    "type: project",
+    "project/smoke_renamed_project"
+  ]);
+  assertFileContains(result.renamedProjectChildPath, [
+    "type: doc"
+  ]);
   assertFileContains(result.archivedProject.path, [
     "status: archived"
   ]);
@@ -597,12 +815,28 @@ function assertWorkflowFiles(result) {
     result.area.path,
     `Smoke subarea overview ${stamp}`
   ]);
+  assertFileContains(result.renamedAreaPath, [
+    "type: area",
+    "area/smoke_renamed_area"
+  ]);
+  assertFileContains(result.renamedNestedAreaPath, [
+    "type: area",
+    `area/${smokeSlug(result.renamedArea.title)}/${smokeSlug(result.renamedNestedArea.title)}`
+  ]);
   assertFileContains(result.resource.path, [
     `Smoke resource body updated ${stamp}`
+  ]);
+  assertFileContains(result.renamedResourcePath, [
+    "type: resource",
+    "resource/smoke_renamed_resource"
   ]);
   assertFileContains(result.permanent.path, [
     "type: zk_permanent",
     "maturity: evergreen"
+  ]);
+  assertFileContains(result.renamedZkPath, [
+    "type: zk_permanent",
+    "knowledge/smoke_renamed_permanent"
   ]);
   assertFileContains(result.promotedResource.path, [
     "type: zk_literature",
@@ -637,10 +871,16 @@ function smokeSummary(result) {
     paths: {
       area: result.area.path,
       project: result.project.path,
+      archiveFlowProject: result.archiveFlowProject.path,
+      renamedProject: result.renamedProject.path,
       archivedProject: result.archivedProject.path,
       subnote: result.subnote.path,
       subarea: result.subarea.path,
+      renamedArea: result.renamedArea.path,
+      renamedNestedArea: result.renamedNestedArea.path,
       resource: result.resource.path,
+      renamedResource: result.renamedResource.path,
+      renamedZk: result.renamedZk.path,
       promotedResource: result.promotedResource.path,
       promotedFleeting: result.promotedFleeting.path,
       journal: result.journal.path,
@@ -1045,6 +1285,33 @@ function assertFileContains(path, needles) {
   }
 }
 
+function assertFileContainsAny(path, needles) {
+  const absolute = join(vaultPath, path);
+  const deadline = Date.now() + 3000;
+  let text = "";
+  while (Date.now() <= deadline) {
+    if (existsSync(absolute) && statSync(absolute).isFile()) {
+      text = readFileSync(absolute, "utf8");
+      if (needles.some((needle) => text.includes(needle))) return;
+    }
+    sleepMs(100);
+  }
+
+  assert(existsSync(absolute), `missing file: ${path}`);
+  assert(statSync(absolute).isFile(), `not a file: ${path}`);
+  throw new Error(`${path} does not contain any of: ${needles.join(" | ")}`);
+}
+
+function assertFileNotContains(path, needles) {
+  const absolute = join(vaultPath, path);
+  assert(existsSync(absolute), `missing file: ${path}`);
+  assert(statSync(absolute).isFile(), `not a file: ${path}`);
+  const text = readFileSync(absolute, "utf8");
+  for (const needle of needles) {
+    assert(!text.includes(needle), `${path} should not contain: ${needle}`);
+  }
+}
+
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
@@ -1069,6 +1336,15 @@ function timestamp() {
     String(date.getSeconds()).padStart(2, "0")
   ];
   return parts.join("");
+}
+
+function smokeSlug(value) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9가-힣_\/]+/g, "_")
+    .replace(/-/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "") || "untitled";
 }
 
 function todayIso() {

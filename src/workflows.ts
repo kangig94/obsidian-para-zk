@@ -201,6 +201,33 @@ export type UpdateSurfaceResult = {
   operation: UpdateOperation;
   changed: boolean;
   matches?: number;
+  moved?: boolean;
+  fromPath?: string;
+  toPath?: string;
+};
+
+export type RenameByTitleOptions = {
+  path?: string;
+  title?: string;
+  newTitle?: string;
+  archived?: boolean;
+};
+
+export type RenameZkOptions = {
+  path?: string;
+  title?: string;
+  newTitle?: string;
+  kind?: string;
+};
+
+export type RenameResult = {
+  path: string;
+  title: string;
+  changed: boolean;
+  fromPath: string;
+  toPath: string;
+  fromTitle: string;
+  toTitle: string;
 };
 
 type TemplateVariables = Record<string, string | undefined>;
@@ -313,6 +340,42 @@ export async function updateJournal(ctx: WorkflowContext, options: UpdateJournal
 
 export async function updateRetro(ctx: WorkflowContext, options: UpdateRetroOptions): Promise<UpdateSurfaceResult> {
   return updateSurface(ctx, resolveRequiredRetro(ctx, options), RETRO_READ_SPEC, options);
+}
+
+export async function renameProject(ctx: WorkflowContext, options: RenameByTitleOptions): Promise<RenameResult> {
+  return renameFolderStyleNote(
+    ctx,
+    resolveRequiredProject(ctx, options),
+    requireTitle(options.newTitle, "new_title"),
+    "project"
+  );
+}
+
+export async function renameArea(ctx: WorkflowContext, options: RenameByTitleOptions): Promise<RenameResult> {
+  return renameFolderStyleNote(
+    ctx,
+    resolveRequiredArea(ctx, options),
+    requireTitle(options.newTitle, "new_title"),
+    "area"
+  );
+}
+
+export async function renameResource(ctx: WorkflowContext, options: RenameByTitleOptions): Promise<RenameResult> {
+  return renameFlatNote(
+    ctx,
+    resolveRequiredResource(ctx, options),
+    requireTitle(options.newTitle, "new_title"),
+    "resource"
+  );
+}
+
+export async function renameZk(ctx: WorkflowContext, options: RenameZkOptions): Promise<RenameResult> {
+  return renameFlatNote(
+    ctx,
+    resolveRequiredZk(ctx, options),
+    requireTitle(options.newTitle, "new_title"),
+    "knowledge"
+  );
 }
 
 export async function createArea(ctx: WorkflowContext, options: CreateAreaOptions): Promise<NoteResult> {
@@ -1072,6 +1135,10 @@ type TextRange = {
 type TextUpdateResult = {
   changed: boolean;
   matches?: number;
+  file?: TFile;
+  moved?: boolean;
+  fromPath?: string;
+  toPath?: string;
 };
 
 async function updateSurface(
@@ -1083,20 +1150,23 @@ async function updateSurface(
   const key = requireUpdateKey(options.key);
   const operation = parseUpdateOperation(options.operation);
   const target = await resolveWritableSurfaceTarget(ctx, file, spec, key, key);
-  const type = readType(fileFrontmatter(ctx, target.file));
   const result = target.kind === "frontmatter"
     ? await updateFrontmatterSurface(ctx, target, operation, options)
     : await updateTextSurface(ctx, target, operation, options);
+  const resultFile = result.file ?? target.file;
 
   return {
-    path: target.file.path,
-    title: target.file.basename,
-    type,
-    archived: isArchivedFile(ctx, target.file),
+    path: resultFile.path,
+    title: resultFile.basename,
+    type: readType(fileFrontmatter(ctx, resultFile)),
+    archived: isArchivedFile(ctx, resultFile),
     key,
     operation,
     changed: result.changed,
-    matches: result.matches
+    matches: result.matches,
+    moved: result.moved,
+    fromPath: result.fromPath,
+    toPath: result.toPath
   };
 }
 
@@ -1171,13 +1241,26 @@ async function updateFrontmatterSurface(
     target.frontmatterKey,
     requireUpdateValue(options)
   );
+  const movePlan = projectStatusMovePlan(ctx, target.file, target.frontmatterKey, value);
+  if (movePlan) assertCanMoveNoteBetweenRoots(ctx, target.file, movePlan.fromRoot, movePlan.toRoot);
   const before = fileFrontmatter(ctx, target.file)[target.frontmatterKey];
-  if (frontmatterValuesEqual(before, value)) return { changed: false };
+  const frontmatterChanged = !frontmatterValuesEqual(before, value);
 
-  await ctx.app.fileManager.processFrontMatter(target.file, (fm) => {
-    fm[target.frontmatterKey] = value;
-  });
-  return { changed: true };
+  if (frontmatterChanged) {
+    await ctx.app.fileManager.processFrontMatter(target.file, (fm) => {
+      fm[target.frontmatterKey] = value;
+    });
+  }
+  if (!movePlan) return { changed: frontmatterChanged };
+
+  const moved = await moveNoteBetweenRoots(ctx, target.file, movePlan.fromRoot, movePlan.toRoot);
+  return {
+    changed: true,
+    file: moved.file,
+    moved: true,
+    fromPath: moved.fromPath,
+    toPath: moved.toPath
+  };
 }
 
 async function updateTextSurface(
@@ -1443,6 +1526,83 @@ function normalizeFrontmatterUpdateValue(type: string, key: string, value: unkno
   return value;
 }
 
+function projectStatusMovePlan(
+  ctx: WorkflowContext,
+  file: TFile,
+  frontmatterKey: string,
+  value: unknown
+): { fromRoot: string; toRoot: string } | undefined {
+  if (frontmatterKey !== "status" || readType(fileFrontmatter(ctx, file)) !== "project") return undefined;
+
+  const archiveRoot = archivedCounterpartFolder(ctx, ctx.settings.paths.projectsFolder);
+  const shouldBeArchived = value === "archived";
+  const archived = isArchivedFile(ctx, file);
+  if (shouldBeArchived && !archived) {
+    return {
+      fromRoot: ctx.settings.paths.projectsFolder,
+      toRoot: archiveRoot
+    };
+  }
+  if (!shouldBeArchived && archived) {
+    return {
+      fromRoot: archiveRoot,
+      toRoot: ctx.settings.paths.projectsFolder
+    };
+  }
+  return undefined;
+}
+
+function assertCanMoveNoteBetweenRoots(
+  ctx: WorkflowContext,
+  file: TFile,
+  fromRoot: string,
+  toRoot: string
+): void {
+  const normalizedFromRoot = normalizeVaultPath(fromRoot);
+  const normalizedToRoot = normalizeVaultPath(toRoot);
+  const folderStyleFolder = folderStyleContainer(file);
+  if (folderStyleFolder) {
+    const relativeFolder = relativePathUnderRoot(folderStyleFolder.path, normalizedFromRoot);
+    assertVacantPath(ctx, joinVaultPath(normalizedToRoot, relativeFolder));
+    return;
+  }
+
+  const relativeFile = relativePathUnderRoot(file.path, normalizedFromRoot);
+  assertVacantPath(ctx, joinVaultPath(normalizedToRoot, relativeFile));
+}
+
+async function moveNoteBetweenRoots(
+  ctx: WorkflowContext,
+  file: TFile,
+  fromRoot: string,
+  toRoot: string
+): Promise<{ file: TFile; fromPath: string; toPath: string }> {
+  const normalizedFromRoot = normalizeVaultPath(fromRoot);
+  const normalizedToRoot = normalizeVaultPath(toRoot);
+  const fromPath = file.path;
+  const folderStyleFolder = folderStyleContainer(file);
+  assertCanMoveNoteBetweenRoots(ctx, file, normalizedFromRoot, normalizedToRoot);
+
+  if (folderStyleFolder) {
+    const relativeFolder = relativePathUnderRoot(folderStyleFolder.path, normalizedFromRoot);
+    const targetFolder = joinVaultPath(normalizedToRoot, relativeFolder);
+    const toPath = joinVaultPath(targetFolder, file.name);
+    await ensureFolder(ctx.app, parentFolder(targetFolder));
+    await ctx.app.fileManager.renameFile(folderStyleFolder, targetFolder);
+    const moved = ctx.app.vault.getFileByPath(toPath);
+    if (!moved) throw new Error(`failed to move ${fromPath} to ${toPath}`);
+    return { file: moved, fromPath, toPath };
+  }
+
+  const relativeFile = relativePathUnderRoot(file.path, normalizedFromRoot);
+  const toPath = joinVaultPath(normalizedToRoot, relativeFile);
+  await ensureFolder(ctx.app, parentFolder(toPath));
+  await ctx.app.fileManager.renameFile(file, toPath);
+  const moved = ctx.app.vault.getFileByPath(toPath);
+  if (!moved) throw new Error(`failed to move ${fromPath} to ${toPath}`);
+  return { file: moved, fromPath, toPath };
+}
+
 function frontmatterValuesEqual(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
@@ -1659,6 +1819,258 @@ function readType(frontmatter: Frontmatter): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+type TagDomain = "project" | "area" | "resource" | "knowledge";
+
+async function renameFolderStyleNote(
+  ctx: WorkflowContext,
+  file: TFile,
+  newTitle: string,
+  tagDomain: TagDomain
+): Promise<RenameResult> {
+  const fromTitle = file.basename;
+  const fromPath = file.path;
+  if (fromTitle === newTitle) {
+    return {
+      path: file.path,
+      title: file.basename,
+      changed: false,
+      fromPath,
+      toPath: file.path,
+      fromTitle,
+      toTitle: newTitle
+    };
+  }
+
+  const folder = folderStyleContainer(file);
+  let renamed: TFile;
+  let toPath: string;
+  if (folder) {
+    const targetFolder = joinVaultPath(parentFolder(folder.path), newTitle);
+    toPath = joinVaultPath(targetFolder, `${newTitle}.md`);
+    assertVacantPath(ctx, targetFolder);
+    const conflictingFile = ctx.app.vault.getAbstractFileByPath(joinVaultPath(folder.path, `${newTitle}.md`));
+    if (conflictingFile && conflictingFile !== file) {
+      throw new Error(`target already exists: ${joinVaultPath(folder.path, `${newTitle}.md`)}`);
+    }
+    await ctx.app.fileManager.renameFile(folder, targetFolder);
+
+    renamed = ctx.app.vault.getFileByPath(toPath) ?? await renameMovedFolderStyleMain(ctx, targetFolder, file.name, toPath);
+  } else {
+    toPath = joinVaultPath(parentFolder(file.path), `${newTitle}.md`);
+    assertVacantPath(ctx, toPath);
+    await ctx.app.fileManager.renameFile(file, toPath);
+    renamed = ctx.app.vault.getFileByPath(toPath) ?? file;
+  }
+
+  const tagUpdate = await updateTitleDerivedTag(ctx, renamed, tagDomain, fromTitle, newTitle);
+  if (tagDomain === "area" && folder) {
+    await updateAreaDescendantTagPrefixes(ctx, toPath, tagUpdate.namespaceMoves);
+  }
+  return {
+    path: toPath,
+    title: newTitle,
+    changed: true,
+    fromPath,
+    toPath,
+    fromTitle,
+    toTitle: newTitle
+  };
+}
+
+async function renameMovedFolderStyleMain(
+  ctx: WorkflowContext,
+  targetFolder: string,
+  oldFileName: string,
+  toPath: string
+): Promise<TFile> {
+  const movedPath = joinVaultPath(targetFolder, oldFileName);
+  const movedMain = ctx.app.vault.getFileByPath(movedPath);
+  if (!movedMain) throw new Error(`failed to find moved note at ${movedPath}`);
+
+  assertVacantPath(ctx, toPath);
+  await ctx.app.fileManager.renameFile(movedMain, toPath);
+  return ctx.app.vault.getFileByPath(toPath) ?? movedMain;
+}
+
+async function renameFlatNote(
+  ctx: WorkflowContext,
+  file: TFile,
+  newTitle: string,
+  tagDomain: TagDomain
+): Promise<RenameResult> {
+  const fromTitle = file.basename;
+  const fromPath = file.path;
+  if (fromTitle === newTitle) {
+    return {
+      path: file.path,
+      title: file.basename,
+      changed: false,
+      fromPath,
+      toPath: file.path,
+      fromTitle,
+      toTitle: newTitle
+    };
+  }
+
+  const toPath = joinVaultPath(parentFolder(file.path), `${newTitle}.md`);
+  assertVacantPath(ctx, toPath);
+  await ctx.app.fileManager.renameFile(file, toPath);
+  const renamed = ctx.app.vault.getFileByPath(toPath) ?? file;
+  await updateTitleDerivedTag(ctx, renamed, tagDomain, fromTitle, newTitle);
+  return {
+    path: toPath,
+    title: newTitle,
+    changed: true,
+    fromPath,
+    toPath,
+    fromTitle,
+    toTitle: newTitle
+  };
+}
+
+async function updateTitleDerivedTag(
+  ctx: WorkflowContext,
+  file: TFile,
+  domain: TagDomain,
+  fromTitle: string,
+  title: string
+): Promise<{ namespaceMoves: TagNamespaceMove[] }> {
+  const activeTagPrefix = localePack(ctx.settings.locale).tags[domain];
+  const knownPrefixes = uniqueStrings([
+    localePack("en").tags[domain],
+    localePack("ko").tags[domain],
+    activeTagPrefix
+  ]);
+  const nextTag = `${activeTagPrefix}/${slugify(title)}`;
+  const namespaceMoves: TagNamespaceMove[] = [];
+
+  await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+    const existing = frontmatterLinks(fm.tags);
+    let replaced = false;
+    const next = existing.map((tag) => {
+      const normalized = tag.startsWith("#") ? tag.slice(1) : tag;
+      if (knownPrefixes.some((prefix) => normalized.startsWith(`${prefix}/`))) {
+        const renamed = renamedTitleTag(normalized, knownPrefixes, activeTagPrefix, fromTitle, title, domain);
+        if (renamed.changed) {
+          replaced = true;
+          namespaceMoves.push({
+            from: normalized,
+            to: renamed.tag
+          });
+        }
+        return tag.startsWith("#") && renamed.tag !== normalized ? `#${renamed.tag}` : renamed.tag;
+      }
+      return tag;
+    });
+    if (!replaced) next.push(nextTag);
+    fm.tags = uniqueStrings(next);
+  });
+
+  return {
+    namespaceMoves: uniqueTagNamespaceMoves(namespaceMoves)
+  };
+}
+
+function renamedTitleTag(
+  tag: string,
+  knownPrefixes: string[],
+  activeTagPrefix: string,
+  fromTitle: string,
+  title: string,
+  domain: TagDomain
+): { tag: string; changed: boolean } {
+  const oldTitleSlug = slugify(fromTitle);
+  const titleSlug = slugify(title);
+  const matchingPrefix = knownPrefixes.find((prefix) => tag.startsWith(`${prefix}/`));
+  if (!matchingPrefix) return { tag: `${activeTagPrefix}/${titleSlug}`, changed: true };
+  if (domain !== "area") return { tag: `${activeTagPrefix}/${titleSlug}`, changed: true };
+
+  const rest = tag.slice(matchingPrefix.length + 1).split("/").filter(Boolean);
+  if (rest.at(-1) !== oldTitleSlug) {
+    return { tag, changed: false };
+  }
+  const parentPath = rest.slice(0, -1).join("/");
+  const renamed = parentPath ? `${activeTagPrefix}/${parentPath}/${titleSlug}` : `${activeTagPrefix}/${titleSlug}`;
+  return {
+    tag: renamed,
+    changed: renamed !== tag
+  };
+}
+
+type TagNamespaceMove = {
+  from: string;
+  to: string;
+};
+
+function uniqueTagNamespaceMoves(moves: TagNamespaceMove[]): TagNamespaceMove[] {
+  const seen = new Set<string>();
+  const result: TagNamespaceMove[] = [];
+  for (const move of moves) {
+    const key = `${move.from}\u0000${move.to}`;
+    if (move.from === move.to || seen.has(key)) continue;
+    seen.add(key);
+    result.push(move);
+  }
+  return result;
+}
+
+async function updateAreaDescendantTagPrefixes(
+  ctx: WorkflowContext,
+  renamedAreaPath: string,
+  namespaceMoves: TagNamespaceMove[]
+): Promise<void> {
+  if (namespaceMoves.length === 0) return;
+
+  const folder = parentFolder(renamedAreaPath);
+  const descendants = ctx.app.vault.getMarkdownFiles().filter((file) => {
+    return file.path !== renamedAreaPath
+      && isInFolder(file, folder)
+      && readType(fileFrontmatter(ctx, file)) === "area";
+  });
+
+  for (const descendant of descendants) {
+    await ctx.app.fileManager.processFrontMatter(descendant, (fm) => {
+      const existing = frontmatterLinks(fm.tags);
+      if (existing.length === 0) return;
+      const next = existing.map((tag) => renameTagNamespace(tag, namespaceMoves));
+      fm.tags = uniqueStrings(next);
+    });
+  }
+}
+
+function renameTagNamespace(tag: string, namespaceMoves: TagNamespaceMove[]): string {
+  const prefixed = tag.startsWith("#");
+  const normalized = prefixed ? tag.slice(1) : tag;
+  for (const move of namespaceMoves) {
+    if (normalized !== move.from && !normalized.startsWith(`${move.from}/`)) continue;
+    const renamed = `${move.to}${normalized.slice(move.from.length)}`;
+    return prefixed ? `#${renamed}` : renamed;
+  }
+  return tag;
+}
+
+function folderStyleContainer(file: TFile): TFolder | undefined {
+  const folder = file.parent;
+  return folder && folder.name === file.basename ? folder : undefined;
+}
+
+function assertVacantPath(ctx: WorkflowContext, path: string): void {
+  const normalized = normalizeVaultPath(path);
+  if (ctx.app.vault.getAbstractFileByPath(normalized)) {
+    throw new Error(`target already exists: ${normalized}`);
+  }
+}
+
+function relativePathUnderRoot(path: string, root: string): string {
+  const normalizedPath = normalizeVaultPath(path);
+  const normalizedRoot = normalizeVaultPath(root);
+  if (normalizedPath === normalizedRoot) return "";
+  if (!normalizedPath.startsWith(`${normalizedRoot}/`)) {
+    throw new Error(`${normalizedPath} is not under ${normalizedRoot}`);
+  }
+  return normalizedPath.slice(normalizedRoot.length + 1);
 }
 
 async function ensureFolderStyleParent(ctx: WorkflowContext, file: TFile): Promise<{

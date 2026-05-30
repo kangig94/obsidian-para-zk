@@ -40,6 +40,8 @@ Notable changes for PARA-ZK are tracked here.
 - Added `para-zk:update-project`, `update-area`, `update-resource`, `update-zk`,
   `update-journal`, and `update-retro` for scoped template-safe updates using
   the same stable map keys as read commands.
+- Added `para-zk:rename-project`, `rename-area`, `rename-resource`, and
+  `rename-zk` for explicit domain-safe title/path changes.
 - Added `archived=true` lookup for PARA read commands so projects, areas,
   resources, and retros can be read from `PARA/Archives` without using exact
   paths.
@@ -81,6 +83,9 @@ Notable changes for PARA-ZK are tracked here.
 - Promoting a fleeting note now keeps the source note in `ZK/Fleeting`, marks it
   `processed: true`, and records `promoted_to` instead of moving it to an
   archive folder.
+- Updating a project's `frontmatter/status` to `archived` now moves the project
+  into `PARA/Archives/Projects`; updating the archived copy to a non-archived
+  status restores it to the active Projects folder.
 
 ### Removed
 
