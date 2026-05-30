@@ -42,6 +42,7 @@ obsidian para-zk:init locale=ko format=json
 obsidian para-zk:init installDeps=true format=json
 obsidian para-zk:create-project title="Project name" area_titles='["AI","Software"]' status=in_progress priority=high format=json
 obsidian para-zk:read-project title="Project name" key=frontmatter/status format=json
+obsidian para-zk:read-project title="Finished project" archived=true key=summary format=json
 obsidian para-zk:read-project title="Project name" key="children/Meeting notes/body" format=json
 obsidian para-zk:read-area title="AI" key=children format=json
 obsidian para-zk:read-resource title="Source" key=body format=json

@@ -140,7 +140,7 @@ function dashboardRecordGroups(records: FileRecord[], settings: ParaZkSettings):
     projects: records.filter((record) => record.frontmatter.type === "project" && isInFolder(record.file, settings.paths.projectsFolder)),
     areas: records.filter((record) => record.frontmatter.type === "area" && isInFolder(record.file, settings.paths.areasFolder)),
     resources: records.filter((record) => record.frontmatter.type === "resource" && isInFolder(record.file, settings.paths.resourcesFolder)),
-    fleeting: records.filter((record) => isInFolder(record.file, settings.paths.fleetingFolder) && !isInFolder(record.file, settings.paths.fleetingArchiveFolder)),
+    fleeting: records.filter((record) => isInFolder(record.file, settings.paths.fleetingFolder) && record.frontmatter.processed !== true),
     literature: records.filter((record) => isInFolder(record.file, settings.paths.literatureFolder)),
     permanent: records.filter((record) => isInFolder(record.file, settings.paths.permanentFolder))
   };

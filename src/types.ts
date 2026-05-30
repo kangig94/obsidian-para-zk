@@ -19,7 +19,6 @@ export type ParaZkPaths = {
   archivesFolder: string;
   zkFolder: string;
   fleetingFolder: string;
-  fleetingArchiveFolder: string;
   literatureFolder: string;
   permanentFolder: string;
   journalFolder: string;
@@ -89,7 +88,6 @@ export type NoteResult = {
 
 export type PromotionResult = NoteResult & {
   sourcePath: string;
-  archivedPath?: string;
   kind: ZkKind;
 };
 
@@ -108,7 +106,6 @@ export const DEFAULT_PATHS: ParaZkPaths = {
   archivesFolder: "PARA/Archives",
   zkFolder: "ZK",
   fleetingFolder: "ZK/Fleeting",
-  fleetingArchiveFolder: "ZK/Fleeting/Archives",
   literatureFolder: "ZK/Literature",
   permanentFolder: "ZK/Permanent",
   journalFolder: "Journal",
@@ -126,7 +123,6 @@ export const DEFAULT_LAYOUT_FOLDERS = [
   "PARA/Archives",
   "ZK",
   "ZK/Fleeting",
-  "ZK/Fleeting/Archives",
   "ZK/Literature",
   "ZK/Permanent",
   "Journal",

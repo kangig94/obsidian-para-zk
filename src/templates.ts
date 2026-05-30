@@ -950,7 +950,7 @@ function dashboardStaleFleeting(t: ReturnType<typeof localePack>, limit: number)
     "const days = (n) => 1000 * 60 * 60 * 24 * n;",
     "const now = Date.now();",
     "const rows = pages('\"ZK/Fleeting\"')",
-    "  .filter(f => !f.file.path.includes('/Archives/'))",
+    "  .filter(f => f.processed !== true)",
     "  .filter(f => now - timeOf(f.file.ctime) >= days(7))",
     "  .sort((a,b) => timeOf(a.file.ctime) - timeOf(b.file.ctime))",
     `  .slice(0, ${limit})`,
@@ -996,7 +996,7 @@ function dashboardThisWeekFleeting(t: ReturnType<typeof localePack>): string[] {
   return dataviewJs([
     "const startOfWeek = (() => { const d = new Date(); const day = (d.getDay() + 6) % 7; d.setHours(0,0,0,0); d.setDate(d.getDate() - day); return d; })();",
     "const rows = pages('\"ZK/Fleeting\"')",
-    "  .filter(p => !p.file.path.includes('/Archives/'))",
+    "  .filter(p => p.processed !== true)",
     "  .filter(p => timeOf(p.file.ctime) >= startOfWeek.getTime())",
     "  .sort((a,b) => timeOf(b.file.ctime) - timeOf(a.file.ctime))",
     "  .map(p => [p.file.link, p.file.ctime]);",

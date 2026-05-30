@@ -48,7 +48,7 @@ accept explicit paths, dates, status codes, priority codes, maturity codes,
 subnote types, links, open flags, dry-run flags, and other structured options
 that let an LLM satisfy the user's request in one call. CLI output should be
 token-efficient JSON with stable fields such as `ok`, `command`, `path`,
-`created`, `sourcePath`, `archivedPath`, `warnings`, and `error`.
+`created`, `sourcePath`, `archived`, `warnings`, and `error`.
 
 Read commands should expose PARA-ZK editable surfaces, not raw Markdown files.
 Their `key` arguments are stable map paths such as `frontmatter/status`,
@@ -56,6 +56,8 @@ Their `key` arguments are stable map paths such as `frontmatter/status`,
 depend on localized generated headings. Raw file reads, arbitrary patches, and
 generic vault search belong to Optsidian; PARA-ZK read/update commands should
 focus on template-safe PARA/ZK surfaces.
+PARA read commands may select archived notes with `archived=true`; the returned
+`archived` field is the single code-level indicator for that state.
 
 "GUI and CLI behave the same" means they call the same core workflow functions
 and produce the same kind of vault side effects. It does not mean the CLI should
@@ -128,9 +130,11 @@ back through frontmatter so Dataview queries can discover them.
 Promotion behavior should preserve traceability:
 
 - Promoting a resource creates a ZK note and links back to the resource.
-- Promoting a fleeting note creates a Literature or Permanent note, moves the
-  source fleeting note into `ZK/Fleeting/Archives`, marks it processed, and links
-  it to the promoted note.
+- Promoting a fleeting note creates a Literature or Permanent note, keeps the
+  source fleeting note in place, marks it processed, and links it to the
+  promoted note.
+- Fleeting notes do not have an archive folder. Completed fleeting work is
+  represented by `processed: true`.
 
 ## Verification Workflow
 

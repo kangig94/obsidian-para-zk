@@ -148,13 +148,17 @@ export type ReadByTitleOptions = {
   path?: string;
   title?: string;
   key?: string;
+  archived?: boolean;
 };
 
 export type ReadProjectOptions = ReadByTitleOptions;
 export type ReadAreaOptions = ReadByTitleOptions;
 export type ReadResourceOptions = ReadByTitleOptions;
 
-export type ReadZkOptions = ReadByTitleOptions & {
+export type ReadZkOptions = {
+  path?: string;
+  title?: string;
+  key?: string;
   kind?: string;
 };
 
@@ -561,7 +565,6 @@ export async function promoteResource(ctx: WorkflowContext, options: PromoteReso
 
 export async function promoteFleeting(ctx: WorkflowContext, options: PromoteFleetingOptions = {}): Promise<PromotionResult> {
   const source = resolveRequiredFile(ctx, options.sourcePath, "source fleeting note");
-  const originalSourcePath = source.path;
   const kind = readOptionalCode(options.kind, parsePromotionKind, "kind", PROMOTION_ZK_KIND_CODE_HELP) ?? "Permanent";
   const maturityCode = readOptionalCode(options.maturity, parseMaturityCode, "maturity", MATURITY_CODE_HELP);
   const title = requireTitle(options.title || source.basename, "ZK title");
@@ -570,17 +573,8 @@ export async function promoteFleeting(ctx: WorkflowContext, options: PromoteFlee
   const path = await uniqueMarkdownPath(ctx.app, joinVaultPath(folder, `${title}.md`));
   const file = await createZkFile(ctx, kind, path, title, { maturityCode });
 
-  await ensureFolder(ctx.app, ctx.settings.paths.fleetingArchiveFolder);
-  const archivedPath = await uniqueMarkdownPath(
-    ctx.app,
-    joinVaultPath(ctx.settings.paths.fleetingArchiveFolder, `${source.basename}.md`)
-  );
-  await ctx.app.fileManager.renameFile(source, archivedPath);
-  const archivedFile = ctx.app.vault.getFileByPath(archivedPath);
-  if (!archivedFile) throw new Error(`failed to archive source at ${archivedPath}`);
-
-  await appendReferenceLine(ctx, file, `- ${wikiLink(archivedPath)}`);
-  await ctx.app.fileManager.processFrontMatter(archivedFile, (fm) => {
+  await appendReferenceLine(ctx, file, `- ${wikiLink(source.path)}`);
+  await ctx.app.fileManager.processFrontMatter(source, (fm) => {
     fm.processed = true;
     fm.promoted_to = linkToFile(file);
   });
@@ -589,8 +583,7 @@ export async function promoteFleeting(ctx: WorkflowContext, options: PromoteFlee
 
   return {
     ...noteResult(file, true, options.open),
-    sourcePath: originalSourcePath,
-    archivedPath,
+    sourcePath: source.path,
     kind
   };
 }
@@ -930,6 +923,7 @@ async function readSurface(
       path: file.path,
       title: file.basename,
       type,
+      archived: isArchivedFile(ctx, file),
       keys: Object.keys(surface),
       ...surface
     };
@@ -939,6 +933,7 @@ async function readSurface(
     path: file.path,
     title: file.basename,
     type,
+    archived: isArchivedFile(ctx, file),
     key,
     value: await readSurfaceKey(ctx, file, surface, key)
   };
@@ -992,6 +987,7 @@ async function readSurfaceKey(
       path: child.path,
       title: child.basename,
       type: readType(fileFrontmatter(ctx, child)),
+      archived: isArchivedFile(ctx, child),
       keys: Object.keys(childSurface),
       ...childSurface
     };
@@ -1007,6 +1003,7 @@ function childIndex(ctx: WorkflowContext, parent: TFile): Record<string, unknown
     const item: Record<string, unknown> = {
       path: file.path,
       type: readType(frontmatter),
+      archived: isArchivedFile(ctx, file),
       key: `children/${file.basename}`,
       keys: keysForSpec(spec)
     };
@@ -1266,7 +1263,7 @@ function folderForZkKind(settings: ParaZkSettings, kind: ZkKind | PromotionZkKin
 function resolveRequiredProject(ctx: WorkflowContext, options: ReadProjectOptions): TFile {
   const file = options.path
     ? resolveRequiredFile(ctx, options.path, "project note")
-    : findProjectByTitle(ctx, requireTitle(options.title, "project title"));
+    : findProjectByTitle(ctx, requireTitle(options.title, "project title"), options.archived);
   if (!file) throw new Error(`project not found: ${options.title}`);
 
   const type = readType(fileFrontmatter(ctx, file));
@@ -1277,7 +1274,7 @@ function resolveRequiredProject(ctx: WorkflowContext, options: ReadProjectOption
 function resolveRequiredArea(ctx: WorkflowContext, options: ReadAreaOptions): TFile {
   const file = options.path
     ? resolveRequiredFile(ctx, options.path, "area note")
-    : findAreaByTitle(ctx, requireTitle(options.title, "area title"));
+    : findAreaByTitleForRead(ctx, requireTitle(options.title, "area title"), options.archived);
   if (!file) throw new Error(`area not found: ${options.title}`);
 
   const type = readType(fileFrontmatter(ctx, file));
@@ -1288,7 +1285,7 @@ function resolveRequiredArea(ctx: WorkflowContext, options: ReadAreaOptions): TF
 function resolveRequiredResource(ctx: WorkflowContext, options: ReadResourceOptions): TFile {
   const file = options.path
     ? resolveRequiredFile(ctx, options.path, "resource note")
-    : findResourceByTitle(ctx, requireTitle(options.title, "resource title"));
+    : findResourceByTitle(ctx, requireTitle(options.title, "resource title"), options.archived);
   if (!file) throw new Error(`resource not found: ${options.title}`);
 
   const type = readType(fileFrontmatter(ctx, file));
@@ -1323,7 +1320,7 @@ function resolveRequiredJournal(ctx: WorkflowContext, options: ReadJournalOption
 function resolveRequiredRetro(ctx: WorkflowContext, options: ReadRetroOptions): TFile {
   const file = options.path
     ? resolveRequiredFile(ctx, options.path, "retro note")
-    : findRetroByTitle(ctx, requireTitle(options.title, "retro title"), options.date);
+    : findRetroByTitle(ctx, requireTitle(options.title, "retro title"), options.date, options.archived);
   if (!file) throw new Error(`retro not found: ${options.title}`);
 
   const type = readType(fileFrontmatter(ctx, file));
@@ -1345,50 +1342,62 @@ function resolveOptionalFile(ctx: WorkflowContext, path: string | undefined): TF
   return file;
 }
 
-function findProjectByTitle(ctx: WorkflowContext, title: string): TFile | undefined {
-  const canonicalPaths = [
-    joinVaultPath(ctx.settings.paths.projectsFolder, title, `${title}.md`),
-    joinVaultPath(ctx.settings.paths.projectsFolder, `${title}.md`)
-  ];
+function findProjectByTitle(ctx: WorkflowContext, title: string, archived: boolean | undefined): TFile | undefined {
+  const folders = archiveAwareFolders(ctx, ctx.settings.paths.projectsFolder, archived);
+  const canonicalPaths = folders.flatMap((folder) => folderStyleCanonicalPaths(folder, title));
 
   for (const path of canonicalPaths) {
     const file = ctx.app.vault.getFileByPath(path);
     if (file) return file;
   }
 
-  const projectFiles = ctx.app.vault.getMarkdownFiles().filter((file) => {
-    const frontmatter = fileFrontmatter(ctx, file);
-    return frontmatter.type === "project" && isInFolder(file, ctx.settings.paths.projectsFolder);
+  return findUniqueNoteByTitle(ctx, {
+    title,
+    folders,
+    type: "project",
+    label: "project"
   });
-  const exactMatches = projectFiles.filter((file) => file.basename === title);
-  if (exactMatches.length === 1) return exactMatches[0];
-  if (exactMatches.length > 1) throw new Error(`project title is ambiguous: ${title}`);
-
-  const foldedTitle = title.toLocaleLowerCase();
-  const foldedMatches = projectFiles.filter((file) => file.basename.toLocaleLowerCase() === foldedTitle);
-  if (foldedMatches.length === 1) return foldedMatches[0];
-  if (foldedMatches.length > 1) throw new Error(`project title is ambiguous: ${title}`);
-
-  return undefined;
 }
 
-function findResourceByTitle(ctx: WorkflowContext, title: string): TFile | undefined {
-  const canonicalPath = joinVaultPath(ctx.settings.paths.resourcesFolder, `${title}.md`);
-  const canonical = ctx.app.vault.getFileByPath(canonicalPath);
-  if (canonical) return canonical;
+function findAreaByTitleForRead(ctx: WorkflowContext, title: string, archived: boolean | undefined): TFile | undefined {
+  const folders = archiveAwareFolders(ctx, ctx.settings.paths.areasFolder, archived);
+  const canonicalPaths = folders.flatMap((folder) => folderStyleCanonicalPaths(folder, title));
+
+  for (const path of canonicalPaths) {
+    const file = ctx.app.vault.getFileByPath(path);
+    if (file) return file;
+  }
 
   return findUniqueNoteByTitle(ctx, {
     title,
-    folder: ctx.settings.paths.resourcesFolder,
+    folders,
+    type: "area",
+    label: "area"
+  });
+}
+
+function findResourceByTitle(ctx: WorkflowContext, title: string, archived: boolean | undefined): TFile | undefined {
+  const folders = archiveAwareFolders(ctx, ctx.settings.paths.resourcesFolder, archived);
+
+  for (const folder of folders) {
+    const file = ctx.app.vault.getFileByPath(joinVaultPath(folder, `${title}.md`));
+    if (file) return file;
+  }
+
+  return findUniqueNoteByTitle(ctx, {
+    title,
+    folders,
     type: "resource",
     label: "resource"
   });
 }
 
-function findZkByTitle(ctx: WorkflowContext, title: string, kind: ZkKind | undefined): TFile | undefined {
-  const folders = kind
-    ? [folderForZkKind(ctx.settings, kind)]
-    : [ctx.settings.paths.fleetingFolder, ctx.settings.paths.literatureFolder, ctx.settings.paths.permanentFolder];
+function findZkByTitle(
+  ctx: WorkflowContext,
+  title: string,
+  kind: ZkKind | undefined
+): TFile | undefined {
+  const folders = zkSearchFolders(ctx, kind);
 
   for (const folder of folders) {
     const file = ctx.app.vault.getFileByPath(joinVaultPath(folder, `${title}.md`));
@@ -1398,20 +1407,25 @@ function findZkByTitle(ctx: WorkflowContext, title: string, kind: ZkKind | undef
   const expectedType = kind ? typeForZkKind(kind) : undefined;
   return findUniqueNoteByTitle(ctx, {
     title,
-    folder: ctx.settings.paths.zkFolder,
+    folders,
     type: expectedType,
     typePrefix: expectedType ? undefined : "zk_",
     label: "ZK note"
   });
 }
 
-function findRetroByTitle(ctx: WorkflowContext, title: string, date: string | undefined): TFile | undefined {
-  const folder = date
+function findRetroByTitle(
+  ctx: WorkflowContext,
+  title: string,
+  date: string | undefined,
+  archived: boolean | undefined
+): TFile | undefined {
+  const activeFolder = date
     ? joinVaultPath(ctx.settings.paths.retrosFolder, isoWeekInfo(dateFromCli(date)).weekIso.replace("-", "_"))
     : ctx.settings.paths.retrosFolder;
   return findUniqueNoteByTitle(ctx, {
     title,
-    folder,
+    folders: archiveAwareFolders(ctx, activeFolder, archived),
     type: "retro",
     label: "retro"
   });
@@ -1421,7 +1435,7 @@ function findUniqueNoteByTitle(
   ctx: WorkflowContext,
   options: {
     title: string;
-    folder: string;
+    folders: string[];
     type?: string;
     typePrefix?: string;
     label: string;
@@ -1429,7 +1443,7 @@ function findUniqueNoteByTitle(
 ): TFile | undefined {
   const files = ctx.app.vault.getMarkdownFiles().filter((file) => {
     const type = readType(fileFrontmatter(ctx, file));
-    return isInFolder(file, options.folder)
+    return options.folders.some((folder) => isInFolder(file, folder))
       && (!options.type || type === options.type)
       && (!options.typePrefix || type.startsWith(options.typePrefix));
   });
@@ -1452,6 +1466,53 @@ function journalPath(ctx: WorkflowContext, date: string | undefined): string {
 
 function typeForZkKind(kind: ZkKind): string {
   return `zk_${kind.toLowerCase()}`;
+}
+
+function archiveAwareFolders(ctx: WorkflowContext, activeFolder: string, archived: boolean | undefined): string[] {
+  const active = normalizeVaultPath(activeFolder);
+  const archive = archivedCounterpartFolder(ctx, active);
+  if (archived === true) return [archive];
+  if (archived === false) return [active];
+  return [active, archive];
+}
+
+function archivedCounterpartFolder(ctx: WorkflowContext, activeFolder: string): string {
+  const normalized = normalizeVaultPath(activeFolder);
+  const mappings = [
+    ctx.settings.paths.projectsFolder,
+    ctx.settings.paths.areasFolder,
+    ctx.settings.paths.resourcesFolder,
+    ctx.settings.paths.retrosFolder
+  ].map((folder) => normalizeVaultPath(folder));
+
+  for (const base of mappings) {
+    if (normalized !== base && !normalized.startsWith(`${base}/`)) continue;
+    const relative = normalized === base ? "" : normalized.slice(base.length + 1);
+    return joinVaultPath(ctx.settings.paths.archivesFolder, folderName(base), relative);
+  }
+
+  return joinVaultPath(ctx.settings.paths.archivesFolder, folderName(normalized));
+}
+
+function folderStyleCanonicalPaths(folder: string, title: string): string[] {
+  return [
+    joinVaultPath(folder, title, `${title}.md`),
+    joinVaultPath(folder, `${title}.md`)
+  ];
+}
+
+function zkSearchFolders(ctx: WorkflowContext, kind: ZkKind | undefined): string[] {
+  return kind
+    ? [folderForZkKind(ctx.settings, kind)]
+    : [ctx.settings.paths.fleetingFolder, ctx.settings.paths.literatureFolder, ctx.settings.paths.permanentFolder];
+}
+
+function isArchivedFile(ctx: WorkflowContext, file: TFile): boolean {
+  return isInFolder(file, ctx.settings.paths.archivesFolder);
+}
+
+function folderName(path: string): string {
+  return normalizeVaultPath(path).split("/").filter(Boolean).pop() ?? "";
 }
 
 function requireTitle(value: string | undefined, label: string): string {

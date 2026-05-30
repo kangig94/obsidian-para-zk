@@ -210,6 +210,23 @@ function runWorkflowScenario(today) {
   ]);
   assert(subnoteTypeRead.value === "meeting", "project child frontmatter key read failed");
 
+  const archivedProject = createArchivedProjectCopy(project, projectTitle);
+  const archivedProjectRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    "archived=true",
+    "format=json"
+  ]);
+  assert(archivedProjectRead.path === archivedProject.path, "archived project read selected the wrong path");
+  assert(archivedProjectRead.archived === true, "archived project read did not mark archived=true");
+
+  const archivedProjectStatusRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    "archived=true",
+    "key=frontmatter/status",
+    "format=json"
+  ]);
+  assert(archivedProjectStatusRead.value === "archived", "archived project status key read failed");
+
   const subarea = cliJson("para-zk:create-subarea", [
     `title=Smoke Subarea ${stamp}`,
     `path=${area.path}`,
@@ -331,6 +348,7 @@ function runWorkflowScenario(today) {
     createdArea,
     reference,
     project,
+    archivedProject,
     subnote,
     subarea,
     resource,
@@ -356,6 +374,45 @@ function assertLegacyPathAliasRejected(projectPath) {
   );
 }
 
+function createArchivedProjectCopy(project, title) {
+  const archived = guiJson(`(async () => {
+    const sourcePath = ${JSON.stringify(project.path)};
+    const title = ${JSON.stringify(title)};
+    const folder = ["PARA/Archives/Projects", title].join("/");
+    const targetPath = [folder, title + ".md"].join("/");
+
+    async function ensureFolder(path) {
+      let current = "";
+      for (const part of path.split("/").filter(Boolean)) {
+        current = current ? current + "/" + part : part;
+        if (!app.vault.getAbstractFileByPath(current)) await app.vault.createFolder(current);
+      }
+    }
+
+    await ensureFolder(folder);
+    const source = app.vault.getFileByPath(sourcePath);
+    if (!source) throw new Error("source project not found: " + sourcePath);
+
+    const existing = app.vault.getFileByPath(targetPath);
+    const content = await app.vault.read(source);
+    const target = existing ?? (await app.vault.create(targetPath, content));
+    if (existing) await app.vault.modify(existing, content);
+    await app.fileManager.processFrontMatter(target, (fm) => {
+      fm.status = "archived";
+    });
+
+    for (let index = 0; index < 20; index += 1) {
+      if (app.metadataCache.getFileCache(target)?.frontmatter?.status === "archived") break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    console.log(JSON.stringify({ ok: true, path: targetPath }));
+  })()`);
+
+  assert(archived.ok === true, "archived project copy failed");
+  return archived;
+}
+
 function assertDryRunInit() {
   const dryRun = cliJson("para-zk:init", [
     "dryRun=true",
@@ -377,6 +434,9 @@ function assertWorkflowFiles(result) {
     "[Reference URL](https://example.com/reference)",
     `[[${result.resource.path}|${result.resource.title}]]`
   ]);
+  assertFileContains(result.archivedProject.path, [
+    "status: archived"
+  ]);
   assertFileContains(result.subnote.path, [
     "type: doc",
     "subnote_type: meeting",
@@ -397,13 +457,13 @@ function assertWorkflowFiles(result) {
   assertFileContains(result.promotedFleeting.path, [
     "type: zk_permanent",
     "maturity: evergreen",
-    `[[${result.promotedFleeting.archivedPath}]]`
+    `[[${result.fleeting.path}]]`
   ]);
-  assertFileContains(result.promotedFleeting.archivedPath, [
+  assertFileContains(result.fleeting.path, [
     "processed: true",
     result.promotedFleeting.path
   ]);
-  assert(!existsSync(join(vaultPath, result.fleeting.path)), "fleeting source was not archived");
+  assert(existsSync(join(vaultPath, result.fleeting.path)), "fleeting source should remain in place after promotion");
   assertFileContains(result.journal.path, [`Smoke memo ${stamp}`]);
   assertFileContains(result.retro.path, [
     "type: retro",
@@ -419,10 +479,10 @@ function smokeSummary(result) {
     paths: {
       area: result.area.path,
       project: result.project.path,
+      archivedProject: result.archivedProject.path,
       subnote: result.subnote.path,
       subarea: result.subarea.path,
       resource: result.resource.path,
-      fleetingArchive: result.promotedFleeting.archivedPath,
       promotedResource: result.promotedResource.path,
       promotedFleeting: result.promotedFleeting.path,
       journal: result.journal.path,

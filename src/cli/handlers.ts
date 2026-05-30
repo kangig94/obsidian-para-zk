@@ -75,6 +75,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     options: {
       title: { value: "<title>", description: "Project title. Used when path is omitted." },
       path: { value: "<path>", description: "Project note path for exact selection." },
+      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
       key: { value: "<map-path>", description: "Optional stable key such as frontmatter/status, summary, children, or children/<title>/body." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -84,6 +85,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       const result = await readProject(workflowContext(plugin), {
         title: readCliTitle(args),
         path: readCliPath(args),
+        archived: readCliBoolean(args, "archived"),
         key: readCliString(args, "key")
       });
       return { ...result };
@@ -95,6 +97,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     options: {
       title: { value: "<title>", description: "Area title. Used when path is omitted." },
       path: { value: "<path>", description: "Area note path for exact selection." },
+      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
       key: { value: "<map-path>", description: "Optional stable key such as overview, references, children, or children/<title>/overview." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -104,6 +107,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       const result = await readArea(workflowContext(plugin), {
         title: readCliTitle(args),
         path: readCliPath(args),
+        archived: readCliBoolean(args, "archived"),
         key: readCliString(args, "key")
       });
       return { ...result };
@@ -115,6 +119,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     options: {
       title: { value: "<title>", description: "Resource title. Used when path is omitted." },
       path: { value: "<path>", description: "Resource note path for exact selection." },
+      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
       key: { value: "<map-path>", description: "Optional stable key such as overview, body, or references." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -124,6 +129,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       const result = await readResource(workflowContext(plugin), {
         title: readCliTitle(args),
         path: readCliPath(args),
+        archived: readCliBoolean(args, "archived"),
         key: readCliString(args, "key")
       });
       return { ...result };
@@ -178,6 +184,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       title: { value: "<title>", description: "Retro note title. Used when path is omitted." },
       path: { value: "<path>", description: "Retro note path for exact selection." },
       date: { value: "<YYYY-MM-DD>", description: "Optional date used to narrow the ISO week folder." },
+      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
       key: { value: "<map-path>", description: "Optional stable key such as week_progress, next_actions, or retro_summary." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -188,6 +195,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
         title: readCliTitle(args),
         path: readCliPath(args),
         date: readCliString(args, "date"),
+        archived: readCliBoolean(args, "archived"),
         key: readCliString(args, "key")
       });
       return { ...result };
@@ -422,7 +430,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
   },
   {
     command: "para-zk:promote-fleeting",
-    description: "Promote a fleeting note to Literature or Permanent and archive the source",
+    description: "Promote a fleeting note to Literature or Permanent and mark the source processed",
     options: {
       path: { value: "<path>", description: "Source fleeting note path." },
       title: { value: "<title>", description: "New ZK note title." },

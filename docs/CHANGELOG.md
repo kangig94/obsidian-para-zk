@@ -37,6 +37,9 @@ Notable changes for PARA-ZK are tracked here.
   `read-journal`, and `read-retro` for reading editable surfaces by stable map
   keys such as `frontmatter/status`, `children`, and
   `children/<child note title>/body`.
+- Added `archived=true` lookup for PARA read commands so projects, areas,
+  resources, and retros can be read from `PARA/Archives` without using exact
+  paths.
 - Added native Home dashboard action rendering with `para-zk-dashboard-actions`.
 - Added native dashboard summary card rendering with `para-zk-dashboard-summary`.
 - Added a first-read project intent document for LLM agents and contributors.
@@ -72,9 +75,14 @@ Notable changes for PARA-ZK are tracked here.
   after a clean init.
 - The disposable-vault smoke test now validates GUI command labels, ribbon
   labels, and ribbon ordering across English and Korean locale changes.
+- Promoting a fleeting note now keeps the source note in `ZK/Fleeting`, marks it
+  `processed: true`, and records `promoted_to` instead of moving it to an
+  archive folder.
 
 ### Removed
 
 - Removed the need for Meta Bind in generated PARA-ZK templates and dashboards.
 - Removed DataviewJS-only card rendering for dashboard summary sections.
 - Removed the separate `sync-managed-files` GUI command.
+- Removed the `ZK/Fleeting/Archives` layout folder because fleeting notes are
+  completed by `processed: true`, not by archive movement.

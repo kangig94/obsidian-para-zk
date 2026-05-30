@@ -224,6 +224,7 @@ Options:
 | --- | --- | --- |
 | `title` | string | Project title. Used when `path` is omitted. |
 | `path` | path | Optional exact project note path. |
+| `archived` | boolean | When selecting by title, `true` restricts lookup to `PARA/Archives`; `false` restricts lookup to the active PARA folder. |
 | `key` | map path | Optional stable key path. |
 
 Top-level keys:
@@ -250,6 +251,7 @@ stable keys, so automation can read a returned path without guessing:
     "Planning Meeting": {
       "path": "PARA/Projects/Model Evaluation/Planning Meeting.md",
       "type": "doc",
+      "archived": false,
       "key": "children/Planning Meeting",
       "subnote_type": "meeting",
       "keys": ["frontmatter", "body"]
@@ -260,6 +262,7 @@ stable keys, so automation can read a returned path without guessing:
 
 Important fields:
 
+- `archived`: true when the selected note is under `PARA/Archives`.
 - `frontmatter`: editable project fields only, such as `status`, `priority`,
   `areas`, `start_date`, `due_date`, and `done_date`.
 - `children`: child-note index; child bodies are read only when requested with
@@ -269,6 +272,9 @@ Important fields:
 The same map-path read algorithm is used by the other domain read commands. The
 command selects the target note, builds that note type's stable surface map, and
 then resolves `key` as a `/`-separated map path.
+When selecting by `title`, `read-project`, `read-area`, `read-resource`, and
+`read-retro` accept `archived=true` to select the matching note under
+`PARA/Archives`.
 
 | Command | Selector | Top-level keys |
 | --- | --- | --- |
@@ -290,6 +296,7 @@ Examples:
 
 ```bash
 optsidian raw para-zk:read-area title="AI" key=children format=json
+optsidian raw para-zk:read-project title="Finished Project" archived=true key=summary format=json
 optsidian raw para-zk:read-resource title="Source Paper" key=body format=json
 optsidian raw para-zk:read-zk title="Stable Interface Contracts" kind=permanent key=frontmatter/maturity format=json
 optsidian raw para-zk:read-journal date=2026-05-30 key=quick_memo format=json
@@ -566,7 +573,8 @@ Important fields:
 
 ### `para-zk:promote-fleeting`
 
-Promotes a fleeting note into Literature or Permanent and archives the source.
+Promotes a fleeting note into Literature or Permanent and marks the source as
+processed in place.
 
 Options:
 
@@ -592,14 +600,13 @@ optsidian raw para-zk:promote-fleeting \
 Important fields:
 
 - `sourcePath`
-- `archivedPath`
 - `kind`
 
 Side effects:
 
 - Creates a target ZK note.
-- Moves the original fleeting note into `ZK/Fleeting/Archives`.
-- Sets `processed: true` and `promoted_to` on the archived source.
+- Links the target note back to the source fleeting note.
+- Sets `processed: true` and `promoted_to` on the source fleeting note.
 
 ## Smoke Test
 
