@@ -1,4 +1,4 @@
-import { Modal, Notice, Setting, setIcon, TFile, type MarkdownPostProcessorContext } from "obsidian";
+import { DropdownComponent, Modal, Notice, Setting, setIcon, TFile, type MarkdownPostProcessorContext } from "obsidian";
 import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { localDate } from "../time";
@@ -20,6 +20,23 @@ type TaskBlockArgs = {
   due?: "today" | "upcoming7" | "upcoming30";
   query?: string;
   limit?: number;
+  order?: TaskOrder;
+};
+
+type TaskOrder = "smart" | "manual" | "due" | "priority" | "status" | "name";
+type TaskStatusFilter = "all" | "open" | "done";
+type TaskDueFilter = "any" | "today" | "upcoming7" | "upcoming30" | "none";
+type TaskPriorityFilter = "any" | "high";
+
+type TaskToolbarState = {
+  order: TaskOrder;
+  status: TaskStatusFilter;
+  due: TaskDueFilter;
+  priority: TaskPriorityFilter;
+  query: string;
+  searchActive: boolean;
+  searchComposing: boolean;
+  searchTimer?: number;
 };
 
 type RenderableTask = {
@@ -35,6 +52,8 @@ type TaskMetaChip = {
 };
 
 type TaskEditValue = Pick<TaskRead, "name" | "priority" | "due" | "scheduled" | "start">;
+
+const taskToolbarStates = new WeakMap<HTMLElement, TaskToolbarState>();
 
 export function registerTaskRenderers(plugin: ParaZkPluginContext): void {
   plugin.registerMarkdownCodeBlockProcessor("para-zk-tasks", (source, el, ctx) => {
@@ -54,7 +73,7 @@ async function renderTaskBlock(
   el.addClass("para-zk-tasks");
 
   const rootFile = args.root === "current"
-    ? plugin.app.vault.getFileByPath(ctx.sourcePath)
+    ? plugin.app.vault.getFileByPath(ctx.sourcePath) ?? undefined
     : undefined;
 
   if (args.root === "current" && !(rootFile instanceof TFile)) {
@@ -62,34 +81,19 @@ async function renderTaskBlock(
     return;
   }
 
-  if (args.root === "current" && rootFile) {
-    const controls = el.createDiv({ cls: "para-zk-task-controls" });
-    const addButton = controls.createEl("button", {
-      cls: "para-zk-task-add",
-      text: t.labels.addTask
-    });
-    addButton.type = "button";
-    addButton.addEventListener("click", async () => {
-      await runTaskAction(plugin, addButton, async () => {
-        const name = await promptText(
-          plugin.app,
-          t.labels.tasks,
-          t.labels.title,
-          "",
-          t.labels.confirm,
-          t.labels.cancel
-        );
-        if (!name) return;
-        await insertRootTask(taskContext(plugin), rootFile, { name });
-        await renderTaskBlock(plugin, source, el, ctx);
-      });
-    });
-  }
-
   const items = args.root === "current" && rootFile
     ? await currentRootTasks(plugin, rootFile)
     : await allRootTasks(plugin);
-  const visible = filteredTasks(items, args);
+  const state = taskToolbarState(el, args);
+  const visible = filteredTasks(items, args, state);
+
+  renderTaskToolbar(plugin, el, source, ctx, {
+    args,
+    rootFile,
+    items,
+    visible,
+    state
+  });
 
   if (visible.length === 0) {
     el.createDiv({ cls: "para-zk-task-empty", text: t.labels.noTasks });
@@ -103,6 +107,175 @@ async function renderTaskBlock(
       rerender: () => renderTaskBlock(plugin, source, el, ctx)
     });
   }
+}
+
+function renderTaskToolbar(
+  plugin: ParaZkPluginContext,
+  el: HTMLElement,
+  source: string,
+  ctx: MarkdownPostProcessorContext,
+  options: {
+    args: TaskBlockArgs;
+    rootFile?: TFile;
+    items: RenderableTask[];
+    visible: RenderableTask[];
+    state: TaskToolbarState;
+  }
+): void {
+  const labels = localePack(plugin.settings.locale).labels;
+  const toolbar = el.createDiv({ cls: "para-zk-task-toolbar" });
+  const heading = toolbar.createDiv({ cls: "para-zk-task-toolbar-heading" });
+  heading.createDiv({ cls: "para-zk-task-toolbar-summary", text: taskSummaryText(options.items, options.visible, labels) });
+
+  const controls = toolbar.createDiv({ cls: "para-zk-task-toolbar-controls" });
+  if (options.args.root === "current" && options.rootFile) {
+    const addButton = controls.createEl("button", {
+      cls: "para-zk-task-toolbar-button para-zk-task-add"
+    });
+    addButton.type = "button";
+    addButton.setAttr("aria-label", labels.addTask);
+    addButton.setAttr("title", labels.addTask);
+    setIcon(addButton, "plus");
+    addButton.createSpan({ text: labels.addTask });
+    addButton.addEventListener("click", async () => {
+      await runTaskAction(plugin, addButton, async () => {
+        const name = await promptText(
+          plugin.app,
+          labels.tasks,
+          labels.title,
+          "",
+          labels.confirm,
+          labels.cancel
+        );
+        if (!name || !options.rootFile) return;
+        await insertRootTask(taskContext(plugin), options.rootFile, { name });
+        await renderTaskBlock(plugin, source, el, ctx);
+      });
+    });
+  }
+
+  renderToolbarSelect(controls, {
+    label: labels.taskOrder,
+    value: options.state.order,
+    options: taskOrderOptions(labels),
+    onChange: (value) => {
+      options.state.order = value as TaskOrder;
+      void renderTaskBlock(plugin, source, el, ctx);
+    }
+  });
+  renderToolbarSelect(controls, {
+    label: labels.status,
+    value: options.state.status,
+    options: taskStatusOptions(labels),
+    onChange: (value) => {
+      options.state.status = value as TaskStatusFilter;
+      void renderTaskBlock(plugin, source, el, ctx);
+    }
+  });
+  renderToolbarSelect(controls, {
+    label: labels.dueDate,
+    value: options.state.due,
+    options: taskDueOptions(labels),
+    onChange: (value) => {
+      options.state.due = value as TaskDueFilter;
+      void renderTaskBlock(plugin, source, el, ctx);
+    }
+  });
+  renderToolbarSelect(controls, {
+    label: labels.priority,
+    value: options.state.priority,
+    options: taskPriorityOptions(labels),
+    onChange: (value) => {
+      options.state.priority = value as TaskPriorityFilter;
+      void renderTaskBlock(plugin, source, el, ctx);
+    }
+  });
+  renderTaskSearch(plugin, controls, el, source, ctx, options.state);
+}
+
+function renderToolbarSelect(
+  parent: HTMLElement,
+  options: {
+    label: string;
+    value: string;
+    options: Array<{ value: string; label: string }>;
+    onChange: (value: string) => void;
+  }
+): void {
+  const wrap = parent.createDiv({ cls: "para-zk-task-toolbar-select" });
+  const dropdown = new DropdownComponent(wrap);
+  dropdown.selectEl.setAttr("aria-label", options.label);
+  dropdown.selectEl.setAttr("title", options.label);
+  for (const item of options.options) {
+    dropdown.addOption(item.value, item.label);
+  }
+  dropdown.setValue(options.value);
+  dropdown.onChange((value) => {
+    dropdown.selectEl.blur();
+    window.setTimeout(() => options.onChange(value), 0);
+  });
+}
+
+function renderTaskSearch(
+  plugin: ParaZkPluginContext,
+  parent: HTMLElement,
+  el: HTMLElement,
+  source: string,
+  ctx: MarkdownPostProcessorContext,
+  state: TaskToolbarState
+): void {
+  const labels = localePack(plugin.settings.locale).labels;
+  const search = parent.createDiv({ cls: `para-zk-task-search${state.searchActive || state.query ? " is-active" : ""}` });
+  const icon = search.createSpan({ cls: "para-zk-task-search-icon" });
+  setIcon(icon, "search");
+  const input = search.createEl("input", {
+    attr: {
+      "aria-label": labels.taskSearch,
+      placeholder: labels.taskSearch,
+      type: "search"
+    }
+  });
+  input.value = state.query;
+  input.addEventListener("focus", () => {
+    state.searchActive = true;
+  });
+  input.addEventListener("blur", () => {
+    state.searchActive = Boolean(state.query);
+  });
+  input.addEventListener("compositionstart", () => {
+    state.searchComposing = true;
+  });
+  input.addEventListener("compositionend", () => {
+    state.searchComposing = false;
+    state.query = input.value;
+    state.searchActive = true;
+    scheduleTaskSearchRender(plugin, el, source, ctx, state);
+  });
+  input.addEventListener("input", () => {
+    state.query = input.value;
+    state.searchActive = true;
+    if (!state.searchComposing) scheduleTaskSearchRender(plugin, el, source, ctx, state);
+  });
+  if (state.searchActive || state.query) {
+    window.setTimeout(() => {
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    }, 0);
+  }
+}
+
+function scheduleTaskSearchRender(
+  plugin: ParaZkPluginContext,
+  el: HTMLElement,
+  source: string,
+  ctx: MarkdownPostProcessorContext,
+  state: TaskToolbarState
+): void {
+  if (state.searchTimer !== undefined) window.clearTimeout(state.searchTimer);
+  state.searchTimer = window.setTimeout(() => {
+    state.searchTimer = undefined;
+    void renderTaskBlock(plugin, source, el, ctx);
+  }, 120);
 }
 
 async function currentRootTasks(plugin: ParaZkPluginContext, rootFile: TFile): Promise<RenderableTask[]> {
@@ -355,28 +528,50 @@ class TaskEditModal extends Modal {
   }
 }
 
-function filteredTasks(items: RenderableTask[], args: TaskBlockArgs): RenderableTask[] {
-  const query = args.query?.toLocaleLowerCase();
+function taskToolbarState(el: HTMLElement, args: TaskBlockArgs): TaskToolbarState {
+  const existing = taskToolbarStates.get(el);
+  if (existing) return existing;
+
+  const state: TaskToolbarState = {
+    order: args.order ?? "smart",
+    status: initialStatusFilter(args.checkbox),
+    due: args.due ?? "any",
+    priority: "any",
+    query: args.query ?? "",
+    searchActive: Boolean(args.query),
+    searchComposing: false
+  };
+  taskToolbarStates.set(el, state);
+  return state;
+}
+
+function initialStatusFilter(value: TaskBlockArgs["checkbox"]): TaskStatusFilter {
+  if (value === "done") return "done";
+  if (value === "open") return "open";
+  return "all";
+}
+
+function filteredTasks(items: RenderableTask[], args: TaskBlockArgs, state: TaskToolbarState): RenderableTask[] {
+  const query = state.query.trim().toLocaleLowerCase();
   return items
-    .filter((item) => checkboxMatches(item.task.checkbox, args.checkbox))
-    .filter((item) => dueMatches(item.task.due, args.due))
+    .filter((item) => statusMatches(item.task.checkbox, state.status))
+    .filter((item) => dueMatches(item.task.due, state.due))
+    .filter((item) => priorityMatches(item.task.priority, state.priority))
     .filter((item) => !query || taskSearchText(item).toLocaleLowerCase().includes(query))
-    .sort(compareTasks)
+    .sort((left, right) => compareTasks(left, right, state.order))
     .slice(0, args.limit);
 }
 
-function checkboxMatches(value: string, filter: TaskBlockArgs["checkbox"]): boolean {
-  if (!filter) return true;
-  const normalized = filter.trim().toLocaleLowerCase();
-  if (normalized === "open") return value.toLocaleLowerCase() !== "x";
-  if (normalized === "done") return value.toLocaleLowerCase() === "x";
-  if (normalized === "space" || normalized === "blank" || normalized === "todo") return value === " ";
-  return value === filter;
+function statusMatches(value: string, filter: TaskStatusFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "done") return value.toLocaleLowerCase() === "x";
+  return value.toLocaleLowerCase() !== "x" && value !== "-";
 }
 
-function dueMatches(value: string | undefined, filter: TaskBlockArgs["due"]): boolean {
-  if (!filter) return true;
+function dueMatches(value: string | undefined, filter: TaskDueFilter): boolean {
+  if (filter === "any") return true;
   const due = value?.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+  if (filter === "none") return !due;
   if (!due) return false;
   const today = localDate(new Date());
   if (filter === "today") return due === today;
@@ -384,9 +579,36 @@ function dueMatches(value: string | undefined, filter: TaskBlockArgs["due"]): bo
   return due > addDays(today, 7) && due <= addDays(today, 30);
 }
 
-function compareTasks(left: RenderableTask, right: RenderableTask): number {
+function priorityMatches(value: string | undefined, filter: TaskPriorityFilter): boolean {
+  if (filter === "any") return true;
+  return value === "high" || value === "highest";
+}
+
+function compareTasks(left: RenderableTask, right: RenderableTask, order: TaskOrder): number {
+  if (order === "manual") return 0;
+  if (order === "due") {
+    return stringCompare(left.task.due, right.task.due)
+      || priorityRank(right.task.priority) - priorityRank(left.task.priority)
+      || left.task.name.localeCompare(right.task.name);
+  }
+  if (order === "priority") {
+    return priorityRank(right.task.priority) - priorityRank(left.task.priority)
+      || stringCompare(left.task.due, right.task.due)
+      || left.task.name.localeCompare(right.task.name);
+  }
+  if (order === "status") {
+    return statusRank(left.task.checkbox) - statusRank(right.task.checkbox)
+      || stringCompare(left.task.due, right.task.due)
+      || priorityRank(right.task.priority) - priorityRank(left.task.priority)
+      || left.task.name.localeCompare(right.task.name);
+  }
+  if (order === "name") {
+    return left.task.name.localeCompare(right.task.name)
+      || stringCompare(left.task.due, right.task.due);
+  }
   return priorityRank(right.task.priority) - priorityRank(left.task.priority)
     || stringCompare(left.task.due, right.task.due)
+    || statusRank(left.task.checkbox) - statusRank(right.task.checkbox)
     || left.rootTitle.localeCompare(right.rootTitle)
     || left.task.name.localeCompare(right.task.name);
 }
@@ -407,6 +629,62 @@ function stringCompare(left: string | undefined, right: string | undefined): num
   if (!left) return 1;
   if (!right) return -1;
   return left.localeCompare(right);
+}
+
+function statusRank(value: string): number {
+  const normalized = value.trim().toLocaleLowerCase();
+  if (!normalized) return 0;
+  if (normalized === "/" || normalized === ">") return 1;
+  if (normalized === "x") return 2;
+  if (normalized === "-") return 3;
+  return 1;
+}
+
+function taskSummaryText(items: RenderableTask[], visible: RenderableTask[], labels: Record<string, string>): string {
+  const open = items.filter((item) => statusMatches(item.task.checkbox, "open")).length;
+  const dueToday = items.filter((item) => statusMatches(item.task.checkbox, "open") && dueMatches(item.task.due, "today")).length;
+  const summary = [
+    `${open} ${labels.taskOpenCount}`,
+    `${dueToday} ${labels.taskTodayCount}`
+  ];
+  if (visible.length !== items.length) summary.push(`${visible.length}/${items.length} ${labels.taskShownCount}`);
+  return summary.join(" · ");
+}
+
+function taskOrderOptions(labels: Record<string, string>): Array<{ value: TaskOrder; label: string }> {
+  return [
+    { value: "smart", label: labels.taskOrderSmart },
+    { value: "manual", label: labels.taskOrderManual },
+    { value: "due", label: labels.taskOrderDue },
+    { value: "priority", label: labels.taskOrderPriority },
+    { value: "status", label: labels.taskOrderStatus },
+    { value: "name", label: labels.taskOrderName }
+  ];
+}
+
+function taskStatusOptions(labels: Record<string, string>): Array<{ value: TaskStatusFilter; label: string }> {
+  return [
+    { value: "open", label: labels.taskFilterOpen },
+    { value: "all", label: labels.taskFilterAll },
+    { value: "done", label: labels.taskFilterDone }
+  ];
+}
+
+function taskDueOptions(labels: Record<string, string>): Array<{ value: TaskDueFilter; label: string }> {
+  return [
+    { value: "any", label: labels.taskDueAny },
+    { value: "today", label: labels.today },
+    { value: "upcoming7", label: labels.upcoming7 },
+    { value: "upcoming30", label: labels.upcoming30 },
+    { value: "none", label: labels.taskDueNone }
+  ];
+}
+
+function taskPriorityOptions(labels: Record<string, string>): Array<{ value: TaskPriorityFilter; label: string }> {
+  return [
+    { value: "any", label: labels.taskPriorityAny },
+    { value: "high", label: labels.taskPriorityHigh }
+  ];
 }
 
 function taskMeta(task: TaskRead): TaskMetaChip[] {
@@ -458,13 +736,29 @@ function parseTaskBlockArgs(source: string): TaskBlockArgs {
     checkbox: raw.checkbox,
     due: parseDueFilter(raw.due),
     query: raw.query?.trim() || undefined,
-    limit: Number.isInteger(limit) && limit > 0 ? limit : 50
+    limit: Number.isInteger(limit) && limit > 0 ? limit : 50,
+    order: parseTaskOrder(raw.order)
   };
 }
 
 function parseDueFilter(value: string | undefined): TaskBlockArgs["due"] {
   const normalized = value?.trim();
   if (normalized === "today" || normalized === "upcoming7" || normalized === "upcoming30") return normalized;
+  return undefined;
+}
+
+function parseTaskOrder(value: string | undefined): TaskOrder | undefined {
+  const normalized = value?.trim();
+  if (
+    normalized === "smart"
+    || normalized === "manual"
+    || normalized === "due"
+    || normalized === "priority"
+    || normalized === "status"
+    || normalized === "name"
+  ) {
+    return normalized;
+  }
   return undefined;
 }
 

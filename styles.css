@@ -306,19 +306,116 @@
   margin: 0.75em 0 1em;
 }
 
-.para-zk-task-controls {
+.para-zk-task-toolbar {
   align-items: center;
   display: flex;
-  gap: 8px;
-  justify-content: flex-start;
-  margin-bottom: 8px;
+  gap: 10px;
+  justify-content: space-between;
+  margin-bottom: 7px;
+  min-width: 0;
+}
+
+.para-zk-task-toolbar-heading {
+  min-width: 92px;
+}
+
+.para-zk-task-toolbar-summary {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.35;
+}
+
+.para-zk-task-toolbar-controls {
+  align-items: center;
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.para-zk-task-toolbar-button,
+.para-zk-task-toolbar-select select,
+.para-zk-task-search {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 5px;
+  box-shadow: none;
+  min-height: 28px;
 }
 
 .para-zk-task-add {
+  align-items: center;
+  display: inline-flex;
   font-size: var(--font-ui-small);
+  gap: 5px;
   font-weight: 600;
-  min-height: 28px;
-  padding: 3px 10px;
+  padding: 3px 9px;
+}
+
+.para-zk-task-toolbar-select select {
+  background: var(--background-primary);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+  max-width: 132px;
+  min-width: 86px;
+  padding: 2px 24px 2px 8px;
+}
+
+.para-zk-task-search {
+  align-items: center;
+  background: var(--background-primary);
+  display: inline-flex;
+  gap: 5px;
+  padding: 0 7px;
+  width: 150px;
+}
+
+.para-zk-task-search:focus-within {
+  border-color: var(--interactive-accent);
+}
+
+.para-zk-task-search-icon {
+  color: var(--text-faint);
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.para-zk-task-search-icon svg {
+  height: 14px;
+  width: 14px;
+}
+
+.para-zk-task-search input {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--text-normal);
+  font-size: var(--font-ui-smaller);
+  height: 24px;
+  min-width: 0;
+  padding: 0;
+  width: 100%;
+}
+
+.para-zk-task-search input:focus {
+  box-shadow: none;
+}
+
+@media (max-width: 640px) {
+  .para-zk-task-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .para-zk-task-toolbar-controls {
+    justify-content: flex-start;
+  }
+
+  .para-zk-task-search {
+    flex: 1 1 160px;
+  }
 }
 
 .para-zk-task-list {
