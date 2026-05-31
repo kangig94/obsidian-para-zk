@@ -349,6 +349,7 @@ type TaskWrite = {
   position: number | "end";
 };
 type TaskMetadata = Pick<TaskRead, "due" | "scheduled" | "start" | "created" | "done" | "cancelled" | "priority">;
+type TaskDateMetadataField = Exclude<keyof TaskMetadata, "priority">;
 export type TaskWritableField = keyof TaskRead;
 type EditableTaskLine = {
   id: string;
@@ -392,8 +393,7 @@ type NormalizedCollectionReadOptions = {
 
 const DEFAULT_COLLECTION_READ_LIMIT = 50;
 const REFERENCE_KINDS = new Set(["url", "note", "file", "wiki", "markdown", "text"]);
-const ROOT_ID_FRONTMATTER_KEY = "para_zk_id";
-const TASK_SHARD_TYPE = "para_zk_tasks";
+const ROOT_ID_FRONTMATTER_KEY = "id";
 
 export async function createProject(ctx: WorkflowContext, options: CreateProjectOptions): Promise<NoteResult & {
   areas?: ProjectAreaResult[];
@@ -1789,9 +1789,7 @@ async function updateFrontmatterSurface(
   }
   if (!movePlan) return { changed: frontmatterChanged };
 
-  const taskShard = await readTaskShardFile(ctx, target.file);
   const moved = await moveNoteBetweenRoots(ctx, target.file, movePlan.fromRoot, movePlan.toRoot);
-  await refreshTaskShardRoot(ctx, moved.file, taskShard);
   return {
     changed: true,
     file: moved.file,
@@ -1831,7 +1829,7 @@ async function updateTaskCollectionSurface(
 
   if (options.valueSource === "value") throw new Error("task insert requires value_json object");
   const write = normalizeTaskWriteValue(requireUpdateValue(options));
-  const taskId = newTaskId();
+  const taskId = await newTaskId(ctx);
   const line = serializeNewTaskLine(write.task, taskId);
   const shardFile = await ensureTaskShard(ctx, target.file);
   const base = await ctx.app.vault.read(shardFile);
@@ -2567,7 +2565,7 @@ function readMarkdownReference(ctx: WorkflowContext, rawLabel: string, rawTarget
   };
 }
 
-const TASK_DATE_FIELDS: Array<{ key: keyof TaskMetadata; re: RegExp }> = [
+const TASK_DATE_FIELDS: Array<{ key: TaskDateMetadataField; re: RegExp }> = [
   { key: "due", re: /\u{1F4C5}\s*(\d{4}-\d{2}-\d{2})/gu },
   { key: "scheduled", re: /\u{23F3}\s*(\d{4}-\d{2}-\d{2})/gu },
   { key: "start", re: /\u{1F6EB}\s*(\d{4}-\d{2}-\d{2})/gu },
@@ -2584,39 +2582,36 @@ const TASK_PRIORITY_FIELDS: Array<{ value: string; re: RegExp }> = [
   { value: "lowest", re: /\u{23EC}/gu }
 ];
 
+const TASK_ID_SYMBOL = "\u{1F194}";
+const TASK_ID_REGEX = /\u{1F194}\s*([a-zA-Z0-9-_]+)/u;
+const TASK_ID_GLOBAL_REGEX = /\u{1F194}\s*([a-zA-Z0-9-_]+)/gu;
+const TASK_ID_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
+const TASK_ID_LENGTH = 8;
+const TASK_DATE_FIELD_SYMBOLS: Record<TaskDateMetadataField, string> = {
+  due: "\u{1F4C5}",
+  scheduled: "\u{23F3}",
+  start: "\u{1F6EB}",
+  created: "\u{2795}",
+  done: "\u{2705}",
+  cancelled: "\u{274C}"
+};
+const TASK_PRIORITY_FIELD_SYMBOLS: Record<string, string> = {
+  highest: "\u{1F53A}",
+  high: "\u{23EB}",
+  medium: "\u{1F53C}",
+  low: "\u{1F53D}",
+  lowest: "\u{23EC}"
+};
+
 async function ensureTaskShard(ctx: WorkflowContext, rootFile: TFile): Promise<TFile> {
   const rootId = await ensureRootId(ctx, rootFile);
   const path = taskShardPath(ctx, rootId);
-  const rootLink = linkToFile(rootFile);
-  const rootType = readType(fileFrontmatter(ctx, rootFile));
   await ensureFolder(ctx.app, parentFolder(path));
 
   let shardFile = ctx.app.vault.getFileByPath(path);
   if (!shardFile) {
-    shardFile = await ctx.app.vault.create(path, [
-      frontmatterText([
-        `type: ${TASK_SHARD_TYPE}`,
-        `root_id: ${rootId}`,
-        `root_path: ${yamlScalar(rootFile.path)}`,
-        `root: ${yamlScalar(rootLink)}`,
-        `root_type: ${rootType}`,
-        `created: ${localDateTimeSpace()}`,
-        "updated:"
-      ]),
-      "# Tasks",
-      ""
-    ].join("\n"));
+    shardFile = await ctx.app.vault.create(path, "# Tasks\n");
   }
-
-  await ctx.app.fileManager.processFrontMatter(shardFile, (fm) => {
-    fm.type = TASK_SHARD_TYPE;
-    fm.root_id = rootId;
-    fm.root_path = rootFile.path;
-    fm.root = rootLink;
-    fm.root_type = rootType;
-    fm.created = fm.created || localDateTimeSpace();
-    if (fm.updated === undefined) fm.updated = "";
-  });
   return shardFile;
 }
 
@@ -2640,26 +2635,11 @@ async function ensureRootId(ctx: WorkflowContext, file: TFile): Promise<string> 
 
 function taskShardFile(ctx: WorkflowContext, rootFile: TFile): TFile | undefined {
   const rootId = rootIdFromFrontmatter(fileFrontmatter(ctx, rootFile));
-  if (!rootId) return findTaskShardByRootPathFromCache(ctx, rootFile.path);
-  return ctx.app.vault.getFileByPath(taskShardPath(ctx, rootId)) ?? findTaskShardByRootPathFromCache(ctx, rootFile.path);
+  return rootId ? ctx.app.vault.getFileByPath(taskShardPath(ctx, rootId)) ?? undefined : undefined;
 }
 
-async function readTaskShardFile(ctx: WorkflowContext, rootFile: TFile): Promise<TFile | undefined> {
-  return taskShardFile(ctx, rootFile) ?? await findTaskShardByRootPathFromDisk(ctx, rootFile.path);
-}
-
-async function refreshTaskShardRoot(ctx: WorkflowContext, rootFile: TFile, shardHint?: TFile): Promise<void> {
-  const shardFile = await readTaskShardFile(ctx, rootFile) ?? shardHint;
-  if (!shardFile) return;
-  const rootId = await ensureRootId(ctx, rootFile);
-  const rootType = readType(fileFrontmatter(ctx, rootFile));
-  await ctx.app.fileManager.processFrontMatter(shardFile, (fm) => {
-    fm.type = TASK_SHARD_TYPE;
-    fm.root_id = rootId;
-    fm.root_path = rootFile.path;
-    fm.root = linkToFile(rootFile);
-    fm.root_type = rootType;
-  });
+function readTaskShardFile(ctx: WorkflowContext, rootFile: TFile): TFile | undefined {
+  return taskShardFile(ctx, rootFile);
 }
 
 function taskShardPath(ctx: WorkflowContext, rootId: string): string {
@@ -2673,37 +2653,6 @@ function taskRootsFolder(ctx: WorkflowContext): string {
 function rootIdFromFrontmatter(frontmatter: Frontmatter): string | undefined {
   const value = frontmatter[ROOT_ID_FRONTMATTER_KEY];
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
-}
-
-function taskShardRootPath(frontmatter: Frontmatter): string | undefined {
-  const value = frontmatter.root_path;
-  return typeof value === "string" && value.trim() ? normalizeVaultPath(value) : undefined;
-}
-
-function findTaskShardByRootPathFromCache(ctx: WorkflowContext, rootPath: string): TFile | undefined {
-  const normalized = normalizeVaultPath(rootPath);
-  return ctx.app.vault.getMarkdownFiles().find((file) => {
-    return isInFolder(file, taskRootsFolder(ctx))
-      && taskShardRootPath(fileFrontmatter(ctx, file)) === normalized;
-  });
-}
-
-async function findTaskShardByRootPathFromDisk(ctx: WorkflowContext, rootPath: string): Promise<TFile | undefined> {
-  const normalized = normalizeVaultPath(rootPath);
-  for (const file of ctx.app.vault.getMarkdownFiles()) {
-    if (!isInFolder(file, taskRootsFolder(ctx))) continue;
-    const content = await ctx.app.vault.cachedRead(file);
-    if (readRootPathFromTaskShardContent(content) === normalized) return file;
-  }
-  return undefined;
-}
-
-function readRootPathFromTaskShardContent(content: string): string | undefined {
-  const bodyStart = content.indexOf("\n---");
-  const header = bodyStart === -1 ? content : content.slice(0, bodyStart);
-  const match = header.match(/^root_path:\s*(?:"([^"]+)"|'([^']+)'|([^\r\n]+))\s*$/m);
-  const value = match?.[1] ?? match?.[2] ?? match?.[3];
-  return value ? normalizeVaultPath(value.trim()) : undefined;
 }
 
 function taskShardTaskRange(content: string): TextRange | undefined {
@@ -2753,15 +2702,72 @@ function editableTaskLineSpans(content: string): Array<TextRange & { endWithoutB
 }
 
 function newRootId(): string {
-  return newId("pzr");
+  return newId();
 }
 
-function newTaskId(): string {
-  return newId("pzt");
+async function newTaskId(ctx: WorkflowContext): Promise<string> {
+  const existing = await existingTaskIds(ctx);
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const id = randomAlphabetId(TASK_ID_LENGTH, TASK_ID_ALPHABET);
+    if (!existing.has(id)) return id;
+  }
+  throw new Error("failed to generate a unique task id");
 }
 
-function newId(prefix: string): string {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+function newId(): string {
+  if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  return fallbackUuid();
+}
+
+function fallbackUuid(): string {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (token) => {
+    const random = Math.floor(Math.random() * 16);
+    const value = token === "x" ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
+}
+
+async function existingTaskIds(ctx: WorkflowContext): Promise<Set<string>> {
+  const ids = new Set<string>();
+  for (const file of ctx.app.vault.getMarkdownFiles()) {
+    const content = await ctx.app.vault.read(file);
+    collectTaskIds(content, ids);
+  }
+  return ids;
+}
+
+function collectTaskIds(content: string, ids: Set<string>): void {
+  for (const match of content.matchAll(TASK_ID_GLOBAL_REGEX)) {
+    const id = match[1]?.trim();
+    if (id) ids.add(id);
+  }
+}
+
+function randomAlphabetId(length: number, alphabet: string): string {
+  const chars: string[] = [];
+  const limit = 256 - (256 % alphabet.length);
+  while (chars.length < length) {
+    for (const byte of randomBytes(length - chars.length)) {
+      if (byte >= limit) continue;
+      chars.push(alphabet[byte % alphabet.length] ?? alphabet[0]);
+      if (chars.length === length) break;
+    }
+  }
+  return chars.join("");
+}
+
+function randomBytes(length: number): Uint8Array {
+  const bytes = new Uint8Array(length);
+  if (globalThis.crypto && typeof globalThis.crypto.getRandomValues === "function") {
+    globalThis.crypto.getRandomValues(bytes);
+    return bytes;
+  }
+  for (let index = 0; index < bytes.length; index += 1) {
+    bytes[index] = Math.floor(Math.random() * 256);
+  }
+  return bytes;
 }
 
 function frontmatterText(lines: string[]): string {
@@ -2811,6 +2817,7 @@ export async function readAllTaskItems(ctx: WorkflowContext): Promise<Array<{
   id: string;
   task: TaskRead;
 }>> {
+  const rootFiles = rootFilesById(ctx);
   const results: Array<{
     rootPath: string;
     rootTitle: string;
@@ -2820,17 +2827,9 @@ export async function readAllTaskItems(ctx: WorkflowContext): Promise<Array<{
   }> = [];
   for (const file of ctx.app.vault.getMarkdownFiles()) {
     if (!isInFolder(file, taskRootsFolder(ctx))) continue;
-    const frontmatter = fileFrontmatter(ctx, file);
-    let content: string | undefined;
-    let rootPath = taskShardRootPath(frontmatter);
-    if (!rootPath) {
-      content = await ctx.app.vault.cachedRead(file);
-      rootPath = readRootPathFromTaskShardContent(content);
-    }
-    if (!rootPath) continue;
-    const rootFile = ctx.app.vault.getFileByPath(rootPath);
+    const rootFile = rootFiles.get(file.basename);
     if (!rootFile) continue;
-    content = content ?? await ctx.app.vault.read(file);
+    const content = await ctx.app.vault.read(file);
     const range = taskShardTaskRange(content);
     if (!range) continue;
     let cursor = range.start;
@@ -2858,9 +2857,19 @@ export async function readAllTaskItems(ctx: WorkflowContext): Promise<Array<{
   return results;
 }
 
+function rootFilesById(ctx: WorkflowContext): Map<string, TFile> {
+  const roots = new Map<string, TFile>();
+  for (const file of ctx.app.vault.getMarkdownFiles()) {
+    if (isInFolder(file, taskRootsFolder(ctx))) continue;
+    const rootId = rootIdFromFrontmatter(fileFrontmatter(ctx, file));
+    if (rootId && !roots.has(rootId)) roots.set(rootId, file);
+  }
+  return roots;
+}
+
 export async function insertRootTask(ctx: WorkflowContext, rootFile: TFile, value: unknown): Promise<string> {
   const write = normalizeTaskWriteValue(value);
-  const taskId = newTaskId();
+  const taskId = await newTaskId(ctx);
   const line = serializeNewTaskLine(write.task, taskId);
   const shardFile = await ensureTaskShard(ctx, rootFile);
   const base = await ctx.app.vault.read(shardFile);
@@ -3112,15 +3121,22 @@ function serializeEditableTaskLine(line: EditableTaskLine, task: TaskRead): stri
 function serializeTaskBody(task: TaskRead, options: { taskId?: string; blockId?: string } = {}): string {
   const name = normalizeTaskNameValue(task.name);
   const parts = [name];
-  if (options.taskId) parts.push(`[id:: ${options.taskId}]`);
+  if (options.taskId) parts.push(`${TASK_ID_SYMBOL} ${options.taskId}`);
   for (const field of TASK_METADATA_WRITE_FIELDS) {
     const value = task[field];
     if (typeof value === "string" && value.trim()) {
-      parts.push(`[${field}:: ${normalizeTaskMetadataWriteValue(field, value)}]`);
+      parts.push(serializeTaskMetadataField(field, value));
     }
   }
   if (options.blockId) parts.push(`^${options.blockId}`);
   return parts.join(" ");
+}
+
+function serializeTaskMetadataField(field: keyof TaskMetadata, value: string): string {
+  const normalized = normalizeTaskMetadataWriteValue(field, value);
+  if (!normalized) return "";
+  if (field === "priority") return TASK_PRIORITY_FIELD_SYMBOLS[normalized];
+  return `${TASK_DATE_FIELD_SYMBOLS[field]} ${normalized}`;
 }
 
 function parseTaskBody(value: string): { name: string; taskId?: string; blockId?: string; metadata: TaskMetadata } {
@@ -3131,7 +3147,6 @@ function parseTaskBody(value: string): { name: string; taskId?: string; blockId?
   const metadata: TaskMetadata = {};
   const taskId = readTaskId(body);
   body = stripTaskIdField(body);
-  body = stripDataviewTaskFields(body, metadata);
   body = stripEmojiTaskDates(body, metadata);
   body = stripEmojiTaskPriority(body, metadata);
 
@@ -3144,28 +3159,15 @@ function parseTaskBody(value: string): { name: string; taskId?: string; blockId?
 }
 
 function readTaskId(value: string): string | undefined {
-  return value.match(/\[id::\s*([^\]\s]+)\s*\]/i)?.[1];
+  return value.match(TASK_ID_REGEX)?.[1];
 }
 
 function stripTaskIdField(value: string): string {
-  return value.replace(/\[id::\s*[^\]]+\]/gi, " ");
+  return value.replace(TASK_ID_GLOBAL_REGEX, " ");
 }
 
 function readTrailingBlockId(value: string): string | undefined {
   return value.match(/\s+\^([A-Za-z0-9_-]+)\s*$/)?.[1];
-}
-
-function stripDataviewTaskFields(value: string, metadata: TaskMetadata): string {
-  return value.replace(/\[(due|scheduled|start|created|completion|done|cancelled|priority)::\s*([^\]]+)\]/gi, (
-    _match,
-    rawKey: string,
-    rawValue: string
-  ) => {
-    const key = normalizeTaskMetadataKey(rawKey);
-    const taskValue = rawValue.trim();
-    if (key && taskValue && metadata[key] === undefined) metadata[key] = normalizeTaskMetadataValue(key, taskValue);
-    return " ";
-  });
 }
 
 function stripEmojiTaskDates(value: string, metadata: TaskMetadata): string {
@@ -3188,23 +3190,6 @@ function stripEmojiTaskPriority(value: string, metadata: TaskMetadata): string {
     });
   }
   return result;
-}
-
-function normalizeTaskMetadataKey(value: string): keyof TaskMetadata | undefined {
-  const key = value.trim().toLowerCase();
-  if (key === "completion") return "done";
-  if (
-    key === "due"
-    || key === "scheduled"
-    || key === "start"
-    || key === "created"
-    || key === "done"
-    || key === "cancelled"
-    || key === "priority"
-  ) {
-    return key;
-  }
-  return undefined;
 }
 
 function normalizeTaskMetadataValue(key: keyof TaskMetadata, value: string): string {
@@ -3378,7 +3363,6 @@ async function renameFolderStyleNote(
     };
   }
 
-  const taskShard = await readTaskShardFile(ctx, file);
   const retroPlans = await dependentRetroRenamePlans(ctx, file, tagDomain, newTitle);
   const folder = folderStyleContainer(file);
   let renamed: TFile;
@@ -3405,7 +3389,6 @@ async function renameFolderStyleNote(
   if (tagDomain === "area" && folder) {
     await updateAreaDescendantTagPrefixes(ctx, toPath, tagUpdate.namespaceMoves);
   }
-  await refreshTaskShardRoot(ctx, renamed, taskShard);
   const renamedRetros = await renameDependentRetros(ctx, retroPlans);
   return {
     path: toPath,
@@ -3422,7 +3405,6 @@ async function renameFolderStyleNote(
 type DependentRetroRenamePlan = {
   fromPath: string;
   toPath: string;
-  taskShard?: TFile;
 };
 
 async function dependentRetroRenamePlans(
@@ -3453,8 +3435,7 @@ async function dependentRetroRenamePlans(
     if (existing && existing !== file) throw new Error(`target already exists: ${toPath}`);
     plans.push({
       fromPath: file.path,
-      toPath,
-      taskShard: await readTaskShardFile(ctx, file)
+      toPath
     });
   }
 
@@ -3529,7 +3510,6 @@ async function renameDependentRetros(
     await ctx.app.fileManager.renameFile(file, plan.toPath);
     const moved = ctx.app.vault.getFileByPath(plan.toPath);
     if (!moved) throw new Error(`failed to rename dependent retro ${plan.fromPath} to ${plan.toPath}`);
-    await refreshTaskShardRoot(ctx, moved, plan.taskShard);
     renamed.push({
       fromPath: plan.fromPath,
       toPath: plan.toPath
@@ -3573,13 +3553,11 @@ async function renameFlatNote(
     };
   }
 
-  const taskShard = await readTaskShardFile(ctx, file);
   const toPath = joinVaultPath(parentFolder(file.path), `${newTitle}.md`);
   assertVacantPath(ctx, toPath);
   await ctx.app.fileManager.renameFile(file, toPath);
   const renamed = ctx.app.vault.getFileByPath(toPath) ?? file;
   await updateTitleDerivedTag(ctx, renamed, tagDomain, fromTitle, newTitle);
-  await refreshTaskShardRoot(ctx, renamed, taskShard);
   return {
     path: toPath,
     title: newTitle,

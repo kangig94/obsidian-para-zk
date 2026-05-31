@@ -68,6 +68,8 @@ Notable changes for PARA-ZK are tracked here.
 - Task collection reads now return structured task items with literal checkbox
   status characters, names, and parsed Tasks metadata instead of returning raw
   Markdown task sections.
+- Task registry writes now use the Tasks plugin's default Emoji format for task
+  ids and metadata.
 - Full read responses now omit static schema keys, `archived: false`, null
   frontmatter values, empty sections, and template-only scaffold content to
   reduce LLM token waste.
@@ -119,6 +121,12 @@ Notable changes for PARA-ZK are tracked here.
 - Tasks now live in PARA-ZK's managed `Tasks/roots` registry and are rendered
   into root notes with `para-zk-tasks` blocks, keeping root note bodies compact
   while preserving stable task ids for CLI reads and updates.
+- Generated root ids are now plain UUIDs without PARA-ZK-specific prefixes;
+  root notes store the id in `id`.
+- Generated task ids are now 8-character lower-case base36 tokens with a
+  vault-wide collision check before writing.
+- Task registry files now omit duplicated root frontmatter; each shard is only
+  `# Tasks` plus task lines.
 - Reference collection roots remain read-only through update commands; use
   `para-zk:add-reference` as the single path for adding references. Individual
   References-section lines can now be updated by `label`/`target` or deleted by

@@ -1,4 +1,4 @@
-import { Notice, TFile, type MarkdownPostProcessorContext } from "obsidian";
+import { Modal, Notice, Setting, setIcon, TFile, type MarkdownPostProcessorContext } from "obsidian";
 import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { localDate } from "../time";
@@ -28,6 +28,13 @@ type RenderableTask = {
   id: string;
   task: TaskRead;
 };
+
+type TaskMetaChip = {
+  kind: string;
+  label: string;
+};
+
+type TaskEditValue = Pick<TaskRead, "name" | "priority" | "due" | "scheduled" | "start">;
 
 export function registerTaskRenderers(plugin: ParaZkPluginContext): void {
   plugin.registerMarkdownCodeBlockProcessor("para-zk-tasks", (source, el, ctx) => {
@@ -131,10 +138,12 @@ function renderTaskRow(
   const row = list.createDiv({ cls: "para-zk-task-row" });
 
   const checkbox = row.createEl("button", {
-    cls: "para-zk-task-checkbox",
-    text: `[${item.task.checkbox}]`
+    cls: `para-zk-task-checkbox ${taskCheckboxClass(item.task.checkbox)}`,
+    text: taskCheckboxText(item.task.checkbox)
   });
   checkbox.type = "button";
+  checkbox.setAttr("aria-label", `Task status ${item.task.checkbox.trim() || "open"}`);
+  checkbox.setAttr("title", "Cycle task status");
   checkbox.addEventListener("click", async () => {
     await runTaskAction(plugin, checkbox, async () => {
       await setRootTaskField(
@@ -164,22 +173,46 @@ function renderTaskRow(
         await plugin.app.workspace.getLeaf(false).openFile(item.rootFile);
       });
     }
-    for (const value of meta) {
-      metaEl.createSpan({ text: value });
+    for (const chip of meta) {
+      metaEl.createSpan({
+        cls: `para-zk-task-chip para-zk-task-chip-${chip.kind}`,
+        text: chip.label
+      });
     }
   }
 
-  const remove = row.createEl("button", {
-    cls: "para-zk-task-delete",
-    text: "x"
+  const actions = row.createDiv({ cls: "para-zk-task-actions" });
+  const edit = actions.createEl("button", { cls: "para-zk-task-edit" });
+  edit.type = "button";
+  edit.setAttr("aria-label", "Edit task");
+  edit.setAttr("title", "Edit task");
+  setIcon(edit, "pencil");
+  edit.addEventListener("click", () => {
+    new TaskEditModal(plugin, item.task, async (value) => {
+      await updateTaskFromEditor(plugin, item, value);
+      await options.rerender();
+    }).open();
   });
+
+  const remove = actions.createEl("button", { cls: "para-zk-task-delete" });
   remove.type = "button";
+  remove.setAttr("aria-label", "Delete task");
+  remove.setAttr("title", "Delete task");
+  setIcon(remove, "trash");
   remove.addEventListener("click", async () => {
     await runTaskAction(plugin, remove, async () => {
       await deleteRootTask(taskContext(plugin), item.rootFile, item.id);
       await options.rerender();
     });
   });
+}
+
+async function updateTaskFromEditor(plugin: ParaZkPluginContext, item: RenderableTask, value: TaskEditValue): Promise<void> {
+  const fields: Array<keyof TaskEditValue> = ["name", "priority", "due", "scheduled", "start"];
+  for (const field of fields) {
+    if ((item.task[field] ?? "") === (value[field] ?? "")) continue;
+    await setRootTaskField(taskContext(plugin), item.rootFile, item.id, field, value[field] ?? "");
+  }
 }
 
 function taskContext(plugin: ParaZkPluginContext): WorkflowContext {
@@ -208,6 +241,118 @@ function renderTaskError(el: HTMLElement, error: unknown): void {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+class TaskEditModal extends Modal {
+  private value: TaskEditValue;
+  private saving = false;
+
+  constructor(
+    private readonly plugin: ParaZkPluginContext,
+    task: TaskRead,
+    private readonly save: (value: TaskEditValue) => Promise<void>
+  ) {
+    super(plugin.app);
+    this.value = {
+      name: task.name,
+      priority: task.priority,
+      due: task.due,
+      scheduled: task.scheduled,
+      start: task.start
+    };
+  }
+
+  onOpen(): void {
+    const labels = localePack(this.plugin.settings.locale).labels;
+    this.contentEl.empty();
+    this.contentEl.addClass("para-zk-task-edit-modal");
+    this.contentEl.createEl("h2", { text: labels.editTask });
+
+    new Setting(this.contentEl)
+      .setName(labels.title)
+      .addText((text) => {
+        text
+          .setValue(this.value.name)
+          .onChange((value) => {
+            this.value.name = value;
+          });
+        text.inputEl.addClass("para-zk-task-edit-title");
+      });
+
+    new Setting(this.contentEl)
+      .setName(labels.priority)
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption("", "")
+          .addOption("highest", "highest")
+          .addOption("high", "high")
+          .addOption("medium", "medium")
+          .addOption("low", "low")
+          .addOption("lowest", "lowest")
+          .setValue(this.value.priority ?? "")
+          .onChange((value) => {
+            this.value.priority = value || undefined;
+          });
+      });
+
+    this.addDateSetting(labels.dueDate, "due");
+    this.addDateSetting(labels.scheduledDate, "scheduled");
+    this.addDateSetting(labels.startDate, "start");
+
+    new Setting(this.contentEl)
+      .addButton((button) => {
+        button
+          .setButtonText(labels.confirm)
+          .setCta()
+          .onClick(() => {
+            void this.submit();
+          });
+      })
+      .addButton((button) => {
+        button
+          .setButtonText(labels.cancel)
+          .onClick(() => this.close());
+      });
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+
+  private addDateSetting(label: string, field: "due" | "scheduled" | "start"): void {
+    new Setting(this.contentEl)
+      .setName(label)
+      .addText((text) => {
+        text.inputEl.type = "date";
+        text
+          .setValue(this.value[field] ?? "")
+          .onChange((value) => {
+            this.value[field] = value || undefined;
+          });
+      });
+  }
+
+  private async submit(): Promise<void> {
+    if (this.saving) return;
+    const name = this.value.name.trim();
+    if (!name) {
+      new Notice(localePack(this.plugin.settings.locale).labels.title);
+      return;
+    }
+
+    this.saving = true;
+    try {
+      await this.save({
+        ...this.value,
+        name
+      });
+      this.close();
+    } catch (error) {
+      new Notice(errorMessage(error));
+    } finally {
+      this.saving = false;
+    }
+  }
 }
 
 function filteredTasks(items: RenderableTask[], args: TaskBlockArgs): RenderableTask[] {
@@ -264,13 +409,30 @@ function stringCompare(left: string | undefined, right: string | undefined): num
   return left.localeCompare(right);
 }
 
-function taskMeta(task: TaskRead): string[] {
+function taskMeta(task: TaskRead): TaskMetaChip[] {
   return [
-    task.priority ? `priority:${task.priority}` : "",
-    task.due ? `due:${task.due}` : "",
-    task.scheduled ? `scheduled:${task.scheduled}` : "",
-    task.start ? `start:${task.start}` : ""
-  ].filter(Boolean);
+    task.priority ? { kind: "priority", label: task.priority } : undefined,
+    task.due ? { kind: "due", label: `due ${task.due}` } : undefined,
+    task.scheduled ? { kind: "scheduled", label: `scheduled ${task.scheduled}` } : undefined,
+    task.start ? { kind: "start", label: `start ${task.start}` } : undefined
+  ].filter(isTaskMetaChip);
+}
+
+function isTaskMetaChip(value: TaskMetaChip | undefined): value is TaskMetaChip {
+  return value !== undefined;
+}
+
+function taskCheckboxClass(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "x") return "is-done";
+  if (normalized === "-") return "is-cancelled";
+  if (normalized === "/" || normalized === ">") return "is-active";
+  return "is-open";
+}
+
+function taskCheckboxText(value: string): string {
+  const normalized = value.trim();
+  return normalized || "";
 }
 
 function taskSearchText(item: RenderableTask): string {

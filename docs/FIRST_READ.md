@@ -76,8 +76,10 @@ Task collection reads are structured: each item exposes the literal checkbox
 status character, task name, and parsed Tasks metadata instead of returning the
 raw task section string. Tasks are not stored inline in project/area/journal
 notes; PARA-ZK owns a hidden `Tasks/roots` registry, keyed by each root note's
-locale-independent `para_zk_id`, and root templates render that registry with
-`para-zk-tasks` blocks.
+locale-independent `id`, and root templates render that registry with
+`para-zk-tasks` blocks. Task shard files are intentionally plain Markdown:
+`Tasks/roots/<root id>.md` contains a `# Tasks` heading and task lines, with no
+frontmatter mirror of root metadata.
 PARA read commands may select archived notes with `archived=true`; the returned
 `archived: true` field, when present, is the single code-level indicator for
 that state.
@@ -92,7 +94,10 @@ Task updates must stay structural: insert with `key=tasks op=insert` and a
 single `value_json` object, optionally with a 1-based `position`, update a task
 field with `tasks/<id>/<field> op=set`, and delete a task with `tasks/<id>
 op=delete`. Do not accept raw Markdown task lines as an alternate task update
-path.
+path. Stored task lines use the Tasks plugin's default Emoji format for task ids
+and metadata. Root ids are UUIDs because they are file-level link keys; task ids
+are 8-character lower-case base36 tokens generated with a vault-wide collision
+check.
 
 Structural changes should stay domain-specific. Use `rename-project`,
 `rename-area`, `rename-resource`, and `rename-zk` for title/path changes instead

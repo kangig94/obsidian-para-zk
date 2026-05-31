@@ -280,8 +280,10 @@ selector and type information needed for follow-up reads:
 Task and reference surfaces are structured collections rather than raw Markdown.
 Full compact reads return only `count`; collection items are omitted by design.
 Tasks are stored in PARA-ZK's hidden `Tasks/roots` registry and rendered back
-into root notes through `para-zk-tasks` blocks. Exact collection root reads such as
-`key=tasks` and `key=references` return a paged collection object:
+into root notes through `para-zk-tasks` blocks. Each task shard is named after
+the root note's `id` and contains only a `# Tasks` heading plus task lines, not
+duplicated root frontmatter. Exact collection root reads such as `key=tasks` and
+`key=references` return a paged collection object:
 
 ```json
 {
@@ -292,7 +294,7 @@ into root notes through `para-zk-tasks` blocks. Exact collection root reads such
     "returned": 20,
     "has_more": true,
     "items": {
-      "pzt_meco3r_a1b2c3d4": {
+      "a8f3k2m9": {
         "checkbox": "/",
         "name": "Review evaluation set",
         "priority": "high"
@@ -395,6 +397,9 @@ Insert one task with `key=tasks op=insert value_json='{...}'`, update one field
 with `key=tasks/<id>/<field> op=set value=...`, and delete one task with
 `key=tasks/<id> op=delete`. Supported task fields are `checkbox`, `name`,
 `priority`, `due`, `scheduled`, `start`, `created`, `done`, and `cancelled`.
+Task ids and metadata use the Tasks plugin's default Emoji format. Generated
+task ids are 8-character lower-case base36 tokens, checked against existing
+vault task ids before writing.
 Use `position` in `value_json` to insert before the 1-based task position, or
 omit it to append at the end.
 Reference collection roots do not accept raw Markdown edits. Add references with
@@ -416,8 +421,8 @@ optsidian raw para-zk:update-project title="Model Evaluation" key=summary op=rep
 optsidian raw para-zk:update-project title="Model Evaluation" key=tasks op=insert value_json='{"name":"Review evaluation set","due":"2026-06-05","priority":"high"}' format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key=references/ref-8b1a9953/label op=set value="Updated source" format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key=references/ref-8b1a9953 op=delete format=json
-optsidian raw para-zk:update-project title="Model Evaluation" key=tasks/pzt_meco3r_a1b2c3d4/checkbox op=set value=x format=json
-optsidian raw para-zk:update-project title="Model Evaluation" key=tasks/pzt_meco3r_a1b2c3d4 op=delete format=json
+optsidian raw para-zk:update-project title="Model Evaluation" key=tasks/a8f3k2m9/checkbox op=set value=x format=json
+optsidian raw para-zk:update-project title="Model Evaluation" key=tasks/a8f3k2m9 op=delete format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key="children/Planning Meeting/body" op=append value="Decision: ship the baseline." format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key=frontmatter/status op=set value=archived format=json
 ```

@@ -334,7 +334,7 @@ function runWorkflowScenario(today) {
     "format=json"
   ]);
   assert(archiveFlowArchivedTasks.value?.count === 1, "archived project task read after move failed");
-  assertTaskRegistryEntryContains(archiveFlowTaskName, [archiveFlowArchivedPath]);
+  assertTaskRegistryEntryContains(archiveFlowTaskName, []);
 
   const restoreMove = cliJson("para-zk:update-project", [
     `title=${archiveProjectTitle}`,
@@ -349,7 +349,14 @@ function runWorkflowScenario(today) {
   assert(restoreMove.toPath === archiveFlowProject.path, "project restore returned wrong toPath");
   assertFileExists(archiveFlowProject.path, "restored project was not moved back to active folder");
   assert(!existsSync(join(vaultPath, archiveFlowArchivedPath)), "project restore left the archived project path behind");
-  assertTaskRegistryEntryContains(archiveFlowTaskName, [archiveFlowProject.path]);
+  const archiveFlowRestoredTasks = cliJson("para-zk:read-project", [
+    `title=${archiveProjectTitle}`,
+    "key=tasks",
+    `query=${archiveFlowTaskName}`,
+    "format=json"
+  ]);
+  assert(archiveFlowRestoredTasks.value?.count === 1, "restored project task read after move failed");
+  assertTaskRegistryEntryContains(archiveFlowTaskName, []);
 
   const renameProject = cliJson("para-zk:create-project", [
     `title=${renameProjectTitle}`,
@@ -410,7 +417,14 @@ function runWorkflowScenario(today) {
     renamedProject.renamedRetros?.some((item) => item.fromPath === renameProjectRetro.path && item.toPath === renamedProjectRetroPath),
     "rename-project did not report renamed project-scoped retro"
   );
-  assertTaskRegistryEntryContains(renameProjectRetroTaskName, [renamedProjectRetroPath]);
+  const renamedProjectRetroTasks = cliJson("para-zk:read-retro", [
+    `path=${renamedProjectRetroPath}`,
+    "key=tasks",
+    `query=${renameProjectRetroTaskName}`,
+    "format=json"
+  ]);
+  assert(renamedProjectRetroTasks.value?.count === 1, "renamed project retro task read failed");
+  assertTaskRegistryEntryContains(renameProjectRetroTaskName, []);
 
   const deleteProject = cliJson("para-zk:create-project", [
     `title=${deleteProjectTitle}`,
@@ -488,6 +502,15 @@ function runWorkflowScenario(today) {
     "format=json"
   ]);
   assert(projectTaskInsert.changed === true, "project task insert failed");
+  assertTaskRegistryEntryContains(`Smoke structured task ${stamp}`, [
+    "\u{1F194}",
+    "\u{23EB}",
+    "\u{1F4C5} 2026-06-05"
+  ]);
+  assertTaskRegistryExcludes(["[id::", "[priority::", "[due::", "pzt_"]);
+  assertTaskRegistryFileNamesExclude(["pzr_"]);
+  assertTaskRegistryFilesStartWith("# Tasks");
+  assertTaskRegistryExcludes(["type: para_zk_tasks", "root_id:", "root_path:", "root_type:"]);
   const projectRawTaskInsertRejected = cliJson("para-zk:update-project", [
     `title=${projectTitle}`,
     "key=tasks",
@@ -514,6 +537,7 @@ function runWorkflowScenario(today) {
   assert(structuredTask, `project task read did not expose the inserted task: ${JSON.stringify(projectTasksRead.value)}`);
   assert(projectTasksRead.value?.count >= 1 && projectTasksRead.value?.returned >= 1, "project task collection read did not expose page metadata");
   assert(typeof structuredTaskId === "string" && structuredTaskId.length > 0, "project task read did not expose a task id");
+  assert(isShortTaskId(structuredTaskId), `project task id is not a short id: ${structuredTaskId}`);
   assert(structuredTask.checkbox === " ", "project task read did not preserve checkbox status");
   assert(structuredTask.due === "2026-06-05", "project task read did not parse the due date");
   assert(structuredTask.priority === "high", "project task read did not parse the priority");
@@ -1432,6 +1456,7 @@ function assertDryRunInit() {
 
 function assertWorkflowFiles(result) {
   assertFileContains(result.project.path, [
+    "id: ",
     "status: in_progress",
     "priority: medium",
     `Smoke summary updated ${stamp}`,
@@ -1440,6 +1465,7 @@ function assertWorkflowFiles(result) {
     "[Reference URL](https://example.com/reference)",
     `[[${result.resource.path}|${result.resource.title}]]`
   ]);
+  assertFileNotContains(result.project.path, ["para_zk_id"]);
   assertFileContains(result.archiveFlowProject.path, [
     "status: in_progress"
   ]);
@@ -1992,6 +2018,37 @@ function assertTaskRegistryEntryContains(taskName, needles) {
   }
 }
 
+function assertTaskRegistryExcludes(needles) {
+  const rootsPath = join(vaultPath, "Tasks", "roots");
+  assert(existsSync(rootsPath), "missing task registry folder: Tasks/roots");
+  const text = readdirSync(rootsPath)
+    .filter((entry) => entry.endsWith(".md"))
+    .map((entry) => readFileSync(join(rootsPath, entry), "utf8"))
+    .join("\n");
+  for (const needle of needles) {
+    assert(!text.includes(needle), `task registry contains deprecated syntax: ${needle}`);
+  }
+}
+
+function assertTaskRegistryFileNamesExclude(prefixes) {
+  const rootsPath = join(vaultPath, "Tasks", "roots");
+  assert(existsSync(rootsPath), "missing task registry folder: Tasks/roots");
+  for (const entry of readdirSync(rootsPath).filter((name) => name.endsWith(".md"))) {
+    for (const prefix of prefixes) {
+      assert(!entry.startsWith(prefix), `task registry file name contains deprecated prefix: ${entry}`);
+    }
+  }
+}
+
+function assertTaskRegistryFilesStartWith(expected) {
+  const rootsPath = join(vaultPath, "Tasks", "roots");
+  assert(existsSync(rootsPath), "missing task registry folder: Tasks/roots");
+  for (const entry of readdirSync(rootsPath).filter((name) => name.endsWith(".md"))) {
+    const content = readFileSync(join(rootsPath, entry), "utf8");
+    assert(content.startsWith(expected), `task registry file has unexpected prelude: ${entry}`);
+  }
+}
+
 function assertFileContainsAny(path, needles) {
   const absolute = join(vaultPath, path);
   const deadline = Date.now() + 3000;
@@ -2026,6 +2083,10 @@ function assert(condition, message) {
 function samePath(left, right) {
   if (!left || !right) return false;
   return resolve(left) === resolve(right);
+}
+
+function isShortTaskId(value) {
+  return /^[a-z0-9]{8}$/.test(value);
 }
 
 function sleepMs(ms) {
