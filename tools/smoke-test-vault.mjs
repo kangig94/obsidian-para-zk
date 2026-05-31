@@ -365,6 +365,22 @@ function runWorkflowScenario(today) {
     "format=json"
   ]);
   assertCreated(renameProjectSubnote, "rename project child");
+  const renameProjectRetro = cliJson("para-zk:create-retro", [
+    `path=${renameProject.path}`,
+    `date=${today}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(renameProjectRetro, "rename project retro");
+  const renameProjectRetroTaskName = `Smoke rename project retro task ${stamp}`;
+  const renameProjectRetroTask = cliJson("para-zk:update-retro", [
+    `path=${renameProjectRetro.path}`,
+    "key=tasks",
+    "op=insert",
+    `value_json=${JSON.stringify({ name: renameProjectRetroTaskName })}`,
+    "format=json"
+  ]);
+  assert(renameProjectRetroTask.changed === true, "rename project retro task setup failed");
   const renameAliasRejected = cliJson("para-zk:rename-project", [
     `title=${renameProjectTitle}`,
     `newTitle=${renamedProjectTitle}`,
@@ -383,10 +399,18 @@ function runWorkflowScenario(today) {
   ]);
   const renamedProjectPath = `PARA/Projects/${renamedProjectTitle}/${renamedProjectTitle}.md`;
   const renamedProjectChildPath = `PARA/Projects/${renamedProjectTitle}/Smoke Rename Child ${stamp}.md`;
+  const renamedProjectRetroPath = renameProjectRetro.path.replace(renameProjectTitle, renamedProjectTitle);
   assert(renamedProject.path === renamedProjectPath, "rename-project returned wrong path");
   assertFileExists(renamedProjectPath, "renamed project file is missing");
   assertFileExists(renamedProjectChildPath, "renamed project child did not move with folder");
+  assertFileExists(renamedProjectRetroPath, "project-scoped retro did not rename with project");
   assert(!existsSync(join(vaultPath, renameProject.path)), "rename-project left the old project file behind");
+  assert(!existsSync(join(vaultPath, renameProjectRetro.path)), "rename-project left the old project-scoped retro file behind");
+  assert(
+    renamedProject.renamedRetros?.some((item) => item.fromPath === renameProjectRetro.path && item.toPath === renamedProjectRetroPath),
+    "rename-project did not report renamed project-scoped retro"
+  );
+  assertTaskRegistryEntryContains(renameProjectRetroTaskName, [renamedProjectRetroPath]);
 
   const deleteProject = cliJson("para-zk:create-project", [
     `title=${deleteProjectTitle}`,
@@ -713,6 +737,13 @@ function runWorkflowScenario(today) {
     "format=json"
   ]);
   assertCreated(renameNestedArea, "rename nested area");
+  const renameAreaRetro = cliJson("para-zk:create-retro", [
+    `path=${renameArea.path}`,
+    `date=${today}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(renameAreaRetro, "rename area retro");
   const renameAreaLinkProject = cliJson("para-zk:create-project", [
     `title=${renameAreaLinkProjectTitle}`,
     `area_titles=${JSON.stringify([renameAreaTitle])}`,
@@ -727,13 +758,20 @@ function runWorkflowScenario(today) {
   ]);
   const renamedAreaPath = `PARA/Areas/${renamedAreaTitle}/${renamedAreaTitle}.md`;
   const movedNestedAreaPath = `PARA/Areas/${renamedAreaTitle}/${renameNestedAreaTitle}/${renameNestedAreaTitle}.md`;
+  const renamedAreaRetroPath = renameAreaRetro.path.replace(renameAreaTitle, renamedAreaTitle);
   const renamedAreaSlug = smokeSlug(renamedAreaTitle);
   const renameAreaSlug = smokeSlug(renameAreaTitle);
   const renameNestedAreaSlug = smokeSlug(renameNestedAreaTitle);
   assert(renamedArea.path === renamedAreaPath, "rename-area returned wrong path");
   assertFileExists(renamedAreaPath, "renamed area file is missing");
   assertFileExists(movedNestedAreaPath, "nested area did not move with renamed parent area");
+  assertFileExists(renamedAreaRetroPath, "area-scoped retro did not rename with area");
   assert(!existsSync(join(vaultPath, renameArea.path)), "rename-area left the old area file behind");
+  assert(!existsSync(join(vaultPath, renameAreaRetro.path)), "rename-area left the old area-scoped retro file behind");
+  assert(
+    renamedArea.renamedRetros?.some((item) => item.fromPath === renameAreaRetro.path && item.toPath === renamedAreaRetroPath),
+    "rename-area did not report renamed area-scoped retro"
+  );
   assertFileContainsAny(renameAreaLinkProject.path, [
     `[[PARA/Areas/${renamedAreaTitle}/${renamedAreaTitle}.md|${renamedAreaTitle}]]`,
     `[[PARA/Areas/${renamedAreaTitle}/${renamedAreaTitle}|${renamedAreaTitle}]]`,

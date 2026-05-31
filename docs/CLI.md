@@ -452,11 +452,14 @@ The same update algorithm is used by the other domain update commands:
 
 Renames are explicit structural commands rather than raw path edits. They update
 the note path and title-derived tag while preserving the note's other metadata.
+Project and area renames also rename default source-scoped retro files whose
+names were deterministically generated from that project or area. Custom-titled
+retros are left in place.
 
 | Command | Selector | Notes |
 | --- | --- | --- |
-| `para-zk:rename-project` | `title` or `path`; optional `archived` | Renames the folder-style project folder and main note. Child notes move with the folder. |
-| `para-zk:rename-area` | `title` or `path`; optional `archived` | Renames the folder-style area folder and main note. Child areas move with the folder; area tag namespaces are updated without dropping inherited parent tags. |
+| `para-zk:rename-project` | `title` or `path`; optional `archived` | Renames the folder-style project folder and main note. Child notes move with the folder; default project-scoped retros are renamed with it. |
+| `para-zk:rename-area` | `title` or `path`; optional `archived` | Renames the folder-style area folder and main note. Child areas move with the folder; default area-scoped retros and area tag namespaces are updated without dropping inherited parent tags. |
 | `para-zk:rename-resource` | `title` or `path`; optional `archived` | Renames the resource note file in place. |
 | `para-zk:rename-zk` | `title` plus optional `kind`, or `path` | Renames the selected ZK note file in place. |
 
@@ -485,6 +488,8 @@ Result fields:
 - `changed`: false when the title was already equal after sanitization.
 - `fromPath` and `toPath`: source and final note paths.
 - `fromTitle` and `toTitle`: source and final titles.
+- `renamedRetros`: project/area rename cascades, when default source-scoped
+  retro files were renamed. Each entry has `fromPath` and `toPath`.
 
 ### Delete Commands
 

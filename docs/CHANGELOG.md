@@ -110,6 +110,9 @@ Notable changes for PARA-ZK are tracked here.
 - Delete workflows now preserve body backlinks, report incoming links, and only
   clean PARA-ZK-owned frontmatter relationships and standalone References-section
   link lines.
+- Project and area rename workflows now cascade to default source-scoped retro
+  files, keeping `Retro-Project-*` and `Retro-Area-*` filenames aligned with the
+  renamed source without adding a standalone retro rename command.
 - Task updates now use the same structured collection shape exposed by reads:
   `value_json` task inserts, `tasks/<id>/<field>` scalar updates, and
   `tasks/<id> op=delete`; raw Markdown task-line updates are rejected.

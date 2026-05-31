@@ -249,6 +249,10 @@ export type RenameResult = {
   toPath: string;
   fromTitle: string;
   toTitle: string;
+  renamedRetros?: Array<{
+    fromPath: string;
+    toPath: string;
+  }>;
 };
 
 export type DeleteByTitleOptions = {
@@ -3375,6 +3379,7 @@ async function renameFolderStyleNote(
   }
 
   const taskShard = await readTaskShardFile(ctx, file);
+  const retroPlans = await dependentRetroRenamePlans(ctx, file, tagDomain, newTitle);
   const folder = folderStyleContainer(file);
   let renamed: TFile;
   let toPath: string;
@@ -3401,6 +3406,7 @@ async function renameFolderStyleNote(
     await updateAreaDescendantTagPrefixes(ctx, toPath, tagUpdate.namespaceMoves);
   }
   await refreshTaskShardRoot(ctx, renamed, taskShard);
+  const renamedRetros = await renameDependentRetros(ctx, retroPlans);
   return {
     path: toPath,
     title: newTitle,
@@ -3408,8 +3414,128 @@ async function renameFolderStyleNote(
     fromPath,
     toPath,
     fromTitle,
-    toTitle: newTitle
+    toTitle: newTitle,
+    ...(renamedRetros.length > 0 ? { renamedRetros } : {})
   };
+}
+
+type DependentRetroRenamePlan = {
+  fromPath: string;
+  toPath: string;
+  taskShard?: TFile;
+};
+
+async function dependentRetroRenamePlans(
+  ctx: WorkflowContext,
+  source: TFile,
+  domain: TagDomain,
+  newTitle: string
+): Promise<DependentRetroRenamePlan[]> {
+  if (domain !== "project" && domain !== "area") return [];
+
+  const plans: DependentRetroRenamePlan[] = [];
+  const seenTargets = new Set<string>();
+  for (const file of ctx.app.vault.getMarkdownFiles()) {
+    const frontmatter = fileFrontmatter(ctx, file);
+    if (readType(frontmatter) !== "retro") continue;
+    if (!isSourceScopedRetro(ctx, file, frontmatter, source, domain)) continue;
+
+    const weekSegment = retroWeekSegment(file, frontmatter);
+    if (!weekSegment) continue;
+    if (!isDefaultSourceRetroFilename(ctx, file.basename, domain, source.basename, weekSegment)) continue;
+
+    const toPath = joinVaultPath(parentFolder(file.path), `${defaultSourceRetroBasename(ctx, domain, newTitle, weekSegment)}.md`);
+    if (toPath === file.path) continue;
+    if (seenTargets.has(toPath)) throw new Error(`duplicate dependent retro target: ${toPath}`);
+    seenTargets.add(toPath);
+
+    const existing = ctx.app.vault.getAbstractFileByPath(toPath);
+    if (existing && existing !== file) throw new Error(`target already exists: ${toPath}`);
+    plans.push({
+      fromPath: file.path,
+      toPath,
+      taskShard: await readTaskShardFile(ctx, file)
+    });
+  }
+
+  return plans.sort((left, right) => left.fromPath.localeCompare(right.fromPath));
+}
+
+function isSourceScopedRetro(
+  ctx: WorkflowContext,
+  retro: TFile,
+  frontmatter: Frontmatter,
+  source: TFile,
+  domain: "project" | "area"
+): boolean {
+  if (domain === "project") {
+    return frontmatterLinks(frontmatter.project).some((link) => stringReferencesAnyTarget(ctx, retro.path, link, [source]));
+  }
+
+  if (frontmatterLinks(frontmatter.project).length > 0) return false;
+  return frontmatterLinks(frontmatter.areas).some((link) => stringReferencesAnyTarget(ctx, retro.path, link, [source]));
+}
+
+function retroWeekSegment(file: TFile, frontmatter: Frontmatter): string | undefined {
+  const weekIso = typeof frontmatter.week_iso === "string" ? frontmatter.week_iso.trim() : "";
+  if (/^\d{4}-W\d{2}$/.test(weekIso)) return weekIso.replace("-", "_");
+
+  const parent = folderName(parentFolder(file.path));
+  return /^\d{4}_W\d{2}$/.test(parent) ? parent : undefined;
+}
+
+function isDefaultSourceRetroFilename(
+  ctx: WorkflowContext,
+  basename: string,
+  domain: "project" | "area",
+  title: string,
+  weekSegment: string
+): boolean {
+  return sourceRetroNamePrefixes(ctx, domain)
+    .some((prefix) => basename === sanitizeFileName(`Retro-${prefix}-${title}-${weekSegment}`));
+}
+
+function defaultSourceRetroBasename(
+  ctx: WorkflowContext,
+  domain: "project" | "area",
+  title: string,
+  weekSegment: string
+): string {
+  return sanitizeFileName(`Retro-${sourceRetroNamePrefix(ctx, domain)}-${title}-${weekSegment}`);
+}
+
+function sourceRetroNamePrefix(ctx: WorkflowContext, domain: "project" | "area"): string {
+  const labels = localePack(ctx.settings.locale).labels;
+  return domain === "project" ? labels.retroNameProjectPrefix : labels.retroNameAreaPrefix;
+}
+
+function sourceRetroNamePrefixes(ctx: WorkflowContext, domain: "project" | "area"): string[] {
+  return uniqueStrings([
+    sourceRetroNamePrefix(ctx, domain),
+    domain === "project" ? localePack("en").labels.retroNameProjectPrefix : localePack("en").labels.retroNameAreaPrefix,
+    domain === "project" ? localePack("ko").labels.retroNameProjectPrefix : localePack("ko").labels.retroNameAreaPrefix
+  ]);
+}
+
+async function renameDependentRetros(
+  ctx: WorkflowContext,
+  plans: DependentRetroRenamePlan[]
+): Promise<Array<{ fromPath: string; toPath: string }>> {
+  const renamed: Array<{ fromPath: string; toPath: string }> = [];
+  for (const plan of plans) {
+    const file = ctx.app.vault.getFileByPath(plan.fromPath);
+    if (!file) continue;
+    await ensureFolder(ctx.app, parentFolder(plan.toPath));
+    await ctx.app.fileManager.renameFile(file, plan.toPath);
+    const moved = ctx.app.vault.getFileByPath(plan.toPath);
+    if (!moved) throw new Error(`failed to rename dependent retro ${plan.fromPath} to ${plan.toPath}`);
+    await refreshTaskShardRoot(ctx, moved, plan.taskShard);
+    renamed.push({
+      fromPath: plan.fromPath,
+      toPath: plan.toPath
+    });
+  }
+  return renamed;
 }
 
 async function renameMovedFolderStyleMain(
