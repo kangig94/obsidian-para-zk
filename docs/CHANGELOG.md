@@ -71,7 +71,9 @@ Notable changes for PARA-ZK are tracked here.
 - Task registry writes now use the Tasks plugin's default Emoji format for task
   ids and metadata.
 - Task blocks now render a compact toolbar with task counts, add, order, status,
-  due, priority, and search controls.
+  due, and priority controls.
+- Props controls, prompt controls, dashboard buttons, inline workflow buttons,
+  and task controls now use Obsidian native UI components where applicable.
 - Full read responses now omit static schema keys, `archived: false`, null
   frontmatter values, empty sections, and template-only scaffold content to
   reduce LLM token waste.

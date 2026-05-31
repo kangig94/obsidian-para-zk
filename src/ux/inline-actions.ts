@@ -7,7 +7,7 @@ import {
   type EditorView,
   type ViewUpdate
 } from "@codemirror/view";
-import { Notice, editorInfoField, type MarkdownPostProcessorContext } from "obsidian";
+import { ButtonComponent, Notice, editorInfoField, type MarkdownPostProcessorContext } from "obsidian";
 import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import {
@@ -74,22 +74,25 @@ export function createWorkflowButton(
   command: string | undefined,
   sourcePath?: string
 ): HTMLButtonElement {
-  const button = document.createElement("button");
-  button.type = "button";
+  const host = document.createElement("span");
+  const component = new ButtonComponent(host);
+  const button = component.buttonEl;
   button.addClass("para-zk-command-button", "mod-cta");
-  button.textContent = label;
+  component
+    .setButtonText(label)
+    .setCta();
 
-  button.addEventListener("click", async () => {
+  component.onClick(async () => {
     if (!command) {
       new Notice(localePack(plugin.settings.locale).messages.buttonMissingCommand);
       return;
     }
 
-    button.disabled = true;
+    component.setDisabled(true);
     try {
       await runGuiWorkflow(plugin, command, sourcePath);
     } finally {
-      button.disabled = false;
+      component.setDisabled(false);
     }
   });
 

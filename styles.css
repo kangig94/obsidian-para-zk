@@ -336,8 +336,7 @@
 }
 
 .para-zk-task-toolbar-button,
-.para-zk-task-toolbar-select select,
-.para-zk-task-search {
+.para-zk-task-toolbar-select select {
   border: 1px solid var(--background-modifier-border);
   border-radius: 5px;
   box-shadow: none;
@@ -354,53 +353,11 @@
 }
 
 .para-zk-task-toolbar-select select {
-  background: var(--background-primary);
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
   font-weight: 600;
   max-width: 132px;
   min-width: 86px;
-  padding: 2px 24px 2px 8px;
-}
-
-.para-zk-task-search {
-  align-items: center;
-  background: var(--background-primary);
-  display: inline-flex;
-  gap: 5px;
-  padding: 0 7px;
-  width: 150px;
-}
-
-.para-zk-task-search:focus-within {
-  border-color: var(--interactive-accent);
-}
-
-.para-zk-task-search-icon {
-  color: var(--text-faint);
-  display: inline-flex;
-  flex: 0 0 auto;
-}
-
-.para-zk-task-search-icon svg {
-  height: 14px;
-  width: 14px;
-}
-
-.para-zk-task-search input {
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-  color: var(--text-normal);
-  font-size: var(--font-ui-smaller);
-  height: 24px;
-  min-width: 0;
-  padding: 0;
-  width: 100%;
-}
-
-.para-zk-task-search input:focus {
-  box-shadow: none;
 }
 
 @media (max-width: 640px) {
@@ -411,10 +368,6 @@
 
   .para-zk-task-toolbar-controls {
     justify-content: flex-start;
-  }
-
-  .para-zk-task-search {
-    flex: 1 1 160px;
   }
 }
 

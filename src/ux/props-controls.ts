@@ -1,7 +1,10 @@
 import {
+  ButtonComponent,
+  DropdownComponent,
   Notice,
   SuggestModal,
   TFile,
+  TextComponent,
   type App,
   type MarkdownPostProcessorContext
 } from "obsidian";
@@ -176,15 +179,15 @@ function renderTextInput(
   container: HTMLElement,
   sourcePath?: string
 ): void {
-  const input = document.createElement("input");
-  input.type = "text";
-  input.value = valueText(readFieldValue(field, frontmatter));
-  input.disabled = !field.key || !sourcePath;
-  input.addClass("para-zk-props-input");
-  input.addEventListener("change", () => {
-    if (field.key) void writeFrontmatterValue(plugin, sourcePath, field.key, input.value);
+  const input = new TextComponent(container);
+  input.inputEl.type = "text";
+  input.inputEl.addClass("para-zk-props-input");
+  input
+    .setValue(valueText(readFieldValue(field, frontmatter)))
+    .setDisabled(!field.key || !sourcePath);
+  input.inputEl.addEventListener("change", () => {
+    if (field.key) void writeFrontmatterValue(plugin, sourcePath, field.key, input.getValue());
   });
-  container.appendChild(input);
 }
 
 function renderDateInput(
@@ -195,21 +198,21 @@ function renderDateInput(
   sourcePath: string | undefined,
   type: "date" | "datetime-local"
 ): void {
-  const input = document.createElement("input");
-  input.type = type;
-  input.value = type === "datetime-local"
-    ? toDateTimeInputValue(valueText(readFieldValue(field, frontmatter)))
-    : valueText(readFieldValue(field, frontmatter));
-  input.disabled = !field.key || !sourcePath;
-  input.addClass("para-zk-props-input");
-  input.addEventListener("change", () => {
+  const input = new TextComponent(container);
+  input.inputEl.type = type;
+  input.inputEl.addClass("para-zk-props-input");
+  input
+    .setValue(type === "datetime-local"
+      ? toDateTimeInputValue(valueText(readFieldValue(field, frontmatter)))
+      : valueText(readFieldValue(field, frontmatter)))
+    .setDisabled(!field.key || !sourcePath);
+  input.inputEl.addEventListener("change", () => {
     if (!field.key) return;
     const value = type === "datetime-local"
-      ? fromDateTimeInputValue(input.value)
-      : input.value;
+      ? fromDateTimeInputValue(input.getValue())
+      : input.getValue();
     void writeFrontmatterValue(plugin, sourcePath, field.key, value);
   });
-  container.appendChild(input);
 }
 
 function renderSelectInput(
@@ -219,26 +222,25 @@ function renderSelectInput(
   container: HTMLElement,
   sourcePath?: string
 ): void {
-  const select = document.createElement("select");
-  select.disabled = !field.key || !sourcePath;
-  select.addClass("para-zk-props-select");
-  select.createEl("option", { value: "", text: "" });
+  const select = new DropdownComponent(container);
+  select.selectEl.addClass("para-zk-props-select");
+  select.setDisabled(!field.key || !sourcePath);
+  select.addOption("", "");
 
   for (const option of field.options ?? []) {
-    select.createEl("option", { value: option.value, text: option.label });
+    select.addOption(option.value, option.label);
   }
 
   const rawValue = valueText(readFieldValue(field, frontmatter));
   const selected = selectValue(rawValue, field.options ?? []);
   if (rawValue && selected === undefined) {
-    select.createEl("option", { value: rawValue, text: rawValue });
+    select.addOption(rawValue, rawValue);
   }
-  select.value = selected ?? rawValue;
+  select.setValue(selected ?? rawValue);
 
-  select.addEventListener("change", () => {
-    if (field.key) void writeFrontmatterValue(plugin, sourcePath, field.key, select.value);
+  select.onChange((value) => {
+    if (field.key) void writeFrontmatterValue(plugin, sourcePath, field.key, value);
   });
-  container.appendChild(select);
 }
 
 function renderAreaListInput(
@@ -257,32 +259,38 @@ function renderAreaListInput(
   for (const [index, value] of values.entries()) {
     const chip = chips.createSpan({ cls: "para-zk-area-chip" });
     chip.createSpan({ text: displayLinkLabel(value) });
-    const remove = chip.createEl("button", { cls: "para-zk-area-remove", text: "x" });
-    remove.type = "button";
-    remove.disabled = !key || !sourcePath;
-    remove.addEventListener("click", async () => {
-      if (!key) return;
-      await writeFrontmatterValue(plugin, sourcePath, key, values.filter((_, itemIndex) => itemIndex !== index));
-      window.setTimeout(rerender, 50);
-    });
+    const remove = new ButtonComponent(chip);
+    remove.buttonEl.addClass("para-zk-area-remove");
+    remove
+      .setIcon("x")
+      .setTooltip("Remove")
+      .setDisabled(!key || !sourcePath)
+      .onClick(async () => {
+        if (!key) return;
+        await writeFrontmatterValue(plugin, sourcePath, key, values.filter((_, itemIndex) => itemIndex !== index));
+        window.setTimeout(rerender, 50);
+      });
   }
 
-  const add = wrapper.createEl("button", { cls: "para-zk-area-add", text: "+" });
-  add.type = "button";
-  add.disabled = !key || !sourcePath;
-  add.addEventListener("click", () => {
-    if (!key) return;
-    const used = new Set(values);
-    const suggestions = areaSuggestions(plugin).filter((area) => !used.has(area.link));
-    if (suggestions.length === 0) {
-      new Notice("PARA-ZK: no area notes found");
-      return;
-    }
-    new AreaSuggestModal(plugin.app, suggestions, async (area) => {
-      await writeFrontmatterValue(plugin, sourcePath, key, [...values, area.link]);
-      window.setTimeout(rerender, 50);
-    }).open();
-  });
+  const add = new ButtonComponent(wrapper);
+  add.buttonEl.addClass("para-zk-area-add");
+  add
+    .setIcon("plus")
+    .setTooltip("Add")
+    .setDisabled(!key || !sourcePath)
+    .onClick(() => {
+      if (!key) return;
+      const used = new Set(values);
+      const suggestions = areaSuggestions(plugin).filter((area) => !used.has(area.link));
+      if (suggestions.length === 0) {
+        new Notice("PARA-ZK: no area notes found");
+        return;
+      }
+      new AreaSuggestModal(plugin.app, suggestions, async (area) => {
+        await writeFrontmatterValue(plugin, sourcePath, key, [...values, area.link]);
+        window.setTimeout(rerender, 50);
+      }).open();
+    });
 }
 
 function renderDisplayValue(field: PropsField, frontmatter: Frontmatter, container: HTMLElement): void {

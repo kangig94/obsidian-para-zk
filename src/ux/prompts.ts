@@ -1,4 +1,4 @@
-import { App, Modal, Setting } from "obsidian";
+import { App, ButtonComponent, Modal, Setting, TextComponent } from "obsidian";
 import { localePack } from "../i18n";
 import type { Locale } from "../types";
 
@@ -56,28 +56,28 @@ class TextPromptModal extends Modal {
     contentEl.empty();
     contentEl.createEl("h2", { text: this.titleText });
 
-    const inputEl = contentEl.createEl("input", {
-      cls: "para-zk-prompt-input",
-      type: "text",
-      value: this.initialValue
-    });
-    inputEl.placeholder = this.placeholder;
+    const input = new TextComponent(contentEl);
+    input.inputEl.type = "text";
+    input.inputEl.addClass("para-zk-prompt-input");
+    input
+      .setValue(this.initialValue)
+      .setPlaceholder(this.placeholder);
 
-    inputEl.addEventListener("keydown", (event: KeyboardEvent) => {
+    input.inputEl.addEventListener("keydown", (event: KeyboardEvent) => {
       if (event.key === "Enter") {
         event.preventDefault();
-        this.submit(inputEl.value);
+        this.submit(input.getValue());
       }
     });
-    inputEl.focus();
-    inputEl.select();
+    input.inputEl.focus();
+    input.inputEl.select();
 
     new Setting(contentEl)
       .addButton((button) => {
         button
           .setButtonText(this.confirmLabel)
           .setCta()
-          .onClick(() => this.submit(inputEl.value));
+          .onClick(() => this.submit(input.getValue()));
       })
       .addButton((button) => {
         button
@@ -224,11 +224,11 @@ class ChoiceModal extends Modal {
     const rows = contentEl.createDiv({ cls: "para-zk-choice-list" });
 
     for (const choice of this.choices) {
-      const button = rows.createEl("button", {
-        cls: "para-zk-choice-button",
-        text: choice.label
-      });
-      button.addEventListener("click", () => this.submit(choice.value));
+      const button = new ButtonComponent(rows);
+      button.buttonEl.addClass("para-zk-choice-button");
+      button
+        .setButtonText(choice.label)
+        .onClick(() => this.submit(choice.value));
     }
   }
 

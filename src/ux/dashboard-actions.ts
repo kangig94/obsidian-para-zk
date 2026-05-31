@@ -1,4 +1,4 @@
-import { type MarkdownPostProcessorContext } from "obsidian";
+import { ButtonComponent, type MarkdownPostProcessorContext } from "obsidian";
 import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { createWorkflowButton } from "./inline-actions";
@@ -53,14 +53,13 @@ function renderActionGroup(
       button.addClass("para-zk-dashboard-action", `para-zk-dashboard-action-${group.tone}`);
       controls.appendChild(button);
     } else {
-      const button = controls.createEl("button", {
-        cls: `para-zk-dashboard-link para-zk-dashboard-action para-zk-dashboard-action-${group.tone}`,
-        text: action.label,
-        type: "button"
-      });
-      button.addEventListener("click", () => {
-        void plugin.app.workspace.openLinkText(action.target, sourcePath);
-      });
+      const button = new ButtonComponent(controls);
+      button.buttonEl.addClass("para-zk-dashboard-link", "para-zk-dashboard-action", `para-zk-dashboard-action-${group.tone}`);
+      button
+        .setButtonText(action.label)
+        .onClick(() => {
+          void plugin.app.workspace.openLinkText(action.target, sourcePath);
+        });
     }
   }
 }

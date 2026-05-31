@@ -1,4 +1,12 @@
-import { DropdownComponent, Modal, Notice, Setting, setIcon, TFile, type MarkdownPostProcessorContext } from "obsidian";
+import {
+  ButtonComponent,
+  DropdownComponent,
+  Modal,
+  Notice,
+  Setting,
+  TFile,
+  type MarkdownPostProcessorContext
+} from "obsidian";
 import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { localDate } from "../time";
@@ -18,7 +26,6 @@ type TaskBlockArgs = {
   root: "current" | "all";
   checkbox?: "open" | "done" | string;
   due?: "today" | "upcoming7" | "upcoming30";
-  query?: string;
   limit?: number;
   order?: TaskOrder;
 };
@@ -33,10 +40,6 @@ type TaskToolbarState = {
   status: TaskStatusFilter;
   due: TaskDueFilter;
   priority: TaskPriorityFilter;
-  query: string;
-  searchActive: boolean;
-  searchComposing: boolean;
-  searchTimer?: number;
 };
 
 type RenderableTask = {
@@ -129,29 +132,29 @@ function renderTaskToolbar(
 
   const controls = toolbar.createDiv({ cls: "para-zk-task-toolbar-controls" });
   if (options.args.root === "current" && options.rootFile) {
-    const addButton = controls.createEl("button", {
-      cls: "para-zk-task-toolbar-button para-zk-task-add"
-    });
-    addButton.type = "button";
+    const add = new ButtonComponent(controls);
+    const addButton = add.buttonEl;
+    addButton.addClass("para-zk-task-toolbar-button", "para-zk-task-add");
     addButton.setAttr("aria-label", labels.addTask);
-    addButton.setAttr("title", labels.addTask);
-    setIcon(addButton, "plus");
-    addButton.createSpan({ text: labels.addTask });
-    addButton.addEventListener("click", async () => {
-      await runTaskAction(plugin, addButton, async () => {
-        const name = await promptText(
-          plugin.app,
-          labels.tasks,
-          labels.title,
-          "",
-          labels.confirm,
-          labels.cancel
-        );
-        if (!name || !options.rootFile) return;
-        await insertRootTask(taskContext(plugin), options.rootFile, { name });
-        await renderTaskBlock(plugin, source, el, ctx);
+    add
+      .setIcon("plus")
+      .setButtonText(labels.addTask)
+      .setTooltip(labels.addTask)
+      .onClick(async () => {
+        await runTaskAction(plugin, addButton, async () => {
+          const name = await promptText(
+            plugin.app,
+            labels.tasks,
+            labels.title,
+            "",
+            labels.confirm,
+            labels.cancel
+          );
+          if (!name || !options.rootFile) return;
+          await insertRootTask(taskContext(plugin), options.rootFile, { name });
+          await renderTaskBlock(plugin, source, el, ctx);
+        });
       });
-    });
   }
 
   renderToolbarSelect(controls, {
@@ -190,7 +193,6 @@ function renderTaskToolbar(
       void renderTaskBlock(plugin, source, el, ctx);
     }
   });
-  renderTaskSearch(plugin, controls, el, source, ctx, options.state);
 }
 
 function renderToolbarSelect(
@@ -209,73 +211,9 @@ function renderToolbarSelect(
   for (const item of options.options) {
     dropdown.addOption(item.value, item.label);
   }
-  dropdown.setValue(options.value);
-  dropdown.onChange((value) => {
-    dropdown.selectEl.blur();
-    window.setTimeout(() => options.onChange(value), 0);
-  });
-}
-
-function renderTaskSearch(
-  plugin: ParaZkPluginContext,
-  parent: HTMLElement,
-  el: HTMLElement,
-  source: string,
-  ctx: MarkdownPostProcessorContext,
-  state: TaskToolbarState
-): void {
-  const labels = localePack(plugin.settings.locale).labels;
-  const search = parent.createDiv({ cls: `para-zk-task-search${state.searchActive || state.query ? " is-active" : ""}` });
-  const icon = search.createSpan({ cls: "para-zk-task-search-icon" });
-  setIcon(icon, "search");
-  const input = search.createEl("input", {
-    attr: {
-      "aria-label": labels.taskSearch,
-      placeholder: labels.taskSearch,
-      type: "search"
-    }
-  });
-  input.value = state.query;
-  input.addEventListener("focus", () => {
-    state.searchActive = true;
-  });
-  input.addEventListener("blur", () => {
-    state.searchActive = Boolean(state.query);
-  });
-  input.addEventListener("compositionstart", () => {
-    state.searchComposing = true;
-  });
-  input.addEventListener("compositionend", () => {
-    state.searchComposing = false;
-    state.query = input.value;
-    state.searchActive = true;
-    scheduleTaskSearchRender(plugin, el, source, ctx, state);
-  });
-  input.addEventListener("input", () => {
-    state.query = input.value;
-    state.searchActive = true;
-    if (!state.searchComposing) scheduleTaskSearchRender(plugin, el, source, ctx, state);
-  });
-  if (state.searchActive || state.query) {
-    window.setTimeout(() => {
-      input.focus();
-      input.setSelectionRange(input.value.length, input.value.length);
-    }, 0);
-  }
-}
-
-function scheduleTaskSearchRender(
-  plugin: ParaZkPluginContext,
-  el: HTMLElement,
-  source: string,
-  ctx: MarkdownPostProcessorContext,
-  state: TaskToolbarState
-): void {
-  if (state.searchTimer !== undefined) window.clearTimeout(state.searchTimer);
-  state.searchTimer = window.setTimeout(() => {
-    state.searchTimer = undefined;
-    void renderTaskBlock(plugin, source, el, ctx);
-  }, 120);
+  dropdown
+    .setValue(options.value)
+    .onChange(options.onChange);
 }
 
 async function currentRootTasks(plugin: ParaZkPluginContext, rootFile: TFile): Promise<RenderableTask[]> {
@@ -310,25 +248,25 @@ function renderTaskRow(
 ): void {
   const row = list.createDiv({ cls: "para-zk-task-row" });
 
-  const checkbox = row.createEl("button", {
-    cls: `para-zk-task-checkbox ${taskCheckboxClass(item.task.checkbox)}`,
-    text: taskCheckboxText(item.task.checkbox)
-  });
-  checkbox.type = "button";
+  const checkboxAction = new ButtonComponent(row);
+  const checkbox = checkboxAction.buttonEl;
+  checkbox.addClass("para-zk-task-checkbox", taskCheckboxClass(item.task.checkbox));
   checkbox.setAttr("aria-label", `Task status ${item.task.checkbox.trim() || "open"}`);
-  checkbox.setAttr("title", "Cycle task status");
-  checkbox.addEventListener("click", async () => {
-    await runTaskAction(plugin, checkbox, async () => {
-      await setRootTaskField(
-        taskContext(plugin),
-        item.rootFile,
-        item.id,
-        "checkbox",
-        cycleTaskCheckbox(item.task.checkbox)
-      );
-      await options.rerender();
+  checkboxAction
+    .setButtonText(taskCheckboxText(item.task.checkbox))
+    .setTooltip("Cycle task status")
+    .onClick(async () => {
+      await runTaskAction(plugin, checkbox, async () => {
+        await setRootTaskField(
+          taskContext(plugin),
+          item.rootFile,
+          item.id,
+          "checkbox",
+          cycleTaskCheckbox(item.task.checkbox)
+        );
+        await options.rerender();
+      });
     });
-  });
 
   const body = row.createDiv({ cls: "para-zk-task-body" });
   body.createDiv({ cls: "para-zk-task-name", text: item.task.name });
@@ -337,14 +275,13 @@ function renderTaskRow(
   if (options.showRoot || meta.length > 0) {
     const metaEl = body.createDiv({ cls: "para-zk-task-meta" });
     if (options.showRoot) {
-      const rootLink = metaEl.createEl("button", {
-        cls: "para-zk-task-root",
-        text: item.rootTitle
-      });
-      rootLink.type = "button";
-      rootLink.addEventListener("click", async () => {
-        await plugin.app.workspace.getLeaf(false).openFile(item.rootFile);
-      });
+      const rootLink = new ButtonComponent(metaEl);
+      rootLink.buttonEl.addClass("para-zk-task-root");
+      rootLink
+        .setButtonText(item.rootTitle)
+        .onClick(async () => {
+          await plugin.app.workspace.getLeaf(false).openFile(item.rootFile);
+        });
     }
     for (const chip of meta) {
       metaEl.createSpan({
@@ -355,29 +292,33 @@ function renderTaskRow(
   }
 
   const actions = row.createDiv({ cls: "para-zk-task-actions" });
-  const edit = actions.createEl("button", { cls: "para-zk-task-edit" });
-  edit.type = "button";
+  const editAction = new ButtonComponent(actions);
+  const edit = editAction.buttonEl;
+  edit.addClass("para-zk-task-edit");
   edit.setAttr("aria-label", "Edit task");
-  edit.setAttr("title", "Edit task");
-  setIcon(edit, "pencil");
-  edit.addEventListener("click", () => {
-    new TaskEditModal(plugin, item.task, async (value) => {
-      await updateTaskFromEditor(plugin, item, value);
-      await options.rerender();
-    }).open();
-  });
-
-  const remove = actions.createEl("button", { cls: "para-zk-task-delete" });
-  remove.type = "button";
-  remove.setAttr("aria-label", "Delete task");
-  remove.setAttr("title", "Delete task");
-  setIcon(remove, "trash");
-  remove.addEventListener("click", async () => {
-    await runTaskAction(plugin, remove, async () => {
-      await deleteRootTask(taskContext(plugin), item.rootFile, item.id);
-      await options.rerender();
+  editAction
+    .setIcon("pencil")
+    .setTooltip("Edit task")
+    .onClick(() => {
+      new TaskEditModal(plugin, item.task, async (value) => {
+        await updateTaskFromEditor(plugin, item, value);
+        await options.rerender();
+      }).open();
     });
-  });
+
+  const removeAction = new ButtonComponent(actions);
+  const remove = removeAction.buttonEl;
+  remove.addClass("para-zk-task-delete");
+  remove.setAttr("aria-label", "Delete task");
+  removeAction
+    .setIcon("trash")
+    .setTooltip("Delete task")
+    .onClick(async () => {
+      await runTaskAction(plugin, remove, async () => {
+        await deleteRootTask(taskContext(plugin), item.rootFile, item.id);
+        await options.rerender();
+      });
+    });
 }
 
 async function updateTaskFromEditor(plugin: ParaZkPluginContext, item: RenderableTask, value: TaskEditValue): Promise<void> {
@@ -536,10 +477,7 @@ function taskToolbarState(el: HTMLElement, args: TaskBlockArgs): TaskToolbarStat
     order: args.order ?? "smart",
     status: initialStatusFilter(args.checkbox),
     due: args.due ?? "any",
-    priority: "any",
-    query: args.query ?? "",
-    searchActive: Boolean(args.query),
-    searchComposing: false
+    priority: "any"
   };
   taskToolbarStates.set(el, state);
   return state;
@@ -552,12 +490,10 @@ function initialStatusFilter(value: TaskBlockArgs["checkbox"]): TaskStatusFilter
 }
 
 function filteredTasks(items: RenderableTask[], args: TaskBlockArgs, state: TaskToolbarState): RenderableTask[] {
-  const query = state.query.trim().toLocaleLowerCase();
   return items
     .filter((item) => statusMatches(item.task.checkbox, state.status))
     .filter((item) => dueMatches(item.task.due, state.due))
     .filter((item) => priorityMatches(item.task.priority, state.priority))
-    .filter((item) => !query || taskSearchText(item).toLocaleLowerCase().includes(query))
     .sort((left, right) => compareTasks(left, right, state.order))
     .slice(0, args.limit);
 }
@@ -664,8 +600,8 @@ function taskOrderOptions(labels: Record<string, string>): Array<{ value: TaskOr
 
 function taskStatusOptions(labels: Record<string, string>): Array<{ value: TaskStatusFilter; label: string }> {
   return [
-    { value: "open", label: labels.taskFilterOpen },
     { value: "all", label: labels.taskFilterAll },
+    { value: "open", label: labels.taskFilterOpen },
     { value: "done", label: labels.taskFilterDone }
   ];
 }
@@ -713,17 +649,6 @@ function taskCheckboxText(value: string): string {
   return normalized || "";
 }
 
-function taskSearchText(item: RenderableTask): string {
-  return [
-    item.rootTitle,
-    item.task.name,
-    item.task.priority,
-    item.task.due,
-    item.task.scheduled,
-    item.task.start
-  ].filter(Boolean).join("\n");
-}
-
 function parseTaskBlockArgs(source: string): TaskBlockArgs {
   const raw = parseCodeBlockKeyValues(source);
   const root = raw.root === "all" ? "all" : "current";
@@ -735,7 +660,6 @@ function parseTaskBlockArgs(source: string): TaskBlockArgs {
     root,
     checkbox: raw.checkbox,
     due: parseDueFilter(raw.due),
-    query: raw.query?.trim() || undefined,
     limit: Number.isInteger(limit) && limit > 0 ? limit : 50,
     order: parseTaskOrder(raw.order)
   };
