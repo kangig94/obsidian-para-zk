@@ -138,6 +138,7 @@ function runWorkflowScenario(today) {
   const renamedNestedAreaTitle = `Smoke Renamed Nested Area ${stamp}`;
   const renameAreaLinkProjectTitle = `Smoke Area Link Project ${stamp}`;
   const resourceTitle = `Smoke Resource ${stamp}`;
+  const referenceOnlyResourceTitle = `Smoke Reference Only Resource ${stamp}`;
   const renameResourceTitle = `Smoke Rename Resource ${stamp}`;
   const renamedResourceTitle = `Smoke Renamed Resource ${stamp}`;
   const deleteAreaTitle = `Smoke Delete Area ${stamp}`;
@@ -834,6 +835,124 @@ function runWorkflowScenario(today) {
     Object.values(projectUrlReferencesRead.value?.items ?? {}).some((item) => item.target === "https://example.com/reference"),
     "project references kind filter did not expose URL reference"
   );
+  const mutableReference = cliJson("para-zk:add-reference", [
+    `path=${project.path}`,
+    "target=https://example.com/mutable-reference",
+    "label=Mutable Reference",
+    "open=false",
+    "format=json"
+  ]);
+  assert(mutableReference.ok === true, "mutable reference setup failed");
+  let mutableReferencesRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    "key=references",
+    "ref_kind=url",
+    "limit=all",
+    "format=json"
+  ]);
+  let mutableReferenceEntry = Object.entries(mutableReferencesRead.value?.items ?? {})
+    .find(([, item]) => item.target === "https://example.com/mutable-reference");
+  assert(mutableReferenceEntry, "mutable reference was not readable");
+  const mutableReferenceId = mutableReferenceEntry[0];
+  const mutableReferenceLabelUpdate = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    `key=references/${mutableReferenceId}/label`,
+    "op=set",
+    "value=Updated Mutable Reference",
+    "format=json"
+  ]);
+  assert(mutableReferenceLabelUpdate.ok === true && mutableReferenceLabelUpdate.changed === true, "reference label update failed");
+  const updatedMutableReferenceLabel = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    `key=references/${mutableReferenceId}/label`,
+    "format=json"
+  ]);
+  assert(updatedMutableReferenceLabel.value === "Updated Mutable Reference", "reference label update was not reflected");
+  const mutableReferenceTargetUpdate = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    `key=references/${mutableReferenceId}/target`,
+    "op=set",
+    "value=https://example.com/mutable-reference-updated",
+    "format=json"
+  ]);
+  assert(mutableReferenceTargetUpdate.ok === true && mutableReferenceTargetUpdate.changed === true, "reference target update failed");
+  mutableReferencesRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    "key=references",
+    "ref_kind=url",
+    "limit=all",
+    "format=json"
+  ]);
+  mutableReferenceEntry = Object.entries(mutableReferencesRead.value?.items ?? {})
+    .find(([, item]) => item.target === "https://example.com/mutable-reference-updated");
+  assert(mutableReferenceEntry, "reference target update was not reflected");
+  const mutableReferenceDelete = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    `key=references/${mutableReferenceEntry[0]}`,
+    "op=delete",
+    "format=json"
+  ]);
+  assert(mutableReferenceDelete.ok === true && mutableReferenceDelete.changed === true, "reference delete failed");
+  mutableReferencesRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    "key=references",
+    "ref_kind=url",
+    "limit=all",
+    "format=json"
+  ]);
+  assert(
+    !Object.values(mutableReferencesRead.value?.items ?? {}).some((item) => item.target === "https://example.com/mutable-reference-updated"),
+    "deleted reference remained readable"
+  );
+  const referenceOnlyResource = cliJson("para-zk:create-resource", [
+    `title=${referenceOnlyResourceTitle}`,
+    "link=false",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(referenceOnlyResource, "reference-only resource");
+  const mutableFileReference = cliJson("para-zk:add-reference", [
+    `path=${project.path}`,
+    `target=${referenceOnlyResource.path}`,
+    "label=Mutable File Reference",
+    "open=false",
+    "format=json"
+  ]);
+  assert(mutableFileReference.ok === true && mutableFileReference.added === true, "mutable file reference setup failed");
+  let mutableFileReferencesRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    "key=references",
+    "limit=all",
+    "format=json"
+  ]);
+  let mutableFileReferenceEntry = Object.entries(mutableFileReferencesRead.value?.items ?? {})
+    .find(([, item]) => item.path === referenceOnlyResource.path);
+  assert(mutableFileReferenceEntry, "mutable file reference was not readable");
+  const mutableFileReferenceLabelUpdate = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    `key=references/${mutableFileReferenceEntry[0]}/label`,
+    "op=set",
+    "value=Updated Mutable File Reference",
+    "format=json"
+  ]);
+  assert(mutableFileReferenceLabelUpdate.ok === true && mutableFileReferenceLabelUpdate.changed === true, "file reference label update failed");
+  const mutableFileReferenceDelete = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    `key=references/${mutableFileReferenceEntry[0]}`,
+    "op=delete",
+    "format=json"
+  ]);
+  assert(mutableFileReferenceDelete.ok === true && mutableFileReferenceDelete.changed === true, "file reference delete failed");
+  assertFileExists(referenceOnlyResource.path, "reference delete removed the referenced resource file");
+  mutableFileReferencesRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    "key=references",
+    "limit=all",
+    "format=json"
+  ]);
+  mutableFileReferenceEntry = Object.entries(mutableFileReferencesRead.value?.items ?? {})
+    .find(([, item]) => item.path === referenceOnlyResource.path);
+  assert(!mutableFileReferenceEntry, "deleted file reference remained readable");
 
   const resourceRead = cliJson("para-zk:read-resource", [
     `title=${resourceTitle}`,

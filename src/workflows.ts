@@ -362,9 +362,18 @@ type ReferenceRead = {
   path?: string;
   text?: string;
 };
+type ReferenceLineFormat = "wiki" | "markdown" | "url" | "text";
 type ReferenceLineRead = {
   id: string;
   reference: ReferenceRead;
+  prefix: string;
+  format: ReferenceLineFormat;
+  rawTarget?: string;
+  rawLabel?: string;
+};
+type ReferenceWritableField = "label" | "target";
+type EditableReferenceLine = ReferenceLineRead & {
+  range: TextRange & { endWithoutBreak: number };
 };
 type NormalizedCollectionReadOptions = {
   offset: number;
@@ -1567,6 +1576,12 @@ type WritableSurfaceTarget =
     shardFile: TFile;
     line: EditableTaskLine;
     field?: TaskWritableField;
+  }
+  | {
+    kind: "referenceItem";
+    file: TFile;
+    line: EditableReferenceLine;
+    field?: ReferenceWritableField;
   };
 
 type TextRange = {
@@ -1598,7 +1613,9 @@ async function updateSurface(
       ? await updateTextSurface(ctx, target, operation, options)
       : target.kind === "taskCollection"
         ? await updateTaskCollectionSurface(ctx, target, operation, options)
-        : await updateTaskItemSurface(ctx, target, operation, options);
+        : target.kind === "referenceItem"
+          ? await updateReferenceItemSurface(ctx, target, operation, options)
+          : await updateTaskItemSurface(ctx, target, operation, options);
   const resultFile = result.file ?? target.file;
 
   return {
@@ -1688,7 +1705,7 @@ async function resolveWritableCollectionTarget(
   originalKey: string
 ): Promise<WritableSurfaceTarget> {
   if (section.collection === "reference") {
-    throw new Error("references collection is read-only through update; use para-zk:add-reference");
+    return resolveWritableReferenceCollectionTarget(ctx, file, section, parts, originalKey);
   }
   if (section.collection !== "task") throw new Error(`unknown update key: ${originalKey}`);
 
@@ -1710,6 +1727,31 @@ async function resolveWritableCollectionTarget(
       kind: "taskItem",
       file,
       shardFile,
+      line,
+      field
+    };
+  }
+
+  throw new Error(`unknown update key: ${originalKey}`);
+}
+
+async function resolveWritableReferenceCollectionTarget(
+  ctx: WorkflowContext,
+  file: TFile,
+  section: ReadSectionSpec,
+  parts: string[],
+  originalKey: string
+): Promise<WritableSurfaceTarget> {
+  if (parts.length === 1) {
+    throw new Error("references collection root is read-only through update; use para-zk:add-reference to add references");
+  }
+  if (parts.length === 2 || parts.length === 3) {
+    const line = await findEditableReferenceLine(ctx, file, section, parts[1]);
+    if (!line) throw new Error(`reference not found: ${parts[1]}`);
+    const field = parts.length === 3 ? readReferenceWritableField(parts[2], originalKey) : undefined;
+    return {
+      kind: "referenceItem",
+      file,
       line,
       field
     };
@@ -1761,7 +1803,7 @@ async function updateTextSurface(
   operation: UpdateOperation,
   options: UpdatePayloadOptions
 ): Promise<TextUpdateResult> {
-  if (operation === "delete") throw new Error("op=delete only supports task item keys");
+  if (operation === "delete") throw new Error("op=delete only supports structured item keys");
   const before = await ctx.app.vault.read(target.file);
   const current = before.slice(target.range.start, target.range.end);
   const update = applyTextOperation(current, operation, options);
@@ -1827,6 +1869,37 @@ async function updateTaskItemSurface(
   return { changed: before !== after };
 }
 
+async function updateReferenceItemSurface(
+  ctx: WorkflowContext,
+  target: Extract<WritableSurfaceTarget, { kind: "referenceItem" }>,
+  operation: UpdateOperation,
+  options: UpdatePayloadOptions
+): Promise<TextUpdateResult> {
+  if (!target.field) {
+    if (operation !== "delete") throw new Error("reference item keys only support op=delete; use references/<id>/<field> for op=set");
+    const before = await ctx.app.vault.read(target.file);
+    const after = removeTextRanges(before, [target.line.range]);
+    if (before !== after) await ctx.app.vault.modify(target.file, after);
+    return { changed: before !== after };
+  }
+
+  if (operation !== "set") throw new Error("reference fields only support op=set");
+  if (options.valueSource === "value_json") throw new Error("reference field updates require value");
+
+  const value = requireUpdateText(options, { allowEmpty: false });
+  const body = target.field === "label"
+    ? serializeReferenceBodyWithLabel(target.line, value)
+    : serializeReferenceBodyWithTarget(ctx, target.line, value);
+  const nextLine = `${target.line.prefix}${body}`;
+  const before = await ctx.app.vault.read(target.file);
+  const currentLine = before.slice(target.line.range.start, target.line.range.endWithoutBreak);
+  if (currentLine === nextLine) return { changed: false };
+
+  const after = spliceTextRange(before, target.line.range, nextLine);
+  if (before !== after) await ctx.app.vault.modify(target.file, after);
+  return { changed: before !== after };
+}
+
 function applyTextOperation(
   current: string,
   operation: UpdateOperation,
@@ -1876,7 +1949,7 @@ function applyTextOperation(
       };
     }
     case "delete":
-      throw new Error("op=delete only supports task item keys");
+      throw new Error("op=delete only supports structured item keys");
   }
 }
 
@@ -2306,43 +2379,144 @@ function readReferences(_content: string, context: SectionTransformContext): Rec
   return items;
 }
 
-function readReferenceLine(ctx: WorkflowContext, sourcePath: string, line: number, text: string): ReferenceLineRead | undefined {
-  const body = stripReferenceLineMarker(text);
-  if (!body) return undefined;
+async function findEditableReferenceLine(
+  ctx: WorkflowContext,
+  file: TFile,
+  section: ReadSectionSpec,
+  id: string
+): Promise<EditableReferenceLine | undefined> {
+  const content = await ctx.app.vault.read(file);
+  const range = findSectionContentRange(content, section);
+  if (!range) return undefined;
 
-  const reference = parseReferenceBody(ctx, sourcePath, body);
-  const idSource = reference.path ?? reference.target ?? reference.text ?? body;
+  const items: Record<string, ReferenceRead> = {};
+  let cursor = range.start;
+  let line = lineNumberAt(content, range.start);
+  while (cursor < range.end) {
+    const span = lineTextRangeAt(content, cursor, range.end);
+    if (!span) break;
+
+    const text = content.slice(span.start, span.endWithoutBreak);
+    const reference = readReferenceLine(ctx, file.path, line, text);
+    if (reference) {
+      const lineId = uniqueReadId(reference.id, items);
+      items[lineId] = reference.reference;
+      if (lineId === id) {
+        return {
+          ...reference,
+          id: lineId,
+          range: span
+        };
+      }
+    }
+
+    cursor = span.end;
+    line += 1;
+  }
+
+  return undefined;
+}
+
+function readReferenceLine(ctx: WorkflowContext, sourcePath: string, line: number, text: string): ReferenceLineRead | undefined {
+  const parts = splitReferenceLine(text);
+  if (!parts) return undefined;
+
+  const parsed = parseReferenceBody(ctx, sourcePath, parts.body);
+  const reference = parsed.reference;
+  const idSource = reference.path ?? reference.target ?? reference.text ?? parts.body;
   return {
-    id: `ref-${hashReadId(idSource || `${sourcePath}:${line}:${body}`)}`,
-    reference
+    id: `ref-${hashReadId(idSource || `${sourcePath}:${line}:${parts.body}`)}`,
+    reference,
+    prefix: parts.prefix,
+    format: parsed.format,
+    rawTarget: parsed.rawTarget,
+    rawLabel: parsed.rawLabel
   };
 }
 
-function stripReferenceLineMarker(value: string): string {
-  let text = value.trim();
-  text = text.replace(/^(?:>\s*)+/, "").trim();
-  text = text.replace(/^(?:[-*+]\s+|\d+[.)]\s+)/, "").trim();
-  return text;
+function splitReferenceLine(value: string): { prefix: string; body: string } | undefined {
+  const match = value.match(/^(\s*(?:(?:>\s*)+)?\s*(?:(?:[-*+]|\d+[.)])\s+)?)(.*?)\s*$/);
+  const body = match?.[2]?.trim() ?? "";
+  if (!body) return undefined;
+  return {
+    prefix: match?.[1] ?? "",
+    body
+  };
 }
 
-function parseReferenceBody(ctx: WorkflowContext, sourcePath: string, value: string): ReferenceRead {
+function parseReferenceBody(
+  ctx: WorkflowContext,
+  sourcePath: string,
+  value: string
+): {
+  reference: ReferenceRead;
+  format: ReferenceLineFormat;
+  rawTarget?: string;
+  rawLabel?: string;
+} {
   const wiki = value.match(/^\[\[([^\]|]+)(?:\|([^\]]+))?\]\]$/);
-  if (wiki) return readWikiReference(ctx, sourcePath, wiki[1], wiki[2]);
+  if (wiki) {
+    return {
+      reference: readWikiReference(ctx, sourcePath, wiki[1], wiki[2]),
+      format: "wiki",
+      rawTarget: wiki[1].trim(),
+      rawLabel: wiki[2]?.trim() || undefined
+    };
+  }
 
   const markdown = value.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-  if (markdown) return readMarkdownReference(ctx, markdown[1], markdown[2]);
+  if (markdown) {
+    return {
+      reference: readMarkdownReference(ctx, markdown[1], markdown[2]),
+      format: "markdown",
+      rawTarget: markdown[2].trim(),
+      rawLabel: markdown[1].trim()
+    };
+  }
 
   if (isExternalReference(value)) {
     return {
-      kind: "url",
-      target: value
+      reference: {
+        kind: "url",
+        target: value
+      },
+      format: "url",
+      rawTarget: value
     };
   }
 
   return {
-    kind: "text",
-    text: value
+    reference: {
+      kind: "text",
+      text: value
+    },
+    format: "text"
   };
+}
+
+function readReferenceWritableField(value: string, originalKey: string): ReferenceWritableField {
+  if (value === "label" || value === "target") return value;
+  throw new Error(`unknown reference field for update key: ${originalKey}`);
+}
+
+function serializeReferenceBodyWithLabel(line: EditableReferenceLine, value: string): string {
+  const label = value.trim();
+  if (!label) throw new Error("reference label is required");
+  if (line.format === "text") throw new Error("text references do not support label updates");
+
+  const target = line.rawTarget ?? line.reference.target ?? line.reference.path;
+  if (!target) throw new Error("reference target is missing");
+
+  if (line.format === "wiki") return wikiLink(target, label);
+  return `[${escapeMarkdownLinkLabel(label)}](${target})`;
+}
+
+function serializeReferenceBodyWithTarget(ctx: WorkflowContext, line: EditableReferenceLine, value: string): string {
+  const target = value.trim();
+  if (!target) throw new Error("reference target is required");
+
+  const label = line.rawLabel?.trim() || undefined;
+  return resolveReferenceTarget(ctx, target, label).line;
 }
 
 function readWikiReference(

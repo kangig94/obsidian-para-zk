@@ -116,8 +116,10 @@ Notable changes for PARA-ZK are tracked here.
 - Tasks now live in PARA-ZK's managed `Tasks/roots` registry and are rendered
   into root notes with `para-zk-tasks` blocks, keeping root note bodies compact
   while preserving stable task ids for CLI reads and updates.
-- Reference collections are now read-only through update commands; use
-  `para-zk:add-reference` as the single path for adding references.
+- Reference collection roots remain read-only through update commands; use
+  `para-zk:add-reference` as the single path for adding references. Individual
+  References-section lines can now be updated by `label`/`target` or deleted by
+  id without touching the referenced note, file, or URL.
 
 ### Removed
 

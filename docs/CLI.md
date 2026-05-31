@@ -397,8 +397,14 @@ with `key=tasks/<id>/<field> op=set value=...`, and delete one task with
 `priority`, `due`, `scheduled`, `start`, `created`, `done`, and `cancelled`.
 Use `position` in `value_json` to insert before the 1-based task position, or
 omit it to append at the end.
-Reference collections are read-only through update; use `para-zk:add-reference`
-to add references.
+Reference collection roots do not accept raw Markdown edits. Add references with
+`para-zk:add-reference`, update one reference line with
+`key=references/<id>/label op=set value=...` or
+`key=references/<id>/target op=set value=...`, and delete one reference line with
+`key=references/<id> op=delete`. These operations only rewrite the selected
+source note's References section; they do not modify the referenced note, file,
+or URL. Updating `target` can change that reference's id, so read
+`key=references` again before making another edit to the same line.
 
 Read-only keys include `children`, `path`, `title`, `type`, and `archived`.
 
@@ -408,6 +414,8 @@ Examples:
 optsidian raw para-zk:update-project title="Model Evaluation" key=frontmatter/status op=set value=done format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key=summary op=replace match="old claim" with="new claim" format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key=tasks op=insert value_json='{"name":"Review evaluation set","due":"2026-06-05","priority":"high"}' format=json
+optsidian raw para-zk:update-project title="Model Evaluation" key=references/ref-8b1a9953/label op=set value="Updated source" format=json
+optsidian raw para-zk:update-project title="Model Evaluation" key=references/ref-8b1a9953 op=delete format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key=tasks/pzt_meco3r_a1b2c3d4/checkbox op=set value=x format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key=tasks/pzt_meco3r_a1b2c3d4 op=delete format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key="children/Planning Meeting/body" op=append value="Decision: ship the baseline." format=json
