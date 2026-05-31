@@ -194,7 +194,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       const result = await readZk(workflowContext(plugin), {
         title: readCliTitle(args),
         path: readCliPath(args),
-        kind: readCliString(args, "kind") ?? readCliString(args, "type"),
+        kind: readCliKind(args),
         key: readCliString(args, "key"),
         collection: readCliCollectionOptions(args)
       });
@@ -327,7 +327,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       const result = await updateZk(workflowContext(plugin), {
         title: readCliTitle(args),
         path: readCliPath(args),
-        kind: readCliString(args, "kind") ?? readCliString(args, "type"),
+        kind: readCliKind(args),
         ...readCliUpdateOptions(args)
       });
       return { ...result };
@@ -386,7 +386,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     run: async (plugin, args) => {
       const { renameProject } = await import("../workflows");
       const result = await renameProject(workflowContext(plugin), {
-        title: readCanonicalCliTitle(args),
+        title: readCliTitle(args),
         path: readCliPath(args),
         archived: readCliBoolean(args, "archived"),
         newTitle: readCliNewTitle(args)
@@ -405,7 +405,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     run: async (plugin, args) => {
       const { renameArea } = await import("../workflows");
       const result = await renameArea(workflowContext(plugin), {
-        title: readCanonicalCliTitle(args),
+        title: readCliTitle(args),
         path: readCliPath(args),
         archived: readCliBoolean(args, "archived"),
         newTitle: readCliNewTitle(args)
@@ -424,7 +424,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     run: async (plugin, args) => {
       const { renameResource } = await import("../workflows");
       const result = await renameResource(workflowContext(plugin), {
-        title: readCanonicalCliTitle(args),
+        title: readCliTitle(args),
         path: readCliPath(args),
         archived: readCliBoolean(args, "archived"),
         newTitle: readCliNewTitle(args)
@@ -443,7 +443,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     run: async (plugin, args) => {
       const { renameZk } = await import("../workflows");
       const result = await renameZk(workflowContext(plugin), {
-        title: readCanonicalCliTitle(args),
+        title: readCliTitle(args),
         path: readCliPath(args),
         kind: readCliRenameKind(args),
         newTitle: readCliNewTitle(args)
@@ -462,7 +462,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     run: async (plugin, args) => {
       const { deleteProject } = await import("../workflows");
       const result = await deleteProject(workflowContext(plugin), {
-        title: readCanonicalCliTitle(args),
+        title: readCliTitle(args),
         path: readCliPath(args),
         archived: readCliBoolean(args, "archived"),
         force: readCliBoolean(args, "force") ?? false
@@ -481,7 +481,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     run: async (plugin, args) => {
       const { deleteArea } = await import("../workflows");
       const result = await deleteArea(workflowContext(plugin), {
-        title: readCanonicalCliTitle(args),
+        title: readCliTitle(args),
         path: readCliPath(args),
         archived: readCliBoolean(args, "archived"),
         force: readCliBoolean(args, "force") ?? false
@@ -500,7 +500,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     run: async (plugin, args) => {
       const { deleteResource } = await import("../workflows");
       const result = await deleteResource(workflowContext(plugin), {
-        title: readCanonicalCliTitle(args),
+        title: readCliTitle(args),
         path: readCliPath(args),
         archived: readCliBoolean(args, "archived"),
         force: readCliBoolean(args, "force") ?? false
@@ -519,7 +519,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     run: async (plugin, args) => {
       const { deleteZk } = await import("../workflows");
       const result = await deleteZk(workflowContext(plugin), {
-        title: readCanonicalCliTitle(args),
+        title: readCliTitle(args),
         path: readCliPath(args),
         kind: readCliRenameKind(args),
         force: readCliBoolean(args, "force") ?? false
@@ -559,7 +559,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     run: async (plugin, args) => {
       const { deleteRetro } = await import("../workflows");
       const result = await deleteRetro(workflowContext(plugin), {
-        title: readCanonicalCliTitle(args),
+        title: readCliTitle(args),
         path: readCliPath(args),
         date: readCliString(args, "date"),
         archived: readCliBoolean(args, "archived"),
@@ -586,7 +586,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       const result = await createProject(workflowContext(plugin), {
         title: readCliTitle(args),
         areas: parseList(readCliString(args, "areas")),
-        areaTitles: parseList(readCliString(args, "area_titles") ?? readCliString(args, "areaTitles")),
+        areaTitles: parseList(readCliAreaTitles(args)),
         status: readCliString(args, "status"),
         priority: readCliString(args, "priority"),
         open: readCliBoolean(args, "open") ?? false
@@ -675,7 +675,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       const result = await createSubnote(workflowContext(plugin), {
         title: readCliTitle(args),
         sourcePath: readCliPath(args),
-        subnoteType: readCliString(args, "subnote_type") ?? readCliString(args, "subnoteType") ?? readCliString(args, "type"),
+        subnoteType: readCliSubnoteType(args),
         open: readCliBoolean(args, "open") ?? false
       });
       return { ...result };
@@ -708,7 +708,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     description: "Create a weekly retro note, optionally scoped to a project or area",
     options: {
       path: { value: "<path>", description: "Project or area note path." },
-      name: { value: "<name>", description: "Retro name segment." },
+      title: { value: "<title>", description: "Retro title segment." },
       date: { value: "<YYYY-MM-DD>", description: "Date used for ISO week calculation." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
@@ -718,7 +718,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       const { createRetro } = await import("../workflows");
       const result = await createRetro(workflowContext(plugin), {
         sourcePath: readCliPath(args),
-        name: readCliString(args, "name") ?? readCliString(args, "title"),
+        title: readCliTitle(args),
         date: readCliString(args, "date"),
         open: readCliBoolean(args, "open") ?? false
       });
@@ -740,7 +740,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       const { createZk } = await import("../workflows");
       const result = await createZk(workflowContext(plugin), {
         title: readCliTitle(args),
-        kind: readCliString(args, "kind") ?? readCliString(args, "type"),
+        kind: readCliKind(args),
         maturity: readCliString(args, "maturity"),
         open: readCliBoolean(args, "open") ?? false
       });
@@ -787,8 +787,8 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       const { promoteResource } = await import("../workflows");
       const result = await promoteResource(workflowContext(plugin), {
         sourcePath: readCliPath(args),
-        title: readCliString(args, "title") ?? readCliString(args, "name"),
-        kind: readCliString(args, "kind") ?? readCliString(args, "type"),
+        title: readCliTitle(args),
+        kind: readCliKind(args),
         maturity: readCliString(args, "maturity"),
         open: readCliBoolean(args, "open") ?? false
       });
@@ -811,8 +811,8 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       const { promoteFleeting } = await import("../workflows");
       const result = await promoteFleeting(workflowContext(plugin), {
         sourcePath: readCliPath(args),
-        title: readCliString(args, "title") ?? readCliString(args, "name"),
-        kind: readCliString(args, "kind") ?? readCliString(args, "type"),
+        title: readCliTitle(args),
+        kind: readCliKind(args),
         maturity: readCliString(args, "maturity"),
         open: readCliBoolean(args, "open") ?? false
       });
@@ -904,12 +904,26 @@ function readCliBoolean(args: CliArgs, key: string): boolean | undefined {
 }
 
 function readCliTitle(args: CliArgs): string {
-  return readCliString(args, "title") ?? readCliString(args, "name") ?? "";
-}
-
-function readCanonicalCliTitle(args: CliArgs): string {
   rejectCliAliases(args, { name: "title" });
   return readCliString(args, "title") ?? "";
+}
+
+function readCliKind(args: CliArgs): string | undefined {
+  rejectCliAliases(args, { type: "kind" });
+  return readCliString(args, "kind");
+}
+
+function readCliAreaTitles(args: CliArgs): string | undefined {
+  rejectCliAliases(args, { areaTitles: "area_titles" });
+  return readCliString(args, "area_titles");
+}
+
+function readCliSubnoteType(args: CliArgs): string | undefined {
+  rejectCliAliases(args, {
+    subnoteType: "subnote_type",
+    type: "subnote_type"
+  });
+  return readCliString(args, "subnote_type");
 }
 
 function readCliNewTitle(args: CliArgs): string {
@@ -921,8 +935,7 @@ function readCliNewTitle(args: CliArgs): string {
 }
 
 function readCliRenameKind(args: CliArgs): string | undefined {
-  rejectCliAliases(args, { type: "kind" });
-  return readCliString(args, "kind");
+  return readCliKind(args);
 }
 
 function readCliPath(args: CliArgs): string | undefined {
@@ -1045,10 +1058,11 @@ function rejectCliAliases(args: CliArgs, aliases: Record<string, string>): void 
 }
 
 function readCliContent(args: CliArgs): string {
-  return readCliString(args, "content")
-    ?? readCliString(args, "text")
-    ?? readCliString(args, "memo")
-    ?? "";
+  rejectCliAliases(args, {
+    text: "content",
+    memo: "content"
+  });
+  return readCliString(args, "content") ?? "";
 }
 
 function decodeCliEscapes(value: string): string {

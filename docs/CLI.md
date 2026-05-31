@@ -22,6 +22,8 @@ that JSON includes.
 All paths are vault-relative. Use the canonical `path` option when a command
 needs an existing note. Legacy aliases such as `file_path`, `filePath`,
 `source`, `sourcePath`, and `file` are rejected.
+Other concepts also use exactly one option name: for example `title`, `kind`,
+`area_titles`, `subnote_type`, and `content`.
 
 ## Stable Codes
 
@@ -195,7 +197,7 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `title` | string | Required. Also accepted as `name`. |
+| `title` | string | Required. |
 | `parent` | path | Optional parent area path. |
 | `open` | boolean | Default `false`. |
 
@@ -342,13 +344,13 @@ When selecting by `title`, `read-project`, `read-area`, `read-resource`, and
 | `para-zk:read-area` | `title` or `path` | `frontmatter`, `overview`, `tasks`, `references`, `children` |
 | `para-zk:read-resource` | `title` or `path` | `frontmatter`, `overview`, `body`, `references` |
 | `para-zk:read-zk` | `title` plus optional `kind`, or `path` | depends on ZK type |
-| `para-zk:read-journal` | `date` or `path` | `frontmatter`, `focus`, `quick_memo`, `timeline`, `tasks`, `short_review`, `links` |
-| `para-zk:read-retro` | `title` plus optional `date`, or `path` | `frontmatter`, `week_progress`, `good`, `improve`, `risks`, `tasks`, `retro_summary`, `links` |
+| `para-zk:read-journal` | `date` or `path` | `frontmatter`, `focus`, `quick_memo`, `timeline`, `tasks`, `short_review`, `references` |
+| `para-zk:read-retro` | `title` plus optional `date`, or `path` | `frontmatter`, `week_progress`, `good`, `improve`, `risks`, `tasks`, `retro_summary`, `references` |
 
 ZK top-level keys:
 
 ```text
-zk_fleeting: frontmatter | thought_summary | memo | references
+zk_fleeting: frontmatter | thought_summary | memo | tasks | references
 zk_literature: frontmatter | highlight_block | summary | insight | evidence | references
 zk_permanent: frontmatter | one_sentence_summary | body | limitations | related_questions | references
 ```
@@ -481,7 +483,7 @@ needed. PARA-ZK only cleans relationships it owns directly:
 
 - frontmatter links in keys such as `areas`, `project`, `parent`, and
   `promoted_to`
-- standalone wikilink lines inside generated References/Links sections
+- standalone wikilink lines inside generated References sections
 
 | Command | Selector | Notes |
 | --- | --- | --- |
@@ -520,7 +522,7 @@ Important result fields:
 - `incomingLinks`: backlink counts observed before deletion; body links are not
   modified.
 - `cleaned.frontmatter`: count of PARA-ZK frontmatter keys cleaned.
-- `cleaned.references`: count of standalone References/Links lines removed.
+- `cleaned.references`: count of standalone References-section lines removed.
 - `trashMethod`: core Obsidian method used, normally `fileManager.trashFile`.
 
 ### `para-zk:create-project`
@@ -531,9 +533,9 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `title` | string | Required. Also accepted as `name`. |
+| `title` | string | Required. |
 | `areas` | JSON array or comma list | Store area links in frontmatter. |
-| `area_titles` | JSON array or comma list | Reuse or create areas by title, then store links in frontmatter. `areaTitles` is also accepted. |
+| `area_titles` | JSON array or comma list | Reuse or create areas by title, then store links in frontmatter. |
 | `status` | project status code | Defaults to `idea`. |
 | `priority` | priority code | Defaults to `low`. |
 | `open` | boolean | Default `false`. |
@@ -567,7 +569,7 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `title` | string | Required. Also accepted as `name`. |
+| `title` | string | Required. |
 | `path` | path | Optional source note receiving the resource link. |
 | `link` | boolean | Defaults to `true` when `path` is present. |
 | `open` | boolean | Default `false`. |
@@ -631,9 +633,9 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `title` | string | Required. Also accepted as `name`. |
+| `title` | string | Required. |
 | `path` | path | Required for deterministic CLI use. Parent project or area note. |
-| `subnote_type` | subnote type code | Defaults to `free`. Also accepted as `subnoteType` or `type`. |
+| `subnote_type` | subnote type code | Defaults to `free`. |
 | `open` | boolean | Default `false`. |
 
 Example:
@@ -660,7 +662,7 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `title` | string | Required. Also accepted as `name`. |
+| `title` | string | Required. |
 | `path` | path | Required for deterministic CLI use. Parent area note. |
 | `inheritParentTag` | boolean | Defaults to `true`. |
 | `open` | boolean | Default `false`. |
@@ -684,7 +686,7 @@ Options:
 | Option | Values | Notes |
 | --- | --- | --- |
 | `path` | path | Optional project or area source note. |
-| `name` | string | Optional retro name segment. `title` is also accepted. |
+| `title` | string | Optional retro title segment. |
 | `date` | `YYYY-MM-DD` | Date used for ISO week calculation. Defaults to today. |
 | `open` | boolean | Default `false`. |
 
@@ -710,8 +712,8 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `title` | string | Required. Also accepted as `name`. |
-| `kind` | ZK kind code | Defaults to `fleeting`. `type` is also accepted. |
+| `title` | string | Required. |
+| `kind` | ZK kind code | Defaults to `fleeting`. |
 | `maturity` | maturity code | Used for permanent notes. Defaults to `draft`. |
 | `open` | boolean | Default `false`. |
 
@@ -737,7 +739,7 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `content` | string | Required. `text` and `memo` are also accepted. |
+| `content` | string | Required. |
 | `date` | `YYYY-MM-DD` | Defaults to today. |
 | `time` | `HH:mm` | Defaults to current local time. |
 | `energy` | energy code | Defaults to `normal` when creating a journal note. |
@@ -771,8 +773,8 @@ Options:
 | Option | Values | Notes |
 | --- | --- | --- |
 | `path` | path | Required for deterministic CLI use. Source resource note. |
-| `title` | string | Optional. Defaults to source basename. `name` is also accepted. |
-| `kind` | ZK kind code | Defaults to `permanent`. `type` is also accepted. |
+| `title` | string | Optional. Defaults to source basename. |
+| `kind` | ZK kind code | Defaults to `permanent`. |
 | `maturity` | maturity code | Used for permanent notes. |
 | `open` | boolean | Default `false`. |
 
@@ -801,8 +803,8 @@ Options:
 | Option | Values | Notes |
 | --- | --- | --- |
 | `path` | path | Required for deterministic CLI use. Source fleeting note. |
-| `title` | string | Optional. Defaults to source basename. `name` is also accepted. |
-| `kind` | promotion target kind code | Defaults to `permanent`. `type` is also accepted. |
+| `title` | string | Optional. Defaults to source basename. |
+| `kind` | promotion target kind code | Defaults to `permanent`. |
 | `maturity` | maturity code | Used for permanent notes. |
 | `open` | boolean | Default `false`. |
 

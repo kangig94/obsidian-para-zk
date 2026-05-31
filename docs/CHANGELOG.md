@@ -76,6 +76,13 @@ Notable changes for PARA-ZK are tracked here.
   with `offset`, `limit`, `returned`, and `has_more`.
 - Journal and retro task collections now use the same stable `tasks` key as
   project and area task collections.
+- Fleeting ZK checklist items are now under the same generated `Tasks` heading
+  and `tasks` read key instead of a separate next-actions surface.
+- Journal and retro references now use the same stable `references` key and
+  generated heading as project, area, resource, and ZK notes.
+- CLI compatibility aliases such as `name`, `type`, `areaTitles`,
+  `subnoteType`, `text`, and `memo` are now rejected in favor of one canonical
+  argument name per concept.
 - The Home dashboard is now designed as native PARA-ZK UI instead of mirroring
   legacy callout and Meta Bind implementations.
 - The disposable-vault smoke test now focuses the target Obsidian vault window

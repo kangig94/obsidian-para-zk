@@ -180,6 +180,7 @@ function runWorkflowScenario(today) {
   assert(createdArea.created === true, "project did not create missing area");
   assert(existsSync(join(vaultPath, createdArea.path)), `created linked area does not exist: ${createdArea.path}`);
   assertLegacyPathAliasRejected(project.path);
+  assertCanonicalCliAliasesRejected(project.path);
 
   const reference = cliJson("para-zk:add-reference", [
     `path=${project.path}`,
@@ -783,6 +784,16 @@ function runWorkflowScenario(today) {
     "format=json"
   ]);
   assertCreated(fleeting, "fleeting");
+  const fleetingTasksRead = cliJson("para-zk:read-zk", [
+    `title=${fleetingTitle}`,
+    "kind=fleeting",
+    "key=tasks",
+    "format=json"
+  ]);
+  assert(
+    Object.values(fleetingTasksRead.value?.items ?? {}).some((task) => task.name === "Add reference"),
+    "fleeting ZK tasks key read failed"
+  );
 
   const permanent = cliJson("para-zk:create-zk", [
     `title=${permanentTitle}`,
@@ -920,7 +931,7 @@ function runWorkflowScenario(today) {
   assertCreated(retro, "retro");
 
   const deleteRetro = cliJson("para-zk:create-retro", [
-    `name=Delete Retro ${stamp}`,
+    `title=Delete Retro ${stamp}`,
     `date=${today}`,
     "open=false",
     "format=json"
@@ -1020,6 +1031,55 @@ function assertLegacyPathAliasRejected(projectPath) {
     typeof rejected.error === "string" && rejected.error.includes("Use path instead of file_path"),
     `legacy file_path alias error was not explicit: ${JSON.stringify(rejected)}`
   );
+}
+
+function assertCanonicalCliAliasesRejected(projectPath) {
+  const cases = [
+    {
+      label: "name",
+      command: "para-zk:create-area",
+      args: [`name=Alias Area ${stamp}`, "format=json"],
+      message: "Use title instead of name"
+    },
+    {
+      label: "areaTitles",
+      command: "para-zk:create-project",
+      args: [`title=Alias Project ${stamp}`, `areaTitles=${JSON.stringify([`Alias Area ${stamp}`])}`, "format=json"],
+      message: "Use area_titles instead of areaTitles"
+    },
+    {
+      label: "subnoteType",
+      command: "para-zk:create-subnote",
+      args: [`title=Alias Subnote ${stamp}`, `path=${projectPath}`, "subnoteType=meeting", "format=json"],
+      message: "Use subnote_type instead of subnoteType"
+    },
+    {
+      label: "type",
+      command: "para-zk:create-zk",
+      args: [`title=Alias ZK ${stamp}`, "type=permanent", "format=json"],
+      message: "Use kind instead of type"
+    },
+    {
+      label: "memo",
+      command: "para-zk:capture-journal",
+      args: [`memo=Alias memo ${stamp}`, "format=json"],
+      message: "Use content instead of memo"
+    },
+    {
+      label: "text",
+      command: "para-zk:capture-journal",
+      args: [`text=Alias text ${stamp}`, "format=json"],
+      message: "Use content instead of text"
+    }
+  ];
+  for (const item of cases) {
+    const rejected = cliJson(item.command, item.args);
+    assert(rejected.ok === false, `${item.label} alias was accepted`);
+    assert(
+      typeof rejected.error === "string" && rejected.error.includes(item.message),
+      `${item.label} alias error was not explicit: ${JSON.stringify(rejected)}`
+    );
+  }
 }
 
 function createArchivedProjectCopy(project, title) {

@@ -102,7 +102,7 @@ export type CreateSubareaOptions = {
 
 export type CreateRetroOptions = {
   sourcePath?: string;
-  name?: string;
+  title?: string;
   date?: string;
   open?: boolean;
 };
@@ -705,7 +705,7 @@ export async function createRetro(ctx: WorkflowContext, options: CreateRetroOpti
   const defaultName = source
     ? `${sourceType === "area" ? labels.retroNameAreaPrefix : sourceType === "project" ? labels.retroNameProjectPrefix : labels.retroNameNotePrefix}-${source.basename}`
     : labels.retroNameGeneral;
-  const name = sanitizeFileName(options.name || defaultName) || "General";
+  const name = sanitizeFileName(options.title || defaultName) || "General";
   const folder = joinVaultPath(ctx.settings.paths.retrosFolder, weekSegment);
   await ensureFolder(ctx.app, folder);
 
@@ -1122,7 +1122,7 @@ const JOURNAL_READ_SPEC: ReadSurfaceSpec = {
     { key: "timeline", labelKey: "timeline" },
     { key: "tasks", labelKey: "tasks", transform: readTasks, collection: "task" },
     { key: "short_review", labelKey: "shortReview" },
-    { key: "links", labelKey: "links" }
+    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" }
   ]
 };
 
@@ -1133,9 +1133,9 @@ const RETRO_READ_SPEC: ReadSurfaceSpec = {
     { key: "good", labelKey: "good" },
     { key: "improve", labelKey: "improve" },
     { key: "risks", labelKey: "risks" },
-    { key: "tasks", labelKey: "nextActions", transform: readTasks, collection: "task" },
+    { key: "tasks", labelKey: "tasks", transform: readTasks, collection: "task" },
     { key: "retro_summary", labelKey: "retroSummary" },
-    { key: "links", labels: ["Links", "링크"], includeSubsections: true }
+    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" }
   ]
 };
 
@@ -1149,6 +1149,7 @@ const ZK_FLEETING_READ_SPEC: ReadSurfaceSpec = {
   sections: [
     { key: "thought_summary", labelKey: "thoughtSummary" },
     { key: "memo", labelKey: "memo" },
+    { key: "tasks", labelKey: "tasks", transform: readTasks, collection: "task" },
     { key: "references", labelKey: "references", transform: readReferences, collection: "reference" }
   ]
 };
@@ -2970,16 +2971,7 @@ async function removeSafeReferenceLines(
 }
 
 function referenceCleanupRange(content: string): TextRange | undefined {
-  const sections: ReadSectionSpec[] = [
-    { key: "references", labelKey: "references" },
-    { key: "links", labelKey: "links", includeSubsections: true },
-    { key: "links", labels: ["Links", "링크"], includeSubsections: true }
-  ];
-  for (const section of sections) {
-    const range = findSectionContentRange(content, section);
-    if (range) return range;
-  }
-  return undefined;
+  return findSectionContentRange(content, { key: "references", labelKey: "references" });
 }
 
 function standaloneReferenceLinkPath(line: string): string | undefined {

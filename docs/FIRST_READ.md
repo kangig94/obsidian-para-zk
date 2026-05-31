@@ -49,6 +49,9 @@ subnote types, links, open flags, dry-run flags, and other structured options
 that let an LLM satisfy the user's request in one call. CLI output should be
 token-efficient JSON with stable fields such as `ok`, `command`, `path`,
 `created`, `sourcePath`, `archived`, `warnings`, and `error`.
+Each CLI concept should have one canonical argument name. Prefer rejecting
+legacy or camelCase aliases with a direct error over accepting multiple spellings;
+that keeps automation prompts and help output unambiguous.
 
 Read commands should expose PARA-ZK editable surfaces, not raw Markdown files.
 Their `key` arguments are stable map paths such as `frontmatter/status`,

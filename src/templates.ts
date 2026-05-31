@@ -234,7 +234,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         `- ${t.labels.improvements}:`,
         "",
         "---",
-        `## ${t.labels.links}`,
+        `## ${t.labels.references}`,
         ""
       ].join("\n");
     case "retro":
@@ -266,7 +266,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         `# ${t.labels.risks}`,
         "- ",
         "",
-        `# ${t.labels.nextActions}`,
+        `# ${t.labels.tasks}`,
         "- [ ] ",
         "",
         "---",
@@ -274,13 +274,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         `> ###### ${retroSummaryPlaceholder(t.locale)}`,
         "",
         "---",
-        `### ${linksHeading(t.locale)}`,
-        "",
-        `#### ${t.labels.output}`,
-        "",
-        `#### ${t.labels.references}`,
-        "",
-        `#### ${t.labels.other}`,
+        `## ${t.labels.references}`,
         ""
       ].join("\n");
     case "subnote":
@@ -320,7 +314,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         `## ${t.labels.promote} ${paraZkInlineAction("promote-fleeting", t.labels.promote)}`,
         "",
         "---",
-        `## ${t.labels.optionalNextActions}`,
+        `## ${t.labels.tasks}`,
         `- [ ] ${t.labels.refineFleetingAction}`,
         `- [ ] ${t.labels.connectReferencesAction}`,
         "",
@@ -480,10 +474,6 @@ function noteContextHint(locale: Locale): string {
 
 function retroSummaryPlaceholder(locale: Locale): string {
   return locale === "ko" ? "(다음 주에 바로 도움이 될 핵심 한 줄)" : "(one line that helps next week)";
-}
-
-function linksHeading(locale: Locale): string {
-  return locale === "ko" ? "링크" : "Links";
 }
 
 function dataviewProjectChildDocs(): string[] {
@@ -868,7 +858,7 @@ function dashboardDueProjects30(t: ReturnType<typeof localePack>): string[] {
 
 function dashboardRecentCoreNotes(t: ReturnType<typeof localePack>, limit: number): string[] {
   return fenced("dataview", [
-    `TABLE WITHOUT ID file.link AS "${t.labels.links}", type AS "${t.labels.kind}", file.mtime AS "${t.labels.updated}"`,
+    `TABLE WITHOUT ID file.link AS "${t.labels.references}", type AS "${t.labels.kind}", file.mtime AS "${t.labels.updated}"`,
     "FROM \"PARA/Projects\" OR \"PARA/Areas\" OR \"PARA/Resources\" OR \"ZK\"",
     "WHERE (type = \"project\" OR type = \"area\" OR type = \"resource\" OR startswith(type, \"zk_\")) AND !contains(file.path, \"/Archives/\")",
     "SORT file.mtime DESC",
