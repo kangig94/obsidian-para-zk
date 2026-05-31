@@ -42,6 +42,16 @@ type TaskToolbarState = {
   priority: TaskPriorityFilter;
 };
 
+type TaskBlockState = {
+  toolbar: TaskToolbarState;
+  generation: number;
+  checkboxMutationSerial: number;
+  pendingCheckboxTimer?: number;
+  summaryEl?: HTMLElement;
+  items: RenderableTask[];
+  visible: RenderableTask[];
+};
+
 type RenderableTask = {
   rootFile: TFile;
   rootTitle: string;
@@ -56,7 +66,9 @@ type TaskMetaChip = {
 
 type TaskEditValue = Pick<TaskRead, "name" | "priority" | "due" | "scheduled" | "start">;
 
-const taskToolbarStates = new WeakMap<HTMLElement, TaskToolbarState>();
+const CHECKBOX_RECONCILE_DELAY_MS = 1200;
+const taskBlockStates = new WeakMap<HTMLElement, TaskBlockState>();
+const taskWriteQueues = new Map<string, Promise<unknown>>();
 
 export function registerTaskRenderers(plugin: ParaZkPluginContext): void {
   plugin.registerMarkdownCodeBlockProcessor("para-zk-tasks", (source, el, ctx) => {
@@ -71,44 +83,57 @@ async function renderTaskBlock(
   ctx: MarkdownPostProcessorContext
 ): Promise<void> {
   const args = parseTaskBlockArgs(source);
-  const t = localePack(plugin.settings.locale);
+  const blockState = beginTaskBlockRender(el, args);
+  const generation = blockState.generation;
   el.empty();
   el.addClass("para-zk-tasks");
 
-  const rootFile = args.root === "current"
-    ? plugin.app.vault.getFileByPath(ctx.sourcePath) ?? undefined
-    : undefined;
+  try {
+    const t = localePack(plugin.settings.locale);
+    const rootFile = args.root === "current"
+      ? plugin.app.vault.getFileByPath(ctx.sourcePath) ?? undefined
+      : undefined;
 
-  if (args.root === "current" && !(rootFile instanceof TFile)) {
-    el.createDiv({ cls: "para-zk-task-empty", text: t.labels.taskRootUnavailable });
-    return;
-  }
+    if (args.root === "current" && !(rootFile instanceof TFile)) {
+      el.createDiv({ cls: "para-zk-task-empty", text: t.labels.taskRootUnavailable });
+      return;
+    }
 
-  const items = args.root === "current" && rootFile
-    ? await currentRootTasks(plugin, rootFile)
-    : await allRootTasks(plugin);
-  const state = taskToolbarState(el, args);
-  const visible = filteredTasks(items, args, state);
+    const items = args.root === "current" && rootFile
+      ? await currentRootTasks(plugin, rootFile)
+      : await allRootTasks(plugin);
+    if (!isCurrentTaskBlockGeneration(el, generation)) return;
 
-  renderTaskToolbar(plugin, el, source, ctx, {
-    args,
-    rootFile,
-    items,
-    visible,
-    state
-  });
+    const visible = filteredTasks(items, args, blockState.toolbar);
+    blockState.items = items;
+    blockState.visible = visible;
 
-  if (visible.length === 0) {
-    el.createDiv({ cls: "para-zk-task-empty", text: t.labels.noTasks });
-    return;
-  }
-
-  const list = el.createDiv({ cls: "para-zk-task-list" });
-  for (const item of visible) {
-    renderTaskRow(plugin, list, item, {
-      showRoot: args.root === "all",
-      rerender: () => renderTaskBlock(plugin, source, el, ctx)
+    renderTaskToolbar(plugin, el, source, ctx, {
+      args,
+      rootFile,
+      items,
+      visible,
+      blockState
     });
+
+    if (visible.length === 0) {
+      el.createDiv({ cls: "para-zk-task-empty", text: t.labels.noTasks });
+      return;
+    }
+
+    const list = el.createDiv({ cls: "para-zk-task-list" });
+    for (const item of visible) {
+      renderTaskRow(plugin, list, item, {
+        blockState,
+        source,
+        ctx,
+        el,
+        showRoot: args.root === "all",
+        rerender: () => renderTaskBlock(plugin, source, el, ctx)
+      });
+    }
+  } catch (error) {
+    if (isCurrentTaskBlockGeneration(el, generation)) renderTaskError(el, error);
   }
 }
 
@@ -122,16 +147,20 @@ function renderTaskToolbar(
     rootFile?: TFile;
     items: RenderableTask[];
     visible: RenderableTask[];
-    state: TaskToolbarState;
+    blockState: TaskBlockState;
   }
 ): void {
   const labels = localePack(plugin.settings.locale).labels;
   const toolbar = el.createDiv({ cls: "para-zk-task-toolbar" });
   const heading = toolbar.createDiv({ cls: "para-zk-task-toolbar-heading" });
-  heading.createDiv({ cls: "para-zk-task-toolbar-summary", text: taskSummaryText(options.items, options.visible, labels) });
+  options.blockState.summaryEl = heading.createDiv({
+    cls: "para-zk-task-toolbar-summary",
+    text: taskSummaryText(options.items, options.visible, labels)
+  });
 
   const controls = toolbar.createDiv({ cls: "para-zk-task-toolbar-controls" });
-  if (options.args.root === "current" && options.rootFile) {
+  const rootFile = options.rootFile;
+  if (options.args.root === "current" && rootFile) {
     const add = new ButtonComponent(controls);
     const addButton = add.buttonEl;
     addButton.addClass("para-zk-task-toolbar-button", "para-zk-task-add");
@@ -150,8 +179,8 @@ function renderTaskToolbar(
             labels.confirm,
             labels.cancel
           );
-          if (!name || !options.rootFile) return;
-          await insertRootTask(taskContext(plugin), options.rootFile, { name });
+          if (!name) return;
+          await queueRootTaskWrite(rootFile, () => insertRootTask(taskContext(plugin), rootFile, { name }));
           await renderTaskBlock(plugin, source, el, ctx);
         });
       });
@@ -159,37 +188,37 @@ function renderTaskToolbar(
 
   renderToolbarSelect(controls, {
     label: labels.taskOrder,
-    value: options.state.order,
+    value: options.blockState.toolbar.order,
     options: taskOrderOptions(labels),
     onChange: (value) => {
-      options.state.order = value as TaskOrder;
+      options.blockState.toolbar.order = value as TaskOrder;
       void renderTaskBlock(plugin, source, el, ctx);
     }
   });
   renderToolbarSelect(controls, {
     label: labels.status,
-    value: options.state.status,
+    value: options.blockState.toolbar.status,
     options: taskStatusOptions(labels),
     onChange: (value) => {
-      options.state.status = value as TaskStatusFilter;
+      options.blockState.toolbar.status = value as TaskStatusFilter;
       void renderTaskBlock(plugin, source, el, ctx);
     }
   });
   renderToolbarSelect(controls, {
     label: labels.dueDate,
-    value: options.state.due,
+    value: options.blockState.toolbar.due,
     options: taskDueOptions(labels),
     onChange: (value) => {
-      options.state.due = value as TaskDueFilter;
+      options.blockState.toolbar.due = value as TaskDueFilter;
       void renderTaskBlock(plugin, source, el, ctx);
     }
   });
   renderToolbarSelect(controls, {
     label: labels.priority,
-    value: options.state.priority,
+    value: options.blockState.toolbar.priority,
     options: taskPriorityOptions(labels),
     onChange: (value) => {
-      options.state.priority = value as TaskPriorityFilter;
+      options.blockState.toolbar.priority = value as TaskPriorityFilter;
       void renderTaskBlock(plugin, source, el, ctx);
     }
   });
@@ -244,7 +273,14 @@ function renderTaskRow(
   plugin: ParaZkPluginContext,
   list: HTMLElement,
   item: RenderableTask,
-  options: { showRoot: boolean; rerender: () => Promise<void> }
+  options: {
+    blockState: TaskBlockState;
+    source: string;
+    ctx: MarkdownPostProcessorContext;
+    el: HTMLElement;
+    showRoot: boolean;
+    rerender: () => Promise<void>;
+  }
 ): void {
   const row = list.createDiv({ cls: "para-zk-task-row" });
 
@@ -257,14 +293,53 @@ function renderTaskRow(
     .setTooltip("Cycle task status")
     .onClick(async () => {
       await runTaskAction(plugin, checkbox, async () => {
-        await setRootTaskField(
-          taskContext(plugin),
-          item.rootFile,
-          item.id,
-          "checkbox",
-          cycleTaskCheckbox(item.task.checkbox)
-        );
-        await options.rerender();
+        const clickGeneration = options.blockState.generation;
+        const mutationSerial = options.blockState.checkboxMutationSerial + 1;
+        options.blockState.checkboxMutationSerial = mutationSerial;
+        cancelPendingCheckboxReconcile(options.blockState);
+
+        const previous = item.task.checkbox;
+        const next = cycleTaskCheckbox(previous);
+        setRenderableTaskCheckbox(item, checkboxAction, checkbox, next);
+        updateTaskSummary(plugin, options.blockState);
+        try {
+          await queueRootTaskWrite(
+            item.rootFile,
+            () => setRootTaskField(
+              taskContext(plugin),
+              item.rootFile,
+              item.id,
+              "checkbox",
+              next
+            )
+          );
+        } catch (error) {
+          setRenderableTaskCheckbox(item, checkboxAction, checkbox, previous);
+          updateTaskSummary(plugin, options.blockState);
+          if (
+            options.el.isConnected
+            && isCurrentTaskBlockGeneration(options.el, clickGeneration)
+            && options.blockState.checkboxMutationSerial === mutationSerial
+          ) {
+            scheduleCheckboxReconcile(
+              plugin,
+              options.source,
+              options.el,
+              options.ctx,
+              options.blockState,
+              clickGeneration
+            );
+          }
+          throw error;
+        }
+
+        if (!options.el.isConnected) return;
+        if (!isCurrentTaskBlockGeneration(options.el, clickGeneration)) {
+          await renderTaskBlock(plugin, options.source, options.el, options.ctx);
+          return;
+        }
+        if (options.blockState.checkboxMutationSerial !== mutationSerial) return;
+        scheduleCheckboxReconcile(plugin, options.source, options.el, options.ctx, options.blockState, clickGeneration);
       });
     });
 
@@ -315,18 +390,20 @@ function renderTaskRow(
     .setTooltip("Delete task")
     .onClick(async () => {
       await runTaskAction(plugin, remove, async () => {
-        await deleteRootTask(taskContext(plugin), item.rootFile, item.id);
+        await queueRootTaskWrite(item.rootFile, () => deleteRootTask(taskContext(plugin), item.rootFile, item.id));
         await options.rerender();
       });
     });
 }
 
 async function updateTaskFromEditor(plugin: ParaZkPluginContext, item: RenderableTask, value: TaskEditValue): Promise<void> {
-  const fields: Array<keyof TaskEditValue> = ["name", "priority", "due", "scheduled", "start"];
-  for (const field of fields) {
-    if ((item.task[field] ?? "") === (value[field] ?? "")) continue;
-    await setRootTaskField(taskContext(plugin), item.rootFile, item.id, field, value[field] ?? "");
-  }
+  await queueRootTaskWrite(item.rootFile, async () => {
+    const fields: Array<keyof TaskEditValue> = ["name", "priority", "due", "scheduled", "start"];
+    for (const field of fields) {
+      if ((item.task[field] ?? "") === (value[field] ?? "")) continue;
+      await setRootTaskField(taskContext(plugin), item.rootFile, item.id, field, value[field] ?? "");
+    }
+  });
 }
 
 function taskContext(plugin: ParaZkPluginContext): WorkflowContext {
@@ -469,18 +546,96 @@ class TaskEditModal extends Modal {
   }
 }
 
-function taskToolbarState(el: HTMLElement, args: TaskBlockArgs): TaskToolbarState {
-  const existing = taskToolbarStates.get(el);
+function beginTaskBlockRender(el: HTMLElement, args: TaskBlockArgs): TaskBlockState {
+  const state = taskBlockState(el, args);
+  state.generation += 1;
+  cancelPendingCheckboxReconcile(state);
+  return state;
+}
+
+function taskBlockState(el: HTMLElement, args: TaskBlockArgs): TaskBlockState {
+  const existing = taskBlockStates.get(el);
   if (existing) return existing;
 
-  const state: TaskToolbarState = {
-    order: args.order ?? "smart",
-    status: initialStatusFilter(args.checkbox),
-    due: args.due ?? "any",
-    priority: "any"
+  const state: TaskBlockState = {
+    toolbar: {
+      order: args.order ?? "smart",
+      status: initialStatusFilter(args.checkbox),
+      due: args.due ?? "any",
+      priority: "any"
+    },
+    generation: 0,
+    checkboxMutationSerial: 0,
+    items: [],
+    visible: []
   };
-  taskToolbarStates.set(el, state);
+  taskBlockStates.set(el, state);
   return state;
+}
+
+function cancelPendingCheckboxReconcile(state: TaskBlockState): void {
+  if (state.pendingCheckboxTimer === undefined) return;
+  window.clearTimeout(state.pendingCheckboxTimer);
+  state.pendingCheckboxTimer = undefined;
+}
+
+function isCurrentTaskBlockGeneration(el: HTMLElement, generation: number): boolean {
+  return taskBlockStates.get(el)?.generation === generation;
+}
+
+function scheduleCheckboxReconcile(
+  plugin: ParaZkPluginContext,
+  source: string,
+  el: HTMLElement,
+  ctx: MarkdownPostProcessorContext,
+  state: TaskBlockState,
+  generation: number
+): void {
+  cancelPendingCheckboxReconcile(state);
+  state.pendingCheckboxTimer = window.setTimeout(() => {
+    state.pendingCheckboxTimer = undefined;
+    if (!el.isConnected) return;
+    if (!isCurrentTaskBlockGeneration(el, generation)) return;
+    void renderTaskBlock(plugin, source, el, ctx);
+  }, CHECKBOX_RECONCILE_DELAY_MS);
+}
+
+async function queueRootTaskWrite<T>(rootFile: TFile, write: () => Promise<T>): Promise<T> {
+  const key = rootFile.path;
+  const previous = taskWriteQueues.get(key) ?? Promise.resolve();
+  const current = previous
+    .catch(() => undefined)
+    .then(write);
+  taskWriteQueues.set(key, current);
+  try {
+    return await current;
+  } finally {
+    if (taskWriteQueues.get(key) === current) {
+      taskWriteQueues.delete(key);
+    }
+  }
+}
+
+function updateTaskSummary(plugin: ParaZkPluginContext, state: TaskBlockState): void {
+  if (!state.summaryEl) return;
+  state.summaryEl.textContent = taskSummaryText(
+    state.items,
+    state.visible,
+    localePack(plugin.settings.locale).labels
+  );
+}
+
+function setRenderableTaskCheckbox(
+  item: RenderableTask,
+  component: ButtonComponent,
+  button: HTMLButtonElement,
+  value: string
+): void {
+  item.task.checkbox = value;
+  button.classList.remove("is-open", "is-active", "is-done", "is-cancelled");
+  button.addClass(taskCheckboxClass(value));
+  button.setAttr("aria-label", `Task status ${value.trim() || "open"}`);
+  component.setButtonText(taskCheckboxText(value));
 }
 
 function initialStatusFilter(value: TaskBlockArgs["checkbox"]): TaskStatusFilter {
