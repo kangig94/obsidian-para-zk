@@ -279,8 +279,7 @@ selector and type information needed for follow-up reads:
 Task and reference surfaces are structured collections rather than raw Markdown.
 Full compact reads return only `count`; collection items are omitted by design.
 Blank template checkboxes are ignored. Exact collection root reads such as
-`key=tasks`, `key=references`, `key=today_tasks`, and `key=next_actions`
-return a paged collection object:
+`key=tasks` and `key=references` return a paged collection object:
 
 ```json
 {
@@ -343,8 +342,8 @@ When selecting by `title`, `read-project`, `read-area`, `read-resource`, and
 | `para-zk:read-area` | `title` or `path` | `frontmatter`, `overview`, `tasks`, `references`, `children` |
 | `para-zk:read-resource` | `title` or `path` | `frontmatter`, `overview`, `body`, `references` |
 | `para-zk:read-zk` | `title` plus optional `kind`, or `path` | depends on ZK type |
-| `para-zk:read-journal` | `date` or `path` | `frontmatter`, `focus`, `quick_memo`, `timeline`, `today_tasks`, `short_review`, `links` |
-| `para-zk:read-retro` | `title` plus optional `date`, or `path` | `frontmatter`, `week_progress`, `good`, `improve`, `risks`, `next_actions`, `retro_summary`, `links` |
+| `para-zk:read-journal` | `date` or `path` | `frontmatter`, `focus`, `quick_memo`, `timeline`, `tasks`, `short_review`, `links` |
+| `para-zk:read-retro` | `title` plus optional `date`, or `path` | `frontmatter`, `week_progress`, `good`, `improve`, `risks`, `tasks`, `retro_summary`, `links` |
 
 ZK top-level keys:
 
@@ -428,8 +427,8 @@ The same update algorithm is used by the other domain update commands:
 | `para-zk:update-area` | `title` or `path` | Supports area surface keys and `children/<title>/...`. |
 | `para-zk:update-resource` | `title` or `path` | Supports resource surface keys such as `overview`, `body`, and `references`. |
 | `para-zk:update-zk` | `title` plus optional `kind`, or `path` | Supports the selected ZK type's surface keys. |
-| `para-zk:update-journal` | `date` or `path` | Supports journal surface keys such as `quick_memo` and `today_tasks`. |
-| `para-zk:update-retro` | `title` plus optional `date`, or `path` | Supports retro surface keys such as `next_actions`. |
+| `para-zk:update-journal` | `date` or `path` | Supports journal surface keys such as `quick_memo` and `tasks`. |
+| `para-zk:update-retro` | `title` plus optional `date`, or `path` | Supports retro surface keys such as `tasks`. |
 
 ### Rename Commands
 

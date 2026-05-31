@@ -895,15 +895,15 @@ function runWorkflowScenario(today) {
   assert(journalUpdate.changed === true, "journal quick_memo update failed");
   const journalTaskUpdate = cliJson("para-zk:update-journal", [
     `date=${today}`,
-    "key=today_tasks",
+    "key=tasks",
     "op=append",
     `value=- [ ] Smoke journal task ${stamp}`,
     "format=json"
   ]);
-  assert(journalTaskUpdate.changed === true, "journal today_tasks update failed");
+  assert(journalTaskUpdate.changed === true, "journal tasks update failed");
   const journalTasksRead = cliJson("para-zk:read-journal", [
     `date=${today}`,
-    "key=today_tasks",
+    "key=tasks",
     "format=json"
   ]);
   assert(
@@ -943,20 +943,20 @@ function runWorkflowScenario(today) {
 
   const retroUpdate = cliJson("para-zk:update-retro", [
     `path=${retro.path}`,
-    "key=next_actions",
+    "key=tasks",
     "op=set",
     `value=- [ ] Smoke retro action ${stamp}`,
     "format=json"
   ]);
-  assert(retroUpdate.changed === true, "retro next_actions update failed");
+  assert(retroUpdate.changed === true, "retro tasks update failed");
   const retroActionsRead = cliJson("para-zk:read-retro", [
     `path=${retro.path}`,
-    "key=next_actions",
+    "key=tasks",
     "format=json"
   ]);
   assert(
     Object.values(retroActionsRead.value?.items ?? {}).some((task) => task.name === `Smoke retro action ${stamp}`),
-    "retro next_actions collection read failed"
+    "retro tasks collection read failed"
   );
 
   const promotedResource = cliJson("para-zk:promote-resource", [

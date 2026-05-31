@@ -1120,7 +1120,7 @@ const JOURNAL_READ_SPEC: ReadSurfaceSpec = {
     { key: "focus", labelKey: "focus" },
     { key: "quick_memo", labelKey: "quickMemo" },
     { key: "timeline", labelKey: "timeline" },
-    { key: "today_tasks", labelKey: "todayTasks", transform: readTasks, collection: "task" },
+    { key: "tasks", labelKey: "tasks", transform: readTasks, collection: "task" },
     { key: "short_review", labelKey: "shortReview" },
     { key: "links", labelKey: "links" }
   ]
@@ -1133,7 +1133,7 @@ const RETRO_READ_SPEC: ReadSurfaceSpec = {
     { key: "good", labelKey: "good" },
     { key: "improve", labelKey: "improve" },
     { key: "risks", labelKey: "risks" },
-    { key: "next_actions", labelKey: "nextActions", transform: readTasks, collection: "task" },
+    { key: "tasks", labelKey: "nextActions", transform: readTasks, collection: "task" },
     { key: "retro_summary", labelKey: "retroSummary" },
     { key: "links", labels: ["Links", "링크"], includeSubsections: true }
   ]

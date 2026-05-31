@@ -207,7 +207,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     options: {
       date: { value: "<YYYY-MM-DD>", description: "Journal date. Defaults to today." },
       path: { value: "<path>", description: "Journal note path for exact selection." },
-      key: { value: "<map-path>", description: "Optional stable key such as focus, quick_memo, timeline, or today_tasks." },
+      key: { value: "<map-path>", description: "Optional stable key such as focus, quick_memo, timeline, or tasks." },
       ...READ_COLLECTION_OPTIONS,
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -231,7 +231,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       path: { value: "<path>", description: "Retro note path for exact selection." },
       date: { value: "<YYYY-MM-DD>", description: "Optional date used to narrow the ISO week folder." },
       archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
-      key: { value: "<map-path>", description: "Optional stable key such as week_progress, next_actions, or retro_summary." },
+      key: { value: "<map-path>", description: "Optional stable key such as week_progress, tasks, or retro_summary." },
       ...READ_COLLECTION_OPTIONS,
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },

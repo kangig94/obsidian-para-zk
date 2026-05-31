@@ -74,6 +74,8 @@ Notable changes for PARA-ZK are tracked here.
 - Full read responses now mark compact mode and summarize large task/reference
   collections with `count`; exact collection root reads return paged `items`
   with `offset`, `limit`, `returned`, and `has_more`.
+- Journal and retro task collections now use the same stable `tasks` key as
+  project and area task collections.
 - The Home dashboard is now designed as native PARA-ZK UI instead of mirroring
   legacy callout and Meta Bind implementations.
 - The disposable-vault smoke test now focuses the target Obsidian vault window

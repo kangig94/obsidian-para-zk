@@ -62,8 +62,8 @@ template-only scaffold content such as blank checkboxes, empty bullet lists, and
 empty markdown tables. Full reads may compact frontmatter wikilinks to their
 display titles; a `key` read may return exact stored values or an explicit empty
 value because the user requested that exact surface.
-Large collections such as `tasks`, `today_tasks`, `next_actions`, and
-`references` should use compact `count` summaries in full reads. Exact
+Large collections such as `tasks` and `references` should use compact `count`
+summaries in full reads. Exact
 collection root reads return a paged object with `count`, `offset`, `limit`,
 `returned`, `has_more`, and `items`; deeper keys such as
 `tasks/<id>/name` return a single item or field. Full read payloads must include

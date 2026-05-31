@@ -225,7 +225,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         "- 09:00 ",
         "- 14:30 ",
         "",
-        `# ${t.labels.todayTasks}`,
+        `# ${t.labels.tasks}`,
         "- [ ] ",
         "",
         "---",
