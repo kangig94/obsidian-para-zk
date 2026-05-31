@@ -16,6 +16,7 @@ import {
   insertRootTask,
   readAllTaskItems,
   readRootTaskMap,
+  reorderRootTasks,
   setRootTaskField,
   type TaskRead,
   type WorkflowContext
@@ -47,6 +48,7 @@ type TaskBlockState = {
   generation: number;
   checkboxMutationSerial: number;
   pendingCheckboxTimer?: number;
+  draggingTaskId?: string;
   summaryEl?: HTMLElement;
   items: RenderableTask[];
   visible: RenderableTask[];
@@ -66,6 +68,10 @@ type TaskMetaChip = {
 
 type TaskEditValue = Pick<TaskRead, "name" | "priority" | "due" | "scheduled" | "start">;
 
+type TaskDragOptions = {
+  onDrop: (draggedId: string, targetId: string, placeAfter: boolean) => Promise<void>;
+};
+
 const CHECKBOX_RECONCILE_DELAY_MS = 1200;
 const taskBlockStates = new WeakMap<HTMLElement, TaskBlockState>();
 const taskWriteQueues = new Map<string, Promise<unknown>>();
@@ -84,6 +90,7 @@ async function renderTaskBlock(
 ): Promise<void> {
   const args = parseTaskBlockArgs(source);
   const blockState = beginTaskBlockRender(el, args);
+  if (args.root === "all" && blockState.toolbar.order === "manual") blockState.toolbar.order = "smart";
   const generation = blockState.generation;
   el.empty();
   el.addClass("para-zk-tasks");
@@ -107,6 +114,7 @@ async function renderTaskBlock(
     const visible = filteredTasks(items, args, blockState.toolbar);
     blockState.items = items;
     blockState.visible = visible;
+    const canReorder = canDragReorder(args, blockState.toolbar, items, visible);
 
     renderTaskToolbar(plugin, el, source, ctx, {
       args,
@@ -129,6 +137,17 @@ async function renderTaskBlock(
         ctx,
         el,
         showRoot: args.root === "all",
+        drag: canReorder && rootFile ? {
+          onDrop: async (draggedId, targetId, placeAfter) => {
+            const nextIds = reorderedTaskIds(blockState.visible, draggedId, targetId, placeAfter);
+            if (!nextIds) return;
+            await queueRootTaskWrite(
+              rootFile,
+              () => reorderRootTasks(taskContext(plugin), rootFile, nextIds)
+            );
+            await renderTaskBlock(plugin, source, el, ctx);
+          }
+        } : undefined,
         rerender: () => renderTaskBlock(plugin, source, el, ctx)
       });
     }
@@ -189,7 +208,7 @@ function renderTaskToolbar(
   renderToolbarSelect(controls, {
     label: labels.taskOrder,
     value: options.blockState.toolbar.order,
-    options: taskOrderOptions(labels),
+    options: taskOrderOptions(labels, options.args.root === "current"),
     onChange: (value) => {
       options.blockState.toolbar.order = value as TaskOrder;
       void renderTaskBlock(plugin, source, el, ctx);
@@ -201,15 +220,6 @@ function renderTaskToolbar(
     options: taskStatusOptions(labels),
     onChange: (value) => {
       options.blockState.toolbar.status = value as TaskStatusFilter;
-      void renderTaskBlock(plugin, source, el, ctx);
-    }
-  });
-  renderToolbarSelect(controls, {
-    label: labels.dueDate,
-    value: options.blockState.toolbar.due,
-    options: taskDueOptions(labels),
-    onChange: (value) => {
-      options.blockState.toolbar.due = value as TaskDueFilter;
       void renderTaskBlock(plugin, source, el, ctx);
     }
   });
@@ -269,6 +279,59 @@ async function allRootTasks(plugin: ParaZkPluginContext): Promise<RenderableTask
   });
 }
 
+function attachTaskDragHandle(
+  plugin: ParaZkPluginContext,
+  list: HTMLElement,
+  row: HTMLElement,
+  item: RenderableTask,
+  state: TaskBlockState,
+  drag: TaskDragOptions
+): void {
+  const labels = localePack(plugin.settings.locale).labels;
+  const handle = new ButtonComponent(row);
+  const button = handle.buttonEl;
+  button.addClass("para-zk-task-drag");
+  button.draggable = true;
+  button.setAttr("aria-label", labels.reorderTask);
+  handle
+    .setIcon("grip-vertical")
+    .setTooltip(labels.reorderTask);
+
+  button.addEventListener("dragstart", (event) => {
+    state.draggingTaskId = item.id;
+    row.addClass("is-dragging");
+    event.dataTransfer?.setData("text/plain", item.id);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+  });
+  button.addEventListener("dragend", () => {
+    state.draggingTaskId = undefined;
+    cleanupTaskDragMarks(list);
+  });
+
+  row.addEventListener("dragover", (event) => {
+    const draggedId = state.draggingTaskId;
+    if (!draggedId || draggedId === item.id) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+    markTaskDropPosition(list, row, isTaskDropAfter(event, row));
+  });
+  row.addEventListener("dragleave", (event) => {
+    if (event.relatedTarget instanceof Node && row.contains(event.relatedTarget)) return;
+    row.removeClass("is-drop-before", "is-drop-after");
+  });
+  row.addEventListener("drop", (event) => {
+    const draggedId = state.draggingTaskId ?? event.dataTransfer?.getData("text/plain");
+    if (!draggedId || draggedId === item.id) return;
+    event.preventDefault();
+    const placeAfter = isTaskDropAfter(event, row);
+    state.draggingTaskId = undefined;
+    cleanupTaskDragMarks(list);
+    void drag.onDrop(draggedId, item.id, placeAfter).catch((error: unknown) => {
+      new Notice(errorMessage(error));
+    });
+  });
+}
+
 function renderTaskRow(
   plugin: ParaZkPluginContext,
   list: HTMLElement,
@@ -279,10 +342,16 @@ function renderTaskRow(
     ctx: MarkdownPostProcessorContext;
     el: HTMLElement;
     showRoot: boolean;
+    drag?: TaskDragOptions;
     rerender: () => Promise<void>;
   }
 ): void {
   const row = list.createDiv({ cls: "para-zk-task-row" });
+  row.dataset.taskId = item.id;
+  if (options.drag) {
+    row.addClass("is-reorderable");
+    attachTaskDragHandle(plugin, list, row, item, options.blockState, options.drag);
+  }
 
   const checkboxAction = new ButtonComponent(row);
   const checkbox = checkboxAction.buttonEl;
@@ -549,6 +618,7 @@ class TaskEditModal extends Modal {
 function beginTaskBlockRender(el: HTMLElement, args: TaskBlockArgs): TaskBlockState {
   const state = taskBlockState(el, args);
   state.generation += 1;
+  state.draggingTaskId = undefined;
   cancelPendingCheckboxReconcile(state);
   return state;
 }
@@ -623,6 +693,61 @@ function updateTaskSummary(plugin: ParaZkPluginContext, state: TaskBlockState): 
     state.visible,
     localePack(plugin.settings.locale).labels
   );
+}
+
+function canDragReorder(
+  args: TaskBlockArgs,
+  state: TaskToolbarState,
+  items: RenderableTask[],
+  visible: RenderableTask[]
+): boolean {
+  return args.root === "current"
+    && state.order === "manual"
+    && state.status === "all"
+    && state.due === "any"
+    && state.priority === "any"
+    && visible.length === items.length
+    && items.length > 1;
+}
+
+function reorderedTaskIds(
+  visible: RenderableTask[],
+  draggedId: string,
+  targetId: string,
+  placeAfter: boolean
+): string[] | undefined {
+  const ids = visible.map((item) => item.id);
+  const from = ids.indexOf(draggedId);
+  const target = ids.indexOf(targetId);
+  if (from === -1 || target === -1 || from === target) return undefined;
+
+  const [moved] = ids.splice(from, 1);
+  const targetAfterRemoval = ids.indexOf(targetId);
+  const insertAt = targetAfterRemoval + (placeAfter ? 1 : 0);
+  ids.splice(insertAt, 0, moved);
+  return ids;
+}
+
+function isTaskDropAfter(event: DragEvent, row: HTMLElement): boolean {
+  const rect = row.getBoundingClientRect();
+  return event.clientY > rect.top + rect.height / 2;
+}
+
+function markTaskDropPosition(list: HTMLElement, row: HTMLElement, placeAfter: boolean): void {
+  cleanupTaskDropMarks(list);
+  row.addClass(placeAfter ? "is-drop-after" : "is-drop-before");
+}
+
+function cleanupTaskDropMarks(list: HTMLElement): void {
+  for (const row of list.querySelectorAll(".para-zk-task-row")) {
+    row.removeClass("is-drop-before", "is-drop-after");
+  }
+}
+
+function cleanupTaskDragMarks(list: HTMLElement): void {
+  for (const row of list.querySelectorAll(".para-zk-task-row")) {
+    row.removeClass("is-dragging", "is-drop-before", "is-drop-after");
+  }
 }
 
 function setRenderableTaskCheckbox(
@@ -742,15 +867,16 @@ function taskSummaryText(items: RenderableTask[], visible: RenderableTask[], lab
   return summary.join(" · ");
 }
 
-function taskOrderOptions(labels: Record<string, string>): Array<{ value: TaskOrder; label: string }> {
-  return [
+function taskOrderOptions(labels: Record<string, string>, includeManual: boolean): Array<{ value: TaskOrder; label: string }> {
+  const options: Array<{ value: TaskOrder; label: string }> = [
     { value: "smart", label: labels.taskOrderSmart },
-    { value: "manual", label: labels.taskOrderManual },
     { value: "due", label: labels.taskOrderDue },
     { value: "priority", label: labels.taskOrderPriority },
     { value: "status", label: labels.taskOrderStatus },
     { value: "name", label: labels.taskOrderName }
   ];
+  if (includeManual) options.splice(1, 0, { value: "manual", label: labels.taskOrderManual });
+  return options;
 }
 
 function taskStatusOptions(labels: Record<string, string>): Array<{ value: TaskStatusFilter; label: string }> {
@@ -758,16 +884,6 @@ function taskStatusOptions(labels: Record<string, string>): Array<{ value: TaskS
     { value: "all", label: labels.taskFilterAll },
     { value: "open", label: labels.taskFilterOpen },
     { value: "done", label: labels.taskFilterDone }
-  ];
-}
-
-function taskDueOptions(labels: Record<string, string>): Array<{ value: TaskDueFilter; label: string }> {
-  return [
-    { value: "any", label: labels.taskDueAny },
-    { value: "today", label: labels.today },
-    { value: "upcoming7", label: labels.upcoming7 },
-    { value: "upcoming30", label: labels.upcoming30 },
-    { value: "none", label: labels.taskDueNone }
   ];
 }
 
@@ -807,15 +923,16 @@ function taskCheckboxText(value: string): string {
 function parseTaskBlockArgs(source: string): TaskBlockArgs {
   const raw = parseCodeBlockKeyValues(source);
   const root = raw.root === "all" ? "all" : "current";
-  const limit = Number(raw.limit ?? "50");
-  if (!Number.isInteger(limit) || limit < 1) {
+  const rawLimit = raw.limit;
+  const limit = rawLimit === undefined ? undefined : Number(rawLimit);
+  if (limit !== undefined && (!Number.isInteger(limit) || limit < 1)) {
     new Notice("PARA-ZK task block limit must be a positive integer.");
   }
   return {
     root,
     checkbox: raw.checkbox,
     due: parseDueFilter(raw.due),
-    limit: Number.isInteger(limit) && limit > 0 ? limit : 50,
+    limit: limit !== undefined && Number.isInteger(limit) && limit > 0 ? limit : root === "all" ? 50 : undefined,
     order: parseTaskOrder(raw.order)
   };
 }

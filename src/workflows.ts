@@ -2904,6 +2904,40 @@ export async function setRootTaskField(
   return true;
 }
 
+export async function reorderRootTasks(ctx: WorkflowContext, rootFile: TFile, taskIds: string[]): Promise<boolean> {
+  const shardFile = await readTaskShardFile(ctx, rootFile);
+  if (!shardFile) throw new Error("task list not found");
+  const before = await ctx.app.vault.read(shardFile);
+  const range = taskShardTaskRange(before);
+  if (!range) throw new Error("task list not found");
+
+  const lines = readEditableTaskLines(shardFile.path, before, range);
+  validateTaskReorderIds(lines, taskIds);
+
+  const byId = new Map(lines.map((line) => [line.id, line]));
+  const section = before.slice(range.start, range.end);
+  const nonTaskContent = removeTextRanges(
+    section,
+    lines.map((line) => ({
+      start: line.range.start - range.start,
+      end: line.range.end - range.start
+    }))
+  );
+  if (nonTaskContent.trim()) throw new Error("task reorder only supports managed task lines");
+
+  const nextSection = taskIds
+    .map((id) => {
+      const line = byId.get(id);
+      if (!line) throw new Error(`task not found: ${id}`);
+      return before.slice(line.range.start, line.range.endWithoutBreak);
+    })
+    .join("\n");
+  if (section === nextSection) return false;
+
+  await ctx.app.vault.modify(shardFile, spliceTextRange(before, range, nextSection));
+  return true;
+}
+
 export async function deleteRootTask(ctx: WorkflowContext, rootFile: TFile, taskId: string): Promise<boolean> {
   const shardFile = await readTaskShardFile(ctx, rootFile);
   if (!shardFile) throw new Error(`task not found: ${taskId}`);
@@ -2964,6 +2998,46 @@ function findEditableTaskLine(path: string, content: string, range: TextRange, t
     line += 1;
   }
   return undefined;
+}
+
+function readEditableTaskLines(path: string, content: string, range: TextRange): EditableTaskLine[] {
+  const lines: EditableTaskLine[] = [];
+  const seen: Record<string, true> = {};
+  let cursor = range.start;
+  let line = lineNumberAt(content, range.start);
+  while (cursor < range.end) {
+    const span = lineTextRangeAt(content, cursor, range.end);
+    if (!span) break;
+
+    const text = content.slice(span.start, span.endWithoutBreak);
+    const task = readEditableTaskLine(path, line, text, span);
+    if (task) {
+      const id = uniqueReadId(task.id, seen);
+      seen[id] = true;
+      lines.push({
+        ...task,
+        id
+      });
+    }
+
+    cursor = span.end;
+    line += 1;
+  }
+  return lines;
+}
+
+function validateTaskReorderIds(lines: EditableTaskLine[], taskIds: string[]): void {
+  if (lines.length !== taskIds.length) {
+    throw new Error("task reorder requires the full current task id order");
+  }
+  const ids = new Set<string>();
+  for (const id of taskIds) {
+    if (ids.has(id)) throw new Error(`duplicate task id in reorder: ${id}`);
+    ids.add(id);
+  }
+  for (const line of lines) {
+    if (!ids.has(line.id)) throw new Error(`missing task id in reorder: ${line.id}`);
+  }
 }
 
 function readEditableTaskLine(
