@@ -130,7 +130,8 @@ export const DEFAULT_LAYOUT_FOLDERS = [
   "Journal",
   "Dashboard",
   "Tasks",
-  "Tasks/roots",
+  "Tasks/current",
+  "Tasks/archives",
   "Templates",
   "Templates/para-zk",
   "assets"

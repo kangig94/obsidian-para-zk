@@ -2185,6 +2185,7 @@ function assertCanMoveNoteBetweenRoots(
 ): void {
   const normalizedFromRoot = normalizeVaultPath(fromRoot);
   const normalizedToRoot = normalizeVaultPath(toRoot);
+  assertCanMoveTaskShardBetweenArchiveStates(ctx, file, normalizedFromRoot, normalizedToRoot);
   const folderStyleFolder = folderStyleContainer(file);
   if (folderStyleFolder) {
     const relativeFolder = relativePathUnderRoot(folderStyleFolder.path, normalizedFromRoot);
@@ -2205,6 +2206,7 @@ async function moveNoteBetweenRoots(
   const normalizedFromRoot = normalizeVaultPath(fromRoot);
   const normalizedToRoot = normalizeVaultPath(toRoot);
   const fromPath = file.path;
+  const rootId = rootIdFromFrontmatter(fileFrontmatter(ctx, file));
   const folderStyleFolder = folderStyleContainer(file);
   assertCanMoveNoteBetweenRoots(ctx, file, normalizedFromRoot, normalizedToRoot);
 
@@ -2216,6 +2218,7 @@ async function moveNoteBetweenRoots(
     await ctx.app.fileManager.renameFile(folderStyleFolder, targetFolder);
     const moved = ctx.app.vault.getFileByPath(toPath);
     if (!moved) throw new Error(`failed to move ${fromPath} to ${toPath}`);
+    await moveTaskShardBetweenArchiveStates(ctx, rootId, normalizedFromRoot, normalizedToRoot);
     return { file: moved, fromPath, toPath };
   }
 
@@ -2225,7 +2228,49 @@ async function moveNoteBetweenRoots(
   await ctx.app.fileManager.renameFile(file, toPath);
   const moved = ctx.app.vault.getFileByPath(toPath);
   if (!moved) throw new Error(`failed to move ${fromPath} to ${toPath}`);
+  await moveTaskShardBetweenArchiveStates(ctx, rootId, normalizedFromRoot, normalizedToRoot);
   return { file: moved, fromPath, toPath };
+}
+
+function assertCanMoveTaskShardBetweenArchiveStates(
+  ctx: WorkflowContext,
+  file: TFile,
+  fromRoot: string,
+  toRoot: string
+): void {
+  const rootId = rootIdFromFrontmatter(fileFrontmatter(ctx, file));
+  if (!rootId) return;
+
+  const fromArchived = isArchivedPath(ctx, fromRoot);
+  const toArchived = isArchivedPath(ctx, toRoot);
+  if (fromArchived === toArchived) return;
+
+  const source = ctx.app.vault.getFileByPath(taskShardPath(ctx, rootId, fromArchived));
+  if (!source) return;
+
+  const targetPath = taskShardPath(ctx, rootId, toArchived);
+  const existing = ctx.app.vault.getAbstractFileByPath(targetPath);
+  if (existing && existing !== source) throw new Error(`target already exists: ${targetPath}`);
+}
+
+async function moveTaskShardBetweenArchiveStates(
+  ctx: WorkflowContext,
+  rootId: string | undefined,
+  fromRoot: string,
+  toRoot: string
+): Promise<void> {
+  if (!rootId) return;
+
+  const fromArchived = isArchivedPath(ctx, fromRoot);
+  const toArchived = isArchivedPath(ctx, toRoot);
+  if (fromArchived === toArchived) return;
+
+  const source = ctx.app.vault.getFileByPath(taskShardPath(ctx, rootId, fromArchived));
+  if (!source) return;
+
+  const targetPath = taskShardPath(ctx, rootId, toArchived);
+  await ensureFolder(ctx.app, parentFolder(targetPath));
+  await ctx.app.fileManager.renameFile(source, targetPath);
 }
 
 function frontmatterValuesEqual(left: unknown, right: unknown): boolean {
@@ -2605,7 +2650,7 @@ const TASK_PRIORITY_FIELD_SYMBOLS: Record<string, string> = {
 
 async function ensureTaskShard(ctx: WorkflowContext, rootFile: TFile): Promise<TFile> {
   const rootId = await ensureRootId(ctx, rootFile);
-  const path = taskShardPath(ctx, rootId);
+  const path = taskShardPath(ctx, rootId, isArchivedFile(ctx, rootFile));
   await ensureFolder(ctx.app, parentFolder(path));
 
   let shardFile = ctx.app.vault.getFileByPath(path);
@@ -2635,19 +2680,31 @@ async function ensureRootId(ctx: WorkflowContext, file: TFile): Promise<string> 
 
 function taskShardFile(ctx: WorkflowContext, rootFile: TFile): TFile | undefined {
   const rootId = rootIdFromFrontmatter(fileFrontmatter(ctx, rootFile));
-  return rootId ? ctx.app.vault.getFileByPath(taskShardPath(ctx, rootId)) ?? undefined : undefined;
+  return rootId ? ctx.app.vault.getFileByPath(taskShardPath(ctx, rootId, isArchivedFile(ctx, rootFile))) ?? undefined : undefined;
 }
 
 function readTaskShardFile(ctx: WorkflowContext, rootFile: TFile): TFile | undefined {
   return taskShardFile(ctx, rootFile);
 }
 
-function taskShardPath(ctx: WorkflowContext, rootId: string): string {
-  return joinVaultPath(taskRootsFolder(ctx), `${sanitizeFileName(rootId)}.md`);
+function taskShardPath(ctx: WorkflowContext, rootId: string, archived: boolean): string {
+  return joinVaultPath(taskShardFolder(ctx, archived), `${sanitizeFileName(rootId)}.md`);
 }
 
-function taskRootsFolder(ctx: WorkflowContext): string {
-  return joinVaultPath(ctx.settings.paths.tasksFolder, "roots");
+function taskShardFolder(ctx: WorkflowContext, archived: boolean): string {
+  return archived ? taskArchivesFolder(ctx) : taskCurrentFolder(ctx);
+}
+
+function taskCurrentFolder(ctx: WorkflowContext): string {
+  return joinVaultPath(ctx.settings.paths.tasksFolder, "current");
+}
+
+function taskArchivesFolder(ctx: WorkflowContext): string {
+  return joinVaultPath(ctx.settings.paths.tasksFolder, "archives");
+}
+
+function taskRegistryFolder(ctx: WorkflowContext): string {
+  return normalizeVaultPath(ctx.settings.paths.tasksFolder);
 }
 
 function rootIdFromFrontmatter(frontmatter: Frontmatter): string | undefined {
@@ -2826,7 +2883,7 @@ export async function readAllTaskItems(ctx: WorkflowContext): Promise<Array<{
     task: TaskRead;
   }> = [];
   for (const file of ctx.app.vault.getMarkdownFiles()) {
-    if (!isInFolder(file, taskRootsFolder(ctx))) continue;
+    if (!isInFolder(file, taskCurrentFolder(ctx))) continue;
     const rootFile = rootFiles.get(file.basename);
     if (!rootFile) continue;
     const content = await ctx.app.vault.read(file);
@@ -2860,7 +2917,7 @@ export async function readAllTaskItems(ctx: WorkflowContext): Promise<Array<{
 function rootFilesById(ctx: WorkflowContext): Map<string, TFile> {
   const roots = new Map<string, TFile>();
   for (const file of ctx.app.vault.getMarkdownFiles()) {
-    if (isInFolder(file, taskRootsFolder(ctx))) continue;
+    if (isInFolder(file, taskRegistryFolder(ctx)) || isArchivedFile(ctx, file)) continue;
     const rootId = rootIdFromFrontmatter(fileFrontmatter(ctx, file));
     if (rootId && !roots.has(rootId)) roots.set(rootId, file);
   }
@@ -4403,6 +4460,12 @@ function zkSearchFolders(ctx: WorkflowContext, kind: ZkKind | undefined): string
 
 function isArchivedFile(ctx: WorkflowContext, file: TFile): boolean {
   return isInFolder(file, ctx.settings.paths.archivesFolder);
+}
+
+function isArchivedPath(ctx: WorkflowContext, path: string): boolean {
+  const archiveRoot = normalizeVaultPath(ctx.settings.paths.archivesFolder);
+  const normalized = normalizeVaultPath(path);
+  return normalized === archiveRoot || normalized.startsWith(`${archiveRoot}/`);
 }
 
 function folderName(path: string): string {

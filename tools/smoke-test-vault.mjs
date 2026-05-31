@@ -334,7 +334,8 @@ function runWorkflowScenario(today) {
     "format=json"
   ]);
   assert(archiveFlowArchivedTasks.value?.count === 1, "archived project task read after move failed");
-  assertTaskRegistryEntryContains(archiveFlowTaskName, []);
+  assertTaskRegistryEntryContains(archiveFlowTaskName, [], "archives");
+  assertTaskRegistryEntryMissing(archiveFlowTaskName, "current");
 
   const restoreMove = cliJson("para-zk:update-project", [
     `title=${archiveProjectTitle}`,
@@ -356,7 +357,8 @@ function runWorkflowScenario(today) {
     "format=json"
   ]);
   assert(archiveFlowRestoredTasks.value?.count === 1, "restored project task read after move failed");
-  assertTaskRegistryEntryContains(archiveFlowTaskName, []);
+  assertTaskRegistryEntryContains(archiveFlowTaskName, [], "current");
+  assertTaskRegistryEntryMissing(archiveFlowTaskName, "archives");
 
   const renameProject = cliJson("para-zk:create-project", [
     `title=${renameProjectTitle}`,
@@ -1974,35 +1976,39 @@ function assertFileContains(path, needles) {
   }
 }
 
-function assertTaskRegistryContains(needles) {
-  const rootsPath = join(vaultPath, "Tasks", "roots");
+function taskRegistryPath(bucket = "current") {
+  return join(vaultPath, "Tasks", bucket);
+}
+
+function assertTaskRegistryContains(needles, bucket = "current") {
+  const registryPath = taskRegistryPath(bucket);
   const deadline = Date.now() + 3000;
   let text = "";
   while (Date.now() <= deadline) {
-    if (existsSync(rootsPath)) {
-      text = readdirSync(rootsPath)
+    if (existsSync(registryPath)) {
+      text = readdirSync(registryPath)
         .filter((entry) => entry.endsWith(".md"))
-        .map((entry) => readFileSync(join(rootsPath, entry), "utf8"))
+        .map((entry) => readFileSync(join(registryPath, entry), "utf8"))
         .join("\n");
       if (needles.every((needle) => text.includes(needle))) return;
     }
     sleepMs(100);
   }
 
-  assert(existsSync(rootsPath), "missing task registry folder: Tasks/roots");
+  assert(existsSync(registryPath), `missing task registry folder: Tasks/${bucket}`);
   for (const needle of needles) {
     assert(text.includes(needle), `task registry does not contain: ${needle}`);
   }
 }
 
-function assertTaskRegistryEntryContains(taskName, needles) {
-  const rootsPath = join(vaultPath, "Tasks", "roots");
+function assertTaskRegistryEntryContains(taskName, needles, bucket = "current") {
+  const registryPath = taskRegistryPath(bucket);
   const deadline = Date.now() + 3000;
   let text = "";
   while (Date.now() <= deadline) {
-    if (existsSync(rootsPath)) {
-      for (const entry of readdirSync(rootsPath).filter((name) => name.endsWith(".md"))) {
-        const content = readFileSync(join(rootsPath, entry), "utf8");
+    if (existsSync(registryPath)) {
+      for (const entry of readdirSync(registryPath).filter((name) => name.endsWith(".md"))) {
+        const content = readFileSync(join(registryPath, entry), "utf8");
         if (!content.includes(taskName)) continue;
         text = content;
         if (needles.every((needle) => content.includes(needle))) return;
@@ -2011,40 +2017,51 @@ function assertTaskRegistryEntryContains(taskName, needles) {
     sleepMs(100);
   }
 
-  assert(existsSync(rootsPath), "missing task registry folder: Tasks/roots");
-  assert(text.includes(taskName), `task registry does not contain task: ${taskName}`);
+  assert(existsSync(registryPath), `missing task registry folder: Tasks/${bucket}`);
+  assert(text.includes(taskName), `task registry ${bucket} does not contain task: ${taskName}`);
   for (const needle of needles) {
-    assert(text.includes(needle), `task registry entry for ${taskName} does not contain: ${needle}`);
+    assert(text.includes(needle), `task registry ${bucket} entry for ${taskName} does not contain: ${needle}`);
   }
 }
 
-function assertTaskRegistryExcludes(needles) {
-  const rootsPath = join(vaultPath, "Tasks", "roots");
-  assert(existsSync(rootsPath), "missing task registry folder: Tasks/roots");
-  const text = readdirSync(rootsPath)
+function assertTaskRegistryEntryMissing(taskName, bucket = "current") {
+  const registryPath = taskRegistryPath(bucket);
+  if (!existsSync(registryPath)) return;
+
+  const text = readdirSync(registryPath)
     .filter((entry) => entry.endsWith(".md"))
-    .map((entry) => readFileSync(join(rootsPath, entry), "utf8"))
+    .map((entry) => readFileSync(join(registryPath, entry), "utf8"))
+    .join("\n");
+  assert(!text.includes(taskName), `task registry ${bucket} still contains task: ${taskName}`);
+}
+
+function assertTaskRegistryExcludes(needles, bucket = "current") {
+  const registryPath = taskRegistryPath(bucket);
+  assert(existsSync(registryPath), `missing task registry folder: Tasks/${bucket}`);
+  const text = readdirSync(registryPath)
+    .filter((entry) => entry.endsWith(".md"))
+    .map((entry) => readFileSync(join(registryPath, entry), "utf8"))
     .join("\n");
   for (const needle of needles) {
     assert(!text.includes(needle), `task registry contains deprecated syntax: ${needle}`);
   }
 }
 
-function assertTaskRegistryFileNamesExclude(prefixes) {
-  const rootsPath = join(vaultPath, "Tasks", "roots");
-  assert(existsSync(rootsPath), "missing task registry folder: Tasks/roots");
-  for (const entry of readdirSync(rootsPath).filter((name) => name.endsWith(".md"))) {
+function assertTaskRegistryFileNamesExclude(prefixes, bucket = "current") {
+  const registryPath = taskRegistryPath(bucket);
+  assert(existsSync(registryPath), `missing task registry folder: Tasks/${bucket}`);
+  for (const entry of readdirSync(registryPath).filter((name) => name.endsWith(".md"))) {
     for (const prefix of prefixes) {
       assert(!entry.startsWith(prefix), `task registry file name contains deprecated prefix: ${entry}`);
     }
   }
 }
 
-function assertTaskRegistryFilesStartWith(expected) {
-  const rootsPath = join(vaultPath, "Tasks", "roots");
-  assert(existsSync(rootsPath), "missing task registry folder: Tasks/roots");
-  for (const entry of readdirSync(rootsPath).filter((name) => name.endsWith(".md"))) {
-    const content = readFileSync(join(rootsPath, entry), "utf8");
+function assertTaskRegistryFilesStartWith(expected, bucket = "current") {
+  const registryPath = taskRegistryPath(bucket);
+  assert(existsSync(registryPath), `missing task registry folder: Tasks/${bucket}`);
+  for (const entry of readdirSync(registryPath).filter((name) => name.endsWith(".md"))) {
+    const content = readFileSync(join(registryPath, entry), "utf8");
     assert(content.startsWith(expected), `task registry file has unexpected prelude: ${entry}`);
   }
 }

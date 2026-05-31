@@ -6,7 +6,7 @@ import {
   type ManagedFileState,
   type ParaZkSettings
 } from "../types";
-import { normalizeVaultPath } from "../vault/paths";
+import { joinVaultPath, normalizeVaultPath } from "../vault/paths";
 import { resolveDependencies } from "./dependencies";
 import { configureObsidianCoreSettings } from "./obsidian-core-config";
 
@@ -33,6 +33,8 @@ export async function initializeVault(
     warnings: [],
     dependencies: []
   };
+
+  await migrateLegacyTaskRootsFolder(app, nextSettings, result, dryRun);
 
   const folders = Array.from(new Set(nextSettings.layoutFolders.map(normalizeVaultPath).filter(Boolean)));
   for (const folder of folders) {
@@ -89,6 +91,54 @@ async function ensureFolder(app: App, folder: string, result: InitResult, dryRun
     if (!dryRun) {
       await app.vault.createFolder(current);
     }
+  }
+}
+
+async function migrateLegacyTaskRootsFolder(
+  app: App,
+  settings: ParaZkSettings,
+  result: InitResult,
+  dryRun: boolean
+): Promise<void> {
+  const legacyPath = joinVaultPath(settings.paths.tasksFolder, "roots");
+  const currentPath = joinVaultPath(settings.paths.tasksFolder, "current");
+  if (legacyPath === currentPath) return;
+
+  const legacyFolder = app.vault.getAbstractFileByPath(legacyPath);
+  if (!(legacyFolder instanceof TFolder)) return;
+
+  const currentFolder = app.vault.getAbstractFileByPath(currentPath);
+  if (!currentFolder) {
+    addUnique(result.updated, `${legacyPath} -> ${currentPath}`);
+    if (!dryRun) {
+      await ensureFolder(app, parentFolder(currentPath), result, false);
+      await app.fileManager.renameFile(legacyFolder, currentPath);
+    }
+    return;
+  }
+
+  if (!(currentFolder instanceof TFolder)) {
+    addUnique(result.skipped, legacyPath);
+    addUnique(result.warnings, `Cannot migrate task registry because a file exists at ${currentPath}`);
+    return;
+  }
+
+  for (const child of [...legacyFolder.children]) {
+    const targetPath = joinVaultPath(currentPath, child.name);
+    if (app.vault.getAbstractFileByPath(targetPath)) {
+      addUnique(result.skipped, child.path);
+      addUnique(result.warnings, `Skipped legacy task registry item because ${targetPath} already exists`);
+      continue;
+    }
+
+    addUnique(result.updated, `${child.path} -> ${targetPath}`);
+    if (!dryRun) await app.fileManager.renameFile(child, targetPath);
+  }
+
+  const refreshedLegacyFolder = app.vault.getAbstractFileByPath(legacyPath);
+  if (refreshedLegacyFolder instanceof TFolder && refreshedLegacyFolder.children.length === 0) {
+    addUnique(result.updated, legacyPath);
+    if (!dryRun) await app.vault.delete(refreshedLegacyFolder, true);
   }
 }
 

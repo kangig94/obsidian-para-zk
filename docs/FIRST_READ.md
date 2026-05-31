@@ -75,11 +75,13 @@ can reason about omitted data.
 Task collection reads are structured: each item exposes the literal checkbox
 status character, task name, and parsed Tasks metadata instead of returning the
 raw task section string. Tasks are not stored inline in project/area/journal
-notes; PARA-ZK owns a hidden `Tasks/roots` registry, keyed by each root note's
-locale-independent `id`, and root templates render that registry with
-`para-zk-tasks` blocks. Task shard files are intentionally plain Markdown:
-`Tasks/roots/<root id>.md` contains a `# Tasks` heading and task lines, with no
-frontmatter mirror of root metadata.
+notes; PARA-ZK owns managed `Tasks/current` and `Tasks/archives` registries,
+keyed by each root note's locale-independent `id`, and root templates render
+that registry with `para-zk-tasks` blocks. Task shard files are intentionally
+plain Markdown: `Tasks/current/<root id>.md` and
+`Tasks/archives/<root id>.md` contain a `# Tasks` heading and task lines, with
+no frontmatter mirror of root metadata. Archiving or restoring a root note moves
+its task shard between those two registries.
 PARA read commands may select archived notes with `archived=true`; the returned
 `archived: true` field, when present, is the single code-level indicator for
 that state.

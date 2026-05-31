@@ -122,9 +122,10 @@ Notable changes for PARA-ZK are tracked here.
 - Task updates now use the same structured collection shape exposed by reads:
   `value_json` task inserts, `tasks/<id>/<field>` scalar updates, and
   `tasks/<id> op=delete`; raw Markdown task-line updates are rejected.
-- Tasks now live in PARA-ZK's managed `Tasks/roots` registry and are rendered
-  into root notes with `para-zk-tasks` blocks, keeping root note bodies compact
-  while preserving stable task ids for CLI reads and updates.
+- Tasks now live in PARA-ZK's managed `Tasks/current` and `Tasks/archives`
+  registries and are rendered into root notes with `para-zk-tasks` blocks,
+  keeping root note bodies compact while preserving stable task ids for CLI
+  reads and updates.
 - Generated root ids are now plain UUIDs without PARA-ZK-specific prefixes;
   root notes store the id in `id`.
 - Generated task ids are now 8-character lower-case base36 tokens with a

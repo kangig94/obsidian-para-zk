@@ -279,11 +279,11 @@ selector and type information needed for follow-up reads:
 
 Task and reference surfaces are structured collections rather than raw Markdown.
 Full compact reads return only `count`; collection items are omitted by design.
-Tasks are stored in PARA-ZK's hidden `Tasks/roots` registry and rendered back
-into root notes through `para-zk-tasks` blocks. Each task shard is named after
-the root note's `id` and contains only a `# Tasks` heading plus task lines, not
-duplicated root frontmatter. Exact collection root reads such as `key=tasks` and
-`key=references` return a paged collection object:
+Tasks are stored in PARA-ZK's managed `Tasks/current` or `Tasks/archives`
+registry and rendered back into root notes through `para-zk-tasks` blocks. Each
+task shard is named after the root note's `id` and contains only a `# Tasks`
+heading plus task lines, not duplicated root frontmatter. Exact collection root
+reads such as `key=tasks` and `key=references` return a paged collection object:
 
 ```json
 {

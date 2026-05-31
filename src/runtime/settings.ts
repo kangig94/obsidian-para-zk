@@ -6,7 +6,7 @@ import {
   type ParaZkSettings
 } from "../types";
 import { isRecord } from "../records";
-import { normalizeVaultPath } from "../vault/paths";
+import { joinVaultPath, normalizeVaultPath } from "../vault/paths";
 
 export async function loadSettings(plugin: Plugin): Promise<ParaZkSettings> {
   return mergeSettings(await plugin.loadData());
@@ -18,16 +18,39 @@ export async function saveSettings(plugin: Plugin, settings: ParaZkSettings): Pr
 
 export function mergeSettings(loaded: unknown): ParaZkSettings {
   const data = isRecord(loaded) ? loaded : {};
+  const paths = readPaths(data.paths);
   return {
     ...DEFAULT_SETTINGS,
-    paths: readPaths(data.paths),
-    layoutFolders: Array.isArray(data.layoutFolders)
-      ? data.layoutFolders.map(String).map(normalizeVaultPath).filter(Boolean)
-      : [...DEFAULT_SETTINGS.layoutFolders],
+    paths,
+    layoutFolders: readLayoutFolders(data.layoutFolders, paths),
     locale: normalizeLocale(data.locale, DEFAULT_SETTINGS.locale),
     initializedAt: typeof data.initializedAt === "string" ? data.initializedAt : undefined,
     managedFiles: readManagedFiles(data.managedFiles)
   };
+}
+
+function readLayoutFolders(value: unknown, paths: ParaZkSettings["paths"]): string[] {
+  if (!Array.isArray(value)) return [...DEFAULT_SETTINGS.layoutFolders];
+
+  const legacyTaskRoots = joinVaultPath(paths.tasksFolder, "roots");
+  const taskCurrent = joinVaultPath(paths.tasksFolder, "current");
+  const taskArchives = joinVaultPath(paths.tasksFolder, "archives");
+  const folders: string[] = [];
+
+  for (const item of value) {
+    const folder = normalizeVaultPath(String(item));
+    if (!folder) continue;
+
+    if (folder === legacyTaskRoots) {
+      addUnique(folders, taskCurrent);
+      addUnique(folders, taskArchives);
+      continue;
+    }
+
+    addUnique(folders, folder);
+  }
+
+  return folders;
 }
 
 function readPaths(value: unknown): ParaZkSettings["paths"] {
@@ -54,4 +77,9 @@ function readManagedFiles(value: unknown): Record<string, ManagedFileState> {
     };
   }
   return result;
+}
+
+function addUnique(items: string[], value: string): void {
+  if (!value) return;
+  if (!items.includes(value)) items.push(value);
 }
