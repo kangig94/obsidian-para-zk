@@ -32,9 +32,9 @@ type NativeCliCommand = {
 
 const UPDATE_OPTIONS: Record<string, CliOptionSpec> = {
   key: { value: "<map-path>", description: "Stable writable key such as summary, body, frontmatter/status, or children/<title>/body." },
-  op: { value: "<set|append|prepend|replace>", description: "Update operation." },
-  value: { value: "<text>", description: "Text value for set, append, or prepend. Also used as a scalar frontmatter value." },
-  value_json: { value: "<json>", description: "Structured value for frontmatter updates." },
+  op: { value: "<set|insert|append|prepend|replace|delete>", description: "Update operation." },
+  value: { value: "<text>", description: "Text value for scalar set, append, or prepend operations." },
+  value_json: { value: "<json>", description: "Structured value for frontmatter updates and task inserts." },
   match: { value: "<text>", description: "Exact text to match inside the selected key for op=replace." },
   with: { value: "<text>", description: "Replacement text for op=replace." },
   all: { value: "<true|false>", description: "For op=replace, replace all matches instead of requiring a single match." },
@@ -989,6 +989,7 @@ function readCliUpdateOptions(args: CliArgs): {
   key?: string;
   operation?: string;
   value?: unknown;
+  valueSource?: "value" | "value_json";
   match?: string;
   replacement?: string;
   all?: boolean;
@@ -1007,13 +1008,14 @@ function readCliUpdateOptions(args: CliArgs): {
     key: readCliString(args, "key"),
     operation: readCliString(args, "op"),
     ...(value.present ? { value: value.value } : {}),
+    ...(value.source ? { valueSource: value.source } : {}),
     ...(match !== undefined ? { match } : {}),
     ...(replacement.present ? { replacement: replacement.value } : {}),
     all: readCliBoolean(args, "all") ?? false
   };
 }
 
-function readCliUpdateValue(args: CliArgs): { present: boolean; value?: unknown } {
+function readCliUpdateValue(args: CliArgs): { present: boolean; value?: unknown; source?: "value" | "value_json" } {
   const hasJson = Object.prototype.hasOwnProperty.call(args, "value_json");
   const hasText = Object.prototype.hasOwnProperty.call(args, "value");
 
@@ -1023,7 +1025,8 @@ function readCliUpdateValue(args: CliArgs): { present: boolean; value?: unknown 
     try {
       return {
         present: true,
-        value: JSON.parse(raw)
+        value: JSON.parse(raw),
+        source: "value_json"
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1034,7 +1037,8 @@ function readCliUpdateValue(args: CliArgs): { present: boolean; value?: unknown 
   if (!hasText) return { present: false };
   return {
     present: true,
-    value: decodeCliEscapes(readCliString(args, "value") ?? "")
+    value: decodeCliEscapes(readCliString(args, "value") ?? ""),
+    source: "value"
   };
 }
 

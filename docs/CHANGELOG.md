@@ -11,7 +11,7 @@ Notable changes for PARA-ZK are tracked here.
   journal capture, and note promotion.
 - Added idempotent vault initialization for PARA, ZK, Journal, Dashboard, Templates,
   and managed PARA-ZK template files.
-- Added dependency checks for Dataview, Tasks, Tabs, Folder notes, Update time
+- Added dependency checks for Dataview, Tasks, Folder notes, Update time
   on edit, Trash Explorer, Custom File Explorer sorting, and Homepage during
   initialization. `installDeps=true` installs and enables missing dependencies,
   DataviewJS is enabled when Dataview is present, Update time on edit is configured
@@ -110,6 +110,14 @@ Notable changes for PARA-ZK are tracked here.
 - Delete workflows now preserve body backlinks, report incoming links, and only
   clean PARA-ZK-owned frontmatter relationships and standalone References-section
   link lines.
+- Task updates now use the same structured collection shape exposed by reads:
+  `value_json` task inserts, `tasks/<id>/<field>` scalar updates, and
+  `tasks/<id> op=delete`; raw Markdown task-line updates are rejected.
+- Tasks now live in PARA-ZK's managed `Tasks/roots` registry and are rendered
+  into root notes with `para-zk-tasks` blocks, keeping root note bodies compact
+  while preserving stable task ids for CLI reads and updates.
+- Reference collections are now read-only through update commands; use
+  `para-zk:add-reference` as the single path for adding references.
 
 ### Removed
 

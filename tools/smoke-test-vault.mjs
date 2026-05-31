@@ -14,12 +14,9 @@ const vaultPath = resolve(args.vault ?? inferVaultPath());
 const pluginDir = resolve(args.pluginDir ?? join(vaultPath, ".obsidian/plugins/para-zk"));
 const installDeps = args.installDeps !== false;
 const stamp = args.stamp ?? timestamp();
-const taskDueMarker = String.fromCodePoint(0x1F4C5);
-const taskHighPriorityMarker = String.fromCodePoint(0x23EB);
 const requiredDependencyIds = [
   "dataview",
   "obsidian-tasks-plugin",
-  "tabs",
   "folder-notes",
   "update-time-on-edit",
   "obsidian-trash-explorer",
@@ -191,6 +188,18 @@ function runWorkflowScenario(today) {
   ]);
   assert(reference.ok === true, "reference add failed");
   assert(reference.added === true, "reference was not added");
+  const rawReferenceUpdateRejected = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    "key=references",
+    "op=append",
+    "value=https://example.com/raw-reference-update",
+    "format=json"
+  ]);
+  assert(rawReferenceUpdateRejected.ok === false, "raw reference update was accepted");
+  assert(
+    typeof rawReferenceUpdateRejected.error === "string" && rawReferenceUpdateRejected.error.includes("add-reference"),
+    `raw reference update error was not explicit: ${JSON.stringify(rawReferenceUpdateRejected)}`
+  );
 
   const subnote = cliJson("para-zk:create-subnote", [
     `title=Smoke Meeting ${stamp}`,
@@ -286,6 +295,15 @@ function runWorkflowScenario(today) {
     "format=json"
   ]);
   assertCreated(archiveFlowProject, "archive flow project");
+  const archiveFlowTaskName = `Smoke archive flow task ${stamp}`;
+  const archiveFlowTaskInsert = cliJson("para-zk:update-project", [
+    `title=${archiveProjectTitle}`,
+    "key=tasks",
+    "op=insert",
+    `value_json=${JSON.stringify({ name: archiveFlowTaskName })}`,
+    "format=json"
+  ]);
+  assert(archiveFlowTaskInsert.changed === true, "archive flow task insert failed");
   const archiveFlowArchivedPath = `PARA/Archives/Projects/${archiveProjectTitle}/${archiveProjectTitle}.md`;
   const archiveMove = cliJson("para-zk:update-project", [
     `title=${archiveProjectTitle}`,
@@ -307,6 +325,15 @@ function runWorkflowScenario(today) {
     "format=json"
   ]);
   assert(archiveFlowRead.value === "archived", "archived project status read after move failed");
+  const archiveFlowArchivedTasks = cliJson("para-zk:read-project", [
+    `title=${archiveProjectTitle}`,
+    "archived=true",
+    "key=tasks",
+    `query=${archiveFlowTaskName}`,
+    "format=json"
+  ]);
+  assert(archiveFlowArchivedTasks.value?.count === 1, "archived project task read after move failed");
+  assertTaskRegistryEntryContains(archiveFlowTaskName, [archiveFlowArchivedPath]);
 
   const restoreMove = cliJson("para-zk:update-project", [
     `title=${archiveProjectTitle}`,
@@ -321,6 +348,7 @@ function runWorkflowScenario(today) {
   assert(restoreMove.toPath === archiveFlowProject.path, "project restore returned wrong toPath");
   assertFileExists(archiveFlowProject.path, "restored project was not moved back to active folder");
   assert(!existsSync(join(vaultPath, archiveFlowArchivedPath)), "project restore left the archived project path behind");
+  assertTaskRegistryEntryContains(archiveFlowTaskName, [archiveFlowProject.path]);
 
   const renameProject = cliJson("para-zk:create-project", [
     `title=${renameProjectTitle}`,
@@ -427,14 +455,26 @@ function runWorkflowScenario(today) {
   ]);
   assert(projectSummaryRead.value === `Smoke summary updated ${stamp}`, "project summary update read failed");
 
-  const projectTaskAppend = cliJson("para-zk:update-project", [
+  const projectTaskInsert = cliJson("para-zk:update-project", [
     `title=${projectTitle}`,
     "key=tasks",
-    "op=append",
-    `value=- [ ] Smoke structured task ${stamp} ${taskDueMarker} 2026-06-05 ${taskHighPriorityMarker}`,
+    "op=insert",
+    `value_json=${JSON.stringify({ name: `Smoke structured task ${stamp}`, due: "2026-06-05", priority: "high" })}`,
     "format=json"
   ]);
-  assert(projectTaskAppend.changed === true, "project task append failed");
+  assert(projectTaskInsert.changed === true, "project task insert failed");
+  const projectRawTaskInsertRejected = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    "key=tasks",
+    "op=insert",
+    `value=- [ ] Smoke raw task ${stamp}`,
+    "format=json"
+  ]);
+  assert(projectRawTaskInsertRejected.ok === false, "project raw task insert was accepted");
+  assert(
+    typeof projectRawTaskInsertRejected.error === "string" && projectRawTaskInsertRejected.error.includes("value_json object"),
+    `project raw task insert error was not explicit: ${JSON.stringify(projectRawTaskInsertRejected)}`
+  );
 
   const projectTasksRead = cliJson("para-zk:read-project", [
     `title=${projectTitle}`,
@@ -446,7 +486,7 @@ function runWorkflowScenario(today) {
     .find(([, task]) => task.name === `Smoke structured task ${stamp}`);
   const structuredTaskId = structuredTaskEntry?.[0];
   const structuredTask = structuredTaskEntry?.[1];
-  assert(structuredTask, `project task read did not expose the appended task: ${JSON.stringify(projectTasksRead.value)}`);
+  assert(structuredTask, `project task read did not expose the inserted task: ${JSON.stringify(projectTasksRead.value)}`);
   assert(projectTasksRead.value?.count >= 1 && projectTasksRead.value?.returned >= 1, "project task collection read did not expose page metadata");
   assert(typeof structuredTaskId === "string" && structuredTaskId.length > 0, "project task read did not expose a task id");
   assert(structuredTask.checkbox === " ", "project task read did not preserve checkbox status");
@@ -458,14 +498,91 @@ function runWorkflowScenario(today) {
     "format=json"
   ]);
   assert(projectTaskNameRead.value === `Smoke structured task ${stamp}`, "project task map path read failed");
-  const projectCustomCheckboxTaskAppend = cliJson("para-zk:update-project", [
+  const projectPositionedTaskInsert = cliJson("para-zk:update-project", [
     `title=${projectTitle}`,
     "key=tasks",
-    "op=append",
-    `value=- [/] Smoke custom checkbox task ${stamp}`,
+    "op=insert",
+    `value_json=${JSON.stringify({ name: `Smoke positioned task ${stamp}`, position: 1 })}`,
     "format=json"
   ]);
-  assert(projectCustomCheckboxTaskAppend.changed === true, "project custom checkbox task append failed");
+  assert(projectPositionedTaskInsert.changed === true, "project positioned task insert failed");
+  const projectPositionedTaskRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    "key=tasks",
+    "limit=1",
+    "format=json"
+  ]);
+  assert(
+    Object.values(projectPositionedTaskRead.value?.items ?? {})[0]?.name === `Smoke positioned task ${stamp}`,
+    "project positioned task insert did not preserve order"
+  );
+  const projectTaskCheckboxUpdate = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    `key=tasks/${structuredTaskId}/checkbox`,
+    "op=set",
+    "value=/",
+    "format=json"
+  ]);
+  assert(projectTaskCheckboxUpdate.changed === true, "project task checkbox update failed");
+  const projectTaskFieldJsonRejected = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    `key=tasks/${structuredTaskId}/checkbox`,
+    "op=set",
+    `value_json=${JSON.stringify("/")}`,
+    "format=json"
+  ]);
+  assert(projectTaskFieldJsonRejected.ok === false, "project task field value_json update was accepted");
+  assert(
+    typeof projectTaskFieldJsonRejected.error === "string" && projectTaskFieldJsonRejected.error.includes("task field updates require value"),
+    `project task field value_json error was not explicit: ${JSON.stringify(projectTaskFieldJsonRejected)}`
+  );
+  const projectTaskInvalidCheckboxRejected = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    `key=tasks/${structuredTaskId}/checkbox`,
+    "op=set",
+    "value=]",
+    "format=json"
+  ]);
+  assert(projectTaskInvalidCheckboxRejected.ok === false, "project invalid task checkbox was accepted");
+  assert(
+    typeof projectTaskInvalidCheckboxRejected.error === "string" && projectTaskInvalidCheckboxRejected.error.includes("single status character"),
+    `project invalid task checkbox error was not explicit: ${JSON.stringify(projectTaskInvalidCheckboxRejected)}`
+  );
+  const projectTaskNameUpdate = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    `key=tasks/${structuredTaskId}/name`,
+    "op=set",
+    `value=Smoke renamed structured task ${stamp}`,
+    "format=json"
+  ]);
+  assert(projectTaskNameUpdate.changed === true, "project task name update failed");
+  const projectTaskMultilineNameRejected = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    `key=tasks/${structuredTaskId}/name`,
+    "op=set",
+    "value=Invalid\\nTask",
+    "format=json"
+  ]);
+  assert(projectTaskMultilineNameRejected.ok === false, "project multiline task name was accepted");
+  assert(
+    typeof projectTaskMultilineNameRejected.error === "string" && projectTaskMultilineNameRejected.error.includes("single line"),
+    `project multiline task name error was not explicit: ${JSON.stringify(projectTaskMultilineNameRejected)}`
+  );
+  const projectTaskAfterUpdateRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    `key=tasks/${structuredTaskId}`,
+    "format=json"
+  ]);
+  assert(projectTaskAfterUpdateRead.value?.checkbox === "/", "project task checkbox field update was not readable");
+  assert(projectTaskAfterUpdateRead.value?.name === `Smoke renamed structured task ${stamp}`, "project task name field update was not readable");
+  const projectCustomCheckboxTaskInsert = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    "key=tasks",
+    "op=insert",
+    `value_json=${JSON.stringify({ checkbox: "/", name: `Smoke custom checkbox task ${stamp}` })}`,
+    "format=json"
+  ]);
+  assert(projectCustomCheckboxTaskInsert.changed === true, "project custom checkbox task insert failed");
   const projectCustomCheckboxTasksRead = cliJson("para-zk:read-project", [
     `title=${projectTitle}`,
     "key=tasks",
@@ -475,15 +592,16 @@ function runWorkflowScenario(today) {
   const customCheckboxTask = Object.values(projectCustomCheckboxTasksRead.value?.items ?? {})
     .find((task) => task.name === `Smoke custom checkbox task ${stamp}`);
   assert(customCheckboxTask?.checkbox === "/", "project task read did not preserve custom checkbox status");
-  const bulkTaskLines = Array.from({ length: 11 }, (_, index) => `- [ ] Smoke bulk task ${index + 1} ${stamp}`).join("\n");
-  const projectBulkTaskAppend = cliJson("para-zk:update-project", [
-    `title=${projectTitle}`,
-    "key=tasks",
-    "op=append",
-    `value=${bulkTaskLines}`,
-    "format=json"
-  ]);
-  assert(projectBulkTaskAppend.changed === true, "project bulk task append failed");
+  for (let index = 0; index < 11; index += 1) {
+    const projectBulkTaskInsert = cliJson("para-zk:update-project", [
+      `title=${projectTitle}`,
+      "key=tasks",
+      "op=insert",
+      `value_json=${JSON.stringify({ name: `Smoke bulk task ${index + 1} ${stamp}` })}`,
+      "format=json"
+    ]);
+    assert(projectBulkTaskInsert.changed === true, `project bulk task insert ${index + 1} failed`);
+  }
   const projectTaskCompactRead = cliJson("para-zk:read-project", [
     `title=${projectTitle}`,
     "format=json"
@@ -509,6 +627,28 @@ function runWorkflowScenario(today) {
     "format=json"
   ]);
   assert(projectTaskQueryRead.value?.count === 1, "project task query did not filter collection");
+  const deleteTaskRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    "key=tasks",
+    `query=Smoke bulk task 11 ${stamp}`,
+    "format=json"
+  ]);
+  const deleteTaskId = Object.keys(deleteTaskRead.value?.items ?? {})[0];
+  assert(deleteTaskId, "project delete task setup did not find task id");
+  const projectTaskDelete = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    `key=tasks/${deleteTaskId}`,
+    "op=delete",
+    "format=json"
+  ]);
+  assert(projectTaskDelete.changed === true, "project task delete failed");
+  const deleteTaskAfterRead = cliJson("para-zk:read-project", [
+    `title=${projectTitle}`,
+    "key=tasks",
+    `query=Smoke bulk task 11 ${stamp}`,
+    "format=json"
+  ]);
+  assert(deleteTaskAfterRead.value?.count === 0, "project deleted task was still readable");
 
   const childBodyAppend = cliJson("para-zk:update-project", [
     `title=${projectTitle}`,
@@ -907,8 +1047,8 @@ function runWorkflowScenario(today) {
   const journalTaskUpdate = cliJson("para-zk:update-journal", [
     `date=${today}`,
     "key=tasks",
-    "op=append",
-    `value=- [ ] Smoke journal task ${stamp}`,
+    "op=insert",
+    `value_json=${JSON.stringify({ name: `Smoke journal task ${stamp}` })}`,
     "format=json"
   ]);
   assert(journalTaskUpdate.changed === true, "journal tasks update failed");
@@ -955,8 +1095,8 @@ function runWorkflowScenario(today) {
   const retroUpdate = cliJson("para-zk:update-retro", [
     `path=${retro.path}`,
     "key=tasks",
-    "op=set",
-    `value=- [ ] Smoke retro action ${stamp}`,
+    "op=insert",
+    `value_json=${JSON.stringify({ name: `Smoke retro action ${stamp}` })}`,
     "format=json"
   ]);
   assert(retroUpdate.changed === true, "retro tasks update failed");
@@ -1210,7 +1350,11 @@ function assertWorkflowFiles(result) {
   ]);
   assertFileContains(result.retro.path, [
     "type: retro",
-    result.project.path,
+    result.project.path
+  ]);
+  assertTaskRegistryContains([
+    `Smoke renamed structured task ${stamp}`,
+    `Smoke journal task ${stamp}`,
     `Smoke retro action ${stamp}`
   ]);
 }
@@ -1483,7 +1627,7 @@ function assertObsidianCoreConfig() {
 
   const ignoreFilters = appConfig.userIgnoreFilters;
   assert(Array.isArray(ignoreFilters), "app.json userIgnoreFilters is not an array");
-  for (const filter of ["Templates/", "Dashboard/", "README"]) {
+  for (const filter of ["Templates/", "Dashboard/", "Tasks/", "README"]) {
     assert(ignoreFilters.includes(filter), `app.json userIgnoreFilters is missing ${filter}`);
   }
 
@@ -1502,10 +1646,10 @@ function assertUpdateTimeOnEditConfig() {
   assert(config.minMinutesBetweenSaves === 1, "update-time-on-edit minMinutesBetweenSaves is not 1");
   assert(config.enableExperimentalHash === true, "update-time-on-edit enableExperimentalHash is not enabled");
 
-  for (const folder of ["Templates", "Dashboard", "assets", "README"]) {
+  for (const folder of ["Templates", "Dashboard", "Tasks", "assets", "README"]) {
     assert(config.ignoreGlobalFolder?.includes(folder), `update-time-on-edit ignoreGlobalFolder is missing ${folder}`);
   }
-  for (const folder of ["Templates", "Dashboard", "README"]) {
+  for (const folder of ["Templates", "Dashboard", "Tasks", "README"]) {
     assert(config.ignoreCreatedFolder?.includes(folder), `update-time-on-edit ignoreCreatedFolder is missing ${folder}`);
   }
 }
@@ -1644,6 +1788,50 @@ function assertFileContains(path, needles) {
   assert(statSync(absolute).isFile(), `not a file: ${path}`);
   for (const needle of needles) {
     assert(text.includes(needle), `${path} does not contain: ${needle}`);
+  }
+}
+
+function assertTaskRegistryContains(needles) {
+  const rootsPath = join(vaultPath, "Tasks", "roots");
+  const deadline = Date.now() + 3000;
+  let text = "";
+  while (Date.now() <= deadline) {
+    if (existsSync(rootsPath)) {
+      text = readdirSync(rootsPath)
+        .filter((entry) => entry.endsWith(".md"))
+        .map((entry) => readFileSync(join(rootsPath, entry), "utf8"))
+        .join("\n");
+      if (needles.every((needle) => text.includes(needle))) return;
+    }
+    sleepMs(100);
+  }
+
+  assert(existsSync(rootsPath), "missing task registry folder: Tasks/roots");
+  for (const needle of needles) {
+    assert(text.includes(needle), `task registry does not contain: ${needle}`);
+  }
+}
+
+function assertTaskRegistryEntryContains(taskName, needles) {
+  const rootsPath = join(vaultPath, "Tasks", "roots");
+  const deadline = Date.now() + 3000;
+  let text = "";
+  while (Date.now() <= deadline) {
+    if (existsSync(rootsPath)) {
+      for (const entry of readdirSync(rootsPath).filter((name) => name.endsWith(".md"))) {
+        const content = readFileSync(join(rootsPath, entry), "utf8");
+        if (!content.includes(taskName)) continue;
+        text = content;
+        if (needles.every((needle) => content.includes(needle))) return;
+      }
+    }
+    sleepMs(100);
+  }
+
+  assert(existsSync(rootsPath), "missing task registry folder: Tasks/roots");
+  assert(text.includes(taskName), `task registry does not contain task: ${taskName}`);
+  for (const needle of needles) {
+    assert(text.includes(needle), `task registry entry for ${taskName} does not contain: ${needle}`);
   }
 }
 

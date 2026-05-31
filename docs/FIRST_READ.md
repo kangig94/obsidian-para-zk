@@ -74,7 +74,10 @@ collection root reads return a paged object with `count`, `offset`, `limit`,
 can reason about omitted data.
 Task collection reads are structured: each item exposes the literal checkbox
 status character, task name, and parsed Tasks metadata instead of returning the
-raw task section string. Task lifecycle commands should build on that shape.
+raw task section string. Tasks are not stored inline in project/area/journal
+notes; PARA-ZK owns a hidden `Tasks/roots` registry, keyed by each root note's
+locale-independent `para_zk_id`, and root templates render that registry with
+`para-zk-tasks` blocks.
 PARA read commands may select archived notes with `archived=true`; the returned
 `archived: true` field, when present, is the single code-level indicator for
 that state.
@@ -85,6 +88,11 @@ frontmatter mutation and supports `op=set`. Section/body keys support
 `op=set`, `op=append`, `op=prepend`, and exact literal `op=replace` scoped to
 the selected key. Do not expose raw line/range editing through PARA-ZK; that is
 Optsidian's responsibility.
+Task updates must stay structural: insert with `key=tasks op=insert` and a
+single `value_json` object, optionally with a 1-based `position`, update a task
+field with `tasks/<id>/<field> op=set`, and delete a task with `tasks/<id>
+op=delete`. Do not accept raw Markdown task lines as an alternate task update
+path.
 
 Structural changes should stay domain-specific. Use `rename-project`,
 `rename-area`, `rename-resource`, and `rename-zk` for title/path changes instead
@@ -128,7 +136,7 @@ Important modules:
 - `src/ux/dashboard-actions.ts`: native Home dashboard action block.
 - `src/ux/dashboard-summary.ts`: native dashboard summary cards.
 - `src/runtime/init.ts`: idempotent vault initialization and managed file writes.
-- `src/runtime/dependencies.ts`: Dataview, Tasks, Tabs, Folder Notes, Update
+- `src/runtime/dependencies/index.ts`: Dataview, Tasks, Folder Notes, Update
   time on edit, Trash Explorer, Custom File Explorer sorting, and Homepage dependency handling.
 
 The architecture lint intentionally rejects content-blank modules and enforces
@@ -149,11 +157,13 @@ Native plugin blocks and tokens replace legacy prompt/script mechanisms:
 - `para-zk-props` and `PZK_INPUT[...]` replace Meta Bind input controls.
 - `para-zk-dashboard-actions` replaces Home dashboard button callouts.
 - `para-zk-dashboard-summary` replaces DataviewJS-only summary cards.
+- `para-zk-tasks` renders the hidden task registry inside root notes.
 
-Dataview and Tasks remain query engines. PARA-ZK should not try to replace them.
-Tabs may still be used for generated task views where it improves the generated
-vault experience. Folder Notes is required because PARA-ZK uses folder-style
-project and area notes, where a folder and its main note share the same name.
+Dataview remains the query engine for note relationships. Tasks remains enabled
+for Tasks-compatible status and metadata syntax, while PARA-ZK owns the root task
+registry and rendered task controls. Folder Notes is required because PARA-ZK
+uses folder-style project and area notes, where a folder and its main note share
+the same name.
 Update time on edit is required to keep `created` and `updated` frontmatter
 current after human edits in Obsidian.
 Trash Explorer is required for reviewing and emptying the local `.trash` folder;
@@ -213,6 +223,8 @@ Representative CLI smoke tests should cover:
   child-note key path
 - `para-zk:read-project key=tasks` with paged structured task items, literal
   checkbox status characters, names, due dates, priority, and collection filters
+- `para-zk:update-project key=tasks op=insert`, positional insert,
+  `tasks/<id>/<field> op=set`, and `tasks/<id> op=delete`
 - `para-zk:read-area`, `para-zk:read-resource`, `para-zk:read-zk`,
   `para-zk:read-journal`, and `para-zk:read-retro` using the same stable map
   key algorithm

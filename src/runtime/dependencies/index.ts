@@ -95,13 +95,7 @@ const REQUIRED_DEPENDENCIES: DependencySpec[] = [
     id: "obsidian-tasks-plugin",
     name: "Tasks",
     repo: "obsidian-tasks-group/obsidian-tasks",
-    reason: "PARA-ZK dashboards use Tasks query blocks"
-  },
-  {
-    id: "tabs",
-    name: "Tabs",
-    repo: "xhuajin/obsidian-tabs",
-    reason: "PARA-ZK area templates use Tabs blocks to separate open and completed tasks"
+    reason: "PARA-ZK stores Tasks-compatible task status and metadata syntax"
   },
   {
     id: "folder-notes",

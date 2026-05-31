@@ -64,12 +64,14 @@ function mergeUpdateTimeOnEditSettings(
     ignoreGlobalFolder: mergeStringList(current.ignoreGlobalFolder, [
       settings.paths.templatesFolder,
       settings.paths.dashboardFolder,
+      settings.paths.tasksFolder,
       ATTACHMENT_FOLDER,
       "README"
     ]),
     ignoreCreatedFolder: mergeStringList(current.ignoreCreatedFolder, [
       settings.paths.templatesFolder,
       settings.paths.dashboardFolder,
+      settings.paths.tasksFolder,
       "README"
     ]),
     enableExperimentalHash: true

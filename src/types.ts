@@ -23,6 +23,7 @@ export type ParaZkPaths = {
   permanentFolder: string;
   journalFolder: string;
   dashboardFolder: string;
+  tasksFolder: string;
   templatesFolder: string;
   managedTemplatesFolder: string;
 };
@@ -110,6 +111,7 @@ export const DEFAULT_PATHS: ParaZkPaths = {
   permanentFolder: "ZK/Permanent",
   journalFolder: "Journal",
   dashboardFolder: "Dashboard",
+  tasksFolder: "Tasks",
   templatesFolder: "Templates",
   managedTemplatesFolder: "Templates/para-zk"
 };
@@ -127,6 +129,8 @@ export const DEFAULT_LAYOUT_FOLDERS = [
   "ZK/Permanent",
   "Journal",
   "Dashboard",
+  "Tasks",
+  "Tasks/roots",
   "Templates",
   "Templates/para-zk",
   "assets"

@@ -115,7 +115,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         "---",
         `# ${t.labels.tasks}`,
         "",
-        "- [ ] ",
+        ...paraZkTasksBlock("current"),
         "",
         "---",
         `# ${t.labels.subnotes} ${paraZkInlineAction("create-subnote", t.labels.createSubnote)}`,
@@ -153,7 +153,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         "---",
         `# ${t.labels.tasks}`,
         "",
-        ...tasksArea(t, tags.area, slugPlaceholder),
+        ...paraZkTasksBlock("current"),
         "",
         "---",
         `# ${t.labels.subareas} ${paraZkInlineAction("create-subarea", t.labels.createSubarea)}`,
@@ -226,7 +226,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         "- 14:30 ",
         "",
         `# ${t.labels.tasks}`,
-        "- [ ] ",
+        ...paraZkTasksBlock("current"),
         "",
         "---",
         `# ${t.labels.shortReview}`,
@@ -267,7 +267,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         "- ",
         "",
         `# ${t.labels.tasks}`,
-        "- [ ] ",
+        ...paraZkTasksBlock("current"),
         "",
         "---",
         `# ${t.labels.retroSummary}`,
@@ -315,8 +315,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         "",
         "---",
         `## ${t.labels.tasks}`,
-        `- [ ] ${t.labels.refineFleetingAction}`,
-        `- [ ] ${t.labels.connectReferencesAction}`,
+        ...paraZkTasksBlock("current"),
         "",
         "---",
         `## ${t.labels.references}`,
@@ -407,6 +406,13 @@ function paraZkPropsBlock(type: PropsViewType): string {
   ].join("\n");
 }
 
+function paraZkTasksBlock(root: "current" | "all", extra: string[] = []): string[] {
+  return fenced("para-zk-tasks", [
+    `root: ${root}`,
+    ...extra
+  ]);
+}
+
 function paraZkInlineAction(command: string, label: string): string {
   return `\`PZK[${command}|${label}]\``;
 }
@@ -439,25 +445,6 @@ function fenced(language: string, lines: string[]): string[] {
     ...lines,
     "```"
   ];
-}
-
-function tabbedTasks(openLines: string[], doneLines: string[], locale: Locale): string[] {
-  return [
-    "````tabs",
-    `tab: ${openTabLabel(locale)}`,
-    ...fenced("tasks", openLines),
-    `tab: ${doneTabLabel(locale)}`,
-    ...fenced("tasks", doneLines),
-    "````"
-  ];
-}
-
-function openTabLabel(locale: Locale): string {
-  return locale === "ko" ? "미완" : "Open";
-}
-
-function doneTabLabel(locale: Locale): string {
-  return locale === "ko" ? "완료" : "Done";
 }
 
 function latestRetroSummaryTitle(locale: Locale): string {
@@ -500,22 +487,6 @@ function dataviewAreaProjects(t: ReturnType<typeof localePack>): string[] {
     "WHERE contains(areas, this.file.link)",
     "SORT due_date ASC, priority DESC"
   ]);
-}
-
-function tasksArea(t: ReturnType<typeof localePack>, areaTag: string, slugPlaceholder: string): string[] {
-  const base = [
-    `tags include #${areaTag}/${slugPlaceholder}`,
-    "path does not include \"Templates\"",
-    "path does not include \".trash\"",
-    "sort by due date"
-  ];
-  return tabbedTasks([
-    "not done",
-    ...base
-  ], [
-    "done",
-    ...base
-  ], t.locale);
 }
 
 function dataviewChildAreas(t: ReturnType<typeof localePack>): string[] {
@@ -573,6 +544,7 @@ function renderGuide(locale: Locale): string {
     `- ZK/Permanent: ${t.labels.folderPermanent}`,
     `- Journal: ${t.labels.folderJournal}`,
     `- Dashboard: ${t.labels.folderDashboard}`,
+    `- Tasks: ${t.labels.tasks}`,
     `- Templates/para-zk: ${t.labels.folderManagedTemplates}`,
     "",
     `## ${t.labels.tagNamespaces}`,
@@ -621,15 +593,14 @@ function renderDashboard(
     ]),
     `# ${titleByKind[kind]}`,
     "",
-    ...renderDashboardBody(kind, t, tags.area),
+    ...renderDashboardBody(kind, t),
     ""
   ].join("\n");
 }
 
 function renderDashboardBody(
   kind: "home" | "projects" | "areas" | "resources" | "zk" | "tasks" | "review",
-  t: ReturnType<typeof localePack>,
-  areaTag: string
+  t: ReturnType<typeof localePack>
 ): string[] {
   switch (kind) {
     case "home":
@@ -645,11 +616,11 @@ function renderDashboardBody(
         "",
         "---",
         `## ${t.labels.todayTasks}`,
-        ...tasksDueToday(),
+        ...paraZkTasksBlock("all", ["checkbox: open", "due: today", "limit: 10"]),
         "",
         "---",
         `## ${t.labels.upcoming7}`,
-        ...tasksDueSoon(10),
+        ...paraZkTasksBlock("all", ["checkbox: open", "due: upcoming7", "limit: 10"]),
         "",
         "---",
         `## ${t.labels.recentUpdates}`,
@@ -741,31 +712,19 @@ function renderDashboardBody(
     case "tasks":
       return [
         `## ${t.labels.today}`,
-        ...tasksDueToday(),
+        ...paraZkTasksBlock("all", ["checkbox: open", "due: today"]),
         "",
         "---",
         `## ${t.labels.upcoming7}`,
-        ...tasksDueSoon(0),
+        ...paraZkTasksBlock("all", ["checkbox: open", "due: upcoming7"]),
         "",
         "---",
         `## ${t.labels.upcoming30}`,
-        ...tasksDueMedium(),
-        "",
-        "---",
-        `## ${t.labels.area}`,
-        ...tasksAreaAll(areaTag),
-        "",
-        "---",
-        `## ${t.labels.project}`,
-        ...tasksProjects(),
-        "",
-        "---",
-        `## ${t.labels.journal}`,
-        ...tasksJournal(),
+        ...paraZkTasksBlock("all", ["checkbox: open", "due: upcoming30"]),
         "",
         "---",
         `## ${t.labels.completedRecent}`,
-        ...tasksDone()
+        ...paraZkTasksBlock("all", ["checkbox: done", "limit: 50"])
       ];
     case "review":
       return [
@@ -991,86 +950,5 @@ function dashboardThisWeekFleeting(t: ReturnType<typeof localePack>): string[] {
     "  .sort((a,b) => timeOf(b.file.ctime) - timeOf(a.file.ctime))",
     "  .map(p => [p.file.link, p.file.ctime]);",
     `dv.table(['Fleeting', ${jsString(t.labels.created)}], rows);`
-  ]);
-}
-
-function tasksDueToday(): string[] {
-  return fenced("tasks", [
-    "not done",
-    "due today",
-    "path does not include \"Templates\"",
-    "path does not include \".trash\"",
-    "hide backlinks",
-    "sort by priority",
-    "sort by due date"
-  ]);
-}
-
-function tasksDueSoon(limit: number): string[] {
-  return fenced("tasks", [
-    "not done",
-    "(due on or after tomorrow) AND (due on or before in 7 days)",
-    "path does not include \"Templates\"",
-    "path does not include \".trash\"",
-    "hide backlinks",
-    ...(limit > 0 ? [`limit ${limit}`] : []),
-    "sort by priority",
-    "sort by due date"
-  ]);
-}
-
-function tasksDueMedium(): string[] {
-  return fenced("tasks", [
-    "not done",
-    "(due on or after in 8 days) AND (due on or before in 30 days)",
-    "path does not include \"Templates\"",
-    "path does not include \".trash\"",
-    "sort by priority",
-    "sort by due date"
-  ]);
-}
-
-function tasksAreaAll(areaTag: string): string[] {
-  return fenced("tasks", [
-    "not done",
-    `tags include #${areaTag}`,
-    "path does not include \"Templates\"",
-    "path does not include \".trash\"",
-    "group by tags",
-    "sort by due date"
-  ]);
-}
-
-function tasksProjects(): string[] {
-  return fenced("tasks", [
-    "not done",
-    "path includes \"PARA/Projects\"",
-    "path does not include \"/Archives/\"",
-    "path does not include \"Templates\"",
-    "path does not include \".trash\"",
-    "group by backlink",
-    "sort by due date"
-  ]);
-}
-
-function tasksJournal(): string[] {
-  return fenced("tasks", [
-    "not done",
-    "path includes \"Journal\"",
-    "path does not include \".trash\"",
-    "hide backlinks",
-    "group by path",
-    "sort by due date"
-  ]);
-}
-
-function tasksDone(): string[] {
-  return fenced("tasks", [
-    "done",
-    "path does not include \"Templates\"",
-    "path does not include \".trash\"",
-    "hide backlinks",
-    "sort by done reverse",
-    "limit 50"
   ]);
 }

@@ -87,6 +87,7 @@ function mergeAppConfig(current: Record<string, unknown>, settings: ParaZkSettin
     userIgnoreFilters: mergeStringList(current.userIgnoreFilters, [
       ignoreFilterFolder(settings.paths.templatesFolder),
       ignoreFilterFolder(settings.paths.dashboardFolder),
+      ignoreFilterFolder(settings.paths.tasksFolder),
       "README"
     ]),
     propertiesInDocument: "hidden"

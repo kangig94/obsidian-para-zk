@@ -143,7 +143,6 @@ Required dependencies:
 
 - Dataview
 - Tasks
-- Tabs
 - Folder Notes
 - Update time on edit
 - Trash Explorer
@@ -152,8 +151,8 @@ Required dependencies:
 
 Dataview JavaScript queries are enabled when Dataview is installed.
 Update time on edit is configured to maintain `created` and `updated`
-frontmatter fields while ignoring generated templates, dashboards, assets, and
-the managed root guide.
+frontmatter fields while ignoring generated templates, dashboards, the managed
+task registry, assets, and the managed root guide.
 Trash Explorer is installed and enabled so local `.trash` contents can be
 reviewed or emptied through the Obsidian GUI.
 Custom File Explorer sorting is configured for bookmark-based ordering with a
@@ -280,7 +279,8 @@ selector and type information needed for follow-up reads:
 
 Task and reference surfaces are structured collections rather than raw Markdown.
 Full compact reads return only `count`; collection items are omitted by design.
-Blank template checkboxes are ignored. Exact collection root reads such as
+Tasks are stored in PARA-ZK's hidden `Tasks/roots` registry and rendered back
+into root notes through `para-zk-tasks` blocks. Exact collection root reads such as
 `key=tasks` and `key=references` return a paged collection object:
 
 ```json
@@ -292,7 +292,7 @@ Blank template checkboxes are ignored. Exact collection root reads such as
     "returned": 20,
     "has_more": true,
     "items": {
-      "task-abc123": {
+      "pzt_meco3r_a1b2c3d4": {
         "checkbox": "/",
         "name": "Review evaluation set",
         "priority": "high"
@@ -380,9 +380,9 @@ Options:
 | `path` | path | Optional exact project note path. |
 | `archived` | boolean | Same title lookup behavior as `read-project`. |
 | `key` | writable map path | Required. Examples: `frontmatter/status`, `summary`, `children/Planning Meeting/body`. |
-| `op` | `set`, `append`, `prepend`, `replace` | Required update operation. |
-| `value` | text | Required for `set`, `append`, and `prepend`. |
-| `value_json` | JSON | Structured value for frontmatter updates. |
+| `op` | `set`, `insert`, `append`, `prepend`, `replace`, `delete` | Required update operation. |
+| `value` | text | Required for scalar `set`, `append`, and `prepend`. |
+| `value_json` | JSON | Structured value for frontmatter updates and task inserts. |
 | `match` | text | Required for `replace`. Exact literal text inside the selected key. |
 | `with` | text | Replacement text for `replace`. Empty is allowed. |
 | `all` | boolean | For `replace`, replace all matches. Without it, multiple matches fail. |
@@ -390,9 +390,15 @@ Options:
 Writable keys are a subset of read keys. `frontmatter/<key>` supports `op=set`
 only and uses Obsidian frontmatter mutation. Section/body keys support
 `set`, `append`, `prepend`, and exact literal `replace`.
-`update-project key=tasks` still edits the underlying Tasks section text. Use
-the structured `read-project key=tasks` collection page for inspection until
-dedicated task lifecycle commands exist.
+Task collections are structured and do not accept raw Markdown task lines.
+Insert one task with `key=tasks op=insert value_json='{...}'`, update one field
+with `key=tasks/<id>/<field> op=set value=...`, and delete one task with
+`key=tasks/<id> op=delete`. Supported task fields are `checkbox`, `name`,
+`priority`, `due`, `scheduled`, `start`, `created`, `done`, and `cancelled`.
+Use `position` in `value_json` to insert before the 1-based task position, or
+omit it to append at the end.
+Reference collections are read-only through update; use `para-zk:add-reference`
+to add references.
 
 Read-only keys include `children`, `path`, `title`, `type`, and `archived`.
 
@@ -401,7 +407,9 @@ Examples:
 ```bash
 optsidian raw para-zk:update-project title="Model Evaluation" key=frontmatter/status op=set value=done format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key=summary op=replace match="old claim" with="new claim" format=json
-optsidian raw para-zk:update-project title="Model Evaluation" key=tasks op=append value="- [ ] Review evaluation set" format=json
+optsidian raw para-zk:update-project title="Model Evaluation" key=tasks op=insert value_json='{"name":"Review evaluation set","due":"2026-06-05","priority":"high"}' format=json
+optsidian raw para-zk:update-project title="Model Evaluation" key=tasks/pzt_meco3r_a1b2c3d4/checkbox op=set value=x format=json
+optsidian raw para-zk:update-project title="Model Evaluation" key=tasks/pzt_meco3r_a1b2c3d4 op=delete format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key="children/Planning Meeting/body" op=append value="Decision: ship the baseline." format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key=frontmatter/status op=set value=archived format=json
 ```
@@ -427,7 +435,7 @@ The same update algorithm is used by the other domain update commands:
 | Command | Selector | Notes |
 | --- | --- | --- |
 | `para-zk:update-area` | `title` or `path` | Supports area surface keys and `children/<title>/...`. |
-| `para-zk:update-resource` | `title` or `path` | Supports resource surface keys such as `overview`, `body`, and `references`. |
+| `para-zk:update-resource` | `title` or `path` | Supports resource surface keys such as `overview` and `body`. |
 | `para-zk:update-zk` | `title` plus optional `kind`, or `path` | Supports the selected ZK type's surface keys. |
 | `para-zk:update-journal` | `date` or `path` | Supports journal surface keys such as `quick_memo` and `tasks`. |
 | `para-zk:update-retro` | `title` plus optional `date`, or `path` | Supports retro surface keys such as `tasks`. |

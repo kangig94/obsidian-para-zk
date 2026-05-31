@@ -192,12 +192,13 @@ export type ReadRetroOptions = ReadOptionsWithCollection & ByTitleSelectorOption
   date?: string;
 };
 
-export type UpdateOperation = "set" | "append" | "prepend" | "replace";
+export type UpdateOperation = "set" | "insert" | "append" | "prepend" | "replace" | "delete";
 
 export type UpdatePayloadOptions = {
   key?: string;
   operation?: string;
   value?: unknown;
+  valueSource?: "value" | "value_json";
   match?: string;
   replacement?: string;
   all?: boolean;
@@ -316,7 +317,7 @@ type ReadSectionSpec = {
   includeSubsections?: boolean;
   skipManagedPrelude?: boolean;
   collection?: ReadCollectionKind;
-  transform?: (content: string, context: SectionTransformContext) => unknown;
+  transform?: (content: string, context: SectionTransformContext) => unknown | Promise<unknown>;
 };
 type ReadSurfaceSpec = {
   frontmatter: string[];
@@ -324,7 +325,7 @@ type ReadSurfaceSpec = {
   body?: boolean;
   children?: boolean;
 };
-type TaskRead = {
+export type TaskRead = {
   checkbox: string;
   name: string;
   due?: string;
@@ -339,7 +340,21 @@ type TaskLineRead = {
   id: string;
   task: TaskRead;
 };
+type TaskWrite = {
+  task: TaskRead;
+  position: number | "end";
+};
 type TaskMetadata = Pick<TaskRead, "due" | "scheduled" | "start" | "created" | "done" | "cancelled" | "priority">;
+export type TaskWritableField = keyof TaskRead;
+type EditableTaskLine = {
+  id: string;
+  range: TextRange & { endWithoutBreak: number };
+  prefix: string;
+  checkboxSuffix: string;
+  task: TaskRead;
+  taskId?: string;
+  blockId?: string;
+};
 type ReferenceRead = {
   kind: "url" | "note" | "file" | "wiki" | "markdown" | "text";
   label?: string;
@@ -364,6 +379,8 @@ type NormalizedCollectionReadOptions = {
 
 const DEFAULT_COLLECTION_READ_LIMIT = 50;
 const REFERENCE_KINDS = new Set(["url", "note", "file", "wiki", "markdown", "text"]);
+const ROOT_ID_FRONTMATTER_KEY = "para_zk_id";
+const TASK_SHARD_TYPE = "para_zk_tasks";
 
 export async function createProject(ctx: WorkflowContext, options: CreateProjectOptions): Promise<NoteResult & {
   areas?: ProjectAreaResult[];
@@ -878,6 +895,11 @@ async function createZkFile(
     if (kind === "Fleeting" && fm.processed === undefined) fm.processed = false;
     if (kind === "Permanent") fm.maturity = fm.maturity ?? maturity;
   });
+  if (kind === "Fleeting") {
+    const labels = localePack(ctx.settings.locale).labels;
+    await insertRootTask(ctx, file, { name: labels.refineFleetingAction });
+    await insertRootTask(ctx, file, { name: labels.connectReferencesAction });
+  }
   return file;
 }
 
@@ -1225,7 +1247,7 @@ async function readSurfaceMap(ctx: WorkflowContext, file: TFile, spec: ReadSurfa
       includeSubsections: section.includeSubsections ?? false
     });
     surface[section.key] = section.transform
-      ? section.transform(value, {
+      ? await section.transform(value, {
         ctx,
         file,
         content,
@@ -1534,6 +1556,17 @@ type WritableSurfaceTarget =
     kind: "text";
     file: TFile;
     range: TextRange;
+  }
+  | {
+    kind: "taskCollection";
+    file: TFile;
+  }
+  | {
+    kind: "taskItem";
+    file: TFile;
+    shardFile: TFile;
+    line: EditableTaskLine;
+    field?: TaskWritableField;
   };
 
 type TextRange = {
@@ -1561,7 +1594,11 @@ async function updateSurface(
   const target = await resolveWritableSurfaceTarget(ctx, file, spec, key, key);
   const result = target.kind === "frontmatter"
     ? await updateFrontmatterSurface(ctx, target, operation, options)
-    : await updateTextSurface(ctx, target, operation, options);
+    : target.kind === "text"
+      ? await updateTextSurface(ctx, target, operation, options)
+      : target.kind === "taskCollection"
+        ? await updateTaskCollectionSurface(ctx, target, operation, options)
+        : await updateTaskItemSurface(ctx, target, operation, options);
   const resultFile = result.file ?? target.file;
 
   return {
@@ -1627,7 +1664,13 @@ async function resolveWritableSurfaceTarget(
   }
 
   const section = spec.sections?.find((item) => item.key === parts[0]);
-  if (!section || parts.length !== 1) throw new Error(`unknown update key: ${originalKey}`);
+  if (!section) throw new Error(`unknown update key: ${originalKey}`);
+
+  if (section.collection) {
+    return resolveWritableCollectionTarget(ctx, file, section, parts, originalKey);
+  }
+
+  if (parts.length !== 1) throw new Error(`unknown update key: ${originalKey}`);
 
   const content = await ctx.app.vault.read(file);
   return {
@@ -1635,6 +1678,44 @@ async function resolveWritableSurfaceTarget(
     file,
     range: writableSectionRange(content, section, originalKey)
   };
+}
+
+async function resolveWritableCollectionTarget(
+  ctx: WorkflowContext,
+  file: TFile,
+  section: ReadSectionSpec,
+  parts: string[],
+  originalKey: string
+): Promise<WritableSurfaceTarget> {
+  if (section.collection === "reference") {
+    throw new Error("references collection is read-only through update; use para-zk:add-reference");
+  }
+  if (section.collection !== "task") throw new Error(`unknown update key: ${originalKey}`);
+
+  if (parts.length === 1) {
+    return {
+      kind: "taskCollection",
+      file
+    };
+  }
+  if (parts.length === 2 || parts.length === 3) {
+    const shardFile = await readTaskShardFile(ctx, file);
+    if (!shardFile) throw new Error(`task not found: ${parts[1]}`);
+    const content = await ctx.app.vault.read(shardFile);
+    const range = taskShardTaskRange(content);
+    const line = range ? findEditableTaskLine(shardFile.path, content, range, parts[1]) : undefined;
+    if (!line) throw new Error(`task not found: ${parts[1]}`);
+    const field = parts.length === 3 ? readTaskWritableField(parts[2], originalKey) : undefined;
+    return {
+      kind: "taskItem",
+      file,
+      shardFile,
+      line,
+      field
+    };
+  }
+
+  throw new Error(`unknown update key: ${originalKey}`);
 }
 
 async function updateFrontmatterSurface(
@@ -1662,7 +1743,9 @@ async function updateFrontmatterSurface(
   }
   if (!movePlan) return { changed: frontmatterChanged };
 
+  const taskShard = await readTaskShardFile(ctx, target.file);
   const moved = await moveNoteBetweenRoots(ctx, target.file, movePlan.fromRoot, movePlan.toRoot);
+  await refreshTaskShardRoot(ctx, moved.file, taskShard);
   return {
     changed: true,
     file: moved.file,
@@ -1678,6 +1761,7 @@ async function updateTextSurface(
   operation: UpdateOperation,
   options: UpdatePayloadOptions
 ): Promise<TextUpdateResult> {
+  if (operation === "delete") throw new Error("op=delete only supports task item keys");
   const before = await ctx.app.vault.read(target.file);
   const current = before.slice(target.range.start, target.range.end);
   const update = applyTextOperation(current, operation, options);
@@ -1689,6 +1773,58 @@ async function updateTextSurface(
     changed: before !== after,
     matches: update.matches
   };
+}
+
+async function updateTaskCollectionSurface(
+  ctx: WorkflowContext,
+  target: Extract<WritableSurfaceTarget, { kind: "taskCollection" }>,
+  operation: UpdateOperation,
+  options: UpdatePayloadOptions
+): Promise<TextUpdateResult> {
+  if (operation !== "insert") throw new Error("task collection root only supports op=insert");
+
+  if (options.valueSource === "value") throw new Error("task insert requires value_json object");
+  const write = normalizeTaskWriteValue(requireUpdateValue(options));
+  const taskId = newTaskId();
+  const line = serializeNewTaskLine(write.task, taskId);
+  const shardFile = await ensureTaskShard(ctx, target.file);
+  const base = await ctx.app.vault.read(shardFile);
+  const normalized = ensureTaskShardTaskSection(base);
+  const current = normalized.content.slice(normalized.range.start, normalized.range.end);
+  const next = insertTaskLine(current, line, write.position);
+  if (current === next && base === normalized.content) return { changed: false };
+
+  const after = spliceTextRange(normalized.content, normalized.range, next);
+  if (base !== after) await ctx.app.vault.modify(shardFile, after);
+  return { changed: base !== after };
+}
+
+async function updateTaskItemSurface(
+  ctx: WorkflowContext,
+  target: Extract<WritableSurfaceTarget, { kind: "taskItem" }>,
+  operation: UpdateOperation,
+  options: UpdatePayloadOptions
+): Promise<TextUpdateResult> {
+  if (!target.field) {
+    if (operation !== "delete") throw new Error("task item keys only support op=delete; use tasks/<id>/<field> for op=set");
+    const before = await ctx.app.vault.read(target.shardFile);
+    const after = removeTextRanges(before, [target.line.range]);
+    if (before !== after) await ctx.app.vault.modify(target.shardFile, after);
+    return { changed: before !== after };
+  }
+
+  if (operation !== "set") throw new Error("task fields only support op=set");
+  if (options.valueSource === "value_json") throw new Error("task field updates require value");
+  const value = normalizeTaskFieldUpdateValue(target.field, requireUpdateValue(options));
+  const nextTask = applyTaskFieldUpdate(target.line.task, target.field, value);
+  const nextLine = serializeEditableTaskLine(target.line, nextTask);
+  const before = await ctx.app.vault.read(target.shardFile);
+  const currentLine = before.slice(target.line.range.start, target.line.range.endWithoutBreak);
+  if (currentLine === nextLine) return { changed: false };
+
+  const after = spliceTextRange(before, target.line.range, nextLine);
+  if (before !== after) await ctx.app.vault.modify(target.shardFile, after);
+  return { changed: before !== after };
 }
 
 function applyTextOperation(
@@ -1704,6 +1840,8 @@ function applyTextOperation(
         value
       };
     }
+    case "insert":
+      throw new Error("op=insert only supports task collection keys");
     case "append": {
       const value = requireUpdateText(options, { allowEmpty: false });
       const next = current.trim() ? `${current}${current.endsWith("\n") ? "" : "\n"}${value}` : value;
@@ -1737,6 +1875,8 @@ function applyTextOperation(
         value
       };
     }
+    case "delete":
+      throw new Error("op=delete only supports task item keys");
   }
 }
 
@@ -1876,10 +2016,10 @@ function requireUpdateKey(value: string | undefined): string {
 
 function parseUpdateOperation(value: string | undefined): UpdateOperation {
   const normalized = value?.trim().toLowerCase();
-  if (normalized === "set" || normalized === "append" || normalized === "prepend" || normalized === "replace") {
+  if (normalized === "set" || normalized === "insert" || normalized === "append" || normalized === "prepend" || normalized === "replace" || normalized === "delete") {
     return normalized;
   }
-  throw new Error("op must be one of: set|append|prepend|replace");
+  throw new Error("op must be one of: set|insert|append|prepend|replace|delete");
 }
 
 function requireUpdateValue(options: UpdatePayloadOptions): unknown {
@@ -1888,6 +2028,7 @@ function requireUpdateValue(options: UpdatePayloadOptions): unknown {
 }
 
 function requireUpdateText(options: UpdatePayloadOptions, config: { allowEmpty: boolean }): string {
+  if (options.valueSource === "value_json") throw new Error("section/body text updates require value");
   const value = requireUpdateValue(options);
   if (typeof value !== "string") throw new Error("section/body value must be a string");
   if (!config.allowEmpty && !value) throw new Error("value must not be empty");
@@ -2265,18 +2406,214 @@ const TASK_PRIORITY_FIELDS: Array<{ value: string; re: RegExp }> = [
   { value: "lowest", re: /\u{23EC}/gu }
 ];
 
-function readTasks(_content: string, context: SectionTransformContext): Record<string, TaskRead> {
+async function ensureTaskShard(ctx: WorkflowContext, rootFile: TFile): Promise<TFile> {
+  const rootId = await ensureRootId(ctx, rootFile);
+  const path = taskShardPath(ctx, rootId);
+  const rootLink = linkToFile(rootFile);
+  const rootType = readType(fileFrontmatter(ctx, rootFile));
+  await ensureFolder(ctx.app, parentFolder(path));
+
+  let shardFile = ctx.app.vault.getFileByPath(path);
+  if (!shardFile) {
+    shardFile = await ctx.app.vault.create(path, [
+      frontmatterText([
+        `type: ${TASK_SHARD_TYPE}`,
+        `root_id: ${rootId}`,
+        `root_path: ${yamlScalar(rootFile.path)}`,
+        `root: ${yamlScalar(rootLink)}`,
+        `root_type: ${rootType}`,
+        `created: ${localDateTimeSpace()}`,
+        "updated:"
+      ]),
+      "# Tasks",
+      ""
+    ].join("\n"));
+  }
+
+  await ctx.app.fileManager.processFrontMatter(shardFile, (fm) => {
+    fm.type = TASK_SHARD_TYPE;
+    fm.root_id = rootId;
+    fm.root_path = rootFile.path;
+    fm.root = rootLink;
+    fm.root_type = rootType;
+    fm.created = fm.created || localDateTimeSpace();
+    if (fm.updated === undefined) fm.updated = "";
+  });
+  return shardFile;
+}
+
+async function ensureRootId(ctx: WorkflowContext, file: TFile): Promise<string> {
+  const existing = rootIdFromFrontmatter(fileFrontmatter(ctx, file));
+  if (existing) return existing;
+
+  const id = newRootId();
+  let resolved = id;
+  await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+    const current = rootIdFromFrontmatter(fm);
+    if (current) {
+      resolved = current;
+    } else {
+      fm[ROOT_ID_FRONTMATTER_KEY] = id;
+      resolved = id;
+    }
+  });
+  return resolved;
+}
+
+function taskShardFile(ctx: WorkflowContext, rootFile: TFile): TFile | undefined {
+  const rootId = rootIdFromFrontmatter(fileFrontmatter(ctx, rootFile));
+  if (!rootId) return findTaskShardByRootPathFromCache(ctx, rootFile.path);
+  return ctx.app.vault.getFileByPath(taskShardPath(ctx, rootId)) ?? findTaskShardByRootPathFromCache(ctx, rootFile.path);
+}
+
+async function readTaskShardFile(ctx: WorkflowContext, rootFile: TFile): Promise<TFile | undefined> {
+  return taskShardFile(ctx, rootFile) ?? await findTaskShardByRootPathFromDisk(ctx, rootFile.path);
+}
+
+async function refreshTaskShardRoot(ctx: WorkflowContext, rootFile: TFile, shardHint?: TFile): Promise<void> {
+  const shardFile = await readTaskShardFile(ctx, rootFile) ?? shardHint;
+  if (!shardFile) return;
+  const rootId = await ensureRootId(ctx, rootFile);
+  const rootType = readType(fileFrontmatter(ctx, rootFile));
+  await ctx.app.fileManager.processFrontMatter(shardFile, (fm) => {
+    fm.type = TASK_SHARD_TYPE;
+    fm.root_id = rootId;
+    fm.root_path = rootFile.path;
+    fm.root = linkToFile(rootFile);
+    fm.root_type = rootType;
+  });
+}
+
+function taskShardPath(ctx: WorkflowContext, rootId: string): string {
+  return joinVaultPath(taskRootsFolder(ctx), `${sanitizeFileName(rootId)}.md`);
+}
+
+function taskRootsFolder(ctx: WorkflowContext): string {
+  return joinVaultPath(ctx.settings.paths.tasksFolder, "roots");
+}
+
+function rootIdFromFrontmatter(frontmatter: Frontmatter): string | undefined {
+  const value = frontmatter[ROOT_ID_FRONTMATTER_KEY];
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function taskShardRootPath(frontmatter: Frontmatter): string | undefined {
+  const value = frontmatter.root_path;
+  return typeof value === "string" && value.trim() ? normalizeVaultPath(value) : undefined;
+}
+
+function findTaskShardByRootPathFromCache(ctx: WorkflowContext, rootPath: string): TFile | undefined {
+  const normalized = normalizeVaultPath(rootPath);
+  return ctx.app.vault.getMarkdownFiles().find((file) => {
+    return isInFolder(file, taskRootsFolder(ctx))
+      && taskShardRootPath(fileFrontmatter(ctx, file)) === normalized;
+  });
+}
+
+async function findTaskShardByRootPathFromDisk(ctx: WorkflowContext, rootPath: string): Promise<TFile | undefined> {
+  const normalized = normalizeVaultPath(rootPath);
+  for (const file of ctx.app.vault.getMarkdownFiles()) {
+    if (!isInFolder(file, taskRootsFolder(ctx))) continue;
+    const content = await ctx.app.vault.cachedRead(file);
+    if (readRootPathFromTaskShardContent(content) === normalized) return file;
+  }
+  return undefined;
+}
+
+function readRootPathFromTaskShardContent(content: string): string | undefined {
+  const bodyStart = content.indexOf("\n---");
+  const header = bodyStart === -1 ? content : content.slice(0, bodyStart);
+  const match = header.match(/^root_path:\s*(?:"([^"]+)"|'([^']+)'|([^\r\n]+))\s*$/m);
+  const value = match?.[1] ?? match?.[2] ?? match?.[3];
+  return value ? normalizeVaultPath(value.trim()) : undefined;
+}
+
+function taskShardTaskRange(content: string): TextRange | undefined {
+  const range = findSectionContentRange(content, {
+    key: "tasks",
+    labels: ["Tasks"]
+  });
+  return range ? trimTextRange(content, range.start, range.end) : undefined;
+}
+
+function ensureTaskShardTaskSection(content: string): { content: string; range: TextRange } {
+  const existing = taskShardTaskRange(content);
+  if (existing) return { content, range: existing };
+
+  const next = `${content.replace(/\s*$/, "")}\n\n# Tasks\n`;
+  return {
+    content: next,
+    range: {
+      start: next.length,
+      end: next.length
+    }
+  };
+}
+
+function insertTaskLine(content: string, line: string, position: number | "end"): string {
+  const current = isMarkdownScaffold(content) ? "" : content;
+  if (!current.trim()) return line;
+  if (position === "end") return `${current}${current.endsWith("\n") ? "" : "\n"}${line}`;
+
+  const taskLines = editableTaskLineSpans(current);
+  if (position > taskLines.length) return `${current}${current.endsWith("\n") ? "" : "\n"}${line}`;
+  const target = taskLines[position - 1];
+  return spliceTextRange(current, { start: target.start, end: target.start }, `${line}\n`);
+}
+
+function editableTaskLineSpans(content: string): Array<TextRange & { endWithoutBreak: number }> {
+  const spans: Array<TextRange & { endWithoutBreak: number }> = [];
+  let cursor = 0;
+  while (cursor < content.length) {
+    const span = lineTextRangeAt(content, cursor, content.length);
+    if (!span) break;
+    const text = content.slice(span.start, span.endWithoutBreak);
+    if (/^\s*(?:[-*+]|\d+[.)])\s+\[[^\]\r\n]?\]\s*/.test(text)) spans.push(span);
+    cursor = span.end;
+  }
+  return spans;
+}
+
+function newRootId(): string {
+  return newId("pzr");
+}
+
+function newTaskId(): string {
+  return newId("pzt");
+}
+
+function newId(prefix: string): string {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function frontmatterText(lines: string[]): string {
+  return [
+    "---",
+    ...lines,
+    "---"
+  ].join("\n");
+}
+
+async function readTasks(_content: string, context: SectionTransformContext): Promise<Record<string, TaskRead>> {
+  return readRootTaskMap(context.ctx, context.file);
+}
+
+export async function readRootTaskMap(ctx: WorkflowContext, rootFile: TFile): Promise<Record<string, TaskRead>> {
   const items: Record<string, TaskRead> = {};
+  const shardFile = await readTaskShardFile(ctx, rootFile);
+  if (!shardFile) return items;
 
-  if (!context.range) return items;
+  const content = await ctx.app.vault.read(shardFile);
+  const range = taskShardTaskRange(content);
+  if (!range) return items;
 
-  let cursor = context.range.start;
-  let line = lineNumberAt(context.content, context.range.start);
-  while (cursor < context.range.end) {
-    const span = readLineSpan(context.content, cursor, context.range.end);
+  let cursor = range.start;
+  let line = lineNumberAt(content, range.start);
+  while (cursor < range.end) {
+    const span = readLineSpan(content, cursor, range.end);
     if (!span) break;
 
-    const task = readTaskLine(context.file.path, line, span.text);
+    const task = readTaskLine(shardFile.path, line, span.text);
     if (task) {
       const id = uniqueReadId(task.id, items);
       items[id] = task.task;
@@ -2289,17 +2626,126 @@ function readTasks(_content: string, context: SectionTransformContext): Record<s
   return items;
 }
 
+export async function readAllTaskItems(ctx: WorkflowContext): Promise<Array<{
+  rootPath: string;
+  rootTitle: string;
+  rootType: string;
+  id: string;
+  task: TaskRead;
+}>> {
+  const results: Array<{
+    rootPath: string;
+    rootTitle: string;
+    rootType: string;
+    id: string;
+    task: TaskRead;
+  }> = [];
+  for (const file of ctx.app.vault.getMarkdownFiles()) {
+    if (!isInFolder(file, taskRootsFolder(ctx))) continue;
+    const frontmatter = fileFrontmatter(ctx, file);
+    let content: string | undefined;
+    let rootPath = taskShardRootPath(frontmatter);
+    if (!rootPath) {
+      content = await ctx.app.vault.cachedRead(file);
+      rootPath = readRootPathFromTaskShardContent(content);
+    }
+    if (!rootPath) continue;
+    const rootFile = ctx.app.vault.getFileByPath(rootPath);
+    if (!rootFile) continue;
+    content = content ?? await ctx.app.vault.read(file);
+    const range = taskShardTaskRange(content);
+    if (!range) continue;
+    let cursor = range.start;
+    let line = lineNumberAt(content, range.start);
+    const seen: Record<string, true> = {};
+    while (cursor < range.end) {
+      const span = readLineSpan(content, cursor, range.end);
+      if (!span) break;
+      const task = readTaskLine(file.path, line, span.text);
+      if (task) {
+        const id = uniqueReadId(task.id, seen);
+        seen[id] = true;
+        results.push({
+          rootPath: rootFile.path,
+          rootTitle: rootFile.basename,
+          rootType: readType(fileFrontmatter(ctx, rootFile)),
+          id,
+          task: task.task
+        });
+      }
+      cursor = span.next;
+      line += 1;
+    }
+  }
+  return results;
+}
+
+export async function insertRootTask(ctx: WorkflowContext, rootFile: TFile, value: unknown): Promise<string> {
+  const write = normalizeTaskWriteValue(value);
+  const taskId = newTaskId();
+  const line = serializeNewTaskLine(write.task, taskId);
+  const shardFile = await ensureTaskShard(ctx, rootFile);
+  const base = await ctx.app.vault.read(shardFile);
+  const normalized = ensureTaskShardTaskSection(base);
+  const current = normalized.content.slice(normalized.range.start, normalized.range.end);
+  const next = insertTaskLine(current, line, write.position);
+  if (current !== next || base !== normalized.content) {
+    await ctx.app.vault.modify(shardFile, spliceTextRange(normalized.content, normalized.range, next));
+  }
+  return taskId;
+}
+
+export async function setRootTaskField(
+  ctx: WorkflowContext,
+  rootFile: TFile,
+  taskId: string,
+  field: TaskWritableField,
+  value: unknown
+): Promise<boolean> {
+  const shardFile = await readTaskShardFile(ctx, rootFile);
+  if (!shardFile) throw new Error(`task not found: ${taskId}`);
+  const before = await ctx.app.vault.read(shardFile);
+  const range = taskShardTaskRange(before);
+  const line = range ? findEditableTaskLine(shardFile.path, before, range, taskId) : undefined;
+  if (!line) throw new Error(`task not found: ${taskId}`);
+  const nextValue = normalizeTaskFieldUpdateValue(field, value);
+  const nextTask = applyTaskFieldUpdate(line.task, field, nextValue);
+  const nextLine = serializeEditableTaskLine(line, nextTask);
+  const currentLine = before.slice(line.range.start, line.range.endWithoutBreak);
+  if (currentLine === nextLine) return false;
+  await ctx.app.vault.modify(shardFile, spliceTextRange(before, line.range, nextLine));
+  return true;
+}
+
+export async function deleteRootTask(ctx: WorkflowContext, rootFile: TFile, taskId: string): Promise<boolean> {
+  const shardFile = await readTaskShardFile(ctx, rootFile);
+  if (!shardFile) throw new Error(`task not found: ${taskId}`);
+  const before = await ctx.app.vault.read(shardFile);
+  const range = taskShardTaskRange(before);
+  const line = range ? findEditableTaskLine(shardFile.path, before, range, taskId) : undefined;
+  if (!line) throw new Error(`task not found: ${taskId}`);
+  const after = removeTextRanges(before, [line.range]);
+  if (before === after) return false;
+  await ctx.app.vault.modify(shardFile, after);
+  return true;
+}
+
+export function cycleTaskCheckbox(checkbox: string): string {
+  const cycle = [" ", "/", "x", "-"];
+  const index = cycle.indexOf(checkbox);
+  return cycle[index === -1 || index === cycle.length - 1 ? 0 : index + 1];
+}
+
 function readTaskLine(path: string, line: number, text: string): TaskLineRead | undefined {
   const match = text.match(/^\s*(?:[-*+]|\d+[.)])\s+\[([^\]\r\n]?)\]\s*(.*)$/);
   if (!match) return undefined;
 
   const checkbox = match[1] ?? " ";
   const parsed = parseTaskBody(match[2] ?? "");
-  if (!parsed.name) return undefined;
+  if (!parsed.name || !parsed.taskId) return undefined;
 
-  const id = parsed.blockId ?? syntheticTaskReadId(path, line, text);
   return {
-    id,
+    id: parsed.taskId,
     task: {
       checkbox,
       name: parsed.name,
@@ -2308,21 +2754,223 @@ function readTaskLine(path: string, line: number, text: string): TaskLineRead | 
   };
 }
 
-function parseTaskBody(value: string): { name: string; blockId?: string; metadata: TaskMetadata } {
+function findEditableTaskLine(path: string, content: string, range: TextRange, taskId: string): EditableTaskLine | undefined {
+  const seen: Record<string, true> = {};
+  let cursor = range.start;
+  let line = lineNumberAt(content, range.start);
+  while (cursor < range.end) {
+    const span = lineTextRangeAt(content, cursor, range.end);
+    if (!span) break;
+
+    const text = content.slice(span.start, span.endWithoutBreak);
+    const task = readEditableTaskLine(path, line, text, span);
+    if (task) {
+      const id = uniqueReadId(task.id, seen);
+      seen[id] = true;
+      if (id === taskId) return {
+        ...task,
+        id
+      };
+    }
+
+    cursor = span.end;
+    line += 1;
+  }
+  return undefined;
+}
+
+function readEditableTaskLine(
+  path: string,
+  line: number,
+  text: string,
+  range: TextRange & { endWithoutBreak: number }
+): EditableTaskLine | undefined {
+  const match = text.match(/^(\s*(?:[-*+]|\d+[.)])\s+\[)([^\]\r\n]?)(\]\s*)(.*)$/);
+  if (!match) return undefined;
+
+  const parsed = parseTaskBody(match[4] ?? "");
+  if (!parsed.name) return undefined;
+
+  return {
+    id: parsed.taskId ?? syntheticTaskReadId(path, line),
+    range,
+    prefix: match[1] ?? "- [",
+    checkboxSuffix: match[3] ?? "] ",
+    task: {
+      checkbox: match[2] ?? " ",
+      name: parsed.name,
+      ...parsed.metadata
+    },
+    taskId: parsed.taskId,
+    blockId: parsed.blockId
+  };
+}
+
+const TASK_WRITABLE_FIELDS: TaskWritableField[] = [
+  "checkbox",
+  "name",
+  "priority",
+  "due",
+  "scheduled",
+  "start",
+  "created",
+  "done",
+  "cancelled"
+];
+
+const TASK_METADATA_WRITE_FIELDS: Array<keyof TaskMetadata> = [
+  "priority",
+  "due",
+  "scheduled",
+  "start",
+  "created",
+  "done",
+  "cancelled"
+];
+
+const TASK_PRIORITIES = new Set(["highest", "high", "medium", "low", "lowest"]);
+
+function readTaskWritableField(value: string, originalKey: string): TaskWritableField {
+  if (TASK_WRITABLE_FIELDS.includes(value as TaskWritableField)) return value as TaskWritableField;
+  throw new Error(`unknown task field for update key: ${originalKey}`);
+}
+
+function normalizeTaskWriteValue(value: unknown): TaskWrite {
+  if (!isRecord(value)) throw new Error("task insert requires value_json object");
+  assertKnownTaskWriteKeys(value);
+
+  const name = normalizeTaskNameValue(value.name);
+  const task: TaskRead = {
+    checkbox: Object.prototype.hasOwnProperty.call(value, "checkbox") ? normalizeTaskCheckboxValue(value.checkbox) : " ",
+    name
+  };
+
+  for (const field of TASK_METADATA_WRITE_FIELDS) {
+    if (!Object.prototype.hasOwnProperty.call(value, field)) continue;
+    const normalized = normalizeTaskMetadataWriteValue(field, value[field]);
+    if (normalized !== undefined) task[field] = normalized;
+  }
+  return {
+    task,
+    position: normalizeTaskInsertPosition(value.position)
+  };
+}
+
+function assertKnownTaskWriteKeys(value: Record<string, unknown>): void {
+  for (const key of Object.keys(value)) {
+    if (key !== "position" && !TASK_WRITABLE_FIELDS.includes(key as TaskWritableField)) {
+      throw new Error(`unknown task field: ${key}`);
+    }
+  }
+}
+
+function normalizeTaskInsertPosition(value: unknown): number | "end" {
+  if (value === undefined || value === null || value === "" || value === "end") return "end";
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
+    throw new Error("task position must be a positive integer or end");
+  }
+  return value;
+}
+
+function normalizeTaskFieldUpdateValue(field: TaskWritableField, value: unknown): string | undefined {
+  if (field === "checkbox") return normalizeTaskCheckboxValue(value);
+  if (field === "name") return normalizeTaskNameValue(value);
+  return normalizeTaskMetadataWriteValue(field, value);
+}
+
+function normalizeTaskCheckboxValue(value: unknown): string {
+  if (typeof value !== "string") throw new Error("task checkbox must be a string");
+  const checkbox = normalizeCheckboxFilter(value);
+  if (checkbox === undefined) throw new Error("task checkbox is required");
+  if (checkbox.length > 1 || checkbox === "]" || checkbox.includes("\n") || checkbox.includes("\r")) {
+    throw new Error("task checkbox must be a single status character");
+  }
+  return checkbox;
+}
+
+function normalizeTaskNameValue(value: unknown): string {
+  if (typeof value !== "string") throw new Error("task name must be a string");
+  const name = value.trim();
+  if (!name) throw new Error("task name is required");
+  if (/[\r\n]/.test(name)) throw new Error("task name must be a single line");
+  return name;
+}
+
+function normalizeTaskMetadataWriteValue(field: keyof TaskMetadata, value: unknown): string | undefined {
+  if (typeof value !== "string") throw new Error(`task ${field} must be a string`);
+  const normalized = normalizeTaskMetadataValue(field, value.trim());
+  if (!normalized) return undefined;
+  if (field !== "priority" && !/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    throw new Error(`task ${field} must be YYYY-MM-DD`);
+  }
+  if (field === "priority" && !TASK_PRIORITIES.has(normalized)) {
+    throw new Error("task priority must be one of: highest|high|medium|low|lowest");
+  }
+  return normalized;
+}
+
+function applyTaskFieldUpdate(task: TaskRead, field: TaskWritableField, value: string | undefined): TaskRead {
+  const next: TaskRead = { ...task };
+  if (value === undefined) {
+    if (field === "checkbox" || field === "name") throw new Error(`task ${field} is required`);
+    delete next[field];
+  } else {
+    next[field] = value;
+  }
+  return next;
+}
+
+function serializeNewTaskLine(task: TaskRead, taskId: string): string {
+  return `- [${task.checkbox}] ${serializeTaskBody(task, { taskId })}`;
+}
+
+function serializeEditableTaskLine(line: EditableTaskLine, task: TaskRead): string {
+  return `${line.prefix}${task.checkbox}${line.checkboxSuffix}${serializeTaskBody(task, {
+    taskId: line.taskId,
+    blockId: line.blockId
+  })}`;
+}
+
+function serializeTaskBody(task: TaskRead, options: { taskId?: string; blockId?: string } = {}): string {
+  const name = normalizeTaskNameValue(task.name);
+  const parts = [name];
+  if (options.taskId) parts.push(`[id:: ${options.taskId}]`);
+  for (const field of TASK_METADATA_WRITE_FIELDS) {
+    const value = task[field];
+    if (typeof value === "string" && value.trim()) {
+      parts.push(`[${field}:: ${normalizeTaskMetadataWriteValue(field, value)}]`);
+    }
+  }
+  if (options.blockId) parts.push(`^${options.blockId}`);
+  return parts.join(" ");
+}
+
+function parseTaskBody(value: string): { name: string; taskId?: string; blockId?: string; metadata: TaskMetadata } {
   let body = value.trim();
   const blockId = readTrailingBlockId(body);
   if (blockId) body = body.replace(/\s+\^[A-Za-z0-9_-]+\s*$/, "").trim();
 
   const metadata: TaskMetadata = {};
+  const taskId = readTaskId(body);
+  body = stripTaskIdField(body);
   body = stripDataviewTaskFields(body, metadata);
   body = stripEmojiTaskDates(body, metadata);
   body = stripEmojiTaskPriority(body, metadata);
 
   return {
     name: body.replace(/\s{2,}/g, " ").trim(),
+    taskId,
     blockId,
     metadata
   };
+}
+
+function readTaskId(value: string): string | undefined {
+  return value.match(/\[id::\s*([^\]\s]+)\s*\]/i)?.[1];
+}
+
+function stripTaskIdField(value: string): string {
+  return value.replace(/\[id::\s*[^\]]+\]/gi, " ");
 }
 
 function readTrailingBlockId(value: string): string | undefined {
@@ -2392,8 +3040,8 @@ function uniqueReadId(id: string, items: Record<string, unknown>): string {
   return `${id}-${index}`;
 }
 
-function syntheticTaskReadId(path: string, line: number, text: string): string {
-  return `task-${hashReadId(`${path}:${line}:${text.trim()}`)}`;
+function syntheticTaskReadId(path: string, line: number): string {
+  return `task-${hashReadId(`${path}:${line}`)}`;
 }
 
 function hashReadId(value: string): string {
@@ -2552,6 +3200,7 @@ async function renameFolderStyleNote(
     };
   }
 
+  const taskShard = await readTaskShardFile(ctx, file);
   const folder = folderStyleContainer(file);
   let renamed: TFile;
   let toPath: string;
@@ -2577,6 +3226,7 @@ async function renameFolderStyleNote(
   if (tagDomain === "area" && folder) {
     await updateAreaDescendantTagPrefixes(ctx, toPath, tagUpdate.namespaceMoves);
   }
+  await refreshTaskShardRoot(ctx, renamed, taskShard);
   return {
     path: toPath,
     title: newTitle,
@@ -2623,11 +3273,13 @@ async function renameFlatNote(
     };
   }
 
+  const taskShard = await readTaskShardFile(ctx, file);
   const toPath = joinVaultPath(parentFolder(file.path), `${newTitle}.md`);
   assertVacantPath(ctx, toPath);
   await ctx.app.fileManager.renameFile(file, toPath);
   const renamed = ctx.app.vault.getFileByPath(toPath) ?? file;
   await updateTitleDerivedTag(ctx, renamed, tagDomain, fromTitle, newTitle);
+  await refreshTaskShardRoot(ctx, renamed, taskShard);
   return {
     path: toPath,
     title: newTitle,
@@ -2768,11 +3420,16 @@ async function deleteDomainNote(
   const type = readType(fileFrontmatter(ctx, file));
   const container = deleteContainer(ctx, file);
   const containerPath = container.path;
-  const deletedPaths = collectAbstractPaths(container);
-  const deletedPathSet = new Set(deletedPaths);
   const deletedFiles = deletedMarkdownFiles(ctx, container);
+  const containerPaths = collectAbstractPaths(container);
+  const taskShards = await taskShardsForDeletedFiles(ctx, deletedFiles);
+  const deletedPaths = uniqueStrings([
+    ...containerPaths,
+    ...taskShards.map((shard) => shard.path)
+  ]);
+  const deletedPathSet = new Set(deletedPaths);
   const deletedFilePaths = new Set(deletedFiles.map((item) => item.path));
-  const extraPaths = deletedPaths.filter((path) => path !== containerPath && path !== file.path);
+  const extraPaths = containerPaths.filter((path) => path !== containerPath && path !== file.path);
   if (extraPaths.length > 0 && !options.force) {
     throw new Error(`delete target contains child files; pass force=true to delete: ${extraPaths.join(", ")}`);
   }
@@ -2780,6 +3437,9 @@ async function deleteDomainNote(
   const incomingLinks = incomingLinksForPaths(ctx, deletedFilePaths, deletedPathSet);
   const cleaned = await cleanupStructuredReferences(ctx, deletedFiles, deletedPathSet);
   const trashMethod = await trashAbstractFile(ctx, container);
+  for (const shard of taskShards) {
+    if (ctx.app.vault.getAbstractFileByPath(shard.path)) await trashAbstractFile(ctx, shard);
+  }
 
   return {
     path: file.path,
@@ -2814,6 +3474,15 @@ function collectAbstractPaths(file: TAbstractFile): string[] {
 function deletedMarkdownFiles(ctx: WorkflowContext, container: TAbstractFile): TFile[] {
   if (container instanceof TFile) return [container];
   return ctx.app.vault.getMarkdownFiles().filter((file) => isInFolder(file, container.path));
+}
+
+async function taskShardsForDeletedFiles(ctx: WorkflowContext, files: TFile[]): Promise<TFile[]> {
+  const shards: TFile[] = [];
+  for (const file of files) {
+    const shard = await readTaskShardFile(ctx, file);
+    if (shard) shards.push(shard);
+  }
+  return uniqueFiles(shards);
 }
 
 async function trashAbstractFile(ctx: WorkflowContext, file: TAbstractFile): Promise<string> {
@@ -2990,7 +3659,10 @@ function lineTextRangeAt(
   if (start >= maxEnd) return undefined;
   const newline = content.indexOf("\n", start);
   const end = newline === -1 || newline + 1 > maxEnd ? maxEnd : newline + 1;
-  const endWithoutBreak = newline === -1 || newline >= maxEnd ? maxEnd : newline;
+  const rawEndWithoutBreak = newline === -1 || newline >= maxEnd ? maxEnd : newline;
+  const endWithoutBreak = rawEndWithoutBreak > start && content.charAt(rawEndWithoutBreak - 1) === "\r"
+    ? rawEndWithoutBreak - 1
+    : rawEndWithoutBreak;
   return {
     start,
     end,
@@ -3407,9 +4079,11 @@ function noteResult(file: TFile, created: boolean, open?: boolean): NoteResult {
 function applyCreatedUpdatedDefaults(frontmatter: {
   created?: unknown;
   updated?: unknown;
+  [ROOT_ID_FRONTMATTER_KEY]?: unknown;
 }, createdAt: string): void {
   frontmatter.created = frontmatter.created || createdAt;
   if (frontmatter.updated === undefined) frontmatter.updated = "";
+  if (!rootIdFromFrontmatter(frontmatter)) frontmatter[ROOT_ID_FRONTMATTER_KEY] = newRootId();
 }
 
 async function ensureJournal(ctx: WorkflowContext, options: OpenJournalOptions): Promise<{
@@ -3545,6 +4219,17 @@ function inlineList(values: string[] | undefined): string {
 
 function uniqueStrings(values: string[]): string[] {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+function uniqueFiles(files: TFile[]): TFile[] {
+  const seen = new Set<string>();
+  const result: TFile[] = [];
+  for (const file of files) {
+    if (seen.has(file.path)) continue;
+    seen.add(file.path);
+    result.push(file);
+  }
+  return result;
 }
 
 function escapeRegExp(value: string): string {
