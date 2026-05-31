@@ -944,7 +944,7 @@ async function readTemplate(ctx: WorkflowContext, templateName: TemplateName): P
   const templatePath = joinVaultPath(ctx.settings.paths.managedTemplatesFolder, `template_${templateName}.md`);
   const templateFile = ctx.app.vault.getFileByPath(templatePath);
   if (templateFile) return ctx.app.vault.read(templateFile);
-  return renderTemplate(templateName, ctx.settings.locale);
+  return renderTemplate(templateName, ctx.settings);
 }
 
 function applyTemplateVariables(content: string, variables: TemplateVariables): string {

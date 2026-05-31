@@ -49,7 +49,7 @@ function renderActionGroup(
 
   for (const action of group.actions) {
     if (action.kind === "command") {
-      const button = createWorkflowButton(plugin, action.label, action.target, sourcePath);
+      const button = createWorkflowButton(plugin, action.label, action.target);
       button.addClass("para-zk-dashboard-action", `para-zk-dashboard-action-${group.tone}`);
       controls.appendChild(button);
     } else {

@@ -25,42 +25,42 @@ export function managedArtifacts(settings: ParaZkSettings): ManagedArtifact[] {
   const t = localePack(settings.locale);
   const templates = TEMPLATE_NAMES.map((name) => ({
     path: `${settings.paths.managedTemplatesFolder}/template_${name}.md`,
-    content: renderTemplate(name, settings.locale)
+    content: renderTemplate(name, settings)
   }));
 
   return [
     ...templates,
     {
       path: "README.md",
-      content: renderGuide(settings.locale)
+      content: renderGuide(settings)
     },
     {
       path: `${settings.paths.dashboardFolder}/HomePage.md`,
-      content: renderDashboard("home", settings.locale)
+      content: renderDashboard("home", settings)
     },
     {
       path: `${settings.paths.dashboardFolder}/Projects.md`,
-      content: renderDashboard("projects", settings.locale)
+      content: renderDashboard("projects", settings)
     },
     {
       path: `${settings.paths.dashboardFolder}/Areas.md`,
-      content: renderDashboard("areas", settings.locale)
+      content: renderDashboard("areas", settings)
     },
     {
       path: `${settings.paths.dashboardFolder}/Resources.md`,
-      content: renderDashboard("resources", settings.locale)
+      content: renderDashboard("resources", settings)
     },
     {
       path: `${settings.paths.dashboardFolder}/ZK.md`,
-      content: renderDashboard("zk", settings.locale)
+      content: renderDashboard("zk", settings)
     },
     {
       path: `${settings.paths.dashboardFolder}/Tasks.md`,
-      content: renderDashboard("tasks", settings.locale)
+      content: renderDashboard("tasks", settings)
     },
     {
       path: `${settings.paths.dashboardFolder}/Review.md`,
-      content: renderDashboard("review", settings.locale)
+      content: renderDashboard("review", settings)
     },
     {
       path: `${settings.paths.managedTemplatesFolder}/README.md`,
@@ -78,8 +78,8 @@ export function managedArtifacts(settings: ParaZkSettings): ManagedArtifact[] {
   ];
 }
 
-export function renderTemplate(name: TemplateName, locale: Locale): string {
-  const t = localePack(locale);
+export function renderTemplate(name: TemplateName, settings: ParaZkSettings): string {
+  const t = localePack(settings.locale);
   const tags = t.tags;
   const nowPlaceholder = "{{created}}";
   const slugPlaceholder = "{{slug}}";
@@ -102,7 +102,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         ]),
         paraZkPropsBlock("project"),
         `# ${t.labels.summary}`,
-        ...latestRetroSummaryTip(t),
+        ...latestRetroSummaryTip(t, settings),
         "",
         "{{cursor}}",
         "",
@@ -125,7 +125,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         "---",
         `# ${t.labels.retros} ${paraZkInlineAction("create-retro", t.labels.createRetro)}`,
         "",
-        ...dataviewProjectRetros(),
+        ...dataviewProjectRetros(settings),
         "",
         "---",
         `## ${t.labels.references} ${referenceActions(t)}`,
@@ -148,7 +148,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         "",
         `# ${t.labels.dashboardProjects}`,
         "",
-        ...dataviewAreaProjects(t),
+        ...dataviewAreaProjects(t, settings),
         "",
         "---",
         `# ${t.labels.tasks}`,
@@ -158,7 +158,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         "---",
         `# ${t.labels.subareas} ${paraZkInlineAction("create-subarea", t.labels.createSubarea)}`,
         "",
-        ...dataviewChildAreas(t),
+        ...dataviewChildAreas(t, settings),
         "",
         "---",
         `# ${t.labels.subnotes} ${paraZkInlineAction("create-subnote", t.labels.createSubnote)}`,
@@ -168,7 +168,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         "---",
         `# ${t.labels.retros} ${paraZkInlineAction("create-retro", t.labels.createRetro)}`,
         "",
-        ...dataviewAreaRetros(t),
+        ...dataviewAreaRetros(t, settings),
         "",
         "---",
         `## ${t.labels.references} ${referenceActions(t)}`,
@@ -196,7 +196,7 @@ export function renderTemplate(name: TemplateName, locale: Locale): string {
         "---",
         `## ${t.labels.promoteToZk} ${paraZkInlineAction("promote-resource", t.labels.promoteToZk)}`,
         "",
-        ...dataviewResourceZkLinks(),
+        ...dataviewResourceZkLinks(settings),
         "",
         "---",
         `## ${t.labels.references} ${referenceActions(t)}`,
@@ -424,18 +424,31 @@ function referenceActions(t: ReturnType<typeof localePack>): string {
   ].join(" ");
 }
 
-function latestRetroSummaryTip(t: ReturnType<typeof localePack>): string[] {
+function latestRetroSummaryTip(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
   return [
     `> [!tip] ${latestRetroSummaryTitle(t.locale)}`,
-    "> ```dataview",
-    "> TABLE WITHOUT ID rows[0] AS \"Latest\"",
-    "> FROM \"PARA/Retros\"",
-    "> WHERE project = this.file.link",
-    "> SORT date DESC",
-    `> FLATTEN choice(rows[0].file.frontmatter[${jsString(t.labels.retroSummary)}], rows[0].file.frontmatter["summary"], "") AS latest`,
-    "> WHERE latest != \"\"",
-    "> LIMIT 1",
-    "> ```"
+    ...quotedDataviewJs([
+      "const current = dv.current();",
+      `const heading = ${jsString(t.labels.retroSummary)};`,
+      `const placeholder = ${jsString(`> ###### ${retroSummaryPlaceholder(t.locale)}`)};`,
+      "const placeholderText = placeholder.replace(/^>\\s*/, '');",
+      `const retros = pages(${dataviewJsSource(settings.paths.retrosFolder)})`,
+      "  .filter(p => sameLink(p.project, current))",
+      "  .sort((a,b) => timeOf(b.date ?? b.file.ctime) - timeOf(a.date ?? a.file.ctime));",
+      "const sectionBody = (text, title) => {",
+      "  const escaped = title.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');",
+      "  const pattern = new RegExp(`^#{1,6}\\\\s+${escaped}\\\\s*\\\\n([\\\\s\\\\S]*?)(?=\\\\n#{1,6}\\\\s+|$)`, 'm');",
+      "  const raw = text.match(pattern)?.[1]?.trim() ?? '';",
+      "  return raw.split('\\n').filter(line => {",
+      "    const trimmed = line.trim();",
+      "    return trimmed !== placeholder && trimmed !== placeholderText;",
+      "  }).join('\\n').trim();",
+      "};",
+      "for (const retro of retros) {",
+      "  const summary = sectionBody(await dv.io.load(retro.file.path), heading);",
+      "  if (summary) { dv.paragraph(summary); break; }",
+      "}"
+    ])
   ];
 }
 
@@ -471,28 +484,28 @@ function dataviewProjectChildDocs(): string[] {
   ]);
 }
 
-function dataviewProjectRetros(): string[] {
+function dataviewProjectRetros(settings: ParaZkSettings): string[] {
   return fenced("dataview", [
-    "LIST FROM \"PARA/Retros\"",
+    `LIST FROM ${dataviewSource(settings.paths.retrosFolder)}`,
     "WHERE project = this.file.link",
     "SORT date DESC",
     "LIMIT 10"
   ]);
 }
 
-function dataviewAreaProjects(t: ReturnType<typeof localePack>): string[] {
+function dataviewAreaProjects(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
   return fenced("dataview", [
     `TABLE status AS "${t.labels.status}", priority AS "${t.labels.priority}"`,
-    "FROM \"PARA/Projects\"",
+    `FROM ${dataviewSource(settings.paths.projectsFolder)}`,
     "WHERE contains(areas, this.file.link)",
     "SORT due_date ASC, priority DESC"
   ]);
 }
 
-function dataviewChildAreas(t: ReturnType<typeof localePack>): string[] {
+function dataviewChildAreas(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
   return fenced("dataview", [
     `TABLE WITHOUT ID file.link AS "${t.labels.area}", file.mtime AS "${t.labels.updated}"`,
-    "FROM \"PARA/Areas\"",
+    `FROM ${dataviewSource(settings.paths.areasFolder)}`,
     "WHERE parent = this.file.link AND type = \"area\"",
     "SORT file.name ASC"
   ]);
@@ -507,26 +520,26 @@ function dataviewChildDocs(t: ReturnType<typeof localePack>): string[] {
   ]);
 }
 
-function dataviewAreaRetros(t: ReturnType<typeof localePack>): string[] {
+function dataviewAreaRetros(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
   return fenced("dataview", [
     `TABLE WITHOUT ID file.link AS "${t.labels.retros}", file.mtime AS "${t.labels.updated}"`,
-    "FROM \"PARA/Retros\"",
+    `FROM ${dataviewSource(settings.paths.retrosFolder)}`,
     "WHERE contains(areas, this.file.link)",
     "SORT date DESC",
     "LIMIT 10"
   ]);
 }
 
-function dataviewResourceZkLinks(): string[] {
+function dataviewResourceZkLinks(settings: ParaZkSettings): string[] {
   return fenced("dataview", [
-    "LIST FROM \"ZK\"",
+    `LIST FROM ${dataviewSources(zkSourceFolders(settings))}`,
     "WHERE contains(file.outlinks, this.file.link)",
     "SORT file.mtime DESC"
   ]);
 }
 
-function renderGuide(locale: Locale): string {
-  const t = localePack(locale);
+function renderGuide(settings: ParaZkSettings): string {
+  const t = localePack(settings.locale);
   const tags = t.tags;
   const lines = [
     "# PARA-ZK Vault Guide",
@@ -534,18 +547,18 @@ function renderGuide(locale: Locale): string {
     t.labels.guideIntro,
     "",
     `## ${t.labels.folderLayout}`,
-    `- PARA/Projects: ${t.labels.folderProjects}`,
-    `- PARA/Areas: ${t.labels.folderAreas}`,
-    `- PARA/Resources: ${t.labels.folderResources}`,
-    `- PARA/Retros: ${t.labels.folderRetros}`,
-    `- PARA/Archives: ${t.labels.folderArchives}`,
-    `- ZK/Fleeting: ${t.labels.folderFleeting}`,
-    `- ZK/Literature: ${t.labels.folderLiterature}`,
-    `- ZK/Permanent: ${t.labels.folderPermanent}`,
-    `- Journal: ${t.labels.folderJournal}`,
-    `- Dashboard: ${t.labels.folderDashboard}`,
-    `- Tasks: ${t.labels.tasks}`,
-    `- Templates/para-zk: ${t.labels.folderManagedTemplates}`,
+    `- ${settings.paths.projectsFolder}: ${t.labels.folderProjects}`,
+    `- ${settings.paths.areasFolder}: ${t.labels.folderAreas}`,
+    `- ${settings.paths.resourcesFolder}: ${t.labels.folderResources}`,
+    `- ${settings.paths.retrosFolder}: ${t.labels.folderRetros}`,
+    `- ${settings.paths.archivesFolder}: ${t.labels.folderArchives}`,
+    `- ${settings.paths.fleetingFolder}: ${t.labels.folderFleeting}`,
+    `- ${settings.paths.literatureFolder}: ${t.labels.folderLiterature}`,
+    `- ${settings.paths.permanentFolder}: ${t.labels.folderPermanent}`,
+    `- ${settings.paths.journalFolder}: ${t.labels.folderJournal}`,
+    `- ${settings.paths.dashboardFolder}: ${t.labels.folderDashboard}`,
+    `- ${settings.paths.tasksFolder}: ${t.labels.tasks}`,
+    `- ${settings.paths.managedTemplatesFolder}: ${t.labels.folderManagedTemplates}`,
     "",
     `## ${t.labels.tagNamespaces}`,
     `- ${tags.project}/...`,
@@ -572,10 +585,9 @@ function renderGuide(locale: Locale): string {
 
 function renderDashboard(
   kind: "home" | "projects" | "areas" | "resources" | "zk" | "tasks" | "review",
-  locale: Locale
+  settings: ParaZkSettings
 ): string {
-  const t = localePack(locale);
-  const tags = t.tags;
+  const t = localePack(settings.locale);
   const titleByKind = {
     home: t.labels.dashboardHome,
     projects: t.labels.dashboardProjects,
@@ -593,14 +605,15 @@ function renderDashboard(
     ]),
     `# ${titleByKind[kind]}`,
     "",
-    ...renderDashboardBody(kind, t),
+    ...renderDashboardBody(kind, t, settings),
     ""
   ].join("\n");
 }
 
 function renderDashboardBody(
   kind: "home" | "projects" | "areas" | "resources" | "zk" | "tasks" | "review",
-  t: ReturnType<typeof localePack>
+  t: ReturnType<typeof localePack>,
+  settings: ParaZkSettings
 ): string[] {
   switch (kind) {
     case "home":
@@ -612,7 +625,7 @@ function renderDashboardBody(
         "",
         "---",
         `## ${t.labels.dueSoon7}`,
-        ...dashboardDueProjects(t, 15),
+        ...dashboardDueProjects(t, settings, 15),
         "",
         "---",
         `## ${t.labels.todayTasks}`,
@@ -624,18 +637,18 @@ function renderDashboardBody(
         "",
         "---",
         `## ${t.labels.recentUpdates}`,
-        ...dashboardRecentCoreNotes(t, 10),
+        ...dashboardRecentCoreNotes(t, settings, 10),
         "",
         "---",
         `## ${t.labels.independentResources}`,
-        ...dashboardOrphanResources(t, 10),
+        ...dashboardOrphanResources(t, settings, 10),
         "",
         "---",
         `## ${t.labels.staleFleeting}`,
-        ...dashboardStaleFleeting(t, 10),
+        ...dashboardStaleFleeting(t, settings, 10),
         "",
         `## ${t.labels.draftCandidates}`,
-        ...dashboardDraftPermanent(t, 10)
+        ...dashboardDraftPermanent(t, settings, 10)
       ];
     case "projects":
       return [
@@ -644,19 +657,19 @@ function renderDashboardBody(
         "",
         "---",
         `## ${t.labels.dueSoon7}`,
-        ...dashboardDueProjects(t, 50),
+        ...dashboardDueProjects(t, settings, 50),
         "",
         "---",
         `## ${t.labels.dueSoon30}`,
-        ...dashboardDueProjects30(t),
+        ...dashboardDueProjects30(t, settings),
         "",
         "---",
         `## ${t.labels.recentUpdates}`,
-        ...dashboardRecentProjects(t),
+        ...dashboardRecentProjects(t, settings),
         "",
         "---",
         `## ${t.labels.area}`,
-        ...dashboardAreaProjectCounts(t)
+        ...dashboardAreaProjectCounts(t, settings)
       ];
     case "areas":
       return [
@@ -665,11 +678,11 @@ function renderDashboardBody(
         "",
         "---",
         `## ${t.labels.dashboardProjects}`,
-        ...dashboardAreaProjectCounts(t),
+        ...dashboardAreaProjectCounts(t, settings),
         "",
         "---",
         `## ${t.labels.recentUpdates}`,
-        ...dashboardAreaRecentProject(t)
+        ...dashboardAreaRecentProject(t, settings)
       ];
     case "resources":
       return [
@@ -678,19 +691,19 @@ function renderDashboardBody(
         "",
         "---",
         `## ${t.labels.active}`,
-        ...dashboardResourcesInUse(t),
+        ...dashboardResourcesInUse(t, settings),
         "",
         "---",
         `## ${t.labels.unreferenced}`,
-        ...dashboardResourcesFree(t),
+        ...dashboardResourcesFree(t, settings),
         "",
         "---",
         `## ${t.labels.independentResources}`,
-        ...dashboardOrphanResources(t, 50),
+        ...dashboardOrphanResources(t, settings, 50),
         "",
         "---",
         `## ${t.labels.dashboardZk}`,
-        ...dashboardResourcesZkReferenced(t)
+        ...dashboardResourcesZkReferenced(t, settings)
       ];
     case "zk":
       return [
@@ -699,15 +712,15 @@ function renderDashboardBody(
         "",
         "---",
         `## ${t.labels.staleFleeting}`,
-        ...dashboardStaleFleeting(t, 50),
+        ...dashboardStaleFleeting(t, settings, 50),
         "",
         "---",
         `## ${t.labels.draftCandidates}`,
-        ...dashboardDraftPermanent(t, 50),
+        ...dashboardDraftPermanent(t, settings, 50),
         "",
         "---",
         `## ${t.labels.recentlyCreated}`,
-        ...dashboardRecentLiterature(t)
+        ...dashboardRecentLiterature(t, settings)
       ];
     case "tasks":
       return [
@@ -733,25 +746,85 @@ function renderDashboardBody(
         "",
         "---",
         `## ${t.labels.createdThisWeek}: ${t.labels.references}`,
-        ...dashboardThisWeekResources(t),
+        ...dashboardThisWeekResources(t, settings),
         "",
         "---",
         `## ${t.labels.createdThisWeek}: Fleeting`,
-        ...dashboardThisWeekFleeting(t),
+        ...dashboardThisWeekFleeting(t, settings),
         "",
         "---",
         `## ${t.labels.draftCandidates}`,
-        ...dashboardDraftPermanent(t, 50),
+        ...dashboardDraftPermanent(t, settings, 50),
         "",
         "---",
         `## ${t.labels.independentResources}`,
-        ...dashboardOrphanResources(t, 50)
+        ...dashboardOrphanResources(t, settings, 50)
       ];
   }
 }
 
 function jsString(value: string): string {
   return JSON.stringify(value);
+}
+
+function normalizedFolder(path: string): string {
+  return path.trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+}
+
+function folderPrefix(path: string): string {
+  const normalized = normalizedFolder(path);
+  return normalized ? `${normalized}/` : "";
+}
+
+function dataviewSource(path: string): string {
+  return jsString(normalizedFolder(path));
+}
+
+function dataviewSources(paths: string[]): string {
+  return minimalFolders(paths).map(dataviewSource).join(" OR ");
+}
+
+function dataviewJsSource(path: string): string {
+  return jsString(dataviewSource(path));
+}
+
+function dataviewNotArchived(settings: ParaZkSettings): string {
+  const archivePrefix = folderPrefix(settings.paths.archivesFolder);
+  return archivePrefix ? `!startswith(file.path, ${jsString(archivePrefix)})` : "true";
+}
+
+function dataviewJsNotArchived(settings: ParaZkSettings, pageName = "p"): string {
+  const archivePrefix = folderPrefix(settings.paths.archivesFolder);
+  return archivePrefix ? `!${pageName}.file.path.startsWith(${jsString(archivePrefix)})` : "true";
+}
+
+function minimalFolders(paths: string[]): string[] {
+  const result: string[] = [];
+  for (const folder of paths.map(normalizedFolder).filter(Boolean)) {
+    if (result.includes(folder)) continue;
+    if (result.some((parent) => folder === parent || folder.startsWith(`${parent}/`))) continue;
+    for (let index = result.length - 1; index >= 0; index -= 1) {
+      if (result[index].startsWith(`${folder}/`)) result.splice(index, 1);
+    }
+    result.push(folder);
+  }
+  return result;
+}
+
+function zkSourceFolders(settings: ParaZkSettings): string[] {
+  return minimalFolders([
+    settings.paths.zkFolder,
+    settings.paths.fleetingFolder,
+    settings.paths.literatureFolder,
+    settings.paths.permanentFolder
+  ]);
+}
+
+function pathStartsWithAnyExpression(pathExpression: string, folders: string[]): string {
+  const prefixes = minimalFolders(folders).map(folderPrefix).filter(Boolean);
+  return prefixes.length > 0
+    ? prefixes.map((prefix) => `${pathExpression}.startsWith(${jsString(prefix)})`).join(" || ")
+    : "false";
 }
 
 function dataviewJs(lines: string[]): string[] {
@@ -763,6 +836,10 @@ function dataviewJs(lines: string[]): string[] {
     "const dayOf = (value) => { const d = new Date(timeOf(value)); d.setHours(0,0,0,0); return d.getTime(); };",
     ...lines
   ]);
+}
+
+function quotedDataviewJs(lines: string[]): string[] {
+  return dataviewJs(lines).map((line) => `> ${line}`);
 }
 
 function dashboardHomeSummary(_t: ReturnType<typeof localePack>): string[] {
@@ -793,21 +870,21 @@ function dashboardSummaryBlock(type: "home" | "projects" | "areas" | "resources"
   return fenced("para-zk-dashboard-summary", [`type: ${type}`]);
 }
 
-function dashboardDueProjects(t: ReturnType<typeof localePack>, limit: number): string[] {
+function dashboardDueProjects(t: ReturnType<typeof localePack>, settings: ParaZkSettings, limit: number): string[] {
   return fenced("dataview", [
     `TABLE WITHOUT ID file.link AS "${t.labels.project}", priority AS "${t.labels.priority}", due_date AS "${t.labels.dueDate}"`,
-    "FROM \"PARA/Projects\"",
-    "WHERE type = \"project\" AND !contains(file.path, \"/Archives/\") AND due_date AND date(due_date) <= date(today) + dur(7 days)",
+    `FROM ${dataviewSource(settings.paths.projectsFolder)}`,
+    `WHERE type = "project" AND ${dataviewNotArchived(settings)} AND due_date AND date(due_date) <= date(today) + dur(7 days)`,
     "SORT due_date ASC",
     `LIMIT ${limit}`
   ]);
 }
 
-function dashboardDueProjects30(t: ReturnType<typeof localePack>): string[] {
+function dashboardDueProjects30(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
   return dataviewJs([
     "const days = (n) => 1000 * 60 * 60 * 24 * n;",
     "const today = new Date(); today.setHours(0,0,0,0);",
-    "const projects = pages('\"PARA/Projects\"').filter(p => p.type === 'project' && !p.file.path.includes('/Archives/') && p.due_date);",
+    `const projects = pages(${dataviewJsSource(settings.paths.projectsFolder)}).filter(p => p.type === 'project' && ${dataviewJsNotArchived(settings)} && p.due_date);`,
     "const rows = projects.filter(p => { const diff = dayOf(p.due_date) - today.getTime(); return diff > days(7) && diff <= days(30); })",
     "  .sort((a,b) => dayOf(a.due_date) - dayOf(b.due_date))",
     "  .map(p => [p.file.link, p.priority ?? '', p.due_date]);",
@@ -815,30 +892,35 @@ function dashboardDueProjects30(t: ReturnType<typeof localePack>): string[] {
   ]);
 }
 
-function dashboardRecentCoreNotes(t: ReturnType<typeof localePack>, limit: number): string[] {
+function dashboardRecentCoreNotes(t: ReturnType<typeof localePack>, settings: ParaZkSettings, limit: number): string[] {
   return fenced("dataview", [
     `TABLE WITHOUT ID file.link AS "${t.labels.references}", type AS "${t.labels.kind}", file.mtime AS "${t.labels.updated}"`,
-    "FROM \"PARA/Projects\" OR \"PARA/Areas\" OR \"PARA/Resources\" OR \"ZK\"",
-    "WHERE (type = \"project\" OR type = \"area\" OR type = \"resource\" OR startswith(type, \"zk_\")) AND !contains(file.path, \"/Archives/\")",
+    `FROM ${dataviewSources([
+      settings.paths.projectsFolder,
+      settings.paths.areasFolder,
+      settings.paths.resourcesFolder,
+      ...zkSourceFolders(settings)
+    ])}`,
+    `WHERE (type = "project" OR type = "area" OR type = "resource" OR startswith(type, "zk_")) AND ${dataviewNotArchived(settings)}`,
     "SORT file.mtime DESC",
     `LIMIT ${limit}`
   ]);
 }
 
-function dashboardRecentProjects(t: ReturnType<typeof localePack>): string[] {
+function dashboardRecentProjects(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
   return fenced("dataview", [
     `TABLE WITHOUT ID file.link AS "${t.labels.project}", file.mtime AS "${t.labels.updated}", due_date AS "${t.labels.dueDate}", priority AS "${t.labels.priority}"`,
-    "FROM \"PARA/Projects\"",
-    "WHERE type = \"project\" AND !contains(file.path, \"/Archives/\")",
+    `FROM ${dataviewSource(settings.paths.projectsFolder)}`,
+    `WHERE type = "project" AND ${dataviewNotArchived(settings)}`,
     "SORT file.mtime DESC",
     "LIMIT 10"
   ]);
 }
 
-function dashboardAreaProjectCounts(t: ReturnType<typeof localePack>): string[] {
+function dashboardAreaProjectCounts(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
   return dataviewJs([
-    "const areas = pages('\"PARA/Areas\"').filter(p => p.type === 'area');",
-    "const projects = pages('\"PARA/Projects\"').filter(p => p.type === 'project' && !p.file.path.includes('/Archives/'));",
+    `const areas = pages(${dataviewJsSource(settings.paths.areasFolder)}).filter(p => p.type === 'area');`,
+    `const projects = pages(${dataviewJsSource(settings.paths.projectsFolder)}).filter(p => p.type === 'project' && ${dataviewJsNotArchived(settings)});`,
     "const rows = areas.map(a => {",
     "  const count = projects.filter(p => asArray(p.areas).some(x => sameLink(x, a))).length;",
     "  return [a.file.link, count];",
@@ -847,10 +929,10 @@ function dashboardAreaProjectCounts(t: ReturnType<typeof localePack>): string[] 
   ]);
 }
 
-function dashboardAreaRecentProject(t: ReturnType<typeof localePack>): string[] {
+function dashboardAreaRecentProject(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
   return dataviewJs([
-    "const areas = pages('\"PARA/Areas\"').filter(p => p.type === 'area');",
-    "const projects = pages('\"PARA/Projects\"').filter(p => p.type === 'project' && !p.file.path.includes('/Archives/')).sort((a,b) => timeOf(b.file.mtime) - timeOf(a.file.mtime));",
+    `const areas = pages(${dataviewJsSource(settings.paths.areasFolder)}).filter(p => p.type === 'area');`,
+    `const projects = pages(${dataviewJsSource(settings.paths.projectsFolder)}).filter(p => p.type === 'project' && ${dataviewJsNotArchived(settings)}).sort((a,b) => timeOf(b.file.mtime) - timeOf(a.file.mtime));`,
     "const rows = [];",
     "for (const area of areas) {",
     "  const matches = projects.filter(p => asArray(p.areas).some(x => sameLink(x, area)));",
@@ -861,21 +943,39 @@ function dashboardAreaRecentProject(t: ReturnType<typeof localePack>): string[] 
   ]);
 }
 
-function dashboardResourcesInUse(t: ReturnType<typeof localePack>): string[] {
-  return resourceBacklinkTable(t, "asArray(r.file.inlinks).some(l => l.path.startsWith('PARA/Projects/') || l.path.startsWith('PARA/Areas/'))");
+function dashboardResourcesInUse(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
+  return resourceBacklinkTable(
+    t,
+    settings,
+    `asArray(r.file.inlinks).some(l => ${pathStartsWithAnyExpression("l.path", [
+      settings.paths.projectsFolder,
+      settings.paths.areasFolder
+    ])})`
+  );
 }
 
-function dashboardResourcesFree(t: ReturnType<typeof localePack>): string[] {
-  return resourceBacklinkTable(t, "!asArray(r.file.inlinks).some(l => l.path.startsWith('PARA/Projects/') || l.path.startsWith('PARA/Areas/'))");
+function dashboardResourcesFree(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
+  return resourceBacklinkTable(
+    t,
+    settings,
+    `!asArray(r.file.inlinks).some(l => ${pathStartsWithAnyExpression("l.path", [
+      settings.paths.projectsFolder,
+      settings.paths.areasFolder
+    ])})`
+  );
 }
 
-function dashboardResourcesZkReferenced(t: ReturnType<typeof localePack>): string[] {
-  return resourceBacklinkTable(t, "asArray(r.file.inlinks).some(l => l.path.startsWith('ZK/'))");
+function dashboardResourcesZkReferenced(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
+  return resourceBacklinkTable(
+    t,
+    settings,
+    `asArray(r.file.inlinks).some(l => ${pathStartsWithAnyExpression("l.path", zkSourceFolders(settings))})`
+  );
 }
 
-function dashboardOrphanResources(t: ReturnType<typeof localePack>, limit: number): string[] {
+function dashboardOrphanResources(t: ReturnType<typeof localePack>, settings: ParaZkSettings, limit: number): string[] {
   return dataviewJs([
-    "const rows = pages('\"PARA/Resources\"')",
+    `const rows = pages(${dataviewJsSource(settings.paths.resourcesFolder)})`,
     "  .filter(r => asArray(r.file.inlinks).length === 0)",
     "  .sort((a,b) => timeOf(b.file.ctime) - timeOf(a.file.ctime))",
     `  .slice(0, ${limit})`,
@@ -884,9 +984,13 @@ function dashboardOrphanResources(t: ReturnType<typeof localePack>, limit: numbe
   ]);
 }
 
-function resourceBacklinkTable(t: ReturnType<typeof localePack>, filterExpression: string): string[] {
+function resourceBacklinkTable(
+  t: ReturnType<typeof localePack>,
+  settings: ParaZkSettings,
+  filterExpression: string
+): string[] {
   return dataviewJs([
-    "const rows = pages('\"PARA/Resources\"')",
+    `const rows = pages(${dataviewJsSource(settings.paths.resourcesFolder)})`,
     `  .filter(r => ${filterExpression})`,
     "  .sort((a,b) => timeOf(b.file.mtime) - timeOf(a.file.mtime))",
     "  .map(r => [r.file.link, asArray(r.file.inlinks).length, r.file.mtime, r.file.ctime]);",
@@ -894,11 +998,11 @@ function resourceBacklinkTable(t: ReturnType<typeof localePack>, filterExpressio
   ]);
 }
 
-function dashboardStaleFleeting(t: ReturnType<typeof localePack>, limit: number): string[] {
+function dashboardStaleFleeting(t: ReturnType<typeof localePack>, settings: ParaZkSettings, limit: number): string[] {
   return dataviewJs([
     "const days = (n) => 1000 * 60 * 60 * 24 * n;",
     "const now = Date.now();",
-    "const rows = pages('\"ZK/Fleeting\"')",
+    `const rows = pages(${dataviewJsSource(settings.paths.fleetingFolder)})`,
     "  .filter(f => f.processed !== true)",
     "  .filter(f => now - timeOf(f.file.ctime) >= days(7))",
     "  .sort((a,b) => timeOf(a.file.ctime) - timeOf(b.file.ctime))",
@@ -908,11 +1012,11 @@ function dashboardStaleFleeting(t: ReturnType<typeof localePack>, limit: number)
   ]);
 }
 
-function dashboardDraftPermanent(t: ReturnType<typeof localePack>, limit: number): string[] {
+function dashboardDraftPermanent(t: ReturnType<typeof localePack>, settings: ParaZkSettings, limit: number): string[] {
   return dataviewJs([
     "const days = (n) => 1000 * 60 * 60 * 24 * n;",
     "const now = Date.now();",
-    "const rows = pages('\"ZK/Permanent\"')",
+    `const rows = pages(${dataviewJsSource(settings.paths.permanentFolder)})`,
     "  .filter(p => p.maturity === 'draft' && now - timeOf(p.file.mtime) >= days(14))",
     "  .sort((a,b) => timeOf(a.file.mtime) - timeOf(b.file.mtime))",
     `  .slice(0, ${limit})`,
@@ -921,19 +1025,19 @@ function dashboardDraftPermanent(t: ReturnType<typeof localePack>, limit: number
   ]);
 }
 
-function dashboardRecentLiterature(t: ReturnType<typeof localePack>): string[] {
+function dashboardRecentLiterature(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
   return fenced("dataview", [
     `TABLE WITHOUT ID file.link AS "Literature", file.ctime AS "${t.labels.created}", file.mtime AS "${t.labels.updated}"`,
-    "FROM \"ZK/Literature\"",
+    `FROM ${dataviewSource(settings.paths.literatureFolder)}`,
     "SORT file.ctime DESC",
     "LIMIT 10"
   ]);
 }
 
-function dashboardThisWeekResources(t: ReturnType<typeof localePack>): string[] {
+function dashboardThisWeekResources(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
   return dataviewJs([
     "const startOfWeek = (() => { const d = new Date(); const day = (d.getDay() + 6) % 7; d.setHours(0,0,0,0); d.setDate(d.getDate() - day); return d; })();",
-    "const rows = pages('\"PARA/Resources\"')",
+    `const rows = pages(${dataviewJsSource(settings.paths.resourcesFolder)})`,
     "  .filter(p => timeOf(p.file.ctime) >= startOfWeek.getTime())",
     "  .sort((a,b) => timeOf(b.file.ctime) - timeOf(a.file.ctime))",
     "  .map(p => [p.file.link, p.file.ctime]);",
@@ -941,10 +1045,10 @@ function dashboardThisWeekResources(t: ReturnType<typeof localePack>): string[] 
   ]);
 }
 
-function dashboardThisWeekFleeting(t: ReturnType<typeof localePack>): string[] {
+function dashboardThisWeekFleeting(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
   return dataviewJs([
     "const startOfWeek = (() => { const d = new Date(); const day = (d.getDay() + 6) % 7; d.setHours(0,0,0,0); d.setDate(d.getDate() - day); return d; })();",
-    "const rows = pages('\"ZK/Fleeting\"')",
+    `const rows = pages(${dataviewJsSource(settings.paths.fleetingFolder)})`,
     "  .filter(p => p.processed !== true)",
     "  .filter(p => timeOf(p.file.ctime) >= startOfWeek.getTime())",
     "  .sort((a,b) => timeOf(b.file.ctime) - timeOf(a.file.ctime))",

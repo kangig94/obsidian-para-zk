@@ -314,6 +314,21 @@ async function writeFrontmatterValue(
   }
 
   try {
+    const type = String(fileFrontmatter(plugin, file).type ?? "").toLowerCase();
+    if (type === "project" && key === "status") {
+      const workflows = await import("../workflows");
+      await workflows.updateProject(
+        { app: plugin.app, settings: plugin.settings },
+        {
+          path: file.path,
+          key: "frontmatter/status",
+          operation: "set",
+          value
+        }
+      );
+      return;
+    }
+
     await plugin.app.fileManager.processFrontMatter(file, (frontmatter) => {
       frontmatter[key] = value;
     });
