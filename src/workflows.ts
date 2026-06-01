@@ -1052,7 +1052,8 @@ export async function insertReferenceItem(
     note
   });
   const items = referenceItemsFromFrontmatter(fileFrontmatter(ctx, file));
-  const duplicateIndex = items.findIndex((candidate) => candidate.link === item.link);
+  const itemKey = referenceDedupeKey(ctx, file, item.link);
+  const duplicateIndex = items.findIndex((candidate) => referenceDedupeKey(ctx, file, candidate.link) === itemKey);
   if (duplicateIndex !== -1) {
     return {
       changed: false,
@@ -1107,7 +1108,8 @@ export async function updateReferenceItem(
   if (hasLabel && !hasLink) label = normalizeReferenceOptionalField(patch.label, "label");
   if (hasNote) note = normalizeReferenceOptionalField(patch.note, "note");
 
-  const duplicateIndex = items.findIndex((candidate, candidateIndex) => candidateIndex !== index && candidate.link === link);
+  const linkKey = referenceDedupeKey(ctx, file, link);
+  const duplicateIndex = items.findIndex((candidate, candidateIndex) => candidateIndex !== index && referenceDedupeKey(ctx, file, candidate.link) === linkKey);
   if (duplicateIndex !== -1) {
     throw new Error(`duplicate reference target: ${link}`);
   }
@@ -1314,6 +1316,22 @@ function deriveWikiReferenceRead(ctx: WorkflowContext, file: TFile, link: string
     kind: "wiki",
     target: normalized
   };
+}
+
+// Dedupe identity for a stored reference link. Resolution-based so two textual forms of
+// the same vault target collide — e.g. a stored `[[full/path/Note.md]]` and the bare
+// `[[Note]]` that Obsidian's rename auto-update normalizes it to both key to the same file.
+// Distinct Obsidian subpaths stay distinct; URLs and unresolved/plain links fall back to
+// their normalized text.
+function referenceDedupeKey(ctx: WorkflowContext, source: TFile, link: string): string {
+  const wiki = parseWikiLink(link);
+  if (wiki) {
+    const resolved = resolveWikiReferenceFile(ctx, source, wiki.target);
+    if (resolved) return `file:${resolved.file.path}#${resolved.subpath}`;
+    return `wiki:${normalizedReferenceTargetWithSubpath(wiki.target)}`;
+  }
+  if (isExternalReference(link)) return `url:${link.trim()}`;
+  return `text:${link}`;
 }
 
 function canonicalizeReferenceTarget(

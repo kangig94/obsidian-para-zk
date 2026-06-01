@@ -1742,6 +1742,18 @@ function assertObjectReferenceRenameSurvival() {
     waitForBacklink(renamedTarget.path, renameProject.path),
     "renamed target's backlinks did not include the object-form referrer after rename"
   );
+  // Re-adding the renamed target must dedupe against the rename-normalized stored link
+  // (Obsidian normalized it to a bare basename; dedupe resolves both forms to the same
+  // file, so no duplicate entry is created).
+  const readdAfterRename = cliJson("para-zk:add-reference", [
+    `path=${renameProject.path}`,
+    `target=${renamedTarget.path}`,
+    "open=false",
+    "format=json"
+  ]);
+  assert(readdAfterRename.ok === true && readdAfterRename.added === false, "re-adding the renamed target should dedupe to the existing reference, not add a duplicate");
+  const referencesAfterReadd = readFrontmatterReferences(renameProject.path);
+  assert(Array.isArray(referencesAfterReadd) && referencesAfterReadd.length === 1, "rename-normalized reference must not duplicate on re-add");
 }
 
 function assertReferenceRendererReorder(path) {

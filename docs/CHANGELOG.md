@@ -150,6 +150,10 @@ Notable changes for PARA-ZK are tracked here.
   `references/<i> op=delete`. Inserts and `add-reference` return `index` and
   canonical `link`; duplicate canonical links are no-op inserts or rejected link
   updates.
+- Reference duplicate detection now resolves links to their vault target instead of
+  comparing link text, so a stored link still dedupes after Obsidian's rename
+  auto-update normalizes it to a different textual form (distinct Obsidian subpaths
+  stay distinct; URLs and unresolved links fall back to normalized text).
 - Creating resources and promoting resource/fleeting notes now writes
   frontmatter reference registry entries instead of body reference lines.
 
