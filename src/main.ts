@@ -10,6 +10,7 @@ import { refreshRegisteredLocaleLabels } from "./ux/locale-labels";
 import { registerPropsControlRenderers } from "./ux/props-controls";
 import { registerRibbonActions } from "./ux/ribbon-actions";
 import { ParaZkSettingTab } from "./ux/settings";
+import { registerReferenceRenderers } from "./ux/reference-renderer";
 import { registerTaskRenderers } from "./ux/task-renderer";
 import {
   registerStatusAndInitCommands,
@@ -31,6 +32,7 @@ export default class ParaZkPlugin extends Plugin {
     registerInlineActionRenderers(this);
     registerPropsControlRenderers(this);
     registerTaskRenderers(this);
+    registerReferenceRenderers(this);
 
     this.addSettingTab(new ParaZkSettingTab(this));
     registerNativeCliHandlers(this);

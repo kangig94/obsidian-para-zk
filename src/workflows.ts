@@ -222,6 +222,9 @@ export type UpdateSurfaceResult = {
   operation: UpdateOperation;
   changed: boolean;
   matches?: number;
+  index?: number;
+  link?: string;
+  added?: boolean;
   moved?: boolean;
   fromPath?: string;
   toPath?: string;
@@ -360,25 +363,37 @@ type EditableTaskLine = {
   taskId?: string;
   blockId?: string;
 };
-type ReferenceRead = {
-  kind: "url" | "note" | "file" | "wiki" | "markdown" | "text";
+type ReferenceKind = "url" | "note" | "file" | "wiki" | "text";
+export type ReferenceStoredItem = string | {
+  link: string;
   label?: string;
-  target?: string;
+  note?: string;
+};
+export type ReferenceRead = {
+  link: string;
+  kind: ReferenceKind;
+  label?: string;
+  note?: string;
   path?: string;
-  text?: string;
+  target?: string;
 };
-type ReferenceLineFormat = "wiki" | "markdown" | "url" | "text";
-type ReferenceLineRead = {
-  id: string;
-  reference: ReferenceRead;
-  prefix: string;
-  format: ReferenceLineFormat;
-  rawTarget?: string;
-  rawLabel?: string;
+type NormalizedReferenceItem = {
+  link: string;
+  label?: string;
+  note?: string;
 };
-type ReferenceWritableField = "label" | "target";
-type EditableReferenceLine = ReferenceLineRead & {
-  range: TextRange & { endWithoutBreak: number };
+type ReferenceWritableField = "link" | "label" | "note";
+type ReferenceWriteInput = {
+  link: unknown;
+  label?: unknown;
+  note?: unknown;
+  position?: unknown;
+};
+type ReferenceMutationResult = {
+  changed: boolean;
+  index: number;
+  link: string;
+  added?: boolean;
 };
 type NormalizedCollectionReadOptions = {
   offset: number;
@@ -392,7 +407,7 @@ type NormalizedCollectionReadOptions = {
 };
 
 const DEFAULT_COLLECTION_READ_LIMIT = 50;
-const REFERENCE_KINDS = new Set(["url", "note", "file", "wiki", "markdown", "text"]);
+const REFERENCE_KINDS = new Set<string>(["url", "note", "file", "wiki", "text"]);
 const ROOT_ID_FRONTMATTER_KEY = "id";
 
 export async function createProject(ctx: WorkflowContext, options: CreateProjectOptions): Promise<NoteResult & {
@@ -598,7 +613,7 @@ export async function createResource(ctx: WorkflowContext, options: CreateResour
 
   let linkedFromSource = false;
   if (source && options.linkToSource !== false) {
-    linkedFromSource = await appendReferenceLink(ctx, source, file);
+    linkedFromSource = (await insertReferenceItem(ctx, source, { link: wikiLink(file.path) })).added === true;
   }
 
   await openIfRequested(ctx, file, options.open);
@@ -612,25 +627,23 @@ export async function createResource(ctx: WorkflowContext, options: CreateResour
 export async function addReference(ctx: WorkflowContext, options: AddReferenceOptions): Promise<{
   path: string;
   title: string;
-  reference: string;
-  target: string;
+  index: number;
+  link: string;
   added: boolean;
   opened?: boolean;
 }> {
   const source = resolveRequiredFile(ctx, options.sourcePath, "source note");
-  const reference = resolveReferenceTarget(ctx, options.target, options.label);
-  const added = await appendReferenceLine(ctx, source, reference.line, {
-    ordered: true,
-    dedupeTargetPath: reference.targetPath,
-    dedupeText: reference.dedupeText
+  const reference = await insertReferenceItem(ctx, source, {
+    link: options.target,
+    ...(options.label !== undefined ? { label: options.label } : {})
   });
   await openIfRequested(ctx, source, options.open);
   return {
     path: source.path,
     title: source.basename,
-    reference: reference.line,
-    target: reference.target,
-    added,
+    index: reference.index,
+    link: reference.link,
+    added: reference.added === true,
     opened: options.open || undefined
   };
 }
@@ -844,7 +857,7 @@ export async function promoteResource(ctx: WorkflowContext, options: PromoteReso
   const path = await uniqueMarkdownPath(ctx.app, joinVaultPath(folder, `${title}.md`));
   const file = await createZkFile(ctx, kind, path, title, { maturityCode });
 
-  await appendReferenceLine(ctx, file, `- ${wikiLink(source.path)}`);
+  await insertReferenceItem(ctx, file, { link: wikiLink(source.path) });
   await openIfRequested(ctx, file, options.open);
 
   return {
@@ -864,7 +877,7 @@ export async function promoteFleeting(ctx: WorkflowContext, options: PromoteFlee
   const path = await uniqueMarkdownPath(ctx.app, joinVaultPath(folder, `${title}.md`));
   const file = await createZkFile(ctx, kind, path, title, { maturityCode });
 
-  await appendReferenceLine(ctx, file, `- ${wikiLink(source.path)}`);
+  await insertReferenceItem(ctx, file, { link: wikiLink(source.path) });
   await ctx.app.fileManager.processFrontMatter(source, (fm) => {
     fm.processed = true;
     fm.promoted_to = linkToFile(file);
@@ -955,35 +968,6 @@ function applyTemplateVariables(content: string, variables: TemplateVariables): 
   return result.replace(/{{\s*[A-Za-z0-9_]+\s*}}/g, "");
 }
 
-async function appendReferenceLink(ctx: WorkflowContext, source: TFile, target: TFile): Promise<boolean> {
-  const link = wikiLink(target.path, target.basename);
-  return appendReferenceLine(ctx, source, link, {
-    ordered: true,
-    dedupeTargetPath: target.path
-  });
-}
-
-async function appendReferenceLine(
-  ctx: WorkflowContext,
-  file: TFile,
-  line: string,
-  options: {
-    ordered?: boolean;
-    dedupe?: boolean;
-    dedupeTargetPath?: string;
-    dedupeText?: string;
-  } = {}
-): Promise<boolean> {
-  const label = localePack(ctx.settings.locale).labels.references;
-  return appendLineUnderHeader(ctx.app, file, label, line, {
-    createHeadingLevel: 2,
-    ordered: options.ordered ?? false,
-    dedupe: options.dedupe ?? true,
-    dedupeTargetPath: options.dedupeTargetPath,
-    dedupeText: options.dedupeText
-  });
-}
-
 async function appendLineUnderHeader(
   app: App,
   file: TFile,
@@ -1035,63 +1019,11 @@ async function appendLineUnderHeader(
   return true;
 }
 
-function resolveReferenceTarget(ctx: WorkflowContext, target: string, label: string | undefined): {
-  line: string;
-  target: string;
-  targetPath?: string;
-  dedupeText?: string;
-} {
-  const value = target.trim();
-  if (!value) throw new Error("reference target is required");
-
-  const wikiTarget = readWikiTarget(value);
-  if (wikiTarget) {
-    return {
-      line: value,
-      target: wikiTarget,
-      targetPath: wikiTarget
-    };
-  }
-
-  const markdownTarget = readMarkdownLinkTarget(value);
-  if (markdownTarget) {
-    return {
-      line: value,
-      target: markdownTarget,
-      dedupeText: markdownTarget
-    };
-  }
-
-  if (isExternalReference(value)) {
-    return {
-      line: label ? `[${escapeMarkdownLinkLabel(label)}](${value})` : value,
-      target: value,
-      dedupeText: value
-    };
-  }
-
-  const normalized = normalizeVaultPath(value);
-  const file = ctx.app.vault.getAbstractFileByPath(normalized);
-  if (file instanceof TFile) {
-    return {
-      line: wikiLink(file.path, label?.trim() || file.basename),
-      target: file.path,
-      targetPath: file.path
-    };
-  }
-
-  throw new Error(`reference target must be an existing vault file, URL, wikilink, or markdown link: ${value}`);
-}
-
-function readWikiTarget(value: string): string | undefined {
-  const match = value.match(/^\[\[([^\]|]+)(?:\|[^\]]*)?\]\]$/);
-  return match ? normalizeVaultPath(match[1]) : undefined;
-}
-
 function readWikiLinkLabel(value: string): string | undefined {
-  const match = value.match(/^\[\[([^\]|]+)(?:\|([^\]]+))?\]\]$/);
+  const match = parseWikiLink(value);
   if (!match) return undefined;
-  return (match[2]?.trim() || pathBasenameWithoutExtension(match[1])).trim();
+  const target = splitObsidianSubpath(match.target).base || match.target;
+  return (match.alias?.trim() || pathBasenameWithoutExtension(target)).trim();
 }
 
 function pathBasenameWithoutExtension(path: string): string {
@@ -1099,17 +1031,493 @@ function pathBasenameWithoutExtension(path: string): string {
   return last.replace(/\.md$/i, "");
 }
 
-function readMarkdownLinkTarget(value: string): string | undefined {
-  const match = value.match(/^\[[^\]]+\]\(([^)]+)\)$/);
-  return match?.[1]?.trim() || undefined;
+export function readReferenceItems(ctx: WorkflowContext, file: TFile): ReferenceRead[] {
+  return referenceItemsFromFrontmatter(fileFrontmatter(ctx, file))
+    .map((item) => deriveReferenceRead(ctx, file, item));
+}
+
+export async function insertReferenceItem(
+  ctx: WorkflowContext,
+  file: TFile,
+  input: ReferenceWriteInput
+): Promise<ReferenceMutationResult> {
+  const canonical = canonicalizeReferenceTarget(ctx, file, input.link, {
+    label: input.label,
+    labelProvided: hasOwn(input, "label")
+  });
+  const note = hasOwn(input, "note") ? normalizeReferenceOptionalField(input.note, "note") : undefined;
+  const item = normalizeReferenceItem({
+    link: canonical.link,
+    label: canonical.label,
+    note
+  });
+  const items = referenceItemsFromFrontmatter(fileFrontmatter(ctx, file));
+  const duplicateIndex = items.findIndex((candidate) => candidate.link === item.link);
+  if (duplicateIndex !== -1) {
+    return {
+      changed: false,
+      index: duplicateIndex,
+      link: item.link,
+      added: false
+    };
+  }
+
+  const position = normalizeReferenceInsertPosition(input.position, items.length);
+  const next = [...items];
+  next.splice(position, 0, item);
+  await writeReferenceItems(ctx, file, next);
+  return {
+    changed: true,
+    index: position,
+    link: item.link,
+    added: true
+  };
+}
+
+export async function updateReferenceItem(
+  ctx: WorkflowContext,
+  file: TFile,
+  index: number,
+  patch: {
+    link?: unknown;
+    label?: unknown;
+    note?: unknown;
+  }
+): Promise<ReferenceMutationResult> {
+  const items = referenceItemsFromFrontmatter(fileFrontmatter(ctx, file));
+  assertReferenceIndex(items, index);
+
+  const current = items[index];
+  const hasLink = hasOwn(patch, "link");
+  const hasLabel = hasOwn(patch, "label");
+  const hasNote = hasOwn(patch, "note");
+
+  let link = current.link;
+  let label = current.label;
+  let note = current.note;
+
+  if (hasLink) {
+    const canonical = canonicalizeReferenceTarget(ctx, file, patch.link, {
+      label: hasLabel ? patch.label : current.label,
+      labelProvided: hasLabel || current.label !== undefined
+    });
+    link = canonical.link;
+    label = canonical.label;
+  }
+  if (hasLabel && !hasLink) label = normalizeReferenceOptionalField(patch.label, "label");
+  if (hasNote) note = normalizeReferenceOptionalField(patch.note, "note");
+
+  const duplicateIndex = items.findIndex((candidate, candidateIndex) => candidateIndex !== index && candidate.link === link);
+  if (duplicateIndex !== -1) {
+    throw new Error(`duplicate reference target: ${link}`);
+  }
+
+  const nextItem = normalizeReferenceItem({ link, label, note });
+  if (referenceItemsEqual(current, nextItem)) {
+    return {
+      changed: false,
+      index,
+      link: nextItem.link
+    };
+  }
+
+  const next = [...items];
+  next[index] = nextItem;
+  await writeReferenceItems(ctx, file, next);
+  return {
+    changed: true,
+    index,
+    link: nextItem.link
+  };
+}
+
+export async function setReferenceItemField(
+  ctx: WorkflowContext,
+  file: TFile,
+  index: number,
+  field: string,
+  value: unknown
+): Promise<ReferenceMutationResult> {
+  const writableField = readReferenceWritableField(field, `references/${index}/${field}`);
+  return updateReferenceItem(ctx, file, index, { [writableField]: value });
+}
+
+export async function deleteReferenceItem(
+  ctx: WorkflowContext,
+  file: TFile,
+  index: number
+): Promise<ReferenceMutationResult> {
+  const items = referenceItemsFromFrontmatter(fileFrontmatter(ctx, file));
+  assertReferenceIndex(items, index);
+  const [removed] = items.splice(index, 1);
+  await writeReferenceItems(ctx, file, items);
+  return {
+    changed: true,
+    index,
+    link: removed.link
+  };
+}
+
+export async function reorderReferenceItems(
+  ctx: WorkflowContext,
+  file: TFile,
+  links: string[]
+): Promise<{ changed: boolean; items: ReferenceRead[] }> {
+  const items = referenceItemsFromFrontmatter(fileFrontmatter(ctx, file));
+  if (links.length !== items.length) throw new Error("reference reorder requires the full current link order");
+
+  const byLink = new Map<string, NormalizedReferenceItem>();
+  for (const item of items) {
+    if (byLink.has(item.link)) throw new Error(`duplicate reference link in current frontmatter: ${item.link}`);
+    byLink.set(item.link, item);
+  }
+
+  const seen = new Set<string>();
+  const next: NormalizedReferenceItem[] = [];
+  for (const link of links) {
+    if (seen.has(link)) throw new Error(`duplicate reference link in reorder: ${link}`);
+    seen.add(link);
+    const item = byLink.get(link);
+    if (!item) throw new Error(`reference no longer present: ${link}`);
+    next.push(item);
+  }
+
+  const changed = !items.every((item, itemIndex) => item.link === next[itemIndex]?.link);
+  if (changed) await writeReferenceItems(ctx, file, next);
+  return {
+    changed,
+    items: next.map((item) => deriveReferenceRead(ctx, file, item))
+  };
+}
+
+function referenceItemsFromFrontmatter(frontmatter: Frontmatter): NormalizedReferenceItem[] {
+  const value = frontmatter.references;
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) throw new Error("references frontmatter must be an array");
+  return value.map((item, index) => normalizeReferenceStoredItem(item, index));
+}
+
+function normalizeReferenceStoredItem(value: unknown, index: number): NormalizedReferenceItem {
+  if (typeof value === "string") {
+    return normalizeReferenceItem({ link: value }, index);
+  }
+  if (!isRecord(value)) {
+    throw new Error(`references[${index}] must be a string or object`);
+  }
+  return normalizeReferenceItem({
+    link: value.link,
+    label: hasOwn(value, "label") ? value.label : undefined,
+    note: hasOwn(value, "note") ? value.note : undefined
+  }, index);
+}
+
+function normalizeReferenceItem(value: {
+  link: unknown;
+  label?: unknown;
+  note?: unknown;
+}, index?: number): NormalizedReferenceItem {
+  const labelPrefix = index === undefined ? "reference" : `references[${index}]`;
+  const link = normalizeReferenceLinkValue(value.link, `${labelPrefix}.link`);
+  const label = normalizeReferenceOptionalField(value.label, "label");
+  const note = normalizeReferenceOptionalField(value.note, "note");
+  return {
+    link,
+    ...(label !== undefined ? { label } : {}),
+    ...(note !== undefined ? { note } : {})
+  };
+}
+
+async function writeReferenceItems(
+  ctx: WorkflowContext,
+  file: TFile,
+  items: NormalizedReferenceItem[]
+): Promise<void> {
+  const stored = items.map(serializeReferenceStoredItem);
+  await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+    if (stored.length === 0) {
+      delete fm.references;
+    } else {
+      fm.references = stored;
+    }
+  });
+}
+
+function serializeReferenceStoredItem(item: NormalizedReferenceItem): ReferenceStoredItem {
+  if (item.label === undefined && item.note === undefined) return item.link;
+  return {
+    link: item.link,
+    ...(item.label !== undefined ? { label: item.label } : {}),
+    ...(item.note !== undefined ? { note: item.note } : {})
+  };
+}
+
+function referenceItemsEqual(left: NormalizedReferenceItem, right: NormalizedReferenceItem): boolean {
+  return left.link === right.link && left.label === right.label && left.note === right.note;
+}
+
+function assertReferenceIndex(items: NormalizedReferenceItem[], index: number): void {
+  if (!Number.isInteger(index) || index < 0 || index >= items.length) {
+    throw new Error(`reference not found: ${index}`);
+  }
+}
+
+function normalizeReferenceInsertPosition(value: unknown, length: number): number {
+  if (value === undefined || value === null || value === "" || value === "end") return length;
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > length) {
+    throw new Error(`reference position must be an integer between 0 and ${length}`);
+  }
+  return value;
+}
+
+function normalizeReferenceLinkValue(value: unknown, key: string): string {
+  if (typeof value !== "string") throw new Error(`${key} must be a string`);
+  const link = value.trim();
+  if (!link) throw new Error(`${key} is required`);
+  return link;
+}
+
+function normalizeReferenceOptionalField(value: unknown, key: "label" | "note"): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "string") throw new Error(`reference ${key} must be a string or null`);
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function deriveReferenceRead(ctx: WorkflowContext, file: TFile, item: NormalizedReferenceItem): ReferenceRead {
+  const link = item.link;
+  const wiki = parseWikiLink(link);
+  const derived = wiki
+    ? deriveWikiReferenceRead(ctx, file, link, wiki.target)
+    : isExternalReference(link)
+      ? { link, kind: "url" as const, target: link }
+      : { link, kind: "text" as const };
+
+  return {
+    ...derived,
+    ...(item.label !== undefined ? { label: item.label } : {}),
+    ...(item.note !== undefined ? { note: item.note } : {})
+  };
+}
+
+function deriveWikiReferenceRead(ctx: WorkflowContext, file: TFile, link: string, target: string): ReferenceRead {
+  const resolved = resolveWikiReferenceFile(ctx, file, target);
+  const normalized = normalizedReferenceTargetWithSubpath(target);
+  if (resolved) {
+    return {
+      link,
+      kind: resolved.file.path.endsWith(".md") ? "note" : "file",
+      path: resolved.file.path
+    };
+  }
+  return {
+    link,
+    kind: "wiki",
+    target: normalized
+  };
+}
+
+function canonicalizeReferenceTarget(
+  ctx: WorkflowContext,
+  source: TFile,
+  target: unknown,
+  options: {
+    label?: unknown;
+    labelProvided?: boolean;
+  } = {}
+): {
+  link: string;
+  label?: string;
+  targetPath?: string;
+} {
+  const value = normalizeReferenceLinkValue(target, "reference target");
+  const parsed = parseReferenceTargetInput(value);
+  const label = options.labelProvided
+    ? normalizeReferenceOptionalField(options.label, "label")
+    : parsed.label;
+
+  if (parsed.syntax === "url" || (parsed.syntax === "markdown" && isExternalReference(parsed.target))) {
+    return {
+      link: parsed.target.trim(),
+      ...(label !== undefined ? { label } : {})
+    };
+  }
+
+  if (parsed.syntax === "wiki") {
+    const resolved = resolveWikiReferenceFile(ctx, source, parsed.target);
+    if (resolved) {
+      return {
+        link: canonicalWikiLink(referenceTargetWithSubpath(resolved.file.path, resolved.subpath)),
+        ...(label !== undefined ? { label } : {}),
+        targetPath: resolved.file.path
+      };
+    }
+    return {
+      link: canonicalWikiLink(normalizedReferenceTargetWithSubpath(parsed.target)),
+      ...(label !== undefined ? { label } : {})
+    };
+  }
+
+  if (parsed.syntax === "markdown") {
+    const resolved = resolveRawReferenceFile(ctx, source, parsed.target);
+    if (!resolved) {
+      throw new Error(`markdown reference target must be a URL or existing vault file: ${parsed.target}`);
+    }
+    return {
+      link: canonicalWikiLink(referenceTargetWithSubpath(resolved.file.path, resolved.subpath)),
+      ...(label !== undefined ? { label } : {}),
+      targetPath: resolved.file.path
+    };
+  }
+
+  const resolved = resolveRawReferenceFile(ctx, source, parsed.target);
+  if (resolved) {
+    return {
+      link: canonicalWikiLink(referenceTargetWithSubpath(resolved.file.path, resolved.subpath)),
+      ...(label !== undefined ? { label } : {}),
+      targetPath: resolved.file.path
+    };
+  }
+
+  return {
+    link: value,
+    ...(label !== undefined ? { label } : {})
+  };
+}
+
+type ParsedReferenceTarget = {
+  syntax: "wiki" | "markdown" | "url" | "raw";
+  target: string;
+  label?: string;
+};
+
+function parseReferenceTargetInput(value: string): ParsedReferenceTarget {
+  const wiki = parseWikiLink(value);
+  if (wiki) {
+    return {
+      syntax: "wiki",
+      target: wiki.target,
+      ...(wiki.alias !== undefined && wiki.alias.trim() ? { label: wiki.alias.trim() } : {})
+    };
+  }
+
+  const markdown = parseMarkdownLink(value);
+  if (markdown) {
+    return {
+      syntax: "markdown",
+      target: markdown.target,
+      ...(markdown.label ? { label: markdown.label } : {})
+    };
+  }
+
+  if (isExternalReference(value)) {
+    return {
+      syntax: "url",
+      target: value
+    };
+  }
+
+  return {
+    syntax: "raw",
+    target: value
+  };
+}
+
+function parseWikiLink(value: string): { target: string; alias?: string } | undefined {
+  const match = value.trim().match(/^\[\[([^\]|]+)(?:\|([^\]]*))?\]\]$/);
+  const target = match?.[1]?.trim();
+  if (!target) return undefined;
+  return {
+    target,
+    ...(match?.[2] !== undefined ? { alias: match[2].trim() } : {})
+  };
+}
+
+function parseMarkdownLink(value: string): { label: string; target: string } | undefined {
+  const match = value.trim().match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+  const label = match?.[1]?.trim();
+  const target = match?.[2]?.trim();
+  if (!label || !target) return undefined;
+  return { label, target };
+}
+
+function resolveWikiReferenceFile(
+  ctx: WorkflowContext,
+  source: TFile,
+  target: string
+): { file: TFile; subpath: string } | undefined {
+  const split = splitObsidianSubpath(target);
+  const normalized = referenceTargetWithSubpath(split.base, split.subpath);
+  const resolved = ctx.app.metadataCache.getFirstLinkpathDest(normalized, source.path)
+    ?? (split.base ? ctx.app.metadataCache.getFirstLinkpathDest(split.base, source.path) : null);
+  if (resolved) {
+    return {
+      file: resolved,
+      subpath: split.subpath
+    };
+  }
+  if (!split.base && split.subpath) {
+    return {
+      file: source,
+      subpath: split.subpath
+    };
+  }
+  return undefined;
+}
+
+function resolveRawReferenceFile(
+  ctx: WorkflowContext,
+  source: TFile,
+  target: string
+): { file: TFile; subpath: string } | undefined {
+  const split = splitObsidianSubpath(target);
+  if (!split.base && split.subpath) {
+    return {
+      file: source,
+      subpath: split.subpath
+    };
+  }
+  const file = ctx.app.vault.getAbstractFileByPath(split.base);
+  if (!(file instanceof TFile)) return undefined;
+  return {
+    file,
+    subpath: split.subpath
+  };
+}
+
+function splitObsidianSubpath(value: string): { base: string; subpath: string } {
+  const normalizedSeparators = value.trim().replace(/\\/g, "/");
+  const hash = normalizedSeparators.indexOf("#");
+  if (hash === -1) {
+    return {
+      base: normalizeVaultPath(normalizedSeparators),
+      subpath: ""
+    };
+  }
+  return {
+    base: normalizeVaultPath(normalizedSeparators.slice(0, hash)),
+    subpath: normalizedSeparators.slice(hash).trim()
+  };
+}
+
+function normalizedReferenceTargetWithSubpath(value: string): string {
+  const split = splitObsidianSubpath(value);
+  return referenceTargetWithSubpath(split.base, split.subpath);
+}
+
+function referenceTargetWithSubpath(base: string, subpath: string): string {
+  return `${base}${subpath}`;
+}
+
+function canonicalWikiLink(target: string): string {
+  return `[[${target}]]`;
 }
 
 function isExternalReference(value: string): boolean {
   return /^[A-Za-z][A-Za-z0-9+.-]*:/.test(value);
 }
 
-function escapeMarkdownLinkLabel(value: string): string {
-  return value.replace(/\\/g, "\\\\").replace(/\[/g, "\\[").replace(/\]/g, "\\]");
+function hasOwn(value: object, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
 }
 
 function countListItems(section: string, prefix: string): number {
@@ -1256,6 +1664,15 @@ async function readSurfaceMap(ctx: WorkflowContext, file: TFile, spec: ReadSurfa
   if (spec.body) surface.body = stripManagedPrelude(content);
 
   for (const section of spec.sections ?? []) {
+    if (section.collection === "reference" && section.transform) {
+      surface[section.key] = await section.transform("", {
+        ctx,
+        file,
+        content,
+        section
+      });
+      continue;
+    }
     const value = readSection(content, sectionHeadingCandidates(section), {
       includeSubsections: section.includeSubsections ?? false
     });
@@ -1524,7 +1941,7 @@ function matchesReferenceCollectionItem(
 function collectionSearchText(kind: ReadCollectionKind, item: Record<string, unknown>): string {
   const keys = kind === "task"
     ? ["name", "checkbox", "priority", "due", "scheduled", "start", "created", "done", "cancelled"]
-    : ["kind", "label", "target", "path", "text"];
+    : ["link", "kind", "label", "note", "target", "path"];
   return keys.map((key) => readRecordString(item, key) ?? "").join("\n");
 }
 
@@ -1589,9 +2006,13 @@ type WritableSurfaceTarget =
     field?: TaskWritableField;
   }
   | {
+    kind: "referenceCollection";
+    file: TFile;
+  }
+  | {
     kind: "referenceItem";
     file: TFile;
-    line: EditableReferenceLine;
+    index: number;
     field?: ReferenceWritableField;
   };
 
@@ -1603,6 +2024,9 @@ type TextRange = {
 type TextUpdateResult = {
   changed: boolean;
   matches?: number;
+  index?: number;
+  link?: string;
+  added?: boolean;
   file?: TFile;
   moved?: boolean;
   fromPath?: string;
@@ -1626,7 +2050,9 @@ async function updateSurface(
         ? await updateTaskCollectionSurface(ctx, target, operation, options)
         : target.kind === "referenceItem"
           ? await updateReferenceItemSurface(ctx, target, operation, options)
-          : await updateTaskItemSurface(ctx, target, operation, options);
+          : target.kind === "referenceCollection"
+            ? await updateReferenceCollectionSurface(ctx, target, operation, options)
+            : await updateTaskItemSurface(ctx, target, operation, options);
   const resultFile = result.file ?? target.file;
 
   return {
@@ -1638,6 +2064,9 @@ async function updateSurface(
     operation,
     changed: result.changed,
     matches: result.matches,
+    index: result.index,
+    link: result.link,
+    added: result.added,
     moved: result.moved,
     fromPath: result.fromPath,
     toPath: result.toPath
@@ -1716,7 +2145,7 @@ async function resolveWritableCollectionTarget(
   originalKey: string
 ): Promise<WritableSurfaceTarget> {
   if (section.collection === "reference") {
-    return resolveWritableReferenceCollectionTarget(ctx, file, section, parts, originalKey);
+    return resolveWritableReferenceCollectionTarget(file, parts, originalKey);
   }
   if (section.collection !== "task") throw new Error(`unknown update key: ${originalKey}`);
 
@@ -1747,23 +2176,23 @@ async function resolveWritableCollectionTarget(
 }
 
 async function resolveWritableReferenceCollectionTarget(
-  ctx: WorkflowContext,
   file: TFile,
-  section: ReadSectionSpec,
   parts: string[],
   originalKey: string
 ): Promise<WritableSurfaceTarget> {
   if (parts.length === 1) {
-    throw new Error("references collection root is read-only through update; use para-zk:add-reference to add references");
+    return {
+      kind: "referenceCollection",
+      file
+    };
   }
   if (parts.length === 2 || parts.length === 3) {
-    const line = await findEditableReferenceLine(ctx, file, section, parts[1]);
-    if (!line) throw new Error(`reference not found: ${parts[1]}`);
+    const index = parseReferenceIndex(parts[1], originalKey);
     const field = parts.length === 3 ? readReferenceWritableField(parts[2], originalKey) : undefined;
     return {
       kind: "referenceItem",
       file,
-      line,
+      index,
       field
     };
   }
@@ -1878,6 +2307,24 @@ async function updateTaskItemSurface(
   return { changed: before !== after };
 }
 
+async function updateReferenceCollectionSurface(
+  ctx: WorkflowContext,
+  target: Extract<WritableSurfaceTarget, { kind: "referenceCollection" }>,
+  operation: UpdateOperation,
+  options: UpdatePayloadOptions
+): Promise<TextUpdateResult> {
+  if (operation !== "insert") throw new Error("references collection root only supports op=insert");
+  if (options.valueSource !== "value_json") throw new Error("reference insert requires value_json object");
+  const write = normalizeReferenceInsertValue(requireUpdateValue(options));
+  const result = await insertReferenceItem(ctx, target.file, write);
+  return {
+    changed: result.changed,
+    index: result.index,
+    link: result.link,
+    added: result.added
+  };
+}
+
 async function updateReferenceItemSurface(
   ctx: WorkflowContext,
   target: Extract<WritableSurfaceTarget, { kind: "referenceItem" }>,
@@ -1885,28 +2332,23 @@ async function updateReferenceItemSurface(
   options: UpdatePayloadOptions
 ): Promise<TextUpdateResult> {
   if (!target.field) {
-    if (operation !== "delete") throw new Error("reference item keys only support op=delete; use references/<id>/<field> for op=set");
-    const before = await ctx.app.vault.read(target.file);
-    const after = removeTextRanges(before, [target.line.range]);
-    if (before !== after) await ctx.app.vault.modify(target.file, after);
-    return { changed: before !== after };
+    if (operation !== "delete") throw new Error("reference item keys only support op=delete; use references/<i>/<field> for op=set");
+    const result = await deleteReferenceItem(ctx, target.file, target.index);
+    return {
+      changed: result.changed,
+      index: result.index,
+      link: result.link
+    };
   }
 
   if (operation !== "set") throw new Error("reference fields only support op=set");
-  if (options.valueSource === "value_json") throw new Error("reference field updates require value");
-
-  const value = requireUpdateText(options, { allowEmpty: false });
-  const body = target.field === "label"
-    ? serializeReferenceBodyWithLabel(target.line, value)
-    : serializeReferenceBodyWithTarget(ctx, target.line, value);
-  const nextLine = `${target.line.prefix}${body}`;
-  const before = await ctx.app.vault.read(target.file);
-  const currentLine = before.slice(target.line.range.start, target.line.range.endWithoutBreak);
-  if (currentLine === nextLine) return { changed: false };
-
-  const after = spliceTextRange(before, target.line.range, nextLine);
-  if (before !== after) await ctx.app.vault.modify(target.file, after);
-  return { changed: before !== after };
+  const value = readReferenceFieldUpdateValue(target.field, options);
+  const result = await setReferenceItemField(ctx, target.file, target.index, target.field, value);
+  return {
+    changed: result.changed,
+    index: result.index,
+    link: result.link
+  };
 }
 
 function applyTextOperation(
@@ -2366,7 +2808,13 @@ function readSurfaceTopLevelKeys(spec: ReadSurfaceSpec): string[] {
 function readKeyHints(spec: ReadSurfaceSpec): string[] {
   const keys: string[] = [];
   if (spec.frontmatter.length > 0) keys.push(`frontmatter/{${spec.frontmatter.join("|")}}`);
-  for (const section of spec.sections ?? []) keys.push(section.key);
+  for (const section of spec.sections ?? []) {
+    if (section.collection === "reference") {
+      keys.push("references", "references/<i>", "references/<i>/{link|label|note}");
+    } else {
+      keys.push(section.key);
+    }
+  }
   if (spec.body) keys.push("body");
   if (spec.children) keys.push("children/<title>/<key>");
   return keys;
@@ -2379,7 +2827,7 @@ function writeKeyHints(spec: ReadSurfaceSpec): string[] {
     if (section.collection === "task") {
       keys.push("tasks=insert", "tasks/<id>=delete", "tasks/<id>/<field>=set");
     } else if (section.collection === "reference") {
-      keys.push("references/<id>=delete", "references/<id>/<field>=set");
+      keys.push("references=insert", "references/<i>=delete", "references/<i>/{link|label|note}=set");
     } else {
       keys.push(`${section.key}=set|append|prepend|replace`);
     }
@@ -2461,210 +2909,49 @@ function isHeadingOnlyBlock(value: string): boolean {
 }
 
 function readReferences(_content: string, context: SectionTransformContext): Record<string, ReferenceRead> {
-  const items: Record<string, ReferenceRead> = {};
-  if (!context.range) return items;
-
-  let cursor = context.range.start;
-  let line = lineNumberAt(context.content, context.range.start);
-  while (cursor < context.range.end) {
-    const span = readLineSpan(context.content, cursor, context.range.end);
-    if (!span) break;
-
-    const reference = readReferenceLine(context.ctx, context.file.path, line, span.text);
-    if (reference) {
-      const id = uniqueReadId(reference.id, items);
-      items[id] = reference.reference;
-    }
-
-    cursor = span.next;
-    line += 1;
-  }
-
-  return items;
-}
-
-async function findEditableReferenceLine(
-  ctx: WorkflowContext,
-  file: TFile,
-  section: ReadSectionSpec,
-  id: string
-): Promise<EditableReferenceLine | undefined> {
-  const content = await ctx.app.vault.read(file);
-  const range = findSectionContentRange(content, section);
-  if (!range) return undefined;
-
-  const items: Record<string, ReferenceRead> = {};
-  let cursor = range.start;
-  let line = lineNumberAt(content, range.start);
-  while (cursor < range.end) {
-    const span = lineTextRangeAt(content, cursor, range.end);
-    if (!span) break;
-
-    const text = content.slice(span.start, span.endWithoutBreak);
-    const reference = readReferenceLine(ctx, file.path, line, text);
-    if (reference) {
-      const lineId = uniqueReadId(reference.id, items);
-      items[lineId] = reference.reference;
-      if (lineId === id) {
-        return {
-          ...reference,
-          id: lineId,
-          range: span
-        };
-      }
-    }
-
-    cursor = span.end;
-    line += 1;
-  }
-
-  return undefined;
-}
-
-function readReferenceLine(ctx: WorkflowContext, sourcePath: string, line: number, text: string): ReferenceLineRead | undefined {
-  const parts = splitReferenceLine(text);
-  if (!parts) return undefined;
-
-  const parsed = parseReferenceBody(ctx, sourcePath, parts.body);
-  const reference = parsed.reference;
-  const idSource = reference.path ?? reference.target ?? reference.text ?? parts.body;
-  return {
-    id: `ref-${hashReadId(idSource || `${sourcePath}:${line}:${parts.body}`)}`,
-    reference,
-    prefix: parts.prefix,
-    format: parsed.format,
-    rawTarget: parsed.rawTarget,
-    rawLabel: parsed.rawLabel
-  };
-}
-
-function splitReferenceLine(value: string): { prefix: string; body: string } | undefined {
-  const match = value.match(/^(\s*(?:(?:>\s*)+)?\s*(?:(?:[-*+]|\d+[.)])\s+)?)(.*?)\s*$/);
-  const body = match?.[2]?.trim() ?? "";
-  if (!body) return undefined;
-  return {
-    prefix: match?.[1] ?? "",
-    body
-  };
-}
-
-function parseReferenceBody(
-  ctx: WorkflowContext,
-  sourcePath: string,
-  value: string
-): {
-  reference: ReferenceRead;
-  format: ReferenceLineFormat;
-  rawTarget?: string;
-  rawLabel?: string;
-} {
-  const wiki = value.match(/^\[\[([^\]|]+)(?:\|([^\]]+))?\]\]$/);
-  if (wiki) {
-    return {
-      reference: readWikiReference(ctx, sourcePath, wiki[1], wiki[2]),
-      format: "wiki",
-      rawTarget: wiki[1].trim(),
-      rawLabel: wiki[2]?.trim() || undefined
-    };
-  }
-
-  const markdown = value.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-  if (markdown) {
-    return {
-      reference: readMarkdownReference(ctx, markdown[1], markdown[2]),
-      format: "markdown",
-      rawTarget: markdown[2].trim(),
-      rawLabel: markdown[1].trim()
-    };
-  }
-
-  if (isExternalReference(value)) {
-    return {
-      reference: {
-        kind: "url",
-        target: value
-      },
-      format: "url",
-      rawTarget: value
-    };
-  }
-
-  return {
-    reference: {
-      kind: "text",
-      text: value
-    },
-    format: "text"
-  };
+  return Object.fromEntries(
+    readReferenceItems(context.ctx, context.file).map((item, index) => [String(index), item])
+  );
 }
 
 function readReferenceWritableField(value: string, originalKey: string): ReferenceWritableField {
-  if (value === "label" || value === "target") return value;
+  if (value === "link" || value === "label" || value === "note") return value;
+  if (value === "kind" || value === "path" || value === "target") {
+    throw new Error(`reference field is read-only for update key: ${originalKey}`);
+  }
   throw new Error(`unknown reference field for update key: ${originalKey}`);
 }
 
-function serializeReferenceBodyWithLabel(line: EditableReferenceLine, value: string): string {
-  const label = value.trim();
-  if (!label) throw new Error("reference label is required");
-  if (line.format === "text") throw new Error("text references do not support label updates");
-
-  const target = line.rawTarget ?? line.reference.target ?? line.reference.path;
-  if (!target) throw new Error("reference target is missing");
-
-  if (line.format === "wiki") return wikiLink(target, label);
-  return `[${escapeMarkdownLinkLabel(label)}](${target})`;
+function parseReferenceIndex(value: string, originalKey: string): number {
+  if (!/^\d+$/.test(value)) throw new Error(`reference index must be a non-negative integer for update key: ${originalKey}`);
+  return Number(value);
 }
 
-function serializeReferenceBodyWithTarget(ctx: WorkflowContext, line: EditableReferenceLine, value: string): string {
-  const target = value.trim();
-  if (!target) throw new Error("reference target is required");
-
-  const label = line.rawLabel?.trim() || undefined;
-  return resolveReferenceTarget(ctx, target, label).line;
-}
-
-function readWikiReference(
-  ctx: WorkflowContext,
-  sourcePath: string,
-  rawTarget: string,
-  rawLabel: string | undefined
-): ReferenceRead {
-  const target = rawTarget.trim();
-  const dest = ctx.app.metadataCache.getFirstLinkpathDest(target, sourcePath);
-  const path = dest?.path ?? normalizeVaultPath(target.split("#")[0]);
+function normalizeReferenceInsertValue(value: unknown): ReferenceWriteInput {
+  if (!isRecord(value)) throw new Error("reference insert requires value_json object");
+  for (const key of Object.keys(value)) {
+    if (key !== "link" && key !== "label" && key !== "note" && key !== "position") {
+      throw new Error(`unknown reference field: ${key}`);
+    }
+  }
   return {
-    kind: path.endsWith(".md") ? "note" : "wiki",
-    path,
-    label: rawLabel?.trim() || pathBasenameWithoutExtension(path)
+    link: value.link,
+    ...(hasOwn(value, "label") ? { label: value.label } : {}),
+    ...(hasOwn(value, "note") ? { note: value.note } : {}),
+    ...(hasOwn(value, "position") ? { position: value.position } : {})
   };
 }
 
-function readMarkdownReference(ctx: WorkflowContext, rawLabel: string, rawTarget: string): ReferenceRead {
-  const label = rawLabel.trim();
-  const target = rawTarget.trim();
-  if (isExternalReference(target)) {
-    return {
-      kind: "url",
-      label,
-      target
-    };
+function readReferenceFieldUpdateValue(field: ReferenceWritableField, options: UpdatePayloadOptions): unknown {
+  const value = requireUpdateValue(options);
+  if (options.valueSource === "value_json") {
+    if (value === null && (field === "label" || field === "note")) return null;
+    if (typeof value === "string") return value;
+    throw new Error(`reference ${field} update requires ${field === "link" ? "a string" : "a string or null"}`);
   }
-
-  const path = normalizeVaultPath(target);
-  const file = ctx.app.vault.getAbstractFileByPath(path);
-  if (file instanceof TFile) {
-    return {
-      kind: path.endsWith(".md") ? "note" : "file",
-      label,
-      path
-    };
-  }
-
-  return {
-    kind: "markdown",
-    label,
-    target
-  };
+  if (typeof value !== "string") throw new Error(`reference ${field} update requires value`);
+  if (field === "link" && !value.trim()) throw new Error("reference link is required");
+  return value;
 }
 
 const TASK_DATE_FIELDS: Array<{ key: TaskDateMetadataField; re: RegExp }> = [
@@ -3993,7 +4280,7 @@ async function cleanupStructuredReferences(
 ): Promise<DeleteCleanupResult> {
   return {
     frontmatter: await cleanupFrontmatterReferences(ctx, targets, deletedPathSet),
-    references: await cleanupReferenceSectionLinks(ctx, targets, deletedPathSet)
+    references: await cleanupReferenceFrontmatterItems(ctx, targets, deletedPathSet)
   };
 }
 
@@ -4060,7 +4347,7 @@ function removeTargetFrontmatterLinks(
   return { changed: false, value };
 }
 
-async function cleanupReferenceSectionLinks(
+async function cleanupReferenceFrontmatterItems(
   ctx: WorkflowContext,
   targets: TFile[],
   deletedPathSet: Set<string>
@@ -4068,53 +4355,39 @@ async function cleanupReferenceSectionLinks(
   let removed = 0;
   for (const file of ctx.app.vault.getMarkdownFiles()) {
     if (deletedPathSet.has(file.path)) continue;
-    const count = await removeSafeReferenceLines(ctx, file, targets);
-    removed += count;
+    const frontmatter = fileFrontmatter(ctx, file);
+    if (!Array.isArray(frontmatter.references)) continue;
+    if (!frontmatter.references.some((item) => referenceFrontmatterItemReferencesAnyTarget(ctx, file.path, item, targets))) continue;
+
+    await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+      const current = Array.isArray(fm.references) ? fm.references : [];
+      const next: unknown[] = [];
+      for (const item of current) {
+        if (referenceFrontmatterItemReferencesAnyTarget(ctx, file.path, item, targets)) {
+          removed += 1;
+        } else {
+          next.push(item);
+        }
+      }
+      if (next.length > 0) {
+        fm.references = next;
+      } else {
+        delete fm.references;
+      }
+    });
   }
   return removed;
 }
 
-async function removeSafeReferenceLines(
+function referenceFrontmatterItemReferencesAnyTarget(
   ctx: WorkflowContext,
-  source: TFile,
+  sourcePath: string,
+  item: unknown,
   targets: TFile[]
-): Promise<number> {
-  const content = await ctx.app.vault.read(source);
-  const range = referenceCleanupRange(content);
-  if (!range) return 0;
-
-  const spans: TextRange[] = [];
-  let cursor = range.start;
-  while (cursor < range.end) {
-    const span = lineTextRangeAt(content, cursor, range.end);
-    if (!span) break;
-    const text = content.slice(span.start, span.endWithoutBreak);
-    const linkPath = standaloneReferenceLinkPath(text);
-    if (linkPath && linkReferencesAnyTarget(ctx, source.path, linkPath, targets)) {
-      spans.push({
-        start: span.start,
-        end: span.end
-      });
-    }
-    cursor = span.end;
-  }
-  if (spans.length === 0) return 0;
-
-  const updated = removeTextRanges(content, spans);
-  if (updated !== content) await ctx.app.vault.modify(source, updated);
-  return spans.length;
-}
-
-function referenceCleanupRange(content: string): TextRange | undefined {
-  return findSectionContentRange(content, { key: "references", labelKey: "references" });
-}
-
-function standaloneReferenceLinkPath(line: string): string | undefined {
-  let text = line.trim();
-  text = text.replace(/^(?:>\s*)+/, "").trim();
-  text = text.replace(/^(?:[-*+]\s+|\d+[.)]\s+)/, "").trim();
-  if (!text) return undefined;
-  return readWikiLinkPath(text);
+): boolean {
+  if (typeof item === "string") return stringReferencesAnyTarget(ctx, sourcePath, item, targets);
+  if (!isRecord(item) || typeof item.link !== "string") return false;
+  return stringReferencesAnyTarget(ctx, sourcePath, item.link, targets);
 }
 
 function lineTextRangeAt(

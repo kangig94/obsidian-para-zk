@@ -1,6 +1,5 @@
 import {
   ButtonComponent,
-  DropdownComponent,
   Modal,
   Notice,
   Setting,
@@ -22,6 +21,21 @@ import {
   type WorkflowContext
 } from "../workflows";
 import { promptText } from "./prompts";
+import {
+  beginRegistryBlockRender,
+  canRegistryDragReorder,
+  createRegistryDragReorder,
+  isCurrentRegistryBlockGeneration,
+  queueRegistryFileWrite,
+  registryErrorMessage,
+  renderRegistryBlockError,
+  renderRegistryRow,
+  renderRegistryToolbar,
+  renderRegistryToolbarSelect,
+  runRegistryBlockAction,
+  type RegistryBlockState,
+  type RegistryDragOptions
+} from "./registry-block";
 
 type TaskBlockArgs = {
   root: "current" | "all";
@@ -43,15 +57,9 @@ type TaskToolbarState = {
   priority: TaskPriorityFilter;
 };
 
-type TaskBlockState = {
-  toolbar: TaskToolbarState;
-  generation: number;
+type TaskBlockState = RegistryBlockState<TaskToolbarState, RenderableTask> & {
   checkboxMutationSerial: number;
   pendingCheckboxTimer?: number;
-  draggingTaskId?: string;
-  summaryEl?: HTMLElement;
-  items: RenderableTask[];
-  visible: RenderableTask[];
 };
 
 type RenderableTask = {
@@ -68,13 +76,8 @@ type TaskMetaChip = {
 
 type TaskEditValue = Pick<TaskRead, "name" | "priority" | "due" | "scheduled" | "start">;
 
-type TaskDragOptions = {
-  onDrop: (draggedId: string, targetId: string, placeAfter: boolean) => Promise<void>;
-};
-
 const CHECKBOX_RECONCILE_DELAY_MS = 1200;
 const taskBlockStates = new WeakMap<HTMLElement, TaskBlockState>();
-const taskWriteQueues = new Map<string, Promise<unknown>>();
 
 export function registerTaskRenderers(plugin: ParaZkPluginContext): void {
   plugin.registerMarkdownCodeBlockProcessor("para-zk-tasks", (source, el, ctx) => {
@@ -115,6 +118,15 @@ async function renderTaskBlock(
     blockState.items = items;
     blockState.visible = visible;
     const canReorder = canDragReorder(args, blockState.toolbar, items, visible);
+    const drag = canReorder && rootFile ? createRegistryDragReorder<RenderableTask>({
+      visibleItems: () => blockState.visible,
+      itemKey: taskItemKey,
+      persistOrder: (nextIds) => queueRootTaskWrite(
+        rootFile,
+        () => reorderRootTasks(taskContext(plugin), rootFile, nextIds)
+      ),
+      rerender: () => renderTaskBlock(plugin, source, el, ctx)
+    }) : undefined;
 
     renderTaskToolbar(plugin, el, source, ctx, {
       args,
@@ -137,17 +149,7 @@ async function renderTaskBlock(
         ctx,
         el,
         showRoot: args.root === "all",
-        drag: canReorder && rootFile ? {
-          onDrop: async (draggedId, targetId, placeAfter) => {
-            const nextIds = reorderedTaskIds(blockState.visible, draggedId, targetId, placeAfter);
-            if (!nextIds) return;
-            await queueRootTaskWrite(
-              rootFile,
-              () => reorderRootTasks(taskContext(plugin), rootFile, nextIds)
-            );
-            await renderTaskBlock(plugin, source, el, ctx);
-          }
-        } : undefined,
+        drag,
         rerender: () => renderTaskBlock(plugin, source, el, ctx)
       });
     }
@@ -170,89 +172,73 @@ function renderTaskToolbar(
   }
 ): void {
   const labels = localePack(plugin.settings.locale).labels;
-  const toolbar = el.createDiv({ cls: "para-zk-task-toolbar" });
-  const heading = toolbar.createDiv({ cls: "para-zk-task-toolbar-heading" });
-  options.blockState.summaryEl = heading.createDiv({
-    cls: "para-zk-task-toolbar-summary",
-    text: taskSummaryText(options.items, options.visible, labels)
-  });
+  const rendered = renderRegistryToolbar(el, {
+    toolbarClass: "para-zk-task-toolbar",
+    headingClass: "para-zk-task-toolbar-heading",
+    summaryClass: "para-zk-task-toolbar-summary",
+    controlsClass: "para-zk-task-toolbar-controls",
+    summaryText: taskSummaryText(options.items, options.visible, labels),
+    renderControls: (controls) => {
+      const rootFile = options.rootFile;
+      if (options.args.root === "current" && rootFile) {
+        const add = new ButtonComponent(controls);
+        const addButton = add.buttonEl;
+        addButton.addClass("para-zk-task-toolbar-button", "para-zk-task-add");
+        addButton.setAttr("aria-label", labels.addTask);
+        add
+          .setIcon("plus")
+          .setButtonText(labels.addTask)
+          .setTooltip(labels.addTask)
+          .onClick(async () => {
+            await runRegistryBlockAction(addButton, async () => {
+              const name = await promptText(
+                plugin.app,
+                labels.tasks,
+                labels.title,
+                "",
+                labels.confirm,
+                labels.cancel
+              );
+              if (!name) return;
+              await queueRootTaskWrite(rootFile, () => insertRootTask(taskContext(plugin), rootFile, { name }));
+              await renderTaskBlock(plugin, source, el, ctx);
+            });
+          });
+      }
 
-  const controls = toolbar.createDiv({ cls: "para-zk-task-toolbar-controls" });
-  const rootFile = options.rootFile;
-  if (options.args.root === "current" && rootFile) {
-    const add = new ButtonComponent(controls);
-    const addButton = add.buttonEl;
-    addButton.addClass("para-zk-task-toolbar-button", "para-zk-task-add");
-    addButton.setAttr("aria-label", labels.addTask);
-    add
-      .setIcon("plus")
-      .setButtonText(labels.addTask)
-      .setTooltip(labels.addTask)
-      .onClick(async () => {
-        await runTaskAction(plugin, addButton, async () => {
-          const name = await promptText(
-            plugin.app,
-            labels.tasks,
-            labels.title,
-            "",
-            labels.confirm,
-            labels.cancel
-          );
-          if (!name) return;
-          await queueRootTaskWrite(rootFile, () => insertRootTask(taskContext(plugin), rootFile, { name }));
-          await renderTaskBlock(plugin, source, el, ctx);
-        });
+      renderRegistryToolbarSelect(controls, {
+        selectClass: "para-zk-task-toolbar-select",
+        label: labels.taskOrder,
+        value: options.blockState.toolbar.order,
+        options: taskOrderOptions(labels, options.args.root === "current"),
+        onChange: (value) => {
+          options.blockState.toolbar.order = value;
+          void renderTaskBlock(plugin, source, el, ctx);
+        }
       });
-  }
-
-  renderToolbarSelect(controls, {
-    label: labels.taskOrder,
-    value: options.blockState.toolbar.order,
-    options: taskOrderOptions(labels, options.args.root === "current"),
-    onChange: (value) => {
-      options.blockState.toolbar.order = value as TaskOrder;
-      void renderTaskBlock(plugin, source, el, ctx);
+      renderRegistryToolbarSelect(controls, {
+        selectClass: "para-zk-task-toolbar-select",
+        label: labels.status,
+        value: options.blockState.toolbar.status,
+        options: taskStatusOptions(labels),
+        onChange: (value) => {
+          options.blockState.toolbar.status = value;
+          void renderTaskBlock(plugin, source, el, ctx);
+        }
+      });
+      renderRegistryToolbarSelect(controls, {
+        selectClass: "para-zk-task-toolbar-select",
+        label: labels.priority,
+        value: options.blockState.toolbar.priority,
+        options: taskPriorityOptions(labels),
+        onChange: (value) => {
+          options.blockState.toolbar.priority = value;
+          void renderTaskBlock(plugin, source, el, ctx);
+        }
+      });
     }
   });
-  renderToolbarSelect(controls, {
-    label: labels.status,
-    value: options.blockState.toolbar.status,
-    options: taskStatusOptions(labels),
-    onChange: (value) => {
-      options.blockState.toolbar.status = value as TaskStatusFilter;
-      void renderTaskBlock(plugin, source, el, ctx);
-    }
-  });
-  renderToolbarSelect(controls, {
-    label: labels.priority,
-    value: options.blockState.toolbar.priority,
-    options: taskPriorityOptions(labels),
-    onChange: (value) => {
-      options.blockState.toolbar.priority = value as TaskPriorityFilter;
-      void renderTaskBlock(plugin, source, el, ctx);
-    }
-  });
-}
-
-function renderToolbarSelect(
-  parent: HTMLElement,
-  options: {
-    label: string;
-    value: string;
-    options: Array<{ value: string; label: string }>;
-    onChange: (value: string) => void;
-  }
-): void {
-  const wrap = parent.createDiv({ cls: "para-zk-task-toolbar-select" });
-  const dropdown = new DropdownComponent(wrap);
-  dropdown.selectEl.setAttr("aria-label", options.label);
-  dropdown.selectEl.setAttr("title", options.label);
-  for (const item of options.options) {
-    dropdown.addOption(item.value, item.label);
-  }
-  dropdown
-    .setValue(options.value)
-    .onChange(options.onChange);
+  options.blockState.summaryEl = rendered.summaryEl;
 }
 
 async function currentRootTasks(plugin: ParaZkPluginContext, rootFile: TFile): Promise<RenderableTask[]> {
@@ -279,57 +265,8 @@ async function allRootTasks(plugin: ParaZkPluginContext): Promise<RenderableTask
   });
 }
 
-function attachTaskDragHandle(
-  plugin: ParaZkPluginContext,
-  list: HTMLElement,
-  row: HTMLElement,
-  item: RenderableTask,
-  state: TaskBlockState,
-  drag: TaskDragOptions
-): void {
-  const labels = localePack(plugin.settings.locale).labels;
-  const handle = new ButtonComponent(row);
-  const button = handle.buttonEl;
-  button.addClass("para-zk-task-drag");
-  button.draggable = true;
-  button.setAttr("aria-label", labels.reorderTask);
-  handle
-    .setIcon("grip-vertical")
-    .setTooltip(labels.reorderTask);
-
-  button.addEventListener("dragstart", (event) => {
-    state.draggingTaskId = item.id;
-    row.addClass("is-dragging");
-    event.dataTransfer?.setData("text/plain", item.id);
-    if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
-  });
-  button.addEventListener("dragend", () => {
-    state.draggingTaskId = undefined;
-    cleanupTaskDragMarks(list);
-  });
-
-  row.addEventListener("dragover", (event) => {
-    const draggedId = state.draggingTaskId;
-    if (!draggedId || draggedId === item.id) return;
-    event.preventDefault();
-    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-    markTaskDropPosition(list, row, isTaskDropAfter(event, row));
-  });
-  row.addEventListener("dragleave", (event) => {
-    if (event.relatedTarget instanceof Node && row.contains(event.relatedTarget)) return;
-    row.removeClass("is-drop-before", "is-drop-after");
-  });
-  row.addEventListener("drop", (event) => {
-    const draggedId = state.draggingTaskId ?? event.dataTransfer?.getData("text/plain");
-    if (!draggedId || draggedId === item.id) return;
-    event.preventDefault();
-    const placeAfter = isTaskDropAfter(event, row);
-    state.draggingTaskId = undefined;
-    cleanupTaskDragMarks(list);
-    void drag.onDrop(draggedId, item.id, placeAfter).catch((error: unknown) => {
-      new Notice(errorMessage(error));
-    });
-  });
+function taskItemKey(item: RenderableTask): string {
+  return item.id;
 }
 
 function renderTaskRow(
@@ -342,54 +279,79 @@ function renderTaskRow(
     ctx: MarkdownPostProcessorContext;
     el: HTMLElement;
     showRoot: boolean;
-    drag?: TaskDragOptions;
+    drag?: RegistryDragOptions;
     rerender: () => Promise<void>;
   }
 ): void {
-  const row = list.createDiv({ cls: "para-zk-task-row" });
-  row.dataset.taskId = item.id;
-  if (options.drag) {
-    row.addClass("is-reorderable");
-    attachTaskDragHandle(plugin, list, row, item, options.blockState, options.drag);
-  }
+  const labels = localePack(plugin.settings.locale).labels;
+  renderRegistryRow(list, item, {
+    rowClass: "para-zk-task-row",
+    dataset: { taskId: item.id },
+    reorderableClass: "is-reorderable",
+    drag: options.drag ? {
+      state: options.blockState,
+      itemKey: taskItemKey,
+      handleClass: "para-zk-task-drag",
+      label: labels.reorderTask,
+      rowSelector: ".para-zk-task-row",
+      drag: options.drag
+    } : undefined,
+    renderBody: (row) => {
+      const checkboxAction = new ButtonComponent(row);
+      const checkbox = checkboxAction.buttonEl;
+      checkbox.addClass("para-zk-task-checkbox", taskCheckboxClass(item.task.checkbox));
+      checkbox.setAttr("aria-label", `Task status ${item.task.checkbox.trim() || "open"}`);
+      checkboxAction
+        .setButtonText(taskCheckboxText(item.task.checkbox))
+        .setTooltip("Cycle task status")
+        .onClick(async () => {
+          await runRegistryBlockAction(checkbox, async () => {
+            const clickGeneration = options.blockState.generation;
+            const mutationSerial = options.blockState.checkboxMutationSerial + 1;
+            options.blockState.checkboxMutationSerial = mutationSerial;
+            cancelPendingCheckboxReconcile(options.blockState);
 
-  const checkboxAction = new ButtonComponent(row);
-  const checkbox = checkboxAction.buttonEl;
-  checkbox.addClass("para-zk-task-checkbox", taskCheckboxClass(item.task.checkbox));
-  checkbox.setAttr("aria-label", `Task status ${item.task.checkbox.trim() || "open"}`);
-  checkboxAction
-    .setButtonText(taskCheckboxText(item.task.checkbox))
-    .setTooltip("Cycle task status")
-    .onClick(async () => {
-      await runTaskAction(plugin, checkbox, async () => {
-        const clickGeneration = options.blockState.generation;
-        const mutationSerial = options.blockState.checkboxMutationSerial + 1;
-        options.blockState.checkboxMutationSerial = mutationSerial;
-        cancelPendingCheckboxReconcile(options.blockState);
+            const previous = item.task.checkbox;
+            const next = cycleTaskCheckbox(previous);
+            setRenderableTaskCheckbox(item, checkboxAction, checkbox, next);
+            updateTaskSummary(plugin, options.blockState);
+            try {
+              await queueRootTaskWrite(
+                item.rootFile,
+                () => setRootTaskField(
+                  taskContext(plugin),
+                  item.rootFile,
+                  item.id,
+                  "checkbox",
+                  next
+                )
+              );
+            } catch (error) {
+              setRenderableTaskCheckbox(item, checkboxAction, checkbox, previous);
+              updateTaskSummary(plugin, options.blockState);
+              if (
+                options.el.isConnected
+                && isCurrentTaskBlockGeneration(options.el, clickGeneration)
+                && options.blockState.checkboxMutationSerial === mutationSerial
+              ) {
+                scheduleCheckboxReconcile(
+                  plugin,
+                  options.source,
+                  options.el,
+                  options.ctx,
+                  options.blockState,
+                  clickGeneration
+                );
+              }
+              throw error;
+            }
 
-        const previous = item.task.checkbox;
-        const next = cycleTaskCheckbox(previous);
-        setRenderableTaskCheckbox(item, checkboxAction, checkbox, next);
-        updateTaskSummary(plugin, options.blockState);
-        try {
-          await queueRootTaskWrite(
-            item.rootFile,
-            () => setRootTaskField(
-              taskContext(plugin),
-              item.rootFile,
-              item.id,
-              "checkbox",
-              next
-            )
-          );
-        } catch (error) {
-          setRenderableTaskCheckbox(item, checkboxAction, checkbox, previous);
-          updateTaskSummary(plugin, options.blockState);
-          if (
-            options.el.isConnected
-            && isCurrentTaskBlockGeneration(options.el, clickGeneration)
-            && options.blockState.checkboxMutationSerial === mutationSerial
-          ) {
+            if (!options.el.isConnected) return;
+            if (!isCurrentTaskBlockGeneration(options.el, clickGeneration)) {
+              await renderTaskBlock(plugin, options.source, options.el, options.ctx);
+              return;
+            }
+            if (options.blockState.checkboxMutationSerial !== mutationSerial) return;
             scheduleCheckboxReconcile(
               plugin,
               options.source,
@@ -398,71 +360,62 @@ function renderTaskRow(
               options.blockState,
               clickGeneration
             );
-          }
-          throw error;
+          });
+        });
+
+      const body = row.createDiv({ cls: "para-zk-task-body" });
+      body.createDiv({ cls: "para-zk-task-name", text: item.task.name });
+
+      const meta = taskMeta(item.task);
+      if (options.showRoot || meta.length > 0) {
+        const metaEl = body.createDiv({ cls: "para-zk-task-meta" });
+        if (options.showRoot) {
+          const rootLink = new ButtonComponent(metaEl);
+          rootLink.buttonEl.addClass("para-zk-task-root");
+          rootLink
+            .setButtonText(item.rootTitle)
+            .onClick(async () => {
+              await plugin.app.workspace.getLeaf(false).openFile(item.rootFile);
+            });
         }
-
-        if (!options.el.isConnected) return;
-        if (!isCurrentTaskBlockGeneration(options.el, clickGeneration)) {
-          await renderTaskBlock(plugin, options.source, options.el, options.ctx);
-          return;
+        for (const chip of meta) {
+          metaEl.createSpan({
+            cls: `para-zk-task-chip para-zk-task-chip-${chip.kind}`,
+            text: chip.label
+          });
         }
-        if (options.blockState.checkboxMutationSerial !== mutationSerial) return;
-        scheduleCheckboxReconcile(plugin, options.source, options.el, options.ctx, options.blockState, clickGeneration);
-      });
-    });
+      }
 
-  const body = row.createDiv({ cls: "para-zk-task-body" });
-  body.createDiv({ cls: "para-zk-task-name", text: item.task.name });
+      const actions = row.createDiv({ cls: "para-zk-task-actions" });
+      const editAction = new ButtonComponent(actions);
+      const edit = editAction.buttonEl;
+      edit.addClass("para-zk-task-edit");
+      edit.setAttr("aria-label", "Edit task");
+      editAction
+        .setIcon("pencil")
+        .setTooltip("Edit task")
+        .onClick(() => {
+          new TaskEditModal(plugin, item.task, async (value) => {
+            await updateTaskFromEditor(plugin, item, value);
+            await options.rerender();
+          }).open();
+        });
 
-  const meta = taskMeta(item.task);
-  if (options.showRoot || meta.length > 0) {
-    const metaEl = body.createDiv({ cls: "para-zk-task-meta" });
-    if (options.showRoot) {
-      const rootLink = new ButtonComponent(metaEl);
-      rootLink.buttonEl.addClass("para-zk-task-root");
-      rootLink
-        .setButtonText(item.rootTitle)
+      const removeAction = new ButtonComponent(actions);
+      const remove = removeAction.buttonEl;
+      remove.addClass("para-zk-task-delete");
+      remove.setAttr("aria-label", "Delete task");
+      removeAction
+        .setIcon("trash")
+        .setTooltip("Delete task")
         .onClick(async () => {
-          await plugin.app.workspace.getLeaf(false).openFile(item.rootFile);
+          await runRegistryBlockAction(remove, async () => {
+            await queueRootTaskWrite(item.rootFile, () => deleteRootTask(taskContext(plugin), item.rootFile, item.id));
+            await options.rerender();
+          });
         });
     }
-    for (const chip of meta) {
-      metaEl.createSpan({
-        cls: `para-zk-task-chip para-zk-task-chip-${chip.kind}`,
-        text: chip.label
-      });
-    }
-  }
-
-  const actions = row.createDiv({ cls: "para-zk-task-actions" });
-  const editAction = new ButtonComponent(actions);
-  const edit = editAction.buttonEl;
-  edit.addClass("para-zk-task-edit");
-  edit.setAttr("aria-label", "Edit task");
-  editAction
-    .setIcon("pencil")
-    .setTooltip("Edit task")
-    .onClick(() => {
-      new TaskEditModal(plugin, item.task, async (value) => {
-        await updateTaskFromEditor(plugin, item, value);
-        await options.rerender();
-      }).open();
-    });
-
-  const removeAction = new ButtonComponent(actions);
-  const remove = removeAction.buttonEl;
-  remove.addClass("para-zk-task-delete");
-  remove.setAttr("aria-label", "Delete task");
-  removeAction
-    .setIcon("trash")
-    .setTooltip("Delete task")
-    .onClick(async () => {
-      await runTaskAction(plugin, remove, async () => {
-        await queueRootTaskWrite(item.rootFile, () => deleteRootTask(taskContext(plugin), item.rootFile, item.id));
-        await options.rerender();
-      });
-    });
+  });
 }
 
 async function updateTaskFromEditor(plugin: ParaZkPluginContext, item: RenderableTask, value: TaskEditValue): Promise<void> {
@@ -482,25 +435,11 @@ function taskContext(plugin: ParaZkPluginContext): WorkflowContext {
   };
 }
 
-async function runTaskAction(plugin: ParaZkPluginContext, button: HTMLButtonElement, action: () => Promise<void>): Promise<void> {
-  button.disabled = true;
-  try {
-    await action();
-  } catch (error) {
-    new Notice(errorMessage(error));
-  } finally {
-    button.disabled = false;
-  }
-}
-
 function renderTaskError(el: HTMLElement, error: unknown): void {
-  el.empty();
-  el.addClass("para-zk-tasks");
-  el.createDiv({ cls: "para-zk-task-empty", text: errorMessage(error) });
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  renderRegistryBlockError(el, error, {
+    blockClass: "para-zk-tasks",
+    emptyClass: "para-zk-task-empty"
+  });
 }
 
 class TaskEditModal extends Modal {
@@ -608,7 +547,7 @@ class TaskEditModal extends Modal {
       });
       this.close();
     } catch (error) {
-      new Notice(errorMessage(error));
+      new Notice(registryErrorMessage(error));
     } finally {
       this.saving = false;
     }
@@ -616,31 +555,18 @@ class TaskEditModal extends Modal {
 }
 
 function beginTaskBlockRender(el: HTMLElement, args: TaskBlockArgs): TaskBlockState {
-  const state = taskBlockState(el, args);
-  state.generation += 1;
-  state.draggingTaskId = undefined;
-  cancelPendingCheckboxReconcile(state);
-  return state;
-}
-
-function taskBlockState(el: HTMLElement, args: TaskBlockArgs): TaskBlockState {
-  const existing = taskBlockStates.get(el);
-  if (existing) return existing;
-
-  const state: TaskBlockState = {
+  return beginRegistryBlockRender(taskBlockStates, el, args, (stateArgs) => ({
     toolbar: {
-      order: args.order ?? "smart",
-      status: initialStatusFilter(args.checkbox),
-      due: args.due ?? "any",
+      order: stateArgs.order ?? "smart",
+      status: initialStatusFilter(stateArgs.checkbox),
+      due: stateArgs.due ?? "any",
       priority: "any"
     },
     generation: 0,
     checkboxMutationSerial: 0,
     items: [],
     visible: []
-  };
-  taskBlockStates.set(el, state);
-  return state;
+  }), cancelPendingCheckboxReconcile);
 }
 
 function cancelPendingCheckboxReconcile(state: TaskBlockState): void {
@@ -650,7 +576,7 @@ function cancelPendingCheckboxReconcile(state: TaskBlockState): void {
 }
 
 function isCurrentTaskBlockGeneration(el: HTMLElement, generation: number): boolean {
-  return taskBlockStates.get(el)?.generation === generation;
+  return isCurrentRegistryBlockGeneration(taskBlockStates, el, generation);
 }
 
 function scheduleCheckboxReconcile(
@@ -671,19 +597,7 @@ function scheduleCheckboxReconcile(
 }
 
 async function queueRootTaskWrite<T>(rootFile: TFile, write: () => Promise<T>): Promise<T> {
-  const key = rootFile.path;
-  const previous = taskWriteQueues.get(key) ?? Promise.resolve();
-  const current = previous
-    .catch(() => undefined)
-    .then(write);
-  taskWriteQueues.set(key, current);
-  try {
-    return await current;
-  } finally {
-    if (taskWriteQueues.get(key) === current) {
-      taskWriteQueues.delete(key);
-    }
-  }
+  return queueRegistryFileWrite(rootFile, write);
 }
 
 function updateTaskSummary(plugin: ParaZkPluginContext, state: TaskBlockState): void {
@@ -701,53 +615,15 @@ function canDragReorder(
   items: RenderableTask[],
   visible: RenderableTask[]
 ): boolean {
-  return args.root === "current"
-    && state.order === "manual"
-    && state.status === "all"
-    && state.due === "any"
-    && state.priority === "any"
-    && visible.length === items.length
-    && items.length > 1;
-}
-
-function reorderedTaskIds(
-  visible: RenderableTask[],
-  draggedId: string,
-  targetId: string,
-  placeAfter: boolean
-): string[] | undefined {
-  const ids = visible.map((item) => item.id);
-  const from = ids.indexOf(draggedId);
-  const target = ids.indexOf(targetId);
-  if (from === -1 || target === -1 || from === target) return undefined;
-
-  const [moved] = ids.splice(from, 1);
-  const targetAfterRemoval = ids.indexOf(targetId);
-  const insertAt = targetAfterRemoval + (placeAfter ? 1 : 0);
-  ids.splice(insertAt, 0, moved);
-  return ids;
-}
-
-function isTaskDropAfter(event: DragEvent, row: HTMLElement): boolean {
-  const rect = row.getBoundingClientRect();
-  return event.clientY > rect.top + rect.height / 2;
-}
-
-function markTaskDropPosition(list: HTMLElement, row: HTMLElement, placeAfter: boolean): void {
-  cleanupTaskDropMarks(list);
-  row.addClass(placeAfter ? "is-drop-after" : "is-drop-before");
-}
-
-function cleanupTaskDropMarks(list: HTMLElement): void {
-  for (const row of list.querySelectorAll(".para-zk-task-row")) {
-    row.removeClass("is-drop-before", "is-drop-after");
-  }
-}
-
-function cleanupTaskDragMarks(list: HTMLElement): void {
-  for (const row of list.querySelectorAll(".para-zk-task-row")) {
-    row.removeClass("is-dragging", "is-drop-before", "is-drop-after");
-  }
+  return canRegistryDragReorder(
+    items,
+    visible,
+    args.root === "current"
+      && state.order === "manual"
+      && state.status === "all"
+      && state.due === "any"
+      && state.priority === "any"
+  );
 }
 
 function setRenderableTaskCheckbox(

@@ -573,6 +573,272 @@
   width: min(360px, 100%);
 }
 
+.para-zk-references {
+  margin: 0.75em 0 1em;
+}
+
+.para-zk-reference-toolbar,
+.para-zk-references-toolbar {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin-bottom: 7px;
+  min-width: 0;
+}
+
+.para-zk-reference-toolbar-heading,
+.para-zk-references-toolbar-heading {
+  min-width: 92px;
+}
+
+.para-zk-reference-toolbar-summary,
+.para-zk-references-toolbar-summary {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.35;
+}
+
+.para-zk-reference-toolbar-controls,
+.para-zk-references-toolbar-controls {
+  align-items: center;
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.para-zk-reference-toolbar-button,
+.para-zk-references-toolbar-button {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 5px;
+  box-shadow: none;
+  min-height: 28px;
+}
+
+.para-zk-reference-add,
+.para-zk-references-add {
+  align-items: center;
+  display: inline-flex;
+  font-size: var(--font-ui-small);
+  gap: 5px;
+  font-weight: 600;
+  padding: 3px 9px;
+}
+
+@media (max-width: 640px) {
+  .para-zk-reference-toolbar,
+  .para-zk-references-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .para-zk-reference-toolbar-controls,
+  .para-zk-references-toolbar-controls {
+    justify-content: flex-start;
+  }
+}
+
+.para-zk-reference-list,
+.para-zk-references-list {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.para-zk-reference-row,
+.para-zk-references-row {
+  align-items: start;
+  background: var(--background-primary);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
+  padding: 7px 8px;
+}
+
+.para-zk-reference-row.is-reorderable,
+.para-zk-references-row.is-reorderable {
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+}
+
+.para-zk-reference-row + .para-zk-reference-row,
+.para-zk-references-row + .para-zk-references-row {
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.para-zk-reference-row:hover,
+.para-zk-references-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.para-zk-reference-drag,
+.para-zk-references-drag,
+.para-zk-reference-edit,
+.para-zk-references-edit,
+.para-zk-reference-delete,
+.para-zk-references-delete {
+  align-items: center;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  box-shadow: none;
+  display: inline-flex;
+  font-size: var(--font-ui-smaller);
+  height: 22px;
+  justify-content: center;
+  line-height: 1;
+  margin: 1px 0 0;
+  min-height: 22px;
+  min-width: 22px;
+  padding: 0;
+  width: 22px;
+}
+
+.para-zk-reference-drag,
+.para-zk-references-drag {
+  background: transparent;
+  color: var(--text-faint);
+  cursor: grab;
+  opacity: 0.75;
+}
+
+.para-zk-reference-drag:active,
+.para-zk-references-drag:active {
+  cursor: grabbing;
+}
+
+.para-zk-reference-row.is-dragging,
+.para-zk-references-row.is-dragging {
+  opacity: 0.45;
+}
+
+.para-zk-reference-row.is-drop-before,
+.para-zk-references-row.is-drop-before {
+  box-shadow: inset 0 2px 0 var(--interactive-accent);
+}
+
+.para-zk-reference-row.is-drop-after,
+.para-zk-references-row.is-drop-after {
+  box-shadow: inset 0 -2px 0 var(--interactive-accent);
+}
+
+.para-zk-reference-body,
+.para-zk-references-body {
+  min-width: 0;
+}
+
+.para-zk-reference-main,
+.para-zk-references-main {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.para-zk-reference-link,
+.para-zk-references-link,
+.para-zk-reference-label,
+.para-zk-references-label {
+  font-size: var(--font-ui-medium);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.para-zk-reference-link,
+.para-zk-references-link {
+  color: var(--text-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.para-zk-reference-link:hover,
+.para-zk-references-link:hover {
+  text-decoration: underline;
+}
+
+.para-zk-reference-label,
+.para-zk-references-label {
+  color: var(--text-normal);
+}
+
+.para-zk-reference-note,
+.para-zk-references-note {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.35;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.para-zk-reference-actions,
+.para-zk-references-actions {
+  align-items: center;
+  display: flex;
+  gap: 4px;
+  margin-top: 1px;
+}
+
+.para-zk-reference-edit,
+.para-zk-references-edit {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.para-zk-reference-edit:hover,
+.para-zk-references-edit:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.para-zk-reference-delete,
+.para-zk-references-delete {
+  background: transparent;
+  color: var(--text-faint);
+  opacity: 0.62;
+}
+
+.para-zk-reference-delete:hover,
+.para-zk-references-delete:hover {
+  background: var(--background-modifier-error-hover);
+  color: var(--text-error);
+  opacity: 1;
+}
+
+.para-zk-reference-empty,
+.para-zk-references-empty {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  padding: 8px 10px;
+}
+
+.para-zk-reference-edit-modal input[type="text"],
+.para-zk-references-edit-modal input[type="text"],
+.para-zk-reference-edit-modal textarea,
+.para-zk-references-edit-modal textarea {
+  min-width: 220px;
+}
+
+.para-zk-reference-edit-link,
+.para-zk-references-edit-link {
+  width: min(420px, 100%);
+}
+
+.para-zk-reference-edit-label,
+.para-zk-references-edit-label {
+  width: min(320px, 100%);
+}
+
+.para-zk-reference-edit-note,
+.para-zk-references-edit-note {
+  min-height: 72px;
+  width: min(420px, 100%);
+}
+
 @media (max-width: 640px) {
   .para-zk-props-row {
     grid-template-columns: 1fr;

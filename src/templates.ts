@@ -128,7 +128,9 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         ...dataviewProjectRetros(settings),
         "",
         "---",
-        `## ${t.labels.references} ${referenceActions(t)}`,
+        `## ${t.labels.references}`,
+        "",
+        ...paraZkReferencesBlock("current"),
         "",
         ""
       ].join("\n");
@@ -171,7 +173,9 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         ...dataviewAreaRetros(t, settings),
         "",
         "---",
-        `## ${t.labels.references} ${referenceActions(t)}`,
+        `## ${t.labels.references}`,
+        "",
+        ...paraZkReferencesBlock("current"),
         "",
         ""
       ].join("\n");
@@ -199,7 +203,9 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         ...dataviewResourceZkLinks(settings),
         "",
         "---",
-        `## ${t.labels.references} ${referenceActions(t)}`,
+        `## ${t.labels.references}`,
+        "",
+        ...paraZkReferencesBlock("current"),
         "",
         ""
       ].join("\n");
@@ -235,6 +241,8 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         "",
         "---",
         `## ${t.labels.references}`,
+        "",
+        ...paraZkReferencesBlock("current"),
         ""
       ].join("\n");
     case "retro":
@@ -275,6 +283,8 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         "",
         "---",
         `## ${t.labels.references}`,
+        "",
+        ...paraZkReferencesBlock("current"),
         ""
       ].join("\n");
     case "subnote":
@@ -319,6 +329,8 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         "",
         "---",
         `## ${t.labels.references}`,
+        "",
+        ...paraZkReferencesBlock("current"),
         ""
       ].join("\n");
     case "zk_literature":
@@ -356,6 +368,8 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         "",
         "---",
         `## ${t.labels.references}`,
+        "",
+        ...paraZkReferencesBlock("current"),
         ""
       ].join("\n");
     case "zk_permanent":
@@ -385,6 +399,8 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         "",
         "---",
         `## ${t.labels.references}`,
+        "",
+        ...paraZkReferencesBlock("current"),
         ""
       ].join("\n");
   }
@@ -413,15 +429,14 @@ function paraZkTasksBlock(root: "current" | "all", extra: string[] = []): string
   ]);
 }
 
-function paraZkInlineAction(command: string, label: string): string {
-  return `\`PZK[${command}|${label}]\``;
+function paraZkReferencesBlock(root: "current"): string[] {
+  return fenced("para-zk-references", [
+    `root: ${root}`
+  ]);
 }
 
-function referenceActions(t: ReturnType<typeof localePack>): string {
-  return [
-    paraZkInlineAction("add-reference", t.labels.addReference),
-    paraZkInlineAction("create-resource", t.labels.createResource)
-  ].join(" ");
+function paraZkInlineAction(command: string, label: string): string {
+  return `\`PZK[${command}|${label}]\``;
 }
 
 function latestRetroSummaryTip(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {

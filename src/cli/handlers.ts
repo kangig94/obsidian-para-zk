@@ -77,7 +77,7 @@ const READ_COLLECTION_OPTIONS: Record<string, CliOptionSpec> = {
   priority: { value: "<priority>", description: "Task collection reads only: parsed Tasks priority such as high or medium." },
   due_before: { value: "<YYYY-MM-DD>", description: "Task collection reads only: include tasks due on or before this date." },
   due_after: { value: "<YYYY-MM-DD>", description: "Task collection reads only: include tasks due on or after this date." },
-  ref_kind: { value: "<url|note|file|wiki|markdown|text>", description: "Reference collection reads only: filter references by kind." }
+  ref_kind: { value: "<url|note|file|wiki|text>", description: "Reference collection reads only: filter references by kind." }
 };
 
 const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
@@ -659,7 +659,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
   },
   {
     command: "para-zk:add-reference",
-    description: "Add an existing vault file, wikilink, markdown link, or URL to a note's References section",
+    description: "Add an existing vault file, wikilink, markdown link, or URL to a note's frontmatter reference registry",
     options: {
       path: { value: "<path>", description: "Source note path that receives the reference." },
       target: { value: "<path|url|wikilink|markdown-link>", description: "Reference target to add." },

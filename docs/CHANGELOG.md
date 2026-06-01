@@ -32,7 +32,8 @@ Notable changes for PARA-ZK are tracked here.
 - Added native PARA-ZK ribbon actions for project, area, resource, ZK, daily
   note, and quick memo workflows, replacing Commander-managed QuickAdd shortcuts.
 - Added an `add-reference` workflow/CLI command for adding existing vault files,
-  wikilinks, markdown links, or URLs to a note's References section.
+  wikilinks, markdown links, URLs, or text references to a note's frontmatter
+  reference registry.
 - Added `para-zk:read-project`, `read-area`, `read-resource`, `read-zk`,
   `read-journal`, and `read-retro` for reading editable surfaces by stable map
   keys such as `frontmatter/status`, `children`, and
@@ -120,8 +121,8 @@ Notable changes for PARA-ZK are tracked here.
   into `PARA/Archives/Projects`; updating the archived copy to a non-archived
   status restores it to the active Projects folder.
 - Delete workflows now preserve body backlinks, report incoming links, and only
-  clean PARA-ZK-owned frontmatter relationships and standalone References-section
-  link lines.
+  clean PARA-ZK-owned frontmatter relationships and frontmatter reference
+  registry entries.
 - Project and area rename workflows now cascade to default source-scoped retro
   files, keeping `Retro-Project-*` and `Retro-Area-*` filenames aligned with the
   renamed source without adding a standalone retro rename command.
@@ -138,10 +139,19 @@ Notable changes for PARA-ZK are tracked here.
   vault-wide collision check before writing.
 - Task registry files now omit duplicated root frontmatter; each shard is only
   `# Tasks` plus task lines.
-- Reference collection roots remain read-only through update commands; use
-  `para-zk:add-reference` as the single path for adding references. Individual
-  References-section lines can now be updated by `label`/`target` or deleted by
-  id without touching the referenced note, file, or URL.
+- References are now stored in each note's frontmatter `references` array as
+  ordered canonical links or `{ link, label?, note? }` objects, and rendered in
+  notes through the native `para-zk-references` block.
+- Reference reads now expose a derived, index-addressed collection:
+  `references`, `references/<i>`, and `references/<i>/<field>`, with derived
+  read-only `kind`, `path`, and `target` fields.
+- Reference updates now use `key=references op=insert` with optional 0-based
+  `position`, `references/<i>/{link|label|note} op=set`, and
+  `references/<i> op=delete`. Inserts and `add-reference` return `index` and
+  canonical `link`; duplicate canonical links are no-op inserts or rejected link
+  updates.
+- Creating resources and promoting resource/fleeting notes now writes
+  frontmatter reference registry entries instead of body reference lines.
 
 ### Removed
 
@@ -150,3 +160,6 @@ Notable changes for PARA-ZK are tracked here.
 - Removed the separate `sync-managed-files` GUI command.
 - Removed the `ZK/Fleeting/Archives` layout folder because fleeting notes are
   completed by `processed: true`, not by archive movement.
+- Removed body `## References` section-line storage, `ref-*` reference ids, and
+  References-section link cleanup. `ref_kind=markdown` is no longer accepted
+  because markdown-link syntax is input-only and stored links are canonicalized.

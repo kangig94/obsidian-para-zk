@@ -69,9 +69,9 @@ Large collections such as `tasks` and `references` should use compact `count`
 summaries in full reads. Exact
 collection root reads return a paged object with `count`, `offset`, `limit`,
 `returned`, `has_more`, and `items`; deeper keys such as
-`tasks/<id>/name` return a single item or field. Full read payloads must include
-`mode: "compact"` and exact key reads must include `mode: "exact"` so automation
-can reason about omitted data.
+`tasks/<id>/name` and `references/<i>/link` return a single item or field. Full
+read payloads must include `mode: "compact"` and exact key reads must include
+`mode: "exact"` so automation can reason about omitted data.
 Task collection reads are structured: each item exposes the literal checkbox
 status character, task name, and parsed Tasks metadata instead of returning the
 raw task section string. Tasks are not stored inline in project/area/journal
@@ -100,6 +100,14 @@ path. Stored task lines use the Tasks plugin's default Emoji format for task ids
 and metadata. Root ids are UUIDs because they are file-level link keys; task ids
 are 8-character lower-case base36 tokens generated with a vault-wide collision
 check.
+Reference updates must stay structural too. References are stored in each note's
+frontmatter `references` array as ordered bare-string canonical links or objects
+`{ link, label?, note? }`. The CLI handle is the absolute 0-based list index:
+`references`, `references/<i>`, and `references/<i>/{link|label|note}`.
+References use `op=insert` with a 0-based `position` inside `value_json`; this
+is intentionally different from task insert's 1-based position. `kind`, `path`,
+and `target` are derived read-only fields. Duplicate canonical links are no-op
+inserts or rejected link updates, never merged records.
 
 Structural changes should stay domain-specific. Use `rename-project`,
 `rename-area`, `rename-resource`, and `rename-zk` for title/path changes instead
@@ -112,8 +120,8 @@ Delete commands should also stay domain-specific and use Obsidian core trash
 APIs. Do not depend on Trash Explorer for deletion; Trash Explorer is only a GUI
 helper for reviewing or emptying `.trash`. Body backlinks should remain in place
 as historical context and be reported in JSON. Only PARA-ZK-owned relationships,
-such as `areas`, `project`, `parent`, `promoted_to`, and standalone
-References-section link lines, should be cleaned automatically.
+such as `areas`, `project`, `parent`, `promoted_to`, and frontmatter
+`references` items, should be cleaned automatically.
 
 "GUI and CLI behave the same" means they call the same core workflow functions
 and produce the same kind of vault side effects. It does not mean the CLI should
@@ -165,6 +173,7 @@ Native plugin blocks and tokens replace legacy prompt/script mechanisms:
 - `para-zk-dashboard-actions` replaces Home dashboard button callouts.
 - `para-zk-dashboard-summary` replaces DataviewJS-only summary cards.
 - `para-zk-tasks` renders the hidden task registry inside root notes.
+- `para-zk-references` renders frontmatter-backed references inside root notes.
 
 Dataview remains the query engine for note relationships. Tasks remains enabled
 for Tasks-compatible status and metadata syntax, while PARA-ZK owns the root task
@@ -232,6 +241,11 @@ Representative CLI smoke tests should cover:
   checkbox status characters, names, due dates, priority, and collection filters
 - `para-zk:update-project key=tasks op=insert`, positional insert,
   `tasks/<id>/<field> op=set`, and `tasks/<id> op=delete`
+- `para-zk:read-project key=references` with paged items, `references/<i>`,
+  `references/<i>/<field>`, `ref_kind` filters, and numeric index keys
+- `para-zk:update-project key=references op=insert`, 0-based positional insert,
+  duplicate insert no-op, `references/<i>/{link|label|note} op=set`, label/note
+  clears, duplicate link rejection, and `references/<i> op=delete`
 - `para-zk:read-area`, `para-zk:read-resource`, `para-zk:read-zk`,
   `para-zk:read-journal`, and `para-zk:read-retro` using the same stable map
   key algorithm

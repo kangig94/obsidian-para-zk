@@ -234,7 +234,7 @@ Options:
 | `priority` | string | Task collection reads only. Parsed Tasks priority such as `high` or `medium`. |
 | `due_before` | `YYYY-MM-DD` | Task collection reads only. Includes tasks due on or before this date. |
 | `due_after` | `YYYY-MM-DD` | Task collection reads only. Includes tasks due on or after this date. |
-| `ref_kind` | `url`, `note`, `file`, `wiki`, `markdown`, `text` | Reference collection reads only. |
+| `ref_kind` | `url`, `note`, `file`, `wiki`, `text` | Reference collection reads only. |
 
 Top-level keys:
 
@@ -283,7 +283,9 @@ Tasks are stored in PARA-ZK's managed `Tasks/current` or `Tasks/archives`
 registry and rendered back into root notes through `para-zk-tasks` blocks. Each
 task shard is named after the root note's `id` and contains only a `# Tasks`
 heading plus task lines, not duplicated root frontmatter. Exact collection root
-reads such as `key=tasks` and `key=references` return a paged collection object:
+reads such as `key=tasks` and `key=references` return a paged collection object.
+Task items are keyed by their stable task id; reference items are keyed by their
+absolute 0-based list index in frontmatter:
 
 ```json
 {
@@ -304,9 +306,10 @@ reads such as `key=tasks` and `key=references` return a paged collection object:
 }
 ```
 
-Use `key=<collection>/<id>` or `key=<collection>/<id>/<field>` to read one
-item or one item field without the page wrapper. When filters are provided,
-`count` is the number of matching items before pagination.
+Use `key=tasks/<id>` or `key=tasks/<id>/<field>` to read one task, and use
+`key=references/<i>` or `key=references/<i>/<field>` to read one reference by
+0-based index. When filters are provided, `count` is the number of matching
+items before pagination.
 
 ```json
 {
@@ -328,8 +331,9 @@ Important fields:
 - `tasks`: structured project task collection. Item keys are task ids.
   `checkbox` is the literal status character from `[ ]`, `[x]`, `[-]`, `[/]`,
   and other Tasks-compatible statuses.
-- `references`: structured reference collection. Items expose `kind`, `label`,
-  `target`, `path`, or `text` depending on the source line.
+- `references`: structured frontmatter reference collection. Items expose
+  stored `link`, derived `kind`, optional `label` and `note`, and derived
+  `path` or `target` where applicable.
 - `children`: child-note index; child bodies are read only when requested with
   a `children/<title>/...` key.
 - `value`: present when `key` is provided.
@@ -384,7 +388,7 @@ Options:
 | `key` | writable map path | Required. Examples: `frontmatter/status`, `summary`, `children/Planning Meeting/body`. |
 | `op` | `set`, `insert`, `append`, `prepend`, `replace`, `delete` | Required update operation. |
 | `value` | text | Required for scalar `set`, `append`, and `prepend`. |
-| `value_json` | JSON | Structured value for frontmatter updates and task inserts. |
+| `value_json` | JSON | Structured value for frontmatter updates and task/reference inserts. |
 | `match` | text | Required for `replace`. Exact literal text inside the selected key. |
 | `with` | text | Replacement text for `replace`. Empty is allowed. |
 | `all` | boolean | For `replace`, replace all matches. Without it, multiple matches fail. |
@@ -400,16 +404,43 @@ with `key=tasks/<id>/<field> op=set value=...`, and delete one task with
 Task ids and metadata use the Tasks plugin's default Emoji format. Generated
 task ids are 8-character lower-case base36 tokens, checked against existing
 vault task ids before writing.
-Use `position` in `value_json` to insert before the 1-based task position, or
-omit it to append at the end.
-Reference collection roots do not accept raw Markdown edits. Add references with
-`para-zk:add-reference`, update one reference line with
-`key=references/<id>/label op=set value=...` or
-`key=references/<id>/target op=set value=...`, and delete one reference line with
-`key=references/<id> op=delete`. These operations only rewrite the selected
-source note's References section; they do not modify the referenced note, file,
-or URL. Updating `target` can change that reference's id, so read
-`key=references` again before making another edit to the same line.
+Use `position` in task `value_json` to insert before the 1-based task position,
+or omit it to append at the end.
+
+References are stored in the selected note's `references` frontmatter array,
+not as body lines. Each stored item is either a bare canonical `link` string or
+an object `{ link, label?, note? }`. The writable collection keys are:
+
+```text
+references
+references/<i>
+references/<i>/link
+references/<i>/label
+references/<i>/note
+```
+
+Insert one reference with `key=references op=insert value_json='{...}'`.
+The reference insert `position` in `value_json` is 0-based: `position: 0`
+inserts before the first reference, while omitted `position` appends. This is a
+different convention from task insert, where `position` is 1-based.
+
+Reference insert values accept `link`, optional `label`, optional `note`, and
+optional 0-based `position`. Insert returns `index`, `link`, `changed`, and
+`added`. If the canonical `link` already exists, insert is a no-op: requested
+`position` is ignored and the existing `index` and `link` are returned with
+`changed: false` and `added: false`.
+
+Update one stored reference field with `key=references/<i>/<field> op=set`.
+Writable fields are `link`, `label`, and `note`. Setting `link` keeps the item
+at the same index and re-derives `kind`, `path`, and `target`. Setting `link` to
+another existing canonical link is rejected as a duplicate without merging,
+deleting, or reordering either item. Setting `label` or `note` to `value=""`, or
+to `value_json=null`, clears that field; if only `link` remains, the item is
+serialized back as a bare string. Delete one item with
+`key=references/<i> op=delete`; later indices shift after deletion.
+
+Derived reference fields are read-only. `kind`, `path`, and `target` can be read
+through `key=references/<i>/<field>`, but cannot be updated.
 
 Read-only keys include `children`, `path`, `title`, `type`, and `archived`.
 
@@ -419,8 +450,10 @@ Examples:
 optsidian raw para-zk:update-project title="Model Evaluation" key=frontmatter/status op=set value=done format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key=summary op=replace match="old claim" with="new claim" format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key=tasks op=insert value_json='{"name":"Review evaluation set","due":"2026-06-05","priority":"high"}' format=json
-optsidian raw para-zk:update-project title="Model Evaluation" key=references/ref-8b1a9953/label op=set value="Updated source" format=json
-optsidian raw para-zk:update-project title="Model Evaluation" key=references/ref-8b1a9953 op=delete format=json
+optsidian raw para-zk:update-project title="Model Evaluation" key=references op=insert value_json='{"link":"https://example.com/paper","label":"Source paper","position":0}' format=json
+optsidian raw para-zk:update-project title="Model Evaluation" key=references/0/note op=set value="Reviewed in May" format=json
+optsidian raw para-zk:update-project title="Model Evaluation" key=references/0/label op=set value_json=null format=json
+optsidian raw para-zk:update-project title="Model Evaluation" key=references/0 op=delete format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key=tasks/a8f3k2m9/checkbox op=set value=x format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key=tasks/a8f3k2m9 op=delete format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key="children/Planning Meeting/body" op=append value="Decision: ship the baseline." format=json
@@ -440,6 +473,8 @@ Result fields:
 - `operation`: the applied operation.
 - `changed`: false when the requested `set` value already matched.
 - `matches`: present for `replace`.
+- `index`, `link`, and `added`: present for reference insert results; `index`
+  and `link` are also present for reference field updates and deletes.
 - `moved`, `fromPath`, and `toPath`: present when a project status update moved
   the project between active and archived folders.
 
@@ -509,14 +544,14 @@ needed. PARA-ZK only cleans relationships it owns directly:
 
 - frontmatter links in keys such as `areas`, `project`, `parent`, and
   `promoted_to`
-- standalone wikilink lines inside generated References sections
+- frontmatter `references` items that point at the deleted note
 
 | Command | Selector | Notes |
 | --- | --- | --- |
 | `para-zk:delete-project` | `title` or `path`; optional `archived` | Deletes the folder-style project container. Requires `force=true` if child files are inside. |
 | `para-zk:delete-area` | `title` or `path`; optional `archived` | Deletes the folder-style area container. Requires `force=true` if child files are inside. |
-| `para-zk:delete-resource` | `title` or `path`; optional `archived` | Deletes the resource note and removes safe References-section links to it. |
-| `para-zk:delete-zk` | `title` plus optional `kind`, or `path` | Deletes the selected ZK note and removes safe References-section links to it. |
+| `para-zk:delete-resource` | `title` or `path`; optional `archived` | Deletes the resource note and removes matching frontmatter reference items. |
+| `para-zk:delete-zk` | `title` plus optional `kind`, or `path` | Deletes the selected ZK note and removes matching frontmatter reference items. |
 | `para-zk:delete-journal` | `date` or `path` | Deletes a daily journal note. |
 | `para-zk:delete-retro` | `title` plus optional `date`, or `path` | Deletes a retro note. |
 
@@ -548,7 +583,7 @@ Important result fields:
 - `incomingLinks`: backlink counts observed before deletion; body links are not
   modified.
 - `cleaned.frontmatter`: count of PARA-ZK frontmatter keys cleaned.
-- `cleaned.references`: count of standalone References-section lines removed.
+- `cleaned.references`: count of frontmatter `references` entries removed.
 - `trashMethod`: core Obsidian method used, normally `fileManager.trashFile`.
 
 ### `para-zk:create-project`
@@ -587,9 +622,10 @@ Side effects:
 
 ### `para-zk:create-resource`
 
-Creates a resource note and optionally links it from a source note's References
-section. Use this when the reference needs its own note, summary, metadata, or
-future reuse. For an existing file, note, or URL, use `para-zk:add-reference`.
+Creates a resource note and optionally appends a frontmatter reference to it on
+the source note. Use this when the reference needs its own note, summary,
+metadata, or future reuse. For an existing file, note, or URL, use
+`para-zk:add-reference`.
 
 Options:
 
@@ -617,15 +653,15 @@ Important fields:
 
 ### `para-zk:add-reference`
 
-Adds an existing vault file, wikilink, markdown link, or URL to a note's
-References section.
+Adds an existing vault file, wikilink, markdown link, URL, or text reference to
+a note's frontmatter `references` array.
 
 Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
 | `path` | path | Required for deterministic CLI use. Source note receiving the reference. |
-| `target` | path, URL, wikilink, or markdown link | Required. Existing vault files are written as wikilinks. URLs are written directly or as markdown links when `label` is present. |
+| `target` | path, URL, wikilink, markdown link, or text | Required. Existing vault files are stored as alias-free wikilinks. URLs are stored directly. Markdown-link and wikilink aliases are input syntax only and become `label` unless overridden. |
 | `label` | string | Optional display label for file paths and URLs. |
 | `open` | boolean | Default `false`. |
 
@@ -647,9 +683,26 @@ optsidian raw para-zk:add-reference \
 Important fields:
 
 - `path`
-- `reference`
-- `target`
+- `index`
+- `link`
 - `added`
+
+`index` is the 0-based position of the affected reference. If the canonical
+`link` already exists, the command returns that existing index with
+`added: false` and does not rewrite the stored label or note.
+
+Canonical stored links are label-free: vault note/file targets are stored as
+`[[path]]` or `[[path#subpath]]`, URLs are stored as raw URLs, unresolved
+wikilinks are stored as normalized `[[target]]`, and plain non-link text remains
+text. `kind`, `path`, and `target` are derived on read and never stored. The
+accepted read kinds are `url`, `note`, `file`, `wiki`, and `text`; `markdown` is
+not a stored or derived kind.
+
+Hand-authored bare-string `references` entries must use wikilink or URL syntax
+when they should behave as links. A frontmatter entry such as
+`references: ["folder/note.md"]` is read as `kind: "text"` and does not produce
+a backlink. Path-to-wikilink canonicalization runs only through write paths such
+as `add-reference` and `update ... key=references op=insert`.
 
 ### `para-zk:create-subnote`
 
@@ -791,8 +844,8 @@ Important fields:
 
 ### `para-zk:promote-resource`
 
-Promotes a resource note into a ZK note and links the new ZK note back to the
-resource.
+Promotes a resource note into a ZK note and writes a frontmatter reference on
+the new ZK note back to the resource.
 
 Options:
 
@@ -821,7 +874,8 @@ Important fields:
 
 ### `para-zk:promote-fleeting`
 
-Promotes a fleeting note into Literature or Permanent and marks the source as
+Promotes a fleeting note into Literature or Permanent, writes a frontmatter
+reference on the new ZK note back to the source, and marks the source as
 processed in place.
 
 Options:
@@ -853,7 +907,8 @@ Important fields:
 Side effects:
 
 - Creates a target ZK note.
-- Links the target note back to the source fleeting note.
+- Stores a frontmatter reference from the target note back to the source
+  fleeting note.
 - Sets `processed: true` and `promoted_to` on the source fleeting note.
 
 ## Smoke Test
