@@ -82,7 +82,7 @@ export type CreateResourceOptions = {
 export type AddReferenceOptions = {
   sourcePath?: string;
   target: string;
-  label?: string;
+  description?: string;
   open?: boolean;
 };
 
@@ -366,27 +366,23 @@ type EditableTaskLine = {
 type ReferenceKind = "url" | "note" | "file" | "wiki" | "text";
 export type ReferenceStoredItem = string | {
   link: string;
-  label?: string;
-  note?: string;
+  description?: string;
 };
 export type ReferenceRead = {
   link: string;
   kind: ReferenceKind;
-  label?: string;
-  note?: string;
+  description?: string;
   path?: string;
   target?: string;
 };
 type NormalizedReferenceItem = {
   link: string;
-  label?: string;
-  note?: string;
+  description?: string;
 };
-type ReferenceWritableField = "link" | "label" | "note";
+type ReferenceWritableField = "link" | "description";
 type ReferenceWriteInput = {
   link: unknown;
-  label?: unknown;
-  note?: unknown;
+  description?: unknown;
   position?: unknown;
 };
 type ReferenceMutationResult = {
@@ -635,7 +631,7 @@ export async function addReference(ctx: WorkflowContext, options: AddReferenceOp
   const source = resolveRequiredFile(ctx, options.sourcePath, "source note");
   const reference = await insertReferenceItem(ctx, source, {
     link: options.target,
-    ...(options.label !== undefined ? { label: options.label } : {})
+    ...(options.description !== undefined ? { description: options.description } : {})
   });
   await openIfRequested(ctx, source, options.open);
   return {
@@ -1041,15 +1037,13 @@ export async function insertReferenceItem(
   file: TFile,
   input: ReferenceWriteInput
 ): Promise<ReferenceMutationResult> {
-  const canonical = canonicalizeReferenceTarget(ctx, file, input.link, {
-    label: input.label,
-    labelProvided: hasOwn(input, "label")
-  });
-  const note = hasOwn(input, "note") ? normalizeReferenceOptionalField(input.note, "note") : undefined;
+  const canonical = canonicalizeReferenceTarget(ctx, file, input.link);
+  const description = hasOwn(input, "description")
+    ? normalizeReferenceOptionalField(input.description, "description")
+    : undefined;
   const item = normalizeReferenceItem({
     link: canonical.link,
-    label: canonical.label,
-    note
+    description
   });
   const items = referenceItemsFromFrontmatter(fileFrontmatter(ctx, file));
   const itemKey = referenceDedupeKey(ctx, file, item.link);
@@ -1081,8 +1075,7 @@ export async function updateReferenceItem(
   index: number,
   patch: {
     link?: unknown;
-    label?: unknown;
-    note?: unknown;
+    description?: unknown;
   }
 ): Promise<ReferenceMutationResult> {
   const items = referenceItemsFromFrontmatter(fileFrontmatter(ctx, file));
@@ -1090,23 +1083,18 @@ export async function updateReferenceItem(
 
   const current = items[index];
   const hasLink = hasOwn(patch, "link");
-  const hasLabel = hasOwn(patch, "label");
-  const hasNote = hasOwn(patch, "note");
+  const hasDescription = hasOwn(patch, "description");
 
   let link = current.link;
-  let label = current.label;
-  let note = current.note;
+  let description = current.description;
 
   if (hasLink) {
-    const canonical = canonicalizeReferenceTarget(ctx, file, patch.link, {
-      label: hasLabel ? patch.label : current.label,
-      labelProvided: hasLabel || current.label !== undefined
-    });
+    const canonical = canonicalizeReferenceTarget(ctx, file, patch.link);
     link = canonical.link;
-    label = canonical.label;
   }
-  if (hasLabel && !hasLink) label = normalizeReferenceOptionalField(patch.label, "label");
-  if (hasNote) note = normalizeReferenceOptionalField(patch.note, "note");
+  if (hasDescription) {
+    description = normalizeReferenceOptionalField(patch.description, "description");
+  }
 
   const linkKey = referenceDedupeKey(ctx, file, link);
   const duplicateIndex = items.findIndex((candidate, candidateIndex) => candidateIndex !== index && referenceDedupeKey(ctx, file, candidate.link) === linkKey);
@@ -1114,7 +1102,7 @@ export async function updateReferenceItem(
     throw new Error(`duplicate reference target: ${link}`);
   }
 
-  const nextItem = normalizeReferenceItem({ link, label, note });
+  const nextItem = normalizeReferenceItem({ link, description });
   if (referenceItemsEqual(current, nextItem)) {
     return {
       changed: false,
@@ -1208,24 +1196,20 @@ function normalizeReferenceStoredItem(value: unknown, index: number): Normalized
   }
   return normalizeReferenceItem({
     link: value.link,
-    label: hasOwn(value, "label") ? value.label : undefined,
-    note: hasOwn(value, "note") ? value.note : undefined
+    description: hasOwn(value, "description") ? value.description : undefined
   }, index);
 }
 
 function normalizeReferenceItem(value: {
   link: unknown;
-  label?: unknown;
-  note?: unknown;
+  description?: unknown;
 }, index?: number): NormalizedReferenceItem {
-  const labelPrefix = index === undefined ? "reference" : `references[${index}]`;
-  const link = normalizeReferenceLinkValue(value.link, `${labelPrefix}.link`);
-  const label = normalizeReferenceOptionalField(value.label, "label");
-  const note = normalizeReferenceOptionalField(value.note, "note");
+  const keyPrefix = index === undefined ? "reference" : `references[${index}]`;
+  const link = normalizeReferenceLinkValue(value.link, `${keyPrefix}.link`);
+  const description = normalizeReferenceOptionalField(value.description, "description");
   return {
     link,
-    ...(label !== undefined ? { label } : {}),
-    ...(note !== undefined ? { note } : {})
+    ...(description !== undefined ? { description } : {})
   };
 }
 
@@ -1245,16 +1229,15 @@ async function writeReferenceItems(
 }
 
 function serializeReferenceStoredItem(item: NormalizedReferenceItem): ReferenceStoredItem {
-  if (item.label === undefined && item.note === undefined) return item.link;
+  if (item.description === undefined) return item.link;
   return {
     link: item.link,
-    ...(item.label !== undefined ? { label: item.label } : {}),
-    ...(item.note !== undefined ? { note: item.note } : {})
+    description: item.description
   };
 }
 
 function referenceItemsEqual(left: NormalizedReferenceItem, right: NormalizedReferenceItem): boolean {
-  return left.link === right.link && left.label === right.label && left.note === right.note;
+  return left.link === right.link && left.description === right.description;
 }
 
 function assertReferenceIndex(items: NormalizedReferenceItem[], index: number): void {
@@ -1278,7 +1261,7 @@ function normalizeReferenceLinkValue(value: unknown, key: string): string {
   return link;
 }
 
-function normalizeReferenceOptionalField(value: unknown, key: "label" | "note"): string | undefined {
+function normalizeReferenceOptionalField(value: unknown, key: "description"): string | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== "string") throw new Error(`reference ${key} must be a string or null`);
   const trimmed = value.trim();
@@ -1296,8 +1279,7 @@ function deriveReferenceRead(ctx: WorkflowContext, file: TFile, item: Normalized
 
   return {
     ...derived,
-    ...(item.label !== undefined ? { label: item.label } : {}),
-    ...(item.note !== undefined ? { note: item.note } : {})
+    ...(item.description !== undefined ? { description: item.description } : {})
   };
 }
 
@@ -1337,26 +1319,17 @@ function referenceDedupeKey(ctx: WorkflowContext, source: TFile, link: string): 
 function canonicalizeReferenceTarget(
   ctx: WorkflowContext,
   source: TFile,
-  target: unknown,
-  options: {
-    label?: unknown;
-    labelProvided?: boolean;
-  } = {}
+  target: unknown
 ): {
   link: string;
-  label?: string;
   targetPath?: string;
 } {
   const value = normalizeReferenceLinkValue(target, "reference target");
   const parsed = parseReferenceTargetInput(value);
-  const label = options.labelProvided
-    ? normalizeReferenceOptionalField(options.label, "label")
-    : parsed.label;
 
   if (parsed.syntax === "url" || (parsed.syntax === "markdown" && isExternalReference(parsed.target))) {
     return {
-      link: parsed.target.trim(),
-      ...(label !== undefined ? { label } : {})
+      link: parsed.target.trim()
     };
   }
 
@@ -1365,13 +1338,11 @@ function canonicalizeReferenceTarget(
     if (resolved) {
       return {
         link: canonicalWikiLink(referenceTargetWithSubpath(resolved.file.path, resolved.subpath)),
-        ...(label !== undefined ? { label } : {}),
         targetPath: resolved.file.path
       };
     }
     return {
-      link: canonicalWikiLink(normalizedReferenceTargetWithSubpath(parsed.target)),
-      ...(label !== undefined ? { label } : {})
+      link: canonicalWikiLink(normalizedReferenceTargetWithSubpath(parsed.target))
     };
   }
 
@@ -1382,7 +1353,6 @@ function canonicalizeReferenceTarget(
     }
     return {
       link: canonicalWikiLink(referenceTargetWithSubpath(resolved.file.path, resolved.subpath)),
-      ...(label !== undefined ? { label } : {}),
       targetPath: resolved.file.path
     };
   }
@@ -1391,21 +1361,18 @@ function canonicalizeReferenceTarget(
   if (resolved) {
     return {
       link: canonicalWikiLink(referenceTargetWithSubpath(resolved.file.path, resolved.subpath)),
-      ...(label !== undefined ? { label } : {}),
       targetPath: resolved.file.path
     };
   }
 
   return {
-    link: value,
-    ...(label !== undefined ? { label } : {})
+    link: value
   };
 }
 
 type ParsedReferenceTarget = {
   syntax: "wiki" | "markdown" | "url" | "raw";
   target: string;
-  label?: string;
 };
 
 function parseReferenceTargetInput(value: string): ParsedReferenceTarget {
@@ -1413,8 +1380,7 @@ function parseReferenceTargetInput(value: string): ParsedReferenceTarget {
   if (wiki) {
     return {
       syntax: "wiki",
-      target: wiki.target,
-      ...(wiki.alias !== undefined && wiki.alias.trim() ? { label: wiki.alias.trim() } : {})
+      target: wiki.target
     };
   }
 
@@ -1422,8 +1388,7 @@ function parseReferenceTargetInput(value: string): ParsedReferenceTarget {
   if (markdown) {
     return {
       syntax: "markdown",
-      target: markdown.target,
-      ...(markdown.label ? { label: markdown.label } : {})
+      target: markdown.target
     };
   }
 
@@ -1450,12 +1415,12 @@ function parseWikiLink(value: string): { target: string; alias?: string } | unde
   };
 }
 
-function parseMarkdownLink(value: string): { label: string; target: string } | undefined {
+function parseMarkdownLink(value: string): { target: string } | undefined {
   const match = value.trim().match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-  const label = match?.[1]?.trim();
+  const text = match?.[1]?.trim();
   const target = match?.[2]?.trim();
-  if (!label || !target) return undefined;
-  return { label, target };
+  if (!text || !target) return undefined;
+  return { target };
 }
 
 function resolveWikiReferenceFile(
@@ -1959,7 +1924,7 @@ function matchesReferenceCollectionItem(
 function collectionSearchText(kind: ReadCollectionKind, item: Record<string, unknown>): string {
   const keys = kind === "task"
     ? ["name", "checkbox", "priority", "due", "scheduled", "start", "created", "done", "cancelled"]
-    : ["link", "kind", "label", "note", "target", "path"];
+    : ["link", "kind", "description", "target", "path"];
   return keys.map((key) => readRecordString(item, key) ?? "").join("\n");
 }
 
@@ -2828,7 +2793,7 @@ function readKeyHints(spec: ReadSurfaceSpec): string[] {
   if (spec.frontmatter.length > 0) keys.push(`frontmatter/{${spec.frontmatter.join("|")}}`);
   for (const section of spec.sections ?? []) {
     if (section.collection === "reference") {
-      keys.push("references", "references/<i>", "references/<i>/{link|label|note}");
+      keys.push("references", "references/<i>", "references/<i>/{link|description}");
     } else {
       keys.push(section.key);
     }
@@ -2845,7 +2810,7 @@ function writeKeyHints(spec: ReadSurfaceSpec): string[] {
     if (section.collection === "task") {
       keys.push("tasks=insert", "tasks/<id>=delete", "tasks/<id>/<field>=set");
     } else if (section.collection === "reference") {
-      keys.push("references=insert", "references/<i>=delete", "references/<i>/{link|label|note}=set");
+      keys.push("references=insert", "references/<i>=delete", "references/<i>/{link|description}=set");
     } else {
       keys.push(`${section.key}=set|append|prepend|replace`);
     }
@@ -2933,7 +2898,7 @@ function readReferences(_content: string, context: SectionTransformContext): Rec
 }
 
 function readReferenceWritableField(value: string, originalKey: string): ReferenceWritableField {
-  if (value === "link" || value === "label" || value === "note") return value;
+  if (value === "link" || value === "description") return value;
   if (value === "kind" || value === "path" || value === "target") {
     throw new Error(`reference field is read-only for update key: ${originalKey}`);
   }
@@ -2948,14 +2913,13 @@ function parseReferenceIndex(value: string, originalKey: string): number {
 function normalizeReferenceInsertValue(value: unknown): ReferenceWriteInput {
   if (!isRecord(value)) throw new Error("reference insert requires value_json object");
   for (const key of Object.keys(value)) {
-    if (key !== "link" && key !== "label" && key !== "note" && key !== "position") {
+    if (key !== "link" && key !== "description" && key !== "position") {
       throw new Error(`unknown reference field: ${key}`);
     }
   }
   return {
     link: value.link,
-    ...(hasOwn(value, "label") ? { label: value.label } : {}),
-    ...(hasOwn(value, "note") ? { note: value.note } : {}),
+    ...(hasOwn(value, "description") ? { description: value.description } : {}),
     ...(hasOwn(value, "position") ? { position: value.position } : {})
   };
 }
@@ -2963,7 +2927,7 @@ function normalizeReferenceInsertValue(value: unknown): ReferenceWriteInput {
 function readReferenceFieldUpdateValue(field: ReferenceWritableField, options: UpdatePayloadOptions): unknown {
   const value = requireUpdateValue(options);
   if (options.valueSource === "value_json") {
-    if (value === null && (field === "label" || field === "note")) return null;
+    if (value === null && field === "description") return null;
     if (typeof value === "string") return value;
     throw new Error(`reference ${field} update requires ${field === "link" ? "a string" : "a string or null"}`);
   }

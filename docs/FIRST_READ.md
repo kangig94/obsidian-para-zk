@@ -102,8 +102,8 @@ are 8-character lower-case base36 tokens generated with a vault-wide collision
 check.
 Reference updates must stay structural too. References are stored in each note's
 frontmatter `references` array as ordered bare-string canonical links or objects
-`{ link, label?, note? }`. The CLI handle is the absolute 0-based list index:
-`references`, `references/<i>`, and `references/<i>/{link|label|note}`.
+`{ link, description? }`. The CLI handle is the absolute 0-based list index:
+`references`, `references/<i>`, and `references/<i>/{link|description}`.
 References use `op=insert` with a 0-based `position` inside `value_json`; this
 is intentionally different from task insert's 1-based position. `kind`, `path`,
 and `target` are derived read-only fields. Duplicate canonical links are no-op
@@ -244,8 +244,8 @@ Representative CLI smoke tests should cover:
 - `para-zk:read-project key=references` with paged items, `references/<i>`,
   `references/<i>/<field>`, `ref_kind` filters, and numeric index keys
 - `para-zk:update-project key=references op=insert`, 0-based positional insert,
-  duplicate insert no-op, `references/<i>/{link|label|note} op=set`, label/note
-  clears, duplicate link rejection, and `references/<i> op=delete`
+  duplicate insert no-op, `references/<i>/{link|description} op=set`,
+  description clears, duplicate link rejection, and `references/<i> op=delete`
 - `para-zk:read-area`, `para-zk:read-resource`, `para-zk:read-zk`,
   `para-zk:read-journal`, and `para-zk:read-retro` using the same stable map
   key algorithm

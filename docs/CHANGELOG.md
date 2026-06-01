@@ -140,13 +140,13 @@ Notable changes for PARA-ZK are tracked here.
 - Task registry files now omit duplicated root frontmatter; each shard is only
   `# Tasks` plus task lines.
 - References are now stored in each note's frontmatter `references` array as
-  ordered canonical links or `{ link, label?, note? }` objects, and rendered in
+  ordered canonical links or `{ link, description? }` objects, and rendered in
   notes through the native `para-zk-references` block.
 - Reference reads now expose a derived, index-addressed collection:
   `references`, `references/<i>`, and `references/<i>/<field>`, with derived
   read-only `kind`, `path`, and `target` fields.
 - Reference updates now use `key=references op=insert` with optional 0-based
-  `position`, `references/<i>/{link|label|note} op=set`, and
+  `position`, `references/<i>/{link|description} op=set`, and
   `references/<i> op=delete`. Inserts and `add-reference` return `index` and
   canonical `link`; duplicate canonical links are no-op inserts or rejected link
   updates.
@@ -154,6 +154,9 @@ Notable changes for PARA-ZK are tracked here.
   comparing link text, so a stored link still dedupes after Obsidian's rename
   auto-update normalizes it to a different textual form (distinct Obsidian subpaths
   stay distinct; URLs and unresolved links fall back to normalized text).
+- Reference free text is now a single optional `description` field. Input
+  wikilink aliases and markdown link text are dropped during canonicalization;
+  the rendered title is always the target filename or URL.
 - Creating resources and promoting resource/fleeting notes now writes
   frontmatter reference registry entries instead of body reference lines.
 

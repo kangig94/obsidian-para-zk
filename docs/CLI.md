@@ -332,7 +332,7 @@ Important fields:
   `checkbox` is the literal status character from `[ ]`, `[x]`, `[-]`, `[/]`,
   and other Tasks-compatible statuses.
 - `references`: structured frontmatter reference collection. Items expose
-  stored `link`, derived `kind`, optional `label` and `note`, and derived
+  stored `link`, derived `kind`, optional `description`, and derived
   `path` or `target` where applicable.
 - `children`: child-note index; child bodies are read only when requested with
   a `children/<title>/...` key.
@@ -409,14 +409,13 @@ or omit it to append at the end.
 
 References are stored in the selected note's `references` frontmatter array,
 not as body lines. Each stored item is either a bare canonical `link` string or
-an object `{ link, label?, note? }`. The writable collection keys are:
+an object `{ link, description? }`. The writable collection keys are:
 
 ```text
 references
 references/<i>
 references/<i>/link
-references/<i>/label
-references/<i>/note
+references/<i>/description
 ```
 
 Insert one reference with `key=references op=insert value_json='{...}'`.
@@ -424,17 +423,17 @@ The reference insert `position` in `value_json` is 0-based: `position: 0`
 inserts before the first reference, while omitted `position` appends. This is a
 different convention from task insert, where `position` is 1-based.
 
-Reference insert values accept `link`, optional `label`, optional `note`, and
+Reference insert values accept `link`, optional `description`, and
 optional 0-based `position`. Insert returns `index`, `link`, `changed`, and
 `added`. If the canonical `link` already exists, insert is a no-op: requested
 `position` is ignored and the existing `index` and `link` are returned with
 `changed: false` and `added: false`.
 
 Update one stored reference field with `key=references/<i>/<field> op=set`.
-Writable fields are `link`, `label`, and `note`. Setting `link` keeps the item
+Writable fields are `link` and `description`. Setting `link` keeps the item
 at the same index and re-derives `kind`, `path`, and `target`. Setting `link` to
 another existing canonical link is rejected as a duplicate without merging,
-deleting, or reordering either item. Setting `label` or `note` to `value=""`, or
+deleting, or reordering either item. Setting `description` to `value=""`, or
 to `value_json=null`, clears that field; if only `link` remains, the item is
 serialized back as a bare string. Delete one item with
 `key=references/<i> op=delete`; later indices shift after deletion.
@@ -450,9 +449,9 @@ Examples:
 optsidian raw para-zk:update-project title="Model Evaluation" key=frontmatter/status op=set value=done format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key=summary op=replace match="old claim" with="new claim" format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key=tasks op=insert value_json='{"name":"Review evaluation set","due":"2026-06-05","priority":"high"}' format=json
-optsidian raw para-zk:update-project title="Model Evaluation" key=references op=insert value_json='{"link":"https://example.com/paper","label":"Source paper","position":0}' format=json
-optsidian raw para-zk:update-project title="Model Evaluation" key=references/0/note op=set value="Reviewed in May" format=json
-optsidian raw para-zk:update-project title="Model Evaluation" key=references/0/label op=set value_json=null format=json
+optsidian raw para-zk:update-project title="Model Evaluation" key=references op=insert value_json='{"link":"https://example.com/paper","description":"Reviewed in May","position":0}' format=json
+optsidian raw para-zk:update-project title="Model Evaluation" key=references/0/description op=set value="Important source paper" format=json
+optsidian raw para-zk:update-project title="Model Evaluation" key=references/0/description op=set value_json=null format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key=references/0 op=delete format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key=tasks/a8f3k2m9/checkbox op=set value=x format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key=tasks/a8f3k2m9 op=delete format=json
@@ -661,8 +660,8 @@ Options:
 | Option | Values | Notes |
 | --- | --- | --- |
 | `path` | path | Required for deterministic CLI use. Source note receiving the reference. |
-| `target` | path, URL, wikilink, markdown link, or text | Required. Existing vault files are stored as alias-free wikilinks. URLs are stored directly. Markdown-link and wikilink aliases are input syntax only and become `label` unless overridden. |
-| `label` | string | Optional display label for file paths and URLs. |
+| `target` | path, URL, wikilink, markdown link, or text | Required. Existing vault files are stored as alias-free wikilinks. URLs are stored directly. Markdown-link and wikilink aliases are input syntax only and are dropped. |
+| `description` | string | Optional per-reference description. |
 | `open` | boolean | Default `false`. |
 
 Examples:
@@ -676,7 +675,7 @@ optsidian raw para-zk:add-reference \
 optsidian raw para-zk:add-reference \
   path="PARA/Projects/Model Evaluation/Model Evaluation.md" \
   target="https://example.com/paper" \
-  label="Source paper" \
+  description="Source paper" \
   format=json
 ```
 
@@ -689,12 +688,15 @@ Important fields:
 
 `index` is the 0-based position of the affected reference. If the canonical
 `link` already exists, the command returns that existing index with
-`added: false` and does not rewrite the stored label or note.
+`added: false` and does not rewrite the stored description.
 
 Canonical stored links are label-free: vault note/file targets are stored as
 `[[path]]` or `[[path#subpath]]`, URLs are stored as raw URLs, unresolved
 wikilinks are stored as normalized `[[target]]`, and plain non-link text remains
-text. `kind`, `path`, and `target` are derived on read and never stored. The
+text. Input aliases such as `[[Note|alias]]` and markdown text such as
+`[text](url)` are dropped; the displayed title is always the target filename or
+URL, and `description` is set only when explicitly supplied. `kind`, `path`, and
+`target` are derived on read and never stored. The
 accepted read kinds are `url`, `note`, `file`, `wiki`, and `text`; `markdown` is
 not a stored or derived kind.
 

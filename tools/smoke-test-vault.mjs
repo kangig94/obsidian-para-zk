@@ -183,7 +183,7 @@ function runWorkflowScenario(today) {
   const reference = cliJson("para-zk:add-reference", [
     `path=${project.path}`,
     "target=https://example.com/reference",
-    "label=Reference URL",
+    "description=Reference URL",
     "open=false",
     "format=json"
   ]);
@@ -1234,7 +1234,7 @@ function assertReferenceRegistryScenario({ project, projectTitle, reference, res
   ]);
   assert(projectReferenceItem.value?.link === originalUrl, "single reference item read returned wrong link");
   assert(projectReferenceItem.value?.kind === "url", "single reference item read returned wrong kind");
-  assert(projectReferenceItem.value?.label === "Reference URL", "single reference item read lost label");
+  assert(projectReferenceItem.value?.description === "Reference URL", "single reference item read lost description");
 
   const projectReferenceKind = cliJson("para-zk:read-project", [
     `title=${projectTitle}`,
@@ -1290,7 +1290,7 @@ function assertReferenceRegistryScenario({ project, projectTitle, reference, res
   const duplicateUrl = cliJson("para-zk:add-reference", [
     `path=${project.path}`,
     `target=${originalUrl}`,
-    "label=Changed URL Label",
+    "description=Changed URL Description",
     "open=false",
     "format=json"
   ]);
@@ -1310,7 +1310,7 @@ function assertReferenceRegistryScenario({ project, projectTitle, reference, res
   const fileReference = cliJson("para-zk:add-reference", [
     `path=${project.path}`,
     `target=${referenceOnlyResource.path}`,
-    "label=Mutable File Reference",
+    "description=Mutable File Reference",
     "open=false",
     "format=json"
   ]);
@@ -1371,7 +1371,7 @@ function assertReferenceUpdateCollectionScenario() {
   const targetAReference = cliJson("para-zk:add-reference", [
     `path=${updateProject.path}`,
     `target=${targetA.path}`,
-    "label=Target A",
+    "description=Target A",
     "open=false",
     "format=json"
   ]);
@@ -1379,7 +1379,7 @@ function assertReferenceUpdateCollectionScenario() {
   const urlReference = cliJson("para-zk:add-reference", [
     `path=${updateProject.path}`,
     `target=${updateUrl}`,
-    "label=Update URL",
+    "description=Update URL",
     "open=false",
     "format=json"
   ]);
@@ -1389,7 +1389,7 @@ function assertReferenceUpdateCollectionScenario() {
     `title=${updateProjectTitle}`,
     "key=references",
     "op=insert",
-    `value_json=${JSON.stringify({ link: plainLink, label: "Plain label", note: "Initial note", position: 0 })}`,
+    `value_json=${JSON.stringify({ link: plainLink, description: "Initial description", position: 0 })}`,
     "format=json"
   ]);
   assert(inserted.ok === true && inserted.changed === true, "reference insert failed");
@@ -1411,7 +1411,7 @@ function assertReferenceUpdateCollectionScenario() {
     `title=${updateProjectTitle}`,
     "key=references",
     "op=insert",
-    `value_json=${JSON.stringify({ link: plainLink, label: "Changed label", note: "Changed note", position: 2 })}`,
+    `value_json=${JSON.stringify({ link: plainLink, description: "Changed description", position: 2 })}`,
     "format=json"
   ]);
   assert(duplicateInsert.ok === true, "duplicate reference insert command failed");
@@ -1426,24 +1426,23 @@ function assertReferenceUpdateCollectionScenario() {
     "format=json"
   ]);
   assert(updateRead.value?.count === 3, "duplicate reference insert changed collection size");
-  assert(updateRead.value?.items?.["0"]?.label === "Plain label", "duplicate reference insert rewrote label");
-  assert(updateRead.value?.items?.["0"]?.note === "Initial note", "duplicate reference insert rewrote note");
+  assert(updateRead.value?.items?.["0"]?.description === "Initial description", "duplicate reference insert rewrote description");
 
-  const noteUpdate = cliJson("para-zk:update-project", [
+  const descriptionUpdate = cliJson("para-zk:update-project", [
     `title=${updateProjectTitle}`,
-    "key=references/0/note",
+    "key=references/0/description",
     "op=set",
-    "value=Updated note",
+    "value=Updated description",
     "format=json"
   ]);
-  assert(noteUpdate.ok === true && noteUpdate.changed === true, "reference note update failed");
-  assert(noteUpdate.index === 0 && noteUpdate.link === plainLink, "reference note update did not keep index/link");
-  const noteRead = cliJson("para-zk:read-project", [
+  assert(descriptionUpdate.ok === true && descriptionUpdate.changed === true, "reference description update failed");
+  assert(descriptionUpdate.index === 0 && descriptionUpdate.link === plainLink, "reference description update did not keep index/link");
+  const descriptionRead = cliJson("para-zk:read-project", [
     `title=${updateProjectTitle}`,
-    "key=references/0/note",
+    "key=references/0/description",
     "format=json"
   ]);
-  assert(noteRead.value === "Updated note", "reference note update was not readable");
+  assert(descriptionRead.value === "Updated description", "reference description update was not readable");
 
   const linkUpdate = cliJson("para-zk:update-project", [
     `title=${updateProjectTitle}`,
@@ -1497,24 +1496,34 @@ function assertReferenceUpdateCollectionScenario() {
     `derived reference field error was not explicit: ${JSON.stringify(derivedFieldRejected)}`
   );
 
-  const labelClear = cliJson("para-zk:update-project", [
+  const descriptionClearEmpty = cliJson("para-zk:update-project", [
     `title=${updateProjectTitle}`,
-    "key=references/0/label",
+    "key=references/0/description",
     "op=set",
     "value=",
     "format=json"
   ]);
-  assert(labelClear.ok === true && labelClear.changed === true, "reference label empty-string clear failed");
-  const noteClear = cliJson("para-zk:update-project", [
+  assert(descriptionClearEmpty.ok === true && descriptionClearEmpty.changed === true, "reference description empty-string clear failed");
+  let updateFrontmatterReferences = readFrontmatterReferences(updateProject.path);
+  assert(updateFrontmatterReferences?.[0] === wikiReferenceLink(targetB.path), "empty-string-cleared reference did not collapse to bare string");
+  const descriptionReset = cliJson("para-zk:update-project", [
     `title=${updateProjectTitle}`,
-    "key=references/0/note",
+    "key=references/0/description",
+    "op=set",
+    "value=Description to clear with null",
+    "format=json"
+  ]);
+  assert(descriptionReset.ok === true && descriptionReset.changed === true, "reference description reset failed");
+  const descriptionClearNull = cliJson("para-zk:update-project", [
+    `title=${updateProjectTitle}`,
+    "key=references/0/description",
     "op=set",
     "value_json=null",
     "format=json"
   ]);
-  assert(noteClear.ok === true && noteClear.changed === true, "reference note null clear failed");
-  const updateFrontmatterReferences = readFrontmatterReferences(updateProject.path);
-  assert(updateFrontmatterReferences?.[0] === wikiReferenceLink(targetB.path), "cleared reference did not collapse to bare string");
+  assert(descriptionClearNull.ok === true && descriptionClearNull.changed === true, "reference description null clear failed");
+  updateFrontmatterReferences = readFrontmatterReferences(updateProject.path);
+  assert(updateFrontmatterReferences?.[0] === wikiReferenceLink(targetB.path), "null-cleared reference did not collapse to bare string");
 
   const deleteFirst = cliJson("para-zk:update-project", [
     `title=${updateProjectTitle}`,
@@ -1560,7 +1569,7 @@ function assertReferenceSubpathScenario() {
   const headingReference = cliJson("para-zk:add-reference", [
     `path=${subpathProject.path}`,
     `target=${headingLink}`,
-    "label=Heading label",
+    "description=Heading description",
     "open=false",
     "format=json"
   ]);
@@ -1570,7 +1579,7 @@ function assertReferenceSubpathScenario() {
   const duplicateMarkdown = cliJson("para-zk:add-reference", [
     `path=${subpathProject.path}`,
     `target=[Markdown heading](${subpathTarget.path}#${heading})`,
-    "label=Different heading label",
+    "description=Different heading description",
     "open=false",
     "format=json"
   ]);
@@ -1647,7 +1656,7 @@ function assertObjectReferenceDeleteCleanup() {
     `title=${cleanupProjectTitle}`,
     "key=references",
     "op=insert",
-    `value_json=${JSON.stringify({ link: cleanupTarget.path, label: "Delete object", note: "Delete note" })}`,
+    `value_json=${JSON.stringify({ link: cleanupTarget.path, description: "Delete object" })}`,
     "format=json"
   ]);
   assert(cleanupDeleteReference.ok === true, "reference cleanup delete object setup failed");
@@ -1655,7 +1664,7 @@ function assertObjectReferenceDeleteCleanup() {
     `title=${cleanupProjectTitle}`,
     "key=references",
     "op=insert",
-    `value_json=${JSON.stringify({ link: cleanupKeep.path, label: "Keep object", note: "Keep note" })}`,
+    `value_json=${JSON.stringify({ link: cleanupKeep.path, description: "Keep object" })}`,
     "format=json"
   ]);
   assert(cleanupKeepReference.ok === true, "reference cleanup keep object setup failed");
@@ -1663,7 +1672,7 @@ function assertObjectReferenceDeleteCleanup() {
     `title=${cleanupEmptyProjectTitle}`,
     "key=references",
     "op=insert",
-    `value_json=${JSON.stringify({ link: cleanupTarget.path, label: "Only object", note: "Only note" })}`,
+    `value_json=${JSON.stringify({ link: cleanupTarget.path, description: "Only object" })}`,
     "format=json"
   ]);
   assert(cleanupEmptyReference.ok === true, "reference cleanup empty object setup failed");
@@ -1684,8 +1693,7 @@ function assertObjectReferenceDeleteCleanup() {
   const cleanupItems = Object.values(cleanupRead.value?.items ?? {});
   assert(cleanupRead.value?.count === 1, "object reference delete cleanup did not remove exactly one matching entry");
   assert(cleanupItems[0]?.path === cleanupKeep.path, "object reference delete cleanup removed nonmatching entry");
-  assert(cleanupItems[0]?.label === "Keep object", "object reference delete cleanup lost preserved label");
-  assert(cleanupItems[0]?.note === "Keep note", "object reference delete cleanup lost preserved note");
+  assert(cleanupItems[0]?.description === "Keep object", "object reference delete cleanup lost preserved description");
   assert(waitForNoFrontmatterReferences(cleanupEmptyProject.path) === true, "object reference delete cleanup did not remove empty references key");
   assertFileContains(cleanupProject.path, [
     `Body mention [[${cleanupTargetTitle}]]`
@@ -1712,7 +1720,7 @@ function assertObjectReferenceRenameSurvival() {
   const objectReference = cliJson("para-zk:add-reference", [
     `path=${renameProject.path}`,
     `target=${renameTarget.path}`,
-    "label=Object rename label",
+    "description=Object rename description",
     "open=false",
     "format=json"
   ]);
@@ -1730,7 +1738,7 @@ function assertObjectReferenceRenameSurvival() {
   // full-path+.md form. Survival is verified behaviorally by the resolve-based path check
   // below; here we only wait until the link tracks the renamed basename.
   const expectedLink = wikiReferenceLink(renamedTargetTitle);
-  const renamedLink = waitForFrontmatterReferenceLink(renameProject.path, "Object rename label", expectedLink);
+  const renamedLink = waitForFrontmatterReferenceLink(renameProject.path, "Object rename description", expectedLink);
   assert(renamedLink === expectedLink, "object-form frontmatter link did not survive rename");
   const renamedReferenceRead = cliJson("para-zk:read-project", [
     `title=${renameProjectTitle}`,
@@ -1940,10 +1948,10 @@ function waitForBacklink(targetPath, sourcePath) {
   return snapshot.found === true;
 }
 
-function waitForFrontmatterReferenceLink(path, label, expectedLink) {
+function waitForFrontmatterReferenceLink(path, description, expectedLink) {
   const snapshot = guiJson(`(async () => {
     const file = app.vault.getFileByPath(${JSON.stringify(path)});
-    const label = ${JSON.stringify(label)};
+    const description = ${JSON.stringify(description)};
     const expectedLink = ${JSON.stringify(expectedLink)};
     if (!file) throw new Error("frontmatter file not found: " + ${JSON.stringify(path)});
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -1951,7 +1959,7 @@ function waitForFrontmatterReferenceLink(path, label, expectedLink) {
     for (let index = 0; index < 50; index += 1) {
       const references = app.metadataCache.getFileCache(file)?.frontmatter?.references;
       const match = Array.isArray(references)
-        ? references.find((item) => typeof item === "object" && item?.label === label)
+        ? references.find((item) => typeof item === "object" && item?.description === description)
         : undefined;
       link = match?.link ?? null;
       if (link === expectedLink) break;

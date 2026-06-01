@@ -659,11 +659,11 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
   },
   {
     command: "para-zk:add-reference",
-    description: "Add an existing vault file, wikilink, markdown link, or URL to a note's frontmatter reference registry",
+    description: "Add an existing vault file, wikilink, markdown link, URL, or text to a note's frontmatter reference registry",
     options: {
       path: { value: "<path>", description: "Source note path that receives the reference." },
-      target: { value: "<path|url|wikilink|markdown-link>", description: "Reference target to add." },
-      label: { value: "<label>", description: "Optional display label for file paths and URLs." },
+      target: { value: "<path|url|wikilink|markdown-link|text>", description: "Reference target to add." },
+      description: { value: "<text>", description: "Optional per-reference description." },
       open: { value: "<true|false>", description: "Open the source note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -673,7 +673,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       const result = await addReference(workflowContext(plugin), {
         sourcePath: readCliPath(args),
         target: readRequiredCliString(args, "target"),
-        label: readCliString(args, "label"),
+        description: readCliString(args, "description"),
         open: readCliBoolean(args, "open") ?? false
       });
       return { ...result };

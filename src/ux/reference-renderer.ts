@@ -48,8 +48,7 @@ type RenderableReference = {
 
 type ReferenceEditValue = {
   link: string;
-  label: string;
-  note: string;
+  description: string;
 };
 
 const REFERENCE_GONE_MESSAGE = "reference no longer present — re-render";
@@ -164,7 +163,7 @@ function renderReferenceToolbar(
           new ReferenceEditModal(
             plugin,
             addLabel,
-            { link: "", label: "", note: "" },
+            { link: "", description: "" },
             async (value) => {
               await queueRegistryFileWrite(
                 options.rootFile,
@@ -220,17 +219,11 @@ function renderReferenceRow(
           new Notice(registryErrorMessage(error));
         });
       });
-      const subLabel = referenceSubLabel(item.reference);
-      if (subLabel) {
+      const description = referenceDescription(item.reference);
+      if (description) {
         body.createDiv({
-          cls: "para-zk-reference-label",
-          text: subLabel
-        });
-      }
-      if (item.reference.note) {
-        body.createDiv({
-          cls: "para-zk-reference-note",
-          text: item.reference.note
+          cls: "para-zk-reference-description",
+          text: description
         });
       }
 
@@ -249,8 +242,7 @@ function renderReferenceRow(
             editLabel,
             {
               link: item.reference.link,
-              label: item.reference.label ?? "",
-              note: item.reference.note ?? ""
+              description: item.reference.description ?? ""
             },
             async (value) => {
               await updateReferenceFromEditor(plugin, item, value);
@@ -296,8 +288,7 @@ async function insertReferenceFromEditor(
 ): Promise<void> {
   await insertReferenceItem(referenceContext(plugin), rootFile, {
     link: value.link,
-    ...(value.label.trim() ? { label: value.label } : {}),
-    ...(value.note.trim() ? { note: value.note } : {})
+    ...(value.description.trim() ? { description: value.description } : {})
   });
 }
 
@@ -316,8 +307,7 @@ async function updateReferenceFromEditor(
     );
     await updateReferenceItem(workflow, item.rootFile, index, {
       link: value.link,
-      label: value.label,
-      note: value.note
+      description: value.description
     });
   });
 }
@@ -403,8 +393,7 @@ class ReferenceEditModal extends Modal {
   onOpen(): void {
     const labels = localePack(this.plugin.settings.locale).labels;
     const linkLabel = labelValue(labels.referenceLinkPlaceholder, "Reference link");
-    const labelLabel = labelValue(labels.referenceLabelPlaceholder, "Label");
-    const noteLabel = labelValue(labels.referenceNotePlaceholder, "Note");
+    const descriptionLabel = labelValue(labels.referenceDescriptionPlaceholder, "Description");
     this.contentEl.empty();
     this.contentEl.addClass("para-zk-reference-edit-modal");
     this.contentEl.createEl("h2", { text: this.heading });
@@ -422,27 +411,15 @@ class ReferenceEditModal extends Modal {
       });
 
     new Setting(this.contentEl)
-      .setName(labelLabel)
-      .addText((text) => {
-        text
-          .setPlaceholder(labelLabel)
-          .setValue(this.value.label)
-          .onChange((value) => {
-            this.value.label = value;
-          });
-        text.inputEl.addClass("para-zk-reference-edit-label");
-      });
-
-    new Setting(this.contentEl)
-      .setName(noteLabel)
+      .setName(descriptionLabel)
       .addTextArea((text) => {
         text
-          .setPlaceholder(noteLabel)
-          .setValue(this.value.note)
+          .setPlaceholder(descriptionLabel)
+          .setValue(this.value.description)
           .onChange((value) => {
-            this.value.note = value;
+            this.value.description = value;
           });
-        text.inputEl.addClass("para-zk-reference-edit-note");
+        text.inputEl.addClass("para-zk-reference-edit-description");
       });
 
     new Setting(this.contentEl)
@@ -478,8 +455,7 @@ class ReferenceEditModal extends Modal {
     try {
       await this.save({
         link,
-        label: this.value.label,
-        note: this.value.note
+        description: this.value.description
       });
       this.close();
     } catch (error) {
@@ -514,22 +490,17 @@ function referenceTargetHint(reference: ReferenceRead): string {
   return reference.path ?? reference.target ?? reference.link;
 }
 
-// Primary display: for an internal file/note/wiki target this is the filename, with any
-// Obsidian subpath (#heading / #^block) stripped and the label intentionally ignored.
-// A URL has no meaningful filename, so its human label (when set) leads, else the URL.
 function referenceTitle(reference: ReferenceRead): string {
-  if (reference.kind === "url") return reference.label ?? reference.target ?? reference.link;
+  if (reference.kind === "url") return reference.target ?? reference.link;
+  if (reference.kind === "text") return reference.link;
 
   const target = reference.path ?? reference.target ?? wikiTarget(reference.link) ?? reference.link;
   const base = stripObsidianSubpath(target);
   return pathBasenameWithoutExtension(base) || target;
 }
 
-// Secondary (small) line under the filename: the user's label for internal references.
-// URLs already surface their label as the title, so they have no sub-label.
-function referenceSubLabel(reference: ReferenceRead): string | undefined {
-  if (reference.kind === "url") return undefined;
-  return reference.label;
+function referenceDescription(reference: ReferenceRead): string | undefined {
+  return reference.description;
 }
 
 function wikiTarget(link: string): string | undefined {
