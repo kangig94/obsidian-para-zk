@@ -651,11 +651,10 @@ class ReferenceTargetSuggest extends AbstractInputSuggest<TFile> {
 
   protected getSuggestions(query: string): TFile[] {
     const normalized = query.trim().toLocaleLowerCase();
+    if (!normalized) return [];
     const files = this.plugin.app.vault.getFiles();
-    const matches = normalized
-      ? files.filter((file) => file.path.toLocaleLowerCase().includes(normalized)
-        || file.basename.toLocaleLowerCase().includes(normalized))
-      : files;
+    const matches = files.filter((file) => file.path.toLocaleLowerCase().includes(normalized)
+      || file.basename.toLocaleLowerCase().includes(normalized));
     return matches.slice(0, 20);
   }
 
@@ -668,6 +667,7 @@ class ReferenceTargetSuggest extends AbstractInputSuggest<TFile> {
   selectSuggestion(file: TFile, _evt: MouseEvent | KeyboardEvent): void {
     this.setValue(file.path);
     this.onSelectFile(file);
+    this.close();
   }
 }
 
@@ -705,6 +705,7 @@ class ReferenceAnchorSuggest extends AbstractInputSuggest<ReferenceAnchorSuggest
   selectSuggestion(suggestion: ReferenceAnchorSuggestion, _evt: MouseEvent | KeyboardEvent): void {
     this.setValue(suggestion.value);
     this.onSelectAnchor(suggestion);
+    this.close();
   }
 }
 
