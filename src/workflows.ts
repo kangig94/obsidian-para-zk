@@ -1,4 +1,4 @@
-import { App, TAbstractFile, TFile, TFolder } from "obsidian";
+import { App, TAbstractFile, TFile, TFolder, parseYaml } from "obsidian";
 import { localePack } from "./i18n";
 import { renderTemplate, type TemplateName } from "./templates";
 import {
@@ -1032,6 +1032,31 @@ export function readReferenceItems(ctx: WorkflowContext, file: TFile): Reference
     .map((item) => deriveReferenceRead(ctx, file, item));
 }
 
+// metadataCache.getFileCache() lags behind processFrontMatter writes (the cache updates
+// asynchronously), so any read immediately after a write returns stale frontmatter. The GUI
+// renderer re-renders right after its own write, and rapid mutations chain reads-after-writes,
+// so reference reads on the mutation/render path must parse the file's current content instead
+// of trusting the cache.
+async function readReferenceFrontmatterFresh(ctx: WorkflowContext, file: TFile): Promise<Frontmatter> {
+  return parseFrontmatterFromContent(await ctx.app.vault.read(file));
+}
+
+export async function readReferenceItemsFresh(ctx: WorkflowContext, file: TFile): Promise<ReferenceRead[]> {
+  return referenceItemsFromFrontmatter(await readReferenceFrontmatterFresh(ctx, file))
+    .map((item) => deriveReferenceRead(ctx, file, item));
+}
+
+function parseFrontmatterFromContent(content: string): Frontmatter {
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!match) return {};
+  try {
+    const parsed = parseYaml(match[1]);
+    return parsed && typeof parsed === "object" ? parsed as Frontmatter : {};
+  } catch {
+    return {};
+  }
+}
+
 export async function insertReferenceItem(
   ctx: WorkflowContext,
   file: TFile,
@@ -1045,7 +1070,7 @@ export async function insertReferenceItem(
     link: canonical.link,
     description
   });
-  const items = referenceItemsFromFrontmatter(fileFrontmatter(ctx, file));
+  const items = referenceItemsFromFrontmatter(await readReferenceFrontmatterFresh(ctx, file));
   const itemKey = referenceDedupeKey(ctx, file, item.link);
   const duplicateIndex = items.findIndex((candidate) => referenceDedupeKey(ctx, file, candidate.link) === itemKey);
   if (duplicateIndex !== -1) {
@@ -1078,7 +1103,7 @@ export async function updateReferenceItem(
     description?: unknown;
   }
 ): Promise<ReferenceMutationResult> {
-  const items = referenceItemsFromFrontmatter(fileFrontmatter(ctx, file));
+  const items = referenceItemsFromFrontmatter(await readReferenceFrontmatterFresh(ctx, file));
   assertReferenceIndex(items, index);
 
   const current = items[index];
@@ -1137,7 +1162,7 @@ export async function deleteReferenceItem(
   file: TFile,
   index: number
 ): Promise<ReferenceMutationResult> {
-  const items = referenceItemsFromFrontmatter(fileFrontmatter(ctx, file));
+  const items = referenceItemsFromFrontmatter(await readReferenceFrontmatterFresh(ctx, file));
   assertReferenceIndex(items, index);
   const [removed] = items.splice(index, 1);
   await writeReferenceItems(ctx, file, items);
@@ -1153,7 +1178,7 @@ export async function reorderReferenceItems(
   file: TFile,
   links: string[]
 ): Promise<{ changed: boolean; items: ReferenceRead[] }> {
-  const items = referenceItemsFromFrontmatter(fileFrontmatter(ctx, file));
+  const items = referenceItemsFromFrontmatter(await readReferenceFrontmatterFresh(ctx, file));
   if (links.length !== items.length) throw new Error("reference reorder requires the full current link order");
 
   const byLink = new Map<string, NormalizedReferenceItem>();

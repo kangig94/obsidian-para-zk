@@ -12,7 +12,7 @@ import type { ParaZkPluginContext } from "../plugin-interface";
 import {
   deleteReferenceItem,
   insertReferenceItem,
-  readReferenceItems,
+  readReferenceItemsFresh,
   reorderReferenceItems,
   updateReferenceItem,
   type ReferenceRead,
@@ -99,7 +99,7 @@ async function renderReferenceBlock(
       return;
     }
 
-    const items = currentReferences(plugin, rootFile);
+    const items = await currentReferences(plugin, rootFile);
     if (!isCurrentReferenceBlockGeneration(el, generation)) return;
 
     blockState.items = items;
@@ -280,8 +280,9 @@ function renderReferenceRow(
   });
 }
 
-function currentReferences(plugin: ParaZkPluginContext, rootFile: TFile): RenderableReference[] {
-  return readReferenceItems(referenceContext(plugin), rootFile).map((reference, index) => ({
+async function currentReferences(plugin: ParaZkPluginContext, rootFile: TFile): Promise<RenderableReference[]> {
+  const items = await readReferenceItemsFresh(referenceContext(plugin), rootFile);
+  return items.map((reference, index) => ({
     rootFile,
     index,
     reference
@@ -310,7 +311,7 @@ async function updateReferenceFromEditor(
 ): Promise<void> {
   await queueRegistryFileWrite(item.rootFile, async () => {
     const workflow = referenceContext(plugin);
-    const index = currentReferenceIndex(
+    const index = await currentReferenceIndex(
       workflow,
       item.rootFile,
       item.reference.link,
@@ -326,7 +327,7 @@ async function updateReferenceFromEditor(
 async function deleteReferenceFromRow(plugin: ParaZkPluginContext, item: RenderableReference): Promise<void> {
   await queueRegistryFileWrite(item.rootFile, async () => {
     const workflow = referenceContext(plugin);
-    const index = currentReferenceIndex(
+    const index = await currentReferenceIndex(
       workflow,
       item.rootFile,
       item.reference.link,
@@ -343,20 +344,20 @@ async function persistReferenceOrder(
   nextLinks: string[]
 ): Promise<void> {
   const workflow = referenceContext(plugin);
-  const currentLinks = readReferenceItems(workflow, rootFile).map((item) => item.link);
+  const currentLinks = (await readReferenceItemsFresh(workflow, rootFile)).map((item) => item.link);
   const goneMessage = referenceGoneMessage(plugin);
   assertSameReferenceLinkSet(renderedLinks, currentLinks, goneMessage);
   assertSameReferenceLinkSet(renderedLinks, nextLinks, goneMessage);
   await reorderReferenceItems(workflow, rootFile, nextLinks);
 }
 
-function currentReferenceIndex(
+async function currentReferenceIndex(
   workflow: WorkflowContext,
   rootFile: TFile,
   link: string,
   goneMessage: string
-): number {
-  const matches = readReferenceItems(workflow, rootFile)
+): Promise<number> {
+  const matches = (await readReferenceItemsFresh(workflow, rootFile))
     .map((item, index) => ({ item, index }))
     .filter(({ item }) => item.link === link);
   if (matches.length !== 1) throw new Error(goneMessage);
