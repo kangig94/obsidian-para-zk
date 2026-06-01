@@ -818,15 +818,38 @@
   min-width: 220px;
 }
 
-.para-zk-reference-edit-link,
-.para-zk-references-edit-link {
+.para-zk-reference-edit-target,
+.para-zk-references-edit-target,
+.para-zk-reference-edit-anchor,
+.para-zk-references-edit-anchor {
   width: min(420px, 100%);
+}
+
+.para-zk-reference-edit-anchor:disabled,
+.para-zk-references-edit-anchor:disabled {
+  color: var(--text-faint);
+  cursor: not-allowed;
 }
 
 .para-zk-reference-edit-description,
 .para-zk-references-edit-description {
   min-height: 72px;
   width: min(420px, 100%);
+}
+
+.para-zk-reference-suggestion-title {
+  font-weight: 600;
+  line-height: var(--line-height-tight);
+}
+
+.para-zk-reference-suggestion-path,
+.para-zk-reference-suggestion-detail {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: var(--line-height-tight);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 640px) {

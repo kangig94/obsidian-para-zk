@@ -1,4 +1,5 @@
 import {
+  AbstractInputSuggest,
   ButtonComponent,
   Modal,
   Notice,
@@ -47,8 +48,19 @@ type RenderableReference = {
 };
 
 type ReferenceEditValue = {
-  link: string;
+  target: string;
+  anchor: string;
   description: string;
+};
+
+type ReferenceAnchorSuggestion = {
+  kind: "heading" | "block";
+  value: string;
+  label: string;
+  detail: string;
+  line: number;
+  level?: number;
+  searchText: string;
 };
 
 const REFERENCE_GONE_MESSAGE = "reference no longer present — re-render";
@@ -163,7 +175,8 @@ function renderReferenceToolbar(
           new ReferenceEditModal(
             plugin,
             addLabel,
-            { link: "", description: "" },
+            options.rootFile.path,
+            { target: "", anchor: "", description: "" },
             async (value) => {
               await queueRegistryFileWrite(
                 options.rootFile,
@@ -240,10 +253,8 @@ function renderReferenceRow(
           new ReferenceEditModal(
             plugin,
             editLabel,
-            {
-              link: item.reference.link,
-              description: item.reference.description ?? ""
-            },
+            item.rootFile.path,
+            referenceEditValue(item.reference),
             async (value) => {
               await updateReferenceFromEditor(plugin, item, value);
               await options.rerender();
@@ -287,7 +298,7 @@ async function insertReferenceFromEditor(
   value: ReferenceEditValue
 ): Promise<void> {
   await insertReferenceItem(referenceContext(plugin), rootFile, {
-    link: value.link,
+    link: buildReferenceLinkInput(value.target, value.anchor),
     ...(value.description.trim() ? { description: value.description } : {})
   });
 }
@@ -306,7 +317,7 @@ async function updateReferenceFromEditor(
       referenceGoneMessage(plugin)
     );
     await updateReferenceItem(workflow, item.rootFile, index, {
-      link: value.link,
+      link: buildReferenceLinkInput(value.target, value.anchor),
       description: value.description
     });
   });
@@ -376,13 +387,47 @@ function renderReferenceError(el: HTMLElement, error: unknown): void {
   });
 }
 
+function buildReferenceLinkInput(target: string, anchor: string): string {
+  const trimmedTarget = target.trim();
+  if (isExternalHref(trimmedTarget)) return trimmedTarget;
+
+  const normalizedAnchor = normalizeReferenceAnchor(anchor);
+  return normalizedAnchor ? `[[${trimmedTarget}#${normalizedAnchor}]]` : `[[${trimmedTarget}]]`;
+}
+
+function referenceEditValue(reference: ReferenceRead): ReferenceEditValue {
+  const description = reference.description ?? "";
+  if (reference.kind === "url" || reference.kind === "text") {
+    return {
+      target: reference.link,
+      anchor: "",
+      description
+    };
+  }
+
+  const innerTarget = wikiTarget(reference.link) ?? reference.target ?? reference.link;
+  const split = splitReferenceSubpath(innerTarget);
+  return {
+    target: reference.path ?? split.base,
+    anchor: normalizeReferenceAnchor(split.subpath),
+    description
+  };
+}
+
 class ReferenceEditModal extends Modal {
   private value: ReferenceEditValue;
   private saving = false;
+  private targetSuggest?: ReferenceTargetSuggest;
+  private anchorSuggest?: ReferenceAnchorSuggest;
+  private anchorInputEl?: HTMLInputElement;
+  private anchorSuggestions: ReferenceAnchorSuggestion[] = [];
+  private anchorLineCache = new Map<string, string[]>();
+  private anchorRefreshGeneration = 0;
 
   constructor(
     private readonly plugin: ParaZkPluginContext,
     private readonly heading: string,
+    private readonly sourcePath: string,
     value: ReferenceEditValue,
     private readonly save: (value: ReferenceEditValue) => Promise<void>
   ) {
@@ -392,22 +437,49 @@ class ReferenceEditModal extends Modal {
 
   onOpen(): void {
     const labels = localePack(this.plugin.settings.locale).labels;
-    const linkLabel = labelValue(labels.referenceLinkPlaceholder, "Reference link");
+    const targetLabel = labelValue(labels.referenceTargetPlaceholder, "Path or URL");
+    const anchorLabel = labelValue(labels.referenceAnchorPlaceholder, "Section or block (optional)");
     const descriptionLabel = labelValue(labels.referenceDescriptionPlaceholder, "Description");
     this.contentEl.empty();
     this.contentEl.addClass("para-zk-reference-edit-modal");
     this.contentEl.createEl("h2", { text: this.heading });
 
     new Setting(this.contentEl)
-      .setName(linkLabel)
+      .setName(targetLabel)
       .addText((text) => {
         text
-          .setPlaceholder(linkLabel)
-          .setValue(this.value.link)
+          .setPlaceholder(targetLabel)
+          .setValue(this.value.target)
           .onChange((value) => {
-            this.value.link = value;
+            this.value.target = value;
+            void this.refreshAnchorSuggestions();
           });
-        text.inputEl.addClass("para-zk-reference-edit-link");
+        text.inputEl.addClass("para-zk-reference-edit-target");
+        this.targetSuggest = new ReferenceTargetSuggest(this.plugin, text.inputEl, (file) => {
+          this.value.target = file.path;
+          void this.refreshAnchorSuggestions();
+        });
+      });
+
+    new Setting(this.contentEl)
+      .setName(anchorLabel)
+      .addText((text) => {
+        text
+          .setPlaceholder(anchorLabel)
+          .setValue(this.value.anchor)
+          .onChange((value) => {
+            if (!text.inputEl.disabled) this.value.anchor = value;
+          });
+        this.anchorInputEl = text.inputEl;
+        text.inputEl.addClass("para-zk-reference-edit-anchor");
+        this.anchorSuggest = new ReferenceAnchorSuggest(
+          this.plugin,
+          text.inputEl,
+          () => this.anchorSuggestions,
+          (suggestion) => {
+            this.value.anchor = suggestion.value;
+          }
+        );
       });
 
     new Setting(this.contentEl)
@@ -421,6 +493,8 @@ class ReferenceEditModal extends Modal {
           });
         text.inputEl.addClass("para-zk-reference-edit-description");
       });
+
+    void this.refreshAnchorSuggestions();
 
     new Setting(this.contentEl)
       .addButton((button) => {
@@ -439,22 +513,29 @@ class ReferenceEditModal extends Modal {
   }
 
   onClose(): void {
+    this.anchorRefreshGeneration += 1;
+    this.targetSuggest?.close();
+    this.anchorSuggest?.close();
+    this.targetSuggest = undefined;
+    this.anchorSuggest = undefined;
+    this.anchorInputEl = undefined;
     this.contentEl.empty();
   }
 
   private async submit(): Promise<void> {
     if (this.saving) return;
     const labels = localePack(this.plugin.settings.locale).labels;
-    const link = this.value.link.trim();
-    if (!link) {
-      new Notice(labelValue(labels.referenceLinkPlaceholder, "Reference link"));
+    const target = this.value.target.trim();
+    if (!target) {
+      new Notice(labelValue(labels.referenceTargetPlaceholder, "Path or URL"));
       return;
     }
 
     this.saving = true;
     try {
       await this.save({
-        link,
+        target,
+        anchor: normalizeReferenceAnchor(this.value.anchor),
         description: this.value.description
       });
       this.close();
@@ -463,6 +544,166 @@ class ReferenceEditModal extends Modal {
     } finally {
       this.saving = false;
     }
+  }
+
+  private async refreshAnchorSuggestions(): Promise<void> {
+    const generation = ++this.anchorRefreshGeneration;
+    const file = this.resolveAnchorTargetFile(this.value.target);
+    if (!isMarkdownFile(file)) {
+      this.anchorSuggestions = [];
+      this.setAnchorInputEnabled(false);
+      return;
+    }
+
+    try {
+      const suggestions = await this.anchorSuggestionsForFile(file);
+      if (generation !== this.anchorRefreshGeneration) return;
+      this.anchorSuggestions = suggestions;
+      this.setAnchorInputEnabled(true);
+    } catch (error) {
+      if (generation !== this.anchorRefreshGeneration) return;
+      this.anchorSuggestions = [];
+      this.setAnchorInputEnabled(false);
+      new Notice(registryErrorMessage(error));
+    }
+  }
+
+  private setAnchorInputEnabled(enabled: boolean): void {
+    if (!this.anchorInputEl) return;
+    this.anchorInputEl.disabled = !enabled;
+    this.anchorInputEl.classList.toggle("is-disabled", !enabled);
+    if (!enabled) {
+      this.value.anchor = "";
+      this.anchorInputEl.value = "";
+    }
+  }
+
+  private resolveAnchorTargetFile(targetValue: string): TFile | undefined {
+    const target = targetValue.trim();
+    if (!target || isExternalHref(target)) return undefined;
+
+    const linked = this.plugin.app.metadataCache.getFirstLinkpathDest(target, this.sourcePath);
+    if (linked instanceof TFile) return linked;
+
+    if (!looksLikeVaultPath(target)) return undefined;
+    const file = this.plugin.app.vault.getAbstractFileByPath(target.replace(/\\/g, "/"));
+    return file instanceof TFile ? file : undefined;
+  }
+
+  private async anchorSuggestionsForFile(file: TFile): Promise<ReferenceAnchorSuggestion[]> {
+    const cache = this.plugin.app.metadataCache.getFileCache(file);
+    if (!cache) return [];
+
+    const blocks = Object.entries(cache.blocks ?? {});
+    const lines = blocks.length > 0 ? await this.cachedTargetLines(file) : [];
+    const suggestions: ReferenceAnchorSuggestion[] = [];
+
+    for (const heading of cache.headings ?? []) {
+      suggestions.push({
+        kind: "heading",
+        value: heading.heading,
+        label: heading.heading,
+        detail: `H${heading.level}`,
+        line: heading.position.start.line,
+        level: heading.level,
+        searchText: heading.heading
+      });
+    }
+
+    for (const [id, block] of blocks) {
+      const snippet = blockLineSnippet(lines, block.position.start.line);
+      suggestions.push({
+        kind: "block",
+        value: `^${id}`,
+        label: `^${id}`,
+        detail: snippet,
+        line: block.position.start.line,
+        searchText: `^${id} ${snippet}`
+      });
+    }
+
+    return suggestions.sort((left, right) => {
+      if (left.line !== right.line) return left.line - right.line;
+      return left.kind.localeCompare(right.kind);
+    });
+  }
+
+  private async cachedTargetLines(file: TFile): Promise<string[]> {
+    const cached = this.anchorLineCache.get(file.path);
+    if (cached) return cached;
+
+    const lines = (await this.plugin.app.vault.cachedRead(file)).split(/\r?\n/);
+    this.anchorLineCache.set(file.path, lines);
+    return lines;
+  }
+}
+
+class ReferenceTargetSuggest extends AbstractInputSuggest<TFile> {
+  constructor(
+    private readonly plugin: ParaZkPluginContext,
+    inputEl: HTMLInputElement,
+    private readonly onSelectFile: (file: TFile) => void
+  ) {
+    super(plugin.app, inputEl);
+    this.limit = 20;
+  }
+
+  protected getSuggestions(query: string): TFile[] {
+    const normalized = query.trim().toLocaleLowerCase();
+    const files = this.plugin.app.vault.getFiles();
+    const matches = normalized
+      ? files.filter((file) => file.path.toLocaleLowerCase().includes(normalized)
+        || file.basename.toLocaleLowerCase().includes(normalized))
+      : files;
+    return matches.slice(0, 20);
+  }
+
+  renderSuggestion(file: TFile, el: HTMLElement): void {
+    el.addClass("para-zk-reference-suggestion");
+    el.createDiv({ cls: "para-zk-reference-suggestion-title", text: file.basename });
+    el.createDiv({ cls: "para-zk-reference-suggestion-path", text: file.path });
+  }
+
+  selectSuggestion(file: TFile, _evt: MouseEvent | KeyboardEvent): void {
+    this.setValue(file.path);
+    this.onSelectFile(file);
+  }
+}
+
+class ReferenceAnchorSuggest extends AbstractInputSuggest<ReferenceAnchorSuggestion> {
+  constructor(
+    plugin: ParaZkPluginContext,
+    inputEl: HTMLInputElement,
+    private readonly suggestions: () => ReferenceAnchorSuggestion[],
+    private readonly onSelectAnchor: (suggestion: ReferenceAnchorSuggestion) => void
+  ) {
+    super(plugin.app, inputEl);
+    this.limit = 20;
+  }
+
+  protected getSuggestions(query: string): ReferenceAnchorSuggestion[] {
+    const normalized = normalizeReferenceAnchor(query).toLocaleLowerCase();
+    const matches = normalized
+      ? this.suggestions().filter((suggestion) => suggestion.searchText.toLocaleLowerCase().includes(normalized))
+      : this.suggestions();
+    return matches.slice(0, 20);
+  }
+
+  renderSuggestion(suggestion: ReferenceAnchorSuggestion, el: HTMLElement): void {
+    el.addClass("para-zk-reference-suggestion");
+    const title = el.createDiv({ cls: "para-zk-reference-suggestion-title", text: suggestion.label });
+    if (suggestion.kind === "heading") {
+      title.addClass("para-zk-reference-suggestion-heading");
+      title.style.paddingLeft = `${Math.max(0, (suggestion.level ?? 1) - 1) * 10}px`;
+    }
+    if (suggestion.detail) {
+      el.createDiv({ cls: "para-zk-reference-suggestion-detail", text: suggestion.detail });
+    }
+  }
+
+  selectSuggestion(suggestion: ReferenceAnchorSuggestion, _evt: MouseEvent | KeyboardEvent): void {
+    this.setValue(suggestion.value);
+    this.onSelectAnchor(suggestion);
   }
 }
 
@@ -512,6 +753,38 @@ function wikiTarget(link: string): string | undefined {
 function stripObsidianSubpath(value: string): string {
   const index = value.indexOf("#");
   return index === -1 ? value : value.slice(0, index);
+}
+
+function splitReferenceSubpath(value: string): { base: string; subpath: string } {
+  const trimmed = value.trim();
+  const index = trimmed.indexOf("#");
+  if (index === -1) {
+    return {
+      base: trimmed,
+      subpath: ""
+    };
+  }
+  return {
+    base: trimmed.slice(0, index).trim(),
+    subpath: trimmed.slice(index).trim()
+  };
+}
+
+function normalizeReferenceAnchor(anchor: string): string {
+  return anchor.trim().replace(/^#/, "").trim();
+}
+
+function isMarkdownFile(file: TFile | undefined): file is TFile {
+  return file instanceof TFile && file.extension.toLocaleLowerCase() === "md";
+}
+
+function looksLikeVaultPath(value: string): boolean {
+  return value.includes("/") || value.toLocaleLowerCase().endsWith(".md");
+}
+
+function blockLineSnippet(lines: string[], line: number): string {
+  const text = (lines[line] ?? "").trim().replace(/\s+/g, " ");
+  return text.length > 60 ? `${text.slice(0, 57)}...` : text;
 }
 
 function pathBasenameWithoutExtension(path: string): string {
