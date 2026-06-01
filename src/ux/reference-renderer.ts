@@ -194,7 +194,8 @@ function renderReferenceRow(
     rowClass: "para-zk-reference-row",
     dataset: {
       referenceIndex: String(item.index),
-      referenceLink: item.reference.link
+      referenceLink: item.reference.link,
+      referenceKind: item.reference.kind
     },
     reorderableClass: "is-reorderable",
     drag: options.drag ? {
@@ -210,18 +211,15 @@ function renderReferenceRow(
       const main = body.createDiv({ cls: "para-zk-reference-main" });
       const link = main.createEl("a", {
         cls: "para-zk-reference-link",
-        text: item.reference.link
+        text: referenceDisplayLabel(item.reference)
       });
       link.setAttr("href", referenceHref(item.reference));
+      link.setAttr("title", referenceTargetHint(item.reference));
       link.addEventListener("click", (event) => {
         event.preventDefault();
         void openReferenceLink(plugin, item.reference, options.ctx.sourcePath).catch((error: unknown) => {
           new Notice(registryErrorMessage(error));
         });
-      });
-      main.createSpan({
-        cls: "para-zk-reference-label",
-        text: referenceDisplayLabel(item.reference)
       });
       if (item.reference.note) {
         body.createDiv({
@@ -504,6 +502,10 @@ function referenceHref(reference: ReferenceRead): string {
 
 function referenceOpenText(reference: ReferenceRead): string {
   return wikiTarget(reference.link) ?? reference.link;
+}
+
+function referenceTargetHint(reference: ReferenceRead): string {
+  return reference.path ?? reference.target ?? reference.link;
 }
 
 function referenceDisplayLabel(reference: ReferenceRead): string {
