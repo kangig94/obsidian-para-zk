@@ -58,6 +58,12 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Changed
 
+- `unknown read key` and `unknown update key` CLI errors now list the valid keys for
+  the selected note type (read errors list readable keys; update errors list writable
+  keys with their supported operations), so callers can self-correct without docs.
+- Read and update command `key` option descriptions are now derived from each note
+  type's surface, so per-command help lists that type's actual keys instead of a
+  generic project-flavored hint. ZK key help is listed per kind.
 - Dashboard action panels now use the same responsive grid rhythm, spacing, radius,
   and shadow scale as dashboard summary cards.
 - Dashboard summary metrics are now calculated by PARA-ZK instead of DataviewJS card

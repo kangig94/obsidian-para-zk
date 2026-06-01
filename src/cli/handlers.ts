@@ -11,7 +11,7 @@ import {
 } from "../vocabulary";
 import { PROMOTION_ZK_KIND_CODE_HELP, ZK_KIND_CODE_HELP } from "../zk/kinds";
 import { parseList } from "./parse";
-import type { CollectionReadOptions, WorkflowContext } from "../workflows";
+import { surfaceReadKeys, surfaceWriteKeys, type CollectionReadOptions, type WorkflowContext } from "../workflows";
 
 type CliCapablePlugin = Plugin & {
   registerCliHandler?: (
@@ -30,8 +30,22 @@ type NativeCliCommand = {
   run: (plugin: ParaZkPluginContext, args: CliArgs) => Promise<Record<string, unknown>>;
 };
 
+const ZK_KEY_TYPES = ["zk_fleeting", "zk_literature", "zk_permanent"];
+
+function readKeyOption(type: string): CliOptionSpec {
+  return { value: "<map-path>", description: `Optional stable read key. Valid: ${surfaceReadKeys(type).join(", ")}.` };
+}
+
+function writeKeyOption(type: string): CliOptionSpec {
+  return { value: "<map-path>", description: `Stable writable key. Valid: ${surfaceWriteKeys(type).join(", ")}.` };
+}
+
+function zkKeyOption(keysFor: (type: string) => string[], verb: string): CliOptionSpec {
+  const byKind = ZK_KEY_TYPES.map((type) => `${type.replace("zk_", "")}: ${keysFor(type).join(", ")}`);
+  return { value: "<map-path>", description: `Stable ${verb} key; depends on ZK kind. ${byKind.join("; ")}.` };
+}
+
 const UPDATE_OPTIONS: Record<string, CliOptionSpec> = {
-  key: { value: "<map-path>", description: "Stable writable key such as summary, body, frontmatter/status, or children/<title>/body." },
   op: { value: "<set|insert|append|prepend|replace|delete>", description: "Update operation." },
   value: { value: "<text>", description: "Text value for scalar set, append, or prepend operations." },
   value_json: { value: "<json>", description: "Structured value for frontmatter updates and task inserts." },
@@ -112,7 +126,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       title: { value: "<title>", description: "Project title. Used when path is omitted." },
       path: { value: "<path>", description: "Project note path for exact selection." },
       archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
-      key: { value: "<map-path>", description: "Optional stable key such as frontmatter/status, summary, children, or children/<title>/body." },
+      key: readKeyOption("project"),
       ...READ_COLLECTION_OPTIONS,
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -136,7 +150,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       title: { value: "<title>", description: "Area title. Used when path is omitted." },
       path: { value: "<path>", description: "Area note path for exact selection." },
       archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
-      key: { value: "<map-path>", description: "Optional stable key such as overview, references, children, or children/<title>/overview." },
+      key: readKeyOption("area"),
       ...READ_COLLECTION_OPTIONS,
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -160,7 +174,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       title: { value: "<title>", description: "Resource title. Used when path is omitted." },
       path: { value: "<path>", description: "Resource note path for exact selection." },
       archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
-      key: { value: "<map-path>", description: "Optional stable key such as overview, body, or references." },
+      key: readKeyOption("resource"),
       ...READ_COLLECTION_OPTIONS,
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -184,7 +198,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       title: { value: "<title>", description: "ZK note title. Used when path is omitted." },
       path: { value: "<path>", description: "ZK note path for exact selection." },
       kind: { value: `<${ZK_KIND_CODE_HELP}>`, description: "Optional ZK kind filter." },
-      key: { value: "<map-path>", description: "Optional stable key such as summary, body, frontmatter/maturity, or references." },
+      key: zkKeyOption(surfaceReadKeys, "read"),
       ...READ_COLLECTION_OPTIONS,
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -207,7 +221,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     options: {
       date: { value: "<YYYY-MM-DD>", description: "Journal date. Defaults to today." },
       path: { value: "<path>", description: "Journal note path for exact selection." },
-      key: { value: "<map-path>", description: "Optional stable key such as focus, quick_memo, timeline, or tasks." },
+      key: readKeyOption("journal"),
       ...READ_COLLECTION_OPTIONS,
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -231,7 +245,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       path: { value: "<path>", description: "Retro note path for exact selection." },
       date: { value: "<YYYY-MM-DD>", description: "Optional date used to narrow the ISO week folder." },
       archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
-      key: { value: "<map-path>", description: "Optional stable key such as week_progress, tasks, or retro_summary." },
+      key: readKeyOption("retro"),
       ...READ_COLLECTION_OPTIONS,
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -256,6 +270,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       title: { value: "<title>", description: "Project title. Used when path is omitted." },
       path: { value: "<path>", description: "Project note path for exact selection." },
       archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
+      key: writeKeyOption("project"),
       ...UPDATE_OPTIONS
     },
     text: "project updated",
@@ -277,6 +292,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       title: { value: "<title>", description: "Area title. Used when path is omitted." },
       path: { value: "<path>", description: "Area note path for exact selection." },
       archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
+      key: writeKeyOption("area"),
       ...UPDATE_OPTIONS
     },
     text: "area updated",
@@ -298,6 +314,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       title: { value: "<title>", description: "Resource title. Used when path is omitted." },
       path: { value: "<path>", description: "Resource note path for exact selection." },
       archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
+      key: writeKeyOption("resource"),
       ...UPDATE_OPTIONS
     },
     text: "resource updated",
@@ -319,6 +336,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       title: { value: "<title>", description: "ZK note title. Used when path is omitted." },
       path: { value: "<path>", description: "ZK note path for exact selection." },
       kind: { value: `<${ZK_KIND_CODE_HELP}>`, description: "Optional ZK kind filter." },
+      key: zkKeyOption(surfaceWriteKeys, "write"),
       ...UPDATE_OPTIONS
     },
     text: "ZK updated",
@@ -339,6 +357,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     options: {
       date: { value: "<YYYY-MM-DD>", description: "Journal date. Defaults to today." },
       path: { value: "<path>", description: "Journal note path for exact selection." },
+      key: writeKeyOption("journal"),
       ...UPDATE_OPTIONS
     },
     text: "journal updated",
@@ -360,6 +379,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       path: { value: "<path>", description: "Retro note path for exact selection." },
       date: { value: "<YYYY-MM-DD>", description: "Optional date used to narrow the ISO week folder." },
       archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
+      key: writeKeyOption("retro"),
       ...UPDATE_OPTIONS
     },
     text: "retro updated",

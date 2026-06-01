@@ -1378,7 +1378,7 @@ async function readSurfaceKey(
   }
 
   if (!Object.prototype.hasOwnProperty.call(surface, "children")) {
-    throw new Error(`unknown read key: ${key}`);
+    throw unknownReadKeyError(spec, key);
   }
   if (parts.length === 1) return surface.children;
 
@@ -1411,6 +1411,13 @@ function readSurfaceMapKey(
 
   if (hasCollectionReadOptions(collectionOptions)) {
     throw new Error("collection read options require key to select a collection root");
+  }
+
+  if (!readSurfaceTopLevelKeys(spec).includes(parts[0])) {
+    throw unknownReadKeyError(spec, originalKey);
+  }
+  if (parts[0] === "frontmatter" && parts.length >= 2 && !spec.frontmatter.includes(parts[1])) {
+    throw unknownReadKeyError(spec, originalKey);
   }
 
   return readMapPath(surface, parts, originalKey);
@@ -1648,7 +1655,7 @@ async function resolveWritableSurfaceTarget(
   if (parts.length === 0) throw new Error("key is required");
 
   if (parts[0] === "children") {
-    if (!spec.children) throw new Error(`unknown update key: ${originalKey}`);
+    if (!spec.children) throw unknownUpdateKeyError(spec, originalKey);
     if (parts.length < 3) throw new Error(`children map is read-only; use children/<title>/<key>`);
 
     const childTitle = parts[1];
@@ -1667,7 +1674,7 @@ async function resolveWritableSurfaceTarget(
   if (parts[0] === "frontmatter") {
     if (parts.length !== 2) throw new Error(`frontmatter map is read-only; use frontmatter/<key>`);
     const frontmatterKey = parts[1];
-    if (!spec.frontmatter.includes(frontmatterKey)) throw new Error(`unknown update key: ${originalKey}`);
+    if (!spec.frontmatter.includes(frontmatterKey)) throw unknownUpdateKeyError(spec, originalKey);
     return {
       kind: "frontmatter",
       file,
@@ -1685,7 +1692,7 @@ async function resolveWritableSurfaceTarget(
   }
 
   const section = spec.sections?.find((item) => item.key === parts[0]);
-  if (!section) throw new Error(`unknown update key: ${originalKey}`);
+  if (!section) throw unknownUpdateKeyError(spec, originalKey);
 
   if (section.collection) {
     return resolveWritableCollectionTarget(ctx, file, section, parts, originalKey);
@@ -2346,6 +2353,56 @@ function specForType(type: string): ReadSurfaceSpec {
   if (type === "zk_literature") return ZK_LITERATURE_READ_SPEC;
   if (type === "zk_permanent") return ZK_PERMANENT_READ_SPEC;
   return NOTE_READ_SPEC;
+}
+
+function readSurfaceTopLevelKeys(spec: ReadSurfaceSpec): string[] {
+  const keys = ["frontmatter"];
+  for (const section of spec.sections ?? []) keys.push(section.key);
+  if (spec.body) keys.push("body");
+  if (spec.children) keys.push("children");
+  return keys;
+}
+
+function readKeyHints(spec: ReadSurfaceSpec): string[] {
+  const keys: string[] = [];
+  if (spec.frontmatter.length > 0) keys.push(`frontmatter/{${spec.frontmatter.join("|")}}`);
+  for (const section of spec.sections ?? []) keys.push(section.key);
+  if (spec.body) keys.push("body");
+  if (spec.children) keys.push("children/<title>/<key>");
+  return keys;
+}
+
+function writeKeyHints(spec: ReadSurfaceSpec): string[] {
+  const keys: string[] = [];
+  if (spec.frontmatter.length > 0) keys.push(`frontmatter/{${spec.frontmatter.join("|")}}=set`);
+  for (const section of spec.sections ?? []) {
+    if (section.collection === "task") {
+      keys.push("tasks=insert", "tasks/<id>=delete", "tasks/<id>/<field>=set");
+    } else if (section.collection === "reference") {
+      keys.push("references/<id>=delete", "references/<id>/<field>=set");
+    } else {
+      keys.push(`${section.key}=set|append|prepend|replace`);
+    }
+  }
+  if (spec.body) keys.push("body=set|append|prepend|replace");
+  if (spec.children) keys.push("children/<title>/<key>");
+  return keys;
+}
+
+function unknownReadKeyError(spec: ReadSurfaceSpec, key: string): Error {
+  return new Error(`unknown read key: ${key} (valid: ${readKeyHints(spec).join(", ")})`);
+}
+
+function unknownUpdateKeyError(spec: ReadSurfaceSpec, key: string): Error {
+  return new Error(`unknown update key: ${key} (writable: ${writeKeyHints(spec).join(", ")})`);
+}
+
+export function surfaceReadKeys(type: string): string[] {
+  return readKeyHints(specForType(type));
+}
+
+export function surfaceWriteKeys(type: string): string[] {
+  return writeKeyHints(specForType(type));
 }
 
 function readMapPath(map: ReadMap, parts: string[], originalKey: string): unknown {
