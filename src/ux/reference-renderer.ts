@@ -208,10 +208,9 @@ function renderReferenceRow(
     } : undefined,
     renderBody: (row) => {
       const body = row.createDiv({ cls: "para-zk-reference-body" });
-      const main = body.createDiv({ cls: "para-zk-reference-main" });
-      const link = main.createEl("a", {
+      const link = body.createEl("a", {
         cls: "para-zk-reference-link",
-        text: referenceDisplayLabel(item.reference)
+        text: referenceTitle(item.reference)
       });
       link.setAttr("href", referenceHref(item.reference));
       link.setAttr("title", referenceTargetHint(item.reference));
@@ -221,6 +220,13 @@ function renderReferenceRow(
           new Notice(registryErrorMessage(error));
         });
       });
+      const subLabel = referenceSubLabel(item.reference);
+      if (subLabel) {
+        body.createDiv({
+          cls: "para-zk-reference-label",
+          text: subLabel
+        });
+      }
       if (item.reference.note) {
         body.createDiv({
           cls: "para-zk-reference-note",
@@ -508,13 +514,22 @@ function referenceTargetHint(reference: ReferenceRead): string {
   return reference.path ?? reference.target ?? reference.link;
 }
 
-function referenceDisplayLabel(reference: ReferenceRead): string {
-  if (reference.label) return reference.label;
-  if (reference.kind === "url") return reference.target ?? reference.link;
+// Primary display: for an internal file/note/wiki target this is the filename, with any
+// Obsidian subpath (#heading / #^block) stripped and the label intentionally ignored.
+// A URL has no meaningful filename, so its human label (when set) leads, else the URL.
+function referenceTitle(reference: ReferenceRead): string {
+  if (reference.kind === "url") return reference.label ?? reference.target ?? reference.link;
 
   const target = reference.path ?? reference.target ?? wikiTarget(reference.link) ?? reference.link;
   const base = stripObsidianSubpath(target);
   return pathBasenameWithoutExtension(base) || target;
+}
+
+// Secondary (small) line under the filename: the user's label for internal references.
+// URLs already surface their label as the title, so they have no sub-label.
+function referenceSubLabel(reference: ReferenceRead): string | undefined {
+  if (reference.kind === "url") return undefined;
+  return reference.label;
 }
 
 function wikiTarget(link: string): string | undefined {

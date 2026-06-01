@@ -726,6 +726,9 @@
 
 .para-zk-reference-body,
 .para-zk-references-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -739,9 +742,7 @@
 }
 
 .para-zk-reference-link,
-.para-zk-references-link,
-.para-zk-reference-label,
-.para-zk-references-label {
+.para-zk-references-link {
   font-size: var(--font-ui-medium);
   line-height: 1.35;
   overflow-wrap: anywhere;
@@ -761,7 +762,10 @@
 
 .para-zk-reference-label,
 .para-zk-references-label {
-  color: var(--text-normal);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .para-zk-reference-note,
