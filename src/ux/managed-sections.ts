@@ -52,6 +52,10 @@ async function renderManagedSections(
   el.addClass("para-zk-managed");
   if (type) el.addClass(`para-zk-managed-${className(type)}`);
 
+  if (type && !block) {
+    return;
+  }
+
   if (!block) {
     el.createDiv({ cls: "para-zk-props-muted", text: `No PARA-ZK managed UI for type: ${type || "(unknown)"}` });
     return;

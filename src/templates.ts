@@ -210,8 +210,6 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         "- ",
         "",
         `# ${t.labels.retroSummary}`,
-        "",
-        paraZkManagedBlock(),
         ""
       ].join("\n");
     case "subnote":
@@ -394,11 +392,6 @@ export function managedUiBlockForType(type: string, settings: ParaZkSettings): s
         paraZkReferencesBlock("current", t.labels.references)
       ]);
     case "journal":
-      return joinManagedUiBlocks([
-        paraZkTasksBlock("current", [], t.labels.tasks),
-        paraZkReferencesBlock("current", t.labels.references)
-      ]);
-    case "retro":
       return joinManagedUiBlocks([
         paraZkTasksBlock("current", [], t.labels.tasks),
         paraZkReferencesBlock("current", t.labels.references)

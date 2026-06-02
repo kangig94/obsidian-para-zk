@@ -23,8 +23,9 @@ describe("managed templates", () => {
     expect(project).not.toContain("sameLink");
     expect(project).toContain("# Summary\n```para-zk-latest-retro-summary\n```\n{{cursor}}");
     expect(subnote).not.toContain("para-zk-managed");
+    expect(retro).not.toContain("para-zk-managed");
 
-    for (const content of [project, area, resource, journal, retro, fleeting, literature, permanent]) {
+    for (const content of [project, area, resource, journal, fleeting, literature, permanent]) {
       expect(content.match(/```para-zk-managed/g)).toHaveLength(1);
       expect(content).not.toContain("---\n```para-zk-managed");
       expect(content).not.toContain("project-subnotes");
@@ -39,7 +40,6 @@ describe("managed templates", () => {
     const area = managedUiBlockForType("area", DEFAULT_SETTINGS) ?? "";
     const resource = managedUiBlockForType("resource", DEFAULT_SETTINGS) ?? "";
     const journal = managedUiBlockForType("journal", DEFAULT_SETTINGS) ?? "";
-    const retro = managedUiBlockForType("retro", DEFAULT_SETTINGS) ?? "";
     const fleeting = managedUiBlockForType("zk_fleeting", DEFAULT_SETTINGS) ?? "";
     const literature = managedUiBlockForType("zk_literature", DEFAULT_SETTINGS) ?? "";
 
@@ -58,7 +58,7 @@ describe("managed templates", () => {
     expect(resource).toContain("resource-zk-links");
     expect(resource).toContain("title: Promote to ZK");
     expect(journal).toContain("para-zk-tasks");
-    expect(retro).toContain("para-zk-tasks");
+    expect(managedUiBlockForType("retro", DEFAULT_SETTINGS)).toBeUndefined();
     expect(fleeting).toContain("fleeting-promotion");
     expect(literature).toContain("para-zk-references");
     expect(managedUiBlockForType("doc", DEFAULT_SETTINGS)).toBeUndefined();
@@ -94,7 +94,10 @@ describe("managed templates", () => {
 
   it("keeps retro summary empty by default", () => {
     const retro = renderTemplate("retro", DEFAULT_SETTINGS);
-    expect(retro).toContain("# Retro summary\n\n```para-zk-managed");
+    expect(retro).toContain("# Retro summary (required)\n");
+    expect(retro).not.toContain("```para-zk-managed");
+    expect(retro).not.toContain("```para-zk-tasks");
+    expect(retro).not.toContain("```para-zk-references");
     expect(retro).not.toContain("Smoke retro summary");
     expect(retro).not.toContain("one line that helps next week");
     expect(retro).not.toContain("다음 주에 바로 도움이 될 핵심 한 줄");

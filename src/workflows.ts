@@ -1665,9 +1665,7 @@ const RETRO_READ_SPEC: ReadSurfaceSpec = {
     { key: "good", labelKey: "good" },
     { key: "improve", labelKey: "improve" },
     { key: "risks", labelKey: "risks" },
-    { key: "tasks", labelKey: "tasks", transform: readTasks, collection: "task" },
     { key: "retro_summary", labelKey: "retroSummary" },
-    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" },
     BACKLINK_READ_SECTION
   ]
 };
@@ -2578,12 +2576,14 @@ function spliceTextRange(content: string, range: TextRange, value: string): stri
     } else {
       replacement = `${replacement}${startsWithMarkdownBoundary(after) ? "\n\n" : "\n"}`;
     }
+  } else if (replacement && !after && !replacement.endsWith("\n")) {
+    replacement = `${replacement}\n`;
   }
   return `${before}${replacement}${after}`;
 }
 
 function startsWithMarkdownBoundary(content: string): boolean {
-  return /^(?:#{1,6}\s+|(?:-{3,}|\*{3,}|_{3,})\s*(?:\r?\n|$))/.test(content);
+  return /^(?:#{1,6}\s+|```|(?:-{3,}|\*{3,}|_{3,})\s*(?:\r?\n|$))/.test(content);
 }
 
 function writableSectionRange(content: string, section: ReadSectionSpec, originalKey: string): TextRange {
@@ -2592,7 +2592,8 @@ function writableSectionRange(content: string, section: ReadSectionSpec, origina
   const editableStart = section.skipManagedPrelude
     ? skipProjectSummaryManagedBlock(content, range.start, range.end)
     : range.start;
-  return trimTextRange(content, editableStart, range.end);
+  const editableEnd = trailingManagedBlockStart(content, editableStart, range.end) ?? range.end;
+  return trimTextRange(content, editableStart, editableEnd);
 }
 
 function writableBodyRange(content: string): TextRange {
@@ -2700,6 +2701,12 @@ function skipLeadingFencedBlock(content: string, start: number, end: number, lan
     cursor = line.next;
   }
   return cursor;
+}
+
+function trailingManagedBlockStart(content: string, start: number, end: number): number | undefined {
+  const slice = content.slice(start, end);
+  const match = slice.match(/(?:\r?\n[ \t]*)*```para-zk-managed[^\r\n]*\r?\n```[ \t]*(?:\r?\n[ \t]*)*$/);
+  return match?.index === undefined ? undefined : start + match.index;
 }
 
 function readLineSpan(text: string, start: number, end: number): { text: string; next: number } | undefined {
@@ -3986,7 +3993,7 @@ function readSectionByHeading(
   const after = content.slice(sectionStart);
   const nextBoundaryRel = nextSectionBoundary(after, options.includeSubsections ? level : undefined);
   const sectionEnd = nextBoundaryRel === -1 ? content.length : sectionStart + nextBoundaryRel;
-  return trimMarkdownBlock(content.slice(sectionStart, sectionEnd));
+  return trimMarkdownBlock(stripTrailingManagedBlock(content.slice(sectionStart, sectionEnd)));
 }
 
 function nextSectionBoundary(content: string, maxHeadingLevel: number | undefined): number {
@@ -4040,6 +4047,10 @@ function stripLeadingFencedBlock(content: string, language: string): string {
 
   while (lines[index]?.trim() === "") index += 1;
   return trimMarkdownBlock(lines.slice(index).join("\n"));
+}
+
+function stripTrailingManagedBlock(content: string): string {
+  return content.replace(/(?:\r?\n[ \t]*)*```para-zk-managed[^\r\n]*\r?\n```[ \t]*(?:\r?\n[ \t]*)*$/, "");
 }
 
 function stripManagedPrelude(content: string): string {

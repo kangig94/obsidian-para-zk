@@ -95,7 +95,7 @@ describe("journal", () => {
 });
 
 describe("retro", () => {
-  it("creates a project retro, reads week_iso, and inserts tasks", async () => {
+  it("creates a project retro and reads week_iso without managed task/reference UI", async () => {
     await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
     const retro = await cli.run("para-zk:create-retro", {
       path: "PARA/Projects/Alpha/Alpha.md",
@@ -107,13 +107,14 @@ describe("retro", () => {
     const weekIso = await cli.run("para-zk:read-retro", { path: String(retro.path), key: "frontmatter/week_iso" });
     expect(String(weekIso.value).length).toBeGreaterThan(0);
 
-    const update = await cli.run("para-zk:update-retro", {
-      path: String(retro.path),
-      key: "tasks",
-      op: "insert",
-      value_json: JSON.stringify({ name: "Retro action" })
-    });
-    expect(update.changed).toBe(true);
+    const content = cli.app.readPath(String(retro.path)) ?? "";
+    expect(content).not.toContain("```para-zk-managed");
+    expect(content).not.toContain("```para-zk-tasks");
+    expect(content).not.toContain("```para-zk-references");
+
+    const compact = await cli.run("para-zk:read-retro", { path: String(retro.path) });
+    expect(compact.available_keys).not.toContain("tasks");
+    expect(compact.available_keys).not.toContain("references");
   });
 
   it("links a project retro even when metadata cache has not caught up", async () => {
@@ -209,6 +210,53 @@ describe("subarea and child bodies", () => {
 
     const read = await cli.run("para-zk:read-project", { title: "Alpha", key: "children/Notes/body" });
     expect(String(read.value)).toContain("Body addition");
+  });
+});
+
+describe("managed UI preservation", () => {
+  it("keeps the managed UI block when updating final human sections", async () => {
+    await cli.run("para-zk:create-area", { title: "Ops", open: "false" });
+    const areaUpdate = await cli.run("para-zk:update-area", {
+      title: "Ops",
+      key: "overview",
+      op: "set",
+      value: "Area overview"
+    });
+    expect(areaUpdate.changed).toBe(true);
+    const areaContent = cli.app.readPath("PARA/Areas/Ops/Ops.md") ?? "";
+    expect(areaContent).toContain("# Overview\nArea overview\n\n```para-zk-managed\n```");
+    expect(areaContent.match(/```para-zk-managed/g)).toHaveLength(1);
+
+    await cli.run("para-zk:create-resource", { title: "Source", open: "false" });
+    const resourceUpdate = await cli.run("para-zk:update-resource", {
+      title: "Source",
+      key: "body",
+      op: "set",
+      value: "Resource body"
+    });
+    expect(resourceUpdate.changed).toBe(true);
+    const resourceContent = cli.app.readPath("PARA/Resources/Source.md") ?? "";
+    expect(resourceContent).toContain("# Body\nResource body\n\n```para-zk-managed\n```");
+    expect(resourceContent.match(/```para-zk-managed/g)).toHaveLength(1);
+
+    await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
+    const retro = await cli.run("para-zk:create-retro", {
+      path: "PARA/Projects/Alpha/Alpha.md",
+      date: "2026-06-02",
+      open: "false"
+    });
+    const retroUpdate = await cli.run("para-zk:update-retro", {
+      path: String(retro.path),
+      key: "retro_summary",
+      op: "set",
+      value: "Retro summary text"
+    });
+    expect(retroUpdate.changed).toBe(true);
+    const retroContent = cli.app.readPath(String(retro.path)) ?? "";
+    expect(retroContent).toContain("# Retro summary (required)\nRetro summary text\n");
+    expect(retroContent).not.toContain("```para-zk-managed");
+    expect(retroContent).not.toContain("```para-zk-tasks");
+    expect(retroContent).not.toContain("```para-zk-references");
   });
 });
 

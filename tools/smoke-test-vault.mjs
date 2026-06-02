@@ -215,7 +215,7 @@ function assertManagedTemplateFiles() {
     const text = readVaultText(path);
     assertNoTemplateDrift(path, text);
 
-    if (name === "subnote") {
+    if (name === "subnote" || name === "retro") {
       assert(!text.includes("```para-zk-managed"), `${path} should not include managed UI`);
     } else {
       assert(countOccurrences(text, "```para-zk-managed") === 1, `${path} must include exactly one managed block`);
@@ -231,7 +231,8 @@ function assertManagedTemplateFiles() {
 
   const retro = readVaultText("Templates/para-zk/template_retro.md");
   assert(retro.includes("areas: {{areas_frontmatter}}"), "template_retro.md must keep YAML-safe areas placeholder spacing");
-  assert(retro.includes("# Retro summary\n\n```para-zk-managed"), "template_retro.md must keep Retro summary empty before managed UI");
+  assert(retro.includes("# Retro summary (required)\n"), "template_retro.md must keep required Retro summary heading");
+  assert(!retro.includes("```para-zk-managed"), "template_retro.md must not include managed UI");
   assertFileNotContains("Templates/para-zk/template_retro.md", [
     "다음 주에 바로 도움이 될 핵심 한 줄",
     "one line that helps next week"
@@ -310,13 +311,13 @@ function assertGeneratedTemplateShapes() {
   assertGeneratedNoteTemplateShape(permanent.path, "zk_permanent");
 }
 
-function assertGeneratedNoteTemplateShape(path, type) {
+function assertGeneratedNoteTemplateShape(path, type, options = {}) {
   assertVaultTextEventually(path, (text) => {
     assertNoTemplateDrift(path, text);
     assert(text.includes("```para-zk-props"), `${path} is missing para-zk props block`);
 
-    if (type === "subnote") {
-      assert(!text.includes("```para-zk-managed"), `${path} subnote should not include managed UI`);
+    if (type === "subnote" || type === "retro") {
+      assert(!text.includes("```para-zk-managed"), `${path} should not include managed UI`);
     } else {
       assert(countOccurrences(text, "```para-zk-managed") === 1, `${path} must include exactly one managed block`);
       assert(text.includes("```para-zk-managed\n```"), `${path} managed block must stay compact`);
@@ -324,8 +325,10 @@ function assertGeneratedNoteTemplateShape(path, type) {
 
     if (type === "project") {
       assertProjectSummaryText(path, text);
+    } else if (type === "retro" && options.allowRetroSummaryText) {
+      assert(text.includes("# Retro summary (required)"), `${path} retro summary heading is missing`);
     } else if (type === "retro") {
-      assert(text.includes("# Retro summary\n\n```para-zk-managed"), `${path} retro summary should be empty before managed UI`);
+      assert(text.includes("# Retro summary (required)\n"), `${path} retro summary heading is missing`);
     }
   });
 }
@@ -499,6 +502,7 @@ function assertBacklinkReadKeyScenario() {
     "format=json"
   ]);
   assert(areaLink.ok === true, "backlink read area link setup failed");
+  assertGeneratedNoteTemplateShape(area.path, "area");
 
   assert(waitForBacklink(target.path, project.path), "project source did not resolve as a backlink");
   assert(waitForBacklink(target.path, area.path), "area source did not resolve as a backlink");
@@ -999,6 +1003,7 @@ function assertCreateRetroButtonProjectLink() {
     "format=json"
   ]);
   assert(update.ok === true && update.changed === true, "retro summary update failed");
+  assertGeneratedNoteTemplateShape(created.retroPath, "retro", { allowRetroSummaryText: true });
 
   const rendered = guiJson(`(async () => {
     const path = ${JSON.stringify(project.path)};
