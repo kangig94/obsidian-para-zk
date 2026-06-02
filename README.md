@@ -94,8 +94,8 @@ Existing non-managed files are skipped, and changed managed files are only overw
 with `force=true`.
 
 `para-zk:init` also checks required community plugin dependencies. It warns when
-Dataview, Tasks, Tabs, Folder notes, Update time on edit, Trash Explorer, Custom
-File Explorer sorting, or Homepage is missing or disabled. Pass `installDeps=true`
+Dataview, Tasks, Folder notes, Update time on edit, Trash Explorer, Custom
+File Explorer sorting, Homepage, or Open Tab Settings is missing or disabled. Pass `installDeps=true`
 to install and enable those dependencies. When Dataview is installed, PARA-ZK also
 enables Dataview JavaScript queries because the generated dashboards use `dataviewjs`
 blocks. When Update time on edit is installed, PARA-ZK configures `created` and

@@ -129,6 +129,12 @@ const REQUIRED_DEPENDENCIES: DependencySpec[] = [
     repo: "mirnovov/obsidian-homepage",
     reason: "PARA-ZK opens the generated Home dashboard on startup and when the workspace is empty",
     configuration: homepageDependencyConfiguration
+  },
+  {
+    id: "open-tab-settings",
+    name: "Open Tab Settings",
+    repo: "jesse-r-s-hines/obsidian-open-tab-settings",
+    reason: "PARA-ZK navigation opens notes from ribbon, dashboard, and inline actions; consistent open-in-new-tab and no-duplicate-tab behavior keeps the PARA/ZK workflow navigable"
   }
 ];
 

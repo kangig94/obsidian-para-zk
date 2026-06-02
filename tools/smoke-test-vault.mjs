@@ -21,7 +21,8 @@ const requiredDependencyIds = [
   "update-time-on-edit",
   "obsidian-trash-explorer",
   "custom-sort",
-  "homepage"
+  "homepage",
+  "open-tab-settings"
 ];
 const guiLocaleExpectations = {
   en: {

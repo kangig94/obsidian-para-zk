@@ -148,6 +148,7 @@ Required dependencies:
 - Trash Explorer
 - Custom File Explorer sorting
 - Homepage
+- Open Tab Settings
 
 Dataview JavaScript queries are enabled when Dataview is installed.
 Update time on edit is configured to maintain `created` and `updated`
@@ -159,6 +160,9 @@ Custom File Explorer sorting is configured for bookmark-based ordering with a
 baseline `sortspec` bookmarks group. Existing `sortspec` groups are preserved.
 Homepage is configured to open `Dashboard/HomePage` on startup and when the
 workspace is empty.
+Open Tab Settings is installed and enabled so PARA-ZK navigation (ribbon,
+dashboard, and inline actions) opens notes with consistent open-in-new-tab and
+no-duplicate-tab behavior. It is installed/enabled only; no settings are forced.
 
 Obsidian core settings are merged into existing config files without deleting
 unrelated user settings:

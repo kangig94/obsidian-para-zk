@@ -189,6 +189,9 @@ PARA-ZK configures bookmark-based sorting and creates the baseline `sortspec`
 bookmarks group only when it is missing.
 Homepage is required for opening the generated Home dashboard on startup and when
 the workspace is empty.
+Open Tab Settings is required so PARA-ZK navigation (ribbon, dashboard, inline
+actions) opens notes with consistent open-in-new-tab / no-duplicate-tab behavior;
+PARA-ZK installs and enables it but does not force its options.
 
 Folder-style notes are part of the workflow. Projects and areas are created as
 folders containing their main note. Child documents and child areas should link

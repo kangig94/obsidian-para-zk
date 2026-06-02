@@ -59,6 +59,10 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Changed
 
+- Added Open Tab Settings (`open-tab-settings`) to the required community plugin
+  dependencies so PARA-ZK navigation opens notes with consistent
+  open-in-new-tab / no-duplicate-tab behavior; `installDeps=true` installs and
+  enables it (options are not forced).
 - `unknown read key` and `unknown update key` CLI errors now list the valid keys for
   the selected note type (read errors list readable keys; update errors list writable
   keys with their supported operations), so callers can self-correct without docs.
