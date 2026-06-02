@@ -21,6 +21,7 @@ import {
 } from "../props/schema";
 import { frontmatterLinks } from "../vault/frontmatter";
 import { normalizeVaultPath, wikiLink } from "../vault/paths";
+import { parseCodeBlockKeyValues } from "./code-block-args";
 
 type Frontmatter = Record<string, unknown>;
 
@@ -404,15 +405,6 @@ function sourceFile(plugin: ParaZkPluginContext, sourcePath: string | undefined)
 
 function fileFrontmatter(plugin: ParaZkPluginContext, file: TFile): Frontmatter {
   return (plugin.app.metadataCache.getFileCache(file)?.frontmatter ?? {}) as Frontmatter;
-}
-
-function parseCodeBlockKeyValues(source: string): Record<string, string> {
-  const result: Record<string, string> = {};
-  for (const line of source.split(/\r?\n/)) {
-    const match = line.match(/^\s*([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/);
-    if (match) result[match[1]] = match[2];
-  }
-  return result;
 }
 
 function parseInlineInputToken(value: string): InlineInputToken | undefined {

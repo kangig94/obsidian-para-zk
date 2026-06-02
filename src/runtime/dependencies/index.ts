@@ -334,9 +334,9 @@ function readDependencyState(
   const manifest = manager.manifests?.[dependency.id];
   return {
     installed: Boolean(manifest),
-    enabled: enabledConfig?.has(dependency.id)
-      ?? manager.enabledPlugins?.has(dependency.id)
-      ?? Boolean(manager.plugins?.[dependency.id]),
+    enabled: Boolean(enabledConfig?.has(dependency.id))
+      || Boolean(manager.enabledPlugins?.has(dependency.id))
+      || Boolean(manager.plugins?.[dependency.id]),
     installedVersion: manifest?.version
   };
 }

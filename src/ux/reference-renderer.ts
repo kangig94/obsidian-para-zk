@@ -14,8 +14,12 @@ import type { ParaZkPluginContext } from "../plugin-interface";
 import {
   deleteReferenceItem,
   insertReferenceItem,
+  isExternalReference,
+  parseWikiLink,
+  pathBasenameWithoutExtension,
   readReferenceItemsFresh,
   reorderReferenceItems,
+  splitObsidianSubpath,
   updateReferenceItem,
   type ReferenceRead,
   type WorkflowContext
@@ -34,6 +38,7 @@ import {
   type RegistryBlockState,
   type RegistryDragOptions
 } from "./registry-block";
+import { parseCodeBlockKeyValues } from "./code-block-args";
 
 type ReferenceBlockArgs = {
   root: "current" | string;
@@ -53,6 +58,9 @@ type ReferenceEditValue = {
   target: string;
   anchor: string;
   description: string;
+  originalLink?: string;
+  prefilledTarget?: string;
+  prefilledAnchor?: string;
 };
 
 type ReferenceAnchorSuggestion = {
@@ -319,10 +327,21 @@ async function updateReferenceFromEditor(
       item.reference.link,
       referenceGoneMessage(plugin)
     );
-    await updateReferenceItem(workflow, item.rootFile, index, {
-      link: buildReferenceLinkInput(value.target, value.anchor),
-      description: value.description
-    });
+    // When the user left target and anchor untouched, update only the description so the
+    // stored link keeps its exact form (passing link would re-canonicalize, e.g. rewriting
+    // a short `[[Foo]]` to a full path or a text reference into a wikilink). Rebuild the link
+    // only when target/anchor actually changed.
+    const linkUnchanged = value.originalLink !== undefined
+      && value.target === value.prefilledTarget
+      && value.anchor === value.prefilledAnchor;
+    await updateReferenceItem(
+      workflow,
+      item.rootFile,
+      index,
+      linkUnchanged
+        ? { description: value.description }
+        : { link: buildReferenceLinkInput(value.target, value.anchor), description: value.description }
+    );
   });
 }
 
@@ -392,7 +411,7 @@ function renderReferenceError(el: HTMLElement, error: unknown): void {
 
 function buildReferenceLinkInput(target: string, anchor: string): string {
   const trimmedTarget = target.trim();
-  if (isExternalHref(trimmedTarget)) return trimmedTarget;
+  if (isExternalReference(trimmedTarget)) return trimmedTarget;
 
   const normalizedAnchor = normalizeReferenceAnchor(anchor);
   return normalizedAnchor ? `[[${trimmedTarget}#${normalizedAnchor}]]` : `[[${trimmedTarget}]]`;
@@ -404,16 +423,24 @@ function referenceEditValue(reference: ReferenceRead): ReferenceEditValue {
     return {
       target: reference.link,
       anchor: "",
-      description
+      description,
+      originalLink: reference.link,
+      prefilledTarget: reference.link,
+      prefilledAnchor: ""
     };
   }
 
-  const innerTarget = wikiTarget(reference.link) ?? reference.target ?? reference.link;
-  const split = splitReferenceSubpath(innerTarget);
+  const innerTarget = parseWikiLink(reference.link)?.target ?? reference.target ?? reference.link;
+  const split = splitObsidianSubpath(innerTarget);
+  const target = reference.path ?? split.base;
+  const anchor = normalizeReferenceAnchor(split.subpath);
   return {
-    target: reference.path ?? split.base,
-    anchor: normalizeReferenceAnchor(split.subpath),
-    description
+    target,
+    anchor,
+    description,
+    originalLink: reference.link,
+    prefilledTarget: target,
+    prefilledAnchor: anchor
   };
 }
 
@@ -435,7 +462,11 @@ class ReferenceEditModal extends Modal {
     private readonly save: (value: ReferenceEditValue) => Promise<void>
   ) {
     super(plugin.app);
-    this.value = { ...value };
+    this.value = {
+      ...value,
+      prefilledTarget: value.prefilledTarget ?? value.target,
+      prefilledAnchor: normalizeReferenceAnchor(value.prefilledAnchor ?? value.anchor)
+    };
   }
 
   onOpen(): void {
@@ -536,11 +567,22 @@ class ReferenceEditModal extends Modal {
 
     this.saving = true;
     try {
-      await this.save({
+      const anchor = normalizeReferenceAnchor(this.value.anchor);
+      const saveValue: ReferenceEditValue = {
         target,
-        anchor: normalizeReferenceAnchor(this.value.anchor),
-        description: this.value.description
-      });
+        anchor,
+        description: this.value.description,
+        prefilledTarget: this.value.prefilledTarget,
+        prefilledAnchor: this.value.prefilledAnchor
+      };
+      if (
+        this.value.originalLink !== undefined
+        && target === this.value.prefilledTarget
+        && anchor === this.value.prefilledAnchor
+      ) {
+        saveValue.originalLink = this.value.originalLink;
+      }
+      await this.save(saveValue);
       this.close();
     } catch (error) {
       new Notice(registryErrorMessage(error));
@@ -575,15 +617,14 @@ class ReferenceEditModal extends Modal {
     if (!this.anchorInputEl) return;
     this.anchorInputEl.disabled = !enabled;
     this.anchorInputEl.classList.toggle("is-disabled", !enabled);
-    if (!enabled) {
-      this.value.anchor = "";
-      this.anchorInputEl.value = "";
+    if (enabled) {
+      this.anchorInputEl.value = this.value.anchor;
     }
   }
 
   private resolveAnchorTargetFile(targetValue: string): TFile | undefined {
     const target = targetValue.trim();
-    if (!target || isExternalHref(target)) return undefined;
+    if (!target || isExternalReference(target)) return undefined;
 
     const linked = this.plugin.app.metadataCache.getFirstLinkpathDest(target, this.sourcePath);
     if (linked instanceof TFile) return linked;
@@ -724,7 +765,7 @@ async function openReferenceLink(
   reference: ReferenceRead,
   sourcePath: string
 ): Promise<void> {
-  if (isExternalHref(reference.link)) {
+  if (isExternalReference(reference.link)) {
     window.open(reference.link, "_blank", "noopener");
     return;
   }
@@ -732,11 +773,11 @@ async function openReferenceLink(
 }
 
 function referenceHref(reference: ReferenceRead): string {
-  return isExternalHref(reference.link) ? reference.link : "#";
+  return isExternalReference(reference.link) ? reference.link : "#";
 }
 
 function referenceOpenText(reference: ReferenceRead): string {
-  return wikiTarget(reference.link) ?? reference.link;
+  return parseWikiLink(reference.link)?.target ?? reference.link;
 }
 
 function referenceTargetHint(reference: ReferenceRead): string {
@@ -747,39 +788,13 @@ function referenceTitle(reference: ReferenceRead): string {
   if (reference.kind === "url") return reference.target ?? reference.link;
   if (reference.kind === "text") return reference.link;
 
-  const target = reference.path ?? reference.target ?? wikiTarget(reference.link) ?? reference.link;
-  const base = stripObsidianSubpath(target);
+  const target = reference.path ?? reference.target ?? parseWikiLink(reference.link)?.target ?? reference.link;
+  const base = splitObsidianSubpath(target).base;
   return pathBasenameWithoutExtension(base) || target;
 }
 
 function referenceDescription(reference: ReferenceRead): string | undefined {
   return reference.description;
-}
-
-function wikiTarget(link: string): string | undefined {
-  const match = link.trim().match(/^\[\[([^\]|]+)(?:\|[^\]]*)?\]\]$/);
-  const target = match?.[1]?.trim();
-  return target || undefined;
-}
-
-function stripObsidianSubpath(value: string): string {
-  const index = value.indexOf("#");
-  return index === -1 ? value : value.slice(0, index);
-}
-
-function splitReferenceSubpath(value: string): { base: string; subpath: string } {
-  const trimmed = value.trim();
-  const index = trimmed.indexOf("#");
-  if (index === -1) {
-    return {
-      base: trimmed,
-      subpath: ""
-    };
-  }
-  return {
-    base: trimmed.slice(0, index).trim(),
-    subpath: trimmed.slice(index).trim()
-  };
 }
 
 function normalizeReferenceAnchor(anchor: string): string {
@@ -797,15 +812,6 @@ function looksLikeVaultPath(value: string): boolean {
 function blockLineSnippet(lines: string[], line: number): string {
   const text = (lines[line] ?? "").trim().replace(/\s+/g, " ");
   return text.length > 60 ? `${text.slice(0, 57)}...` : text;
-}
-
-function pathBasenameWithoutExtension(path: string): string {
-  const last = path.split("/").filter(Boolean).pop() ?? path;
-  return last.replace(/\.md$/i, "");
-}
-
-function isExternalHref(link: string): boolean {
-  return /^[A-Za-z][A-Za-z0-9+.-]*:/.test(link);
 }
 
 function referenceSummaryText(items: RenderableReference[], labels: Record<string, string>): string {
@@ -838,13 +844,4 @@ function parseReferenceBlockArgs(source: string): ReferenceBlockArgs {
   return {
     root: raw.root?.trim() || "current"
   };
-}
-
-function parseCodeBlockKeyValues(source: string): Record<string, string> {
-  const result: Record<string, string> = {};
-  for (const line of source.split(/\r?\n/)) {
-    const match = line.match(/^\s*([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/);
-    if (match) result[match[1]] = match[2];
-  }
-  return result;
 }

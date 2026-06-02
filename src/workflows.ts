@@ -702,7 +702,8 @@ export async function createSubarea(ctx: WorkflowContext, options: CreateSubarea
   }
 
   const tags = localePack(ctx.settings.locale).tags;
-  const parentTags = frontmatterLinks(ctx.app.metadataCache.getFileCache(parent.file)?.frontmatter?.tags);
+  const parentFrontmatter = parseFrontmatterFromContent(await ctx.app.vault.read(parent.file));
+  const parentTags = frontmatterLinks(parentFrontmatter.tags);
   const parentNamespace = parentTags.find((tag) => tag.startsWith(`${tags.area}/`)) ?? `${tags.area}/${slugify(parent.file.basename)}`;
   const childNamespace = `${parentNamespace}/${slugify(title)}`;
   await ctx.app.fileManager.processFrontMatter(file, (fm) => {
@@ -1022,7 +1023,7 @@ function readWikiLinkLabel(value: string): string | undefined {
   return (match.alias?.trim() || pathBasenameWithoutExtension(target)).trim();
 }
 
-function pathBasenameWithoutExtension(path: string): string {
+export function pathBasenameWithoutExtension(path: string): string {
   const last = path.split("/").filter(Boolean).pop() ?? path;
   return last.replace(/\.md$/i, "");
 }
@@ -1038,7 +1039,13 @@ export function readReferenceItems(ctx: WorkflowContext, file: TFile): Reference
 // so reference reads on the mutation/render path must parse the file's current content instead
 // of trusting the cache.
 async function readReferenceFrontmatterFresh(ctx: WorkflowContext, file: TFile): Promise<Frontmatter> {
-  return parseFrontmatterFromContent(await ctx.app.vault.read(file));
+  const content = await ctx.app.vault.read(file);
+  const fresh = parseFrontmatterFromContent(content);
+  if (hasFrontmatterKeys(fresh)) return fresh;
+
+  const cached = fileFrontmatter(ctx, file);
+  if (contentHasYamlFrontmatterBlock(content) && hasFrontmatterKeys(cached)) return cached;
+  return fresh;
 }
 
 export async function readReferenceItemsFresh(ctx: WorkflowContext, file: TFile): Promise<ReferenceRead[]> {
@@ -1047,7 +1054,7 @@ export async function readReferenceItemsFresh(ctx: WorkflowContext, file: TFile)
 }
 
 function parseFrontmatterFromContent(content: string): Frontmatter {
-  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  const match = stripLeadingUtf8Bom(content).match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
   if (!match) return {};
   try {
     const parsed = parseYaml(match[1]);
@@ -1055,6 +1062,36 @@ function parseFrontmatterFromContent(content: string): Frontmatter {
   } catch {
     return {};
   }
+}
+
+function stripLeadingUtf8Bom(content: string): string {
+  return content.startsWith("\uFEFF") ? content.slice(1) : content;
+}
+
+function hasFrontmatterKeys(frontmatter: Frontmatter): boolean {
+  return Object.keys(frontmatter).length > 0;
+}
+
+function contentHasYamlFrontmatterBlock(content: string): boolean {
+  const normalized = stripLeadingUtf8Bom(content);
+  return yamlFrontmatterRange(normalized) !== undefined
+    || /^[ \t\r\n]*---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.test(normalized);
+}
+
+function yamlFrontmatterRange(content: string): TextRange | undefined {
+  const openStart = content.startsWith("\uFEFF") ? 1 : 0;
+  if (!content.startsWith("---\n", openStart) && !content.startsWith("---\r\n", openStart)) {
+    return undefined;
+  }
+
+  const delimiter = /\r?\n---(?:\r?\n|$)/g;
+  delimiter.lastIndex = openStart + 3;
+  const match = delimiter.exec(content);
+  if (!match) return undefined;
+  return {
+    start: 0,
+    end: match.index + match[0].length
+  };
 }
 
 export async function insertReferenceItem(
@@ -1430,7 +1467,7 @@ function parseReferenceTargetInput(value: string): ParsedReferenceTarget {
   };
 }
 
-function parseWikiLink(value: string): { target: string; alias?: string } | undefined {
+export function parseWikiLink(value: string): { target: string; alias?: string } | undefined {
   const match = value.trim().match(/^\[\[([^\]|]+)(?:\|([^\]]*))?\]\]$/);
   const target = match?.[1]?.trim();
   if (!target) return undefined;
@@ -1492,7 +1529,7 @@ function resolveRawReferenceFile(
   };
 }
 
-function splitObsidianSubpath(value: string): { base: string; subpath: string } {
+export function splitObsidianSubpath(value: string): { base: string; subpath: string } {
   const normalizedSeparators = value.trim().replace(/\\/g, "/");
   const hash = normalizedSeparators.indexOf("#");
   if (hash === -1) {
@@ -1520,8 +1557,9 @@ function canonicalWikiLink(target: string): string {
   return `[[${target}]]`;
 }
 
-function isExternalReference(value: string): boolean {
-  return /^[A-Za-z][A-Za-z0-9+.-]*:/.test(value);
+export function isExternalReference(value: string): boolean {
+  const trimmed = value.trim();
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) || /^(mailto|tel):/i.test(trimmed);
 }
 
 function hasOwn(value: object, key: string): boolean {
@@ -2478,14 +2516,10 @@ function findSectionContentRangeByHeading(
 }
 
 function markdownBodyRange(content: string): TextRange {
-  if (!content.startsWith("---\n") && !content.startsWith("---\r\n")) {
-    return { start: 0, end: content.length };
-  }
-
-  const delimiter = content.match(/\r?\n---(?:\r?\n|$)/);
-  if (!delimiter || delimiter.index === undefined) return { start: 0, end: content.length };
+  const frontmatter = yamlFrontmatterRange(content);
+  if (!frontmatter) return { start: 0, end: content.length };
   return {
-    start: delimiter.index + delimiter[0].length,
+    start: frontmatter.end,
     end: content.length
   };
 }
@@ -3139,8 +3173,10 @@ function fallbackUuid(): string {
 
 async function existingTaskIds(ctx: WorkflowContext): Promise<Set<string>> {
   const ids = new Set<string>();
+  const tasksFolder = taskRegistryFolder(ctx);
   for (const file of ctx.app.vault.getMarkdownFiles()) {
-    const content = await ctx.app.vault.read(file);
+    if (tasksFolder && !isInFolder(file, tasksFolder)) continue;
+    const content = await ctx.app.vault.cachedRead(file);
     collectTaskIds(content, ids);
   }
   return ids;
@@ -3775,11 +3811,8 @@ function stripManagedPrelude(content: string): string {
 }
 
 function stripYamlFrontmatter(content: string): string {
-  if (!content.startsWith("---\n")) return content;
-  const end = content.indexOf("\n---", 4);
-  if (end === -1) return content;
-  const after = end + "\n---".length;
-  return content.charAt(after) === "\n" ? content.slice(after + 1) : content.slice(after);
+  const frontmatter = yamlFrontmatterRange(content);
+  return frontmatter ? content.slice(frontmatter.end) : content;
 }
 
 function sectionLabels(labelKey: string): string[] {
@@ -4434,8 +4467,13 @@ function stringReferencesAnyTarget(
   const wikiTarget = readWikiLinkPath(value);
   if (wikiTarget) return linkReferencesAnyTarget(ctx, sourcePath, wikiTarget, targets);
 
-  const normalized = normalizeVaultPath(value);
-  return targets.some((target) => normalized === target.path || normalized === target.basename);
+  const markdown = parseMarkdownLink(value);
+  if (markdown) {
+    const target = splitObsidianSubpath(markdown.target).base;
+    return target ? linkReferencesAnyTarget(ctx, sourcePath, target, targets) : false;
+  }
+
+  return bareStringReferencesAnyTarget(ctx, sourcePath, value, targets);
 }
 
 function linkReferencesAnyTarget(
@@ -4445,11 +4483,32 @@ function linkReferencesAnyTarget(
   targets: TFile[]
 ): boolean {
   const targetPaths = new Set(targets.map((target) => target.path));
-  const resolved = ctx.app.metadataCache.getFirstLinkpathDest(linkPath, sourcePath);
-  if (resolved && targetPaths.has(resolved.path)) return true;
+  const resolved = resolveLinkReference(ctx, sourcePath, linkPath);
+  if (resolved) return targetPaths.has(resolved.path);
 
   const normalized = normalizeVaultPath(linkPath.split("#")[0]);
   return targets.some((target) => normalized === target.path || normalized === target.basename);
+}
+
+function bareStringReferencesAnyTarget(
+  ctx: WorkflowContext,
+  sourcePath: string,
+  value: string,
+  targets: TFile[]
+): boolean {
+  const targetPaths = new Set(targets.map((target) => target.path));
+  if (targetPaths.has(normalizeVaultPath(value))) return true;
+
+  const resolved = resolveLinkReference(ctx, sourcePath, value);
+  return resolved ? targetPaths.has(resolved.path) : false;
+}
+
+function resolveLinkReference(ctx: WorkflowContext, sourcePath: string, linkPath: string): TFile | null {
+  if (!linkPath.trim()) return null;
+  const split = splitObsidianSubpath(linkPath);
+  const withSubpath = referenceTargetWithSubpath(split.base, split.subpath);
+  return ctx.app.metadataCache.getFirstLinkpathDest(withSubpath, sourcePath)
+    ?? (split.base ? ctx.app.metadataCache.getFirstLinkpathDest(split.base, sourcePath) : null);
 }
 
 function readWikiLinkPath(value: string): string | undefined {

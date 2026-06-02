@@ -9,6 +9,7 @@ import {
 import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { localDate } from "../time";
+import { parseCodeBlockKeyValues } from "./code-block-args";
 import {
   cycleTaskCheckbox,
   deleteRootTask,
@@ -832,15 +833,6 @@ function parseTaskOrder(value: string | undefined): TaskOrder | undefined {
     return normalized;
   }
   return undefined;
-}
-
-function parseCodeBlockKeyValues(source: string): Record<string, string> {
-  const result: Record<string, string> = {};
-  for (const line of source.split(/\r?\n/)) {
-    const match = line.match(/^\s*([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/);
-    if (match) result[match[1]] = match[2];
-  }
-  return result;
 }
 
 function addDays(isoDate: string, days: number): string {

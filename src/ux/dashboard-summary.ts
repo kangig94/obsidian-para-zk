@@ -4,6 +4,7 @@ import type { ParaZkPluginContext } from "../plugin-interface";
 import type { ParaZkSettings } from "../types";
 import { frontmatterLinks } from "../vault/frontmatter";
 import { normalizeVaultPath } from "../vault/paths";
+import { parseCodeBlockKeyValues } from "./code-block-args";
 
 type DashboardSummaryType = "home" | "projects" | "areas" | "resources" | "zk" | "review";
 
@@ -67,9 +68,10 @@ function summaryCards(plugin: ParaZkPluginContext, type: DashboardSummaryType): 
     case "projects": {
       const today = startOfToday();
       const withDue = groups.projects.filter((record) => hasDate(record.frontmatter.due_date));
+      const active = groups.projects.filter((record) => readText(record.frontmatter.status) !== "done").length;
       return [
         card("📦", t.labels.total, groups.projects.length),
-        card("🟣", t.labels.active, groups.projects.length),
+        card("🟣", t.labels.active, active),
         card("📅", t.labels.dueToday, withDue.filter((record) => dateDay(record.frontmatter.due_date) === today).length),
         card("⏰", t.labels.overdue, withDue.filter((record) => dateDay(record.frontmatter.due_date) < today).length),
         card("🗓️", t.labels.dueSoon7, withDue.filter((record) => dueWithin(record, 0, 7)).length),
@@ -77,22 +79,27 @@ function summaryCards(plugin: ParaZkPluginContext, type: DashboardSummaryType): 
       ];
     }
     case "areas": {
-      const linkedAreas = groups.areas.filter((area) => groups.projects.some((project) => projectLinksToArea(project, area)));
+      const linkedAreaTargets = projectAreaLinkTargets(groups.projects);
+      const linkedAreas = groups.areas.filter((area) => linkTargetsIncludeFile(linkedAreaTargets, area.file));
       return [
         card("📦", t.labels.total, groups.areas.length),
         card("🔗", t.labels.dashboardProjects, linkedAreas.length)
       ];
     }
     case "resources": {
+      const reverseLinks = reverseLinkIndex(plugin.app);
+      const projectSourcePrefix = `${normalizeVaultPath(plugin.settings.paths.projectsFolder)}/`;
+      const areaSourcePrefix = `${normalizeVaultPath(plugin.settings.paths.areasFolder)}/`;
+      const zkSourcePrefix = `${normalizeVaultPath(plugin.settings.paths.zkFolder)}/`;
       const inUse = groups.resources.filter((resource) => {
-        const inlinks = inlinkPaths(plugin.app, resource.file);
-        return inlinks.some((path) => path.startsWith(`${normalizeVaultPath(plugin.settings.paths.projectsFolder)}/`)
-          || path.startsWith(`${normalizeVaultPath(plugin.settings.paths.areasFolder)}/`));
+        const inlinks = reverseLinks.get(resource.file.path) ?? [];
+        return inlinks.some((path) => path.startsWith(projectSourcePrefix) || path.startsWith(areaSourcePrefix));
       });
-      const free = groups.resources.filter((resource) => !inUse.includes(resource));
-      const orphan = groups.resources.filter((resource) => inlinkPaths(plugin.app, resource.file).length === 0);
-      const zkReferenced = groups.resources.filter((resource) => inlinkPaths(plugin.app, resource.file).some((path) => {
-        return path.startsWith(`${normalizeVaultPath(plugin.settings.paths.zkFolder)}/`);
+      const inUseSet = new Set(inUse);
+      const free = groups.resources.filter((resource) => !inUseSet.has(resource));
+      const orphan = groups.resources.filter((resource) => (reverseLinks.get(resource.file.path) ?? []).length === 0);
+      const zkReferenced = groups.resources.filter((resource) => (reverseLinks.get(resource.file.path) ?? []).some((path) => {
+        return path.startsWith(zkSourcePrefix);
       }));
       const staleFree = free.filter((resource) => resource.file.stat.mtime < Date.now() - days(30));
       return [
@@ -162,15 +169,20 @@ function isInFolder(file: TFile, folder: string): boolean {
   return file.path === normalized || file.path.startsWith(`${normalized}/`);
 }
 
-function projectLinksToArea(project: FileRecord, area: FileRecord): boolean {
-  return frontmatterLinks(project.frontmatter.areas).some((link) => linkMatchesFile(link, area.file));
+function projectAreaLinkTargets(projects: FileRecord[]): Set<string> {
+  const targets = new Set<string>();
+  for (const project of projects) {
+    for (const link of frontmatterLinks(project.frontmatter.areas)) {
+      targets.add(wikiTarget(link));
+    }
+  }
+  return targets;
 }
 
-function linkMatchesFile(value: string, file: TFile): boolean {
-  const target = wikiTarget(value);
-  return target === file.path
-    || target === file.basename
-    || target === file.path.replace(/\.md$/i, "");
+function linkTargetsIncludeFile(targets: Set<string>, file: TFile): boolean {
+  return targets.has(file.path)
+    || targets.has(file.basename)
+    || targets.has(file.path.replace(/\.md$/i, ""));
 }
 
 function wikiTarget(value: string): string {
@@ -179,15 +191,26 @@ function wikiTarget(value: string): string {
   return normalizeVaultPath((match?.[1] ?? trimmed).replace(/\.md$/i, ""));
 }
 
-function inlinkPaths(app: App, file: TFile): string[] {
+function reverseLinkIndex(app: App): Map<string, string[]> {
   const resolvedLinks = (app.metadataCache as unknown as {
     resolvedLinks?: Record<string, Record<string, number | undefined> | undefined>;
   }).resolvedLinks;
-  if (!resolvedLinks) return [];
+  const index = new Map<string, string[]>();
+  if (!resolvedLinks) return index;
 
-  return Object.entries(resolvedLinks)
-    .filter(([, targets]) => Boolean(targets?.[file.path]))
-    .map(([source]) => source);
+  for (const [source, targets] of Object.entries(resolvedLinks)) {
+    if (!targets) continue;
+    for (const [targetPath, count] of Object.entries(targets)) {
+      if (!count) continue;
+      const inlinks = index.get(targetPath);
+      if (inlinks) {
+        inlinks.push(source);
+      } else {
+        index.set(targetPath, [source]);
+      }
+    }
+  }
+  return index;
 }
 
 function dueWithin(record: FileRecord, minDays: number, maxDays: number): boolean {
@@ -255,13 +278,4 @@ function parseSummaryType(value: string | undefined): DashboardSummaryType | und
     || token === "review"
   ) return token;
   return undefined;
-}
-
-function parseCodeBlockKeyValues(source: string): Record<string, string> {
-  const result: Record<string, string> = {};
-  for (const line of source.split(/\r?\n/)) {
-    const match = line.match(/^\s*([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/);
-    if (match) result[match[1]] = match[2];
-  }
-  return result;
 }
