@@ -27,7 +27,7 @@ Use these vaults with different trust levels:
   `$PARA_ZK_TEST_VAULT` when it is set; otherwise infer the vault from local
   context by looking for a vault that has `.obsidian`, a `para-zk` plugin
   install, or a name clearly meant for PARA-ZK testing. It may be cleared,
-  reinitialized, and filled with smoke-test notes to validate this plugin. Do
+  rebuilt, and filled with smoke-test notes to validate this plugin. Do
   not treat its current contents as a specification; older generated files may
   not match the current source.
 - This repository is the implementation source of truth. Generated vault output
@@ -150,7 +150,7 @@ Important modules:
 - `src/ux/props-controls.ts`: native `para-zk-props` controls for frontmatter.
 - `src/ux/dashboard-actions.ts`: native Home dashboard action block.
 - `src/ux/dashboard-summary.ts`: native dashboard summary cards.
-- `src/runtime/init.ts`: idempotent vault initialization and managed file writes.
+- `src/runtime/setup.ts`: idempotent vault setup and managed file writes.
 - `src/runtime/dependencies/index.ts`: Dataview, Tasks, Folder Notes, Update
   time on edit, Trash Explorer, Custom File Explorer sorting, and Homepage dependency handling.
 
@@ -160,7 +160,7 @@ and runtime adapters.
 
 ## Behavioral Expectations
 
-`para-zk:init` should be idempotent. It creates the PARA/ZK layout, managed
+`para-zk:setup` should be idempotent. It creates the PARA/ZK layout, managed
 templates under `Templates/para-zk`, dashboards under `Dashboard`, and a root
 vault guide. Existing non-managed files are skipped. Managed files are updated
 only when safe or when `force=true` is requested.
@@ -216,7 +216,7 @@ export PARA_ZK_TEST_VAULT=/path/to/para-zk-test-vault
 OBSIDIAN_PLUGIN_DIR="$PARA_ZK_TEST_VAULT/.obsidian/plugins/para-zk" npm run build
 optsidian open-gui vault-path="$PARA_ZK_TEST_VAULT"
 optsidian raw plugin:reload id=para-zk
-optsidian raw para-zk:init installDeps=true format=json
+optsidian raw para-zk:setup installDeps=true format=json
 ```
 
 The default locale is English. Pass `locale=ko` only when validating Korean
@@ -232,7 +232,7 @@ npm run smoke:vault -- --vault "$PARA_ZK_TEST_VAULT" --clean
 When a clean test is needed, preserve `.obsidian` and clear the rest of
 the disposable vault, then remove
 `$PARA_ZK_TEST_VAULT/.obsidian/plugins/para-zk/data.json` before running
-`para-zk:init`.
+`para-zk:setup`.
 
 Representative CLI smoke tests should cover:
 
@@ -268,7 +268,7 @@ Representative CLI smoke tests should cover:
 - `para-zk:capture-journal`
 - `para-zk:promote-resource`
 - `para-zk:promote-fleeting`
-- `para-zk:init dryRun=true` after initialization
+- `para-zk:setup dryRun=true` after initialization
 
 Always run `npm run lint` and `npm run build` before considering behavior
 changes complete.

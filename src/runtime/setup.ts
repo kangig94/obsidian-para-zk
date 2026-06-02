@@ -1,8 +1,8 @@
 import { App, TFile, TFolder } from "obsidian";
 import { managedArtifacts } from "../templates";
 import {
-  type InitOptions,
-  type InitResult,
+  type SetupOptions,
+  type SetupResult,
   type ManagedFileState,
   type ParaZkSettings
 } from "../types";
@@ -10,11 +10,11 @@ import { joinVaultPath, normalizeVaultPath } from "../vault/paths";
 import { resolveDependencies } from "./dependencies";
 import { configureObsidianCoreSettings } from "./obsidian-core-config";
 
-export async function initializeVault(
+export async function setupVault(
   app: App,
   settings: ParaZkSettings,
-  options: InitOptions = {}
-): Promise<{ result: InitResult; settings: ParaZkSettings }> {
+  options: SetupOptions = {}
+): Promise<{ result: SetupResult; settings: ParaZkSettings }> {
   const nextSettings: ParaZkSettings = {
     ...settings,
     paths: { ...settings.paths },
@@ -24,7 +24,7 @@ export async function initializeVault(
   };
   const dryRun = options.dryRun ?? false;
   const force = options.force ?? false;
-  const result: InitResult = {
+  const result: SetupResult = {
     dryRun,
     created: [],
     updated: [],
@@ -63,7 +63,7 @@ export async function initializeVault(
       result,
       settings: {
         ...nextSettings,
-        initializedAt: new Date().toISOString()
+        setupAt: new Date().toISOString()
       }
     };
   }
@@ -71,7 +71,7 @@ export async function initializeVault(
   return { result, settings };
 }
 
-async function ensureFolder(app: App, folder: string, result: InitResult, dryRun: boolean): Promise<void> {
+async function ensureFolder(app: App, folder: string, result: SetupResult, dryRun: boolean): Promise<void> {
   const parts = normalizeVaultPath(folder).split("/").filter(Boolean);
   let current = "";
 
@@ -97,7 +97,7 @@ async function ensureFolder(app: App, folder: string, result: InitResult, dryRun
 async function migrateLegacyTaskRootsFolder(
   app: App,
   settings: ParaZkSettings,
-  result: InitResult,
+  result: SetupResult,
   dryRun: boolean
 ): Promise<void> {
   const legacyPath = joinVaultPath(settings.paths.tasksFolder, "roots");
@@ -146,7 +146,7 @@ async function writeManagedFile(
   app: App,
   path: string,
   content: string,
-  result: InitResult,
+  result: SetupResult,
   options: {
     dryRun: boolean;
     force: boolean;
@@ -203,12 +203,11 @@ async function writeManagedFile(
     return;
   }
 
-  if (!options.force) {
-    addUnique(result.skipped, normalized);
-    addUnique(result.warnings, `Skipped changed PARA-ZK managed file at ${normalized}; pass force=true to overwrite`);
-    return;
-  }
-
+  // Past the guards above, this is a file PARA-ZK wrote that the user has not
+  // modified (known.hash === currentHash) but whose generated content is now
+  // stale — e.g. after a locale or settings change. Regenerate it to match the
+  // current settings without requiring force; force only gates user-managed
+  // (untracked) or user-modified files, which are handled above.
   addUnique(result.updated, normalized);
   if (!options.dryRun) {
     await app.vault.modify(existing, content);

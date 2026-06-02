@@ -7,20 +7,20 @@ Notable changes for PARA-ZK are tracked here.
 ### Added
 
 - Added native Obsidian commands and native CLI handlers for PARA/ZK workflows:
-  vault initialization, project/area/resource creation, subnotes, retros, ZK notes,
+  vault setup, project/area/resource creation, subnotes, retros, ZK notes,
   journal capture, and note promotion.
-- Added idempotent vault initialization for PARA, ZK, Journal, Dashboard, Templates,
+- Added idempotent vault setup for PARA, ZK, Journal, Dashboard, Templates,
   and managed PARA-ZK template files.
 - Added dependency checks for Dataview, Tasks, Folder notes, Update time
   on edit, Trash Explorer, Custom File Explorer sorting, and Homepage during
-  initialization. `installDeps=true` installs and enables missing dependencies,
+  setup. `installDeps=true` installs and enables missing dependencies,
   DataviewJS is enabled when Dataview is present, Update time on edit is configured
   for `created`/`updated` frontmatter, Custom File Explorer sorting is configured
   with a baseline `sortspec` bookmarks group, and Homepage opens the generated
   Home dashboard on startup and when the workspace is empty.
 - Added a native file-explorer empty-trash action that calls Trash Explorer,
   replacing the Commander-managed explorer shortcut.
-- Added Obsidian core configuration to vault initialization, including automatic
+- Added Obsidian core configuration to vault setup, including automatic
   link updates, the `assets` attachment folder, local Obsidian trash, ignored
   generated/reference paths, hidden document properties, and the core Templates folder.
 - Added locale-neutral workflow arguments for CLI automation while keeping localized
@@ -56,9 +56,24 @@ Notable changes for PARA-ZK are tracked here.
 - Added `area_titles` support to project creation so CLI automation can reuse or create area notes by title.
 - Added a native daily journal GUI command that creates or opens today's journal
   without requiring QuickAdd.
+- Added a Vitest unit suite (`npm run test`) covering pure helper modules and the
+  workflow/CLI logic through an in-memory Obsidian mock, so most behavior is
+  verified without a running Obsidian.
 
 ### Changed
 
+- Renamed the vault setup action to `para-zk:setup` (GUI command "Set up
+  PARA-ZK vault" / "PARA-ZK vault 구성", settings button "Set up" / "구성").
+  It both creates the vault layout and re-applies the current settings — e.g.
+  a locale change — to managed files, so the previous "Initialize" / "초기화"
+  name no longer fit. Managed files PARA-ZK owns that the user has not edited
+  now regenerate to match the current settings without `force=true`; files the
+  user modified still require it.
+- Trimmed the disposable-vault smoke test to live-only checks (dependency
+  install/config, GUI labels, Homepage runtime, rename link rewriting, backlink
+  resolution, and the live reference/task-block renderers); CRUD, references,
+  tasks, archive, rename, delete, and argument validation now run in the Vitest
+  unit suite instead.
 - Added Open Tab Settings (`open-tab-settings`) to the required community plugin
   dependencies so PARA-ZK navigation opens notes with consistent
   open-in-new-tab / no-duplicate-tab behavior; `installDeps=true` installs and
@@ -104,7 +119,7 @@ Notable changes for PARA-ZK are tracked here.
   legacy callout and Meta Bind implementations.
 - The disposable-vault smoke test now focuses the target Obsidian vault window
   with `xdotool` when multiple vault windows are open.
-- Vault initialization and managed-file regeneration now share the same GUI
+- Vault setup and managed-file regeneration now share the same GUI
   command; the GUI command opens an options modal, and command args such as
   `force=true` select the sync behavior when passed by automation.
 - The default locale is now English when no locale is configured or supplied;
@@ -113,7 +128,7 @@ Notable changes for PARA-ZK are tracked here.
   the selected language is visible immediately without moving ribbon icons.
 - Native PARA-ZK ribbon actions now keep a stable order below Obsidian's default
   ribbon actions even after plugin reloads.
-- Vault initialization now writes managed dashboard files before dependency
+- Vault setup now writes managed dashboard files before dependency
   runtime activation, so Homepage can open `Dashboard/HomePage.md` immediately
   after a clean init.
 - The disposable-vault smoke test now validates GUI command labels, ribbon

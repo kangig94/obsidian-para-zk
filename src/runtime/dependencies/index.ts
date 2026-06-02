@@ -479,5 +479,5 @@ function dependencyWarning(
   state: Pick<DependencyResult, "installed" | "enabled">
 ): string {
   const status = state.installed ? "installed but disabled" : "not installed";
-  return `Required plugin ${dependency.name} (${dependency.id}) is ${status}; ${dependency.reason}. Re-run para-zk:init installDeps=true to install/enable dependencies.`;
+  return `Required plugin ${dependency.name} (${dependency.id}) is ${status}; ${dependency.reason}. Re-run para-zk:setup installDeps=true to install/enable dependencies.`;
 }

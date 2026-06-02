@@ -7,7 +7,7 @@ import {
   statusCommandEntries,
   workflowCommandEntries
 } from "./locale-labels";
-import { chooseValue, promptInitOptions, promptText } from "./prompts";
+import { chooseValue, promptSetupOptions, promptText } from "./prompts";
 
 export function registerStatusAndInitCommands(plugin: ParaZkPluginContext): void {
   const labels = localePack(plugin.settings.locale).labels;
@@ -23,8 +23,8 @@ export function registerStatusAndInitCommands(plugin: ParaZkPluginContext): void
   });
 
   plugin.addCommand({
-    id: "initialize-vault",
-    name: commandNames.get("initialize-vault") ?? labels.initCommandName,
+    id: "setup-vault",
+    name: commandNames.get("setup-vault") ?? labels.setupCommandName,
     callback: async (...rawArgs: unknown[]) => {
       const args = readCommandArgs(rawArgs);
       const options = hasCommandArgs(args)
@@ -34,7 +34,7 @@ export function registerStatusAndInitCommands(plugin: ParaZkPluginContext): void
           dryRun: readCommandBoolean(args, "dryRun") ?? readCommandBoolean(args, "dry-run") ?? false,
           installDeps: readCommandBoolean(args, "installDeps") ?? readCommandBoolean(args, "install-deps") ?? false
         }
-        : await promptInitOptions(plugin.app, {
+        : await promptSetupOptions(plugin.app, {
           locale: plugin.settings.locale,
           force: false,
           installDeps: false
@@ -43,9 +43,9 @@ export function registerStatusAndInitCommands(plugin: ParaZkPluginContext): void
         new Notice(localePack(plugin.settings.locale).messages.commandCancelled);
         return;
       }
-      const result = await plugin.initializeVault(options);
+      const result = await plugin.setupVault(options);
       const messages = localePack(options.locale).messages;
-      new Notice(`${messages.initReady}: ${result.created.length} created, ${result.updated.length} updated`);
+      new Notice(`${messages.setupReady}: ${result.created.length} created, ${result.updated.length} updated`);
     }
   });
 }

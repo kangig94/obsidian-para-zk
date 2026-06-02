@@ -8,6 +8,8 @@
     "dev": "node tools/build.mjs",
     "watch": "node tools/build.mjs --watch",
     "sync": "node tools/sync.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "smoke:vault": "node tools/smoke-test-vault.mjs",
     "typecheck": "tsc --noEmit",
     "lint:architecture": "node tools/check-architecture.mjs",
@@ -24,6 +26,8 @@
     "@types/node": "^25.9.1",
     "esbuild": "^0.28.0",
     "obsidian": "^1.12.3",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8",
+    "yaml": "^2.9.0"
   }
 }

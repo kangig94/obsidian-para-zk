@@ -95,8 +95,8 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     })
   },
   {
-    command: "para-zk:init",
-    description: "Initialize the PARA-ZK vault layout and managed files",
+    command: "para-zk:setup",
+    description: "Set up the PARA-ZK vault layout and managed files",
     options: {
       locale: { value: "<ko|en>", description: "Language for UI, generated files, and tags." },
       dryRun: { value: "<true|false>", description: "Plan changes without writing." },
@@ -104,17 +104,17 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       installDeps: { value: "<true|false>", description: "Install and enable required community plugins." },
       format: { value: "<text|json>", description: "Output format (default: text)" }
     },
-    text: "vault initialized",
+    text: "vault set up",
     run: async (plugin, args) => {
       const locale = normalizeLocale(readCliString(args, "locale"), plugin.settings.locale);
-      const result = await plugin.initializeVault({
+      const result = await plugin.setupVault({
         locale,
         dryRun: readCliBoolean(args, "dryRun") ?? false,
         force: readCliBoolean(args, "force") ?? false,
         installDeps: readCliBoolean(args, "installDeps") ?? false
       });
       return {
-        message: localePack(locale).messages.initReady,
+        message: localePack(locale).messages.setupReady,
         ...result
       };
     }

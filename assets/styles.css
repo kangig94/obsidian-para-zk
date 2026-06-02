@@ -3,6 +3,12 @@
   font-size: var(--font-ui-smaller);
 }
 
+.para-zk-language-label {
+  align-self: center;
+  margin-right: 0.4em;
+  color: var(--text-muted);
+}
+
 .para-zk-button-container {
   display: inline-flex;
   margin: 0.25em 0;

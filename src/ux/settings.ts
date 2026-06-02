@@ -1,7 +1,7 @@
 import { ButtonComponent, Notice, PluginSettingTab, Setting } from "obsidian";
 import { localePack, normalizeLocale } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
-import type { InitOptions, InitResult } from "../types";
+import type { SetupOptions, SetupResult } from "../types";
 import { normalizeVaultPath } from "../vault/paths";
 import { refreshRegisteredLocaleLabels } from "./locale-labels";
 
@@ -21,36 +21,17 @@ export class ParaZkSettingTab extends PluginSettingTab {
       text: labels.settingsNote
     });
 
-    new Setting(containerEl)
-      .setName(labels.settingsInitializeVault)
-      .setDesc(labels.settingsInitializeVaultDesc)
-      .addButton((button) => {
-        button
-          .setButtonText(labels.settingsInitializeVaultButton)
-          .setCta()
-          .onClick(() => {
-            void this.runInitializeAction(button, { installDeps: false });
-          });
-      });
-
-    new Setting(containerEl)
-      .setName(labels.initInstallDeps)
-      .setDesc(labels.initInstallDepsDesc)
-      .addButton((button) => {
-        button
-          .setButtonText(labels.settingsInstallDepsButton)
-          .onClick(() => {
-            void this.runInitializeAction(button, { installDeps: true });
-          });
-      });
-
-    new Setting(containerEl)
-      .setName(labels.locale)
-      .setDesc(labels.localeDesc)
+    const setupSetting = new Setting(containerEl)
+      .setName(labels.settingsSetupVault)
+      .setDesc(labels.settingsSetupVaultDesc);
+    // Fixed English caption to the left of the language picker; it stays
+    // "Language:" regardless of the selected locale.
+    setupSetting.controlEl.createSpan({ cls: "para-zk-language-label", text: "Language:" });
+    setupSetting
       .addDropdown((dropdown) => {
         dropdown
-          .addOption("ko", "ko")
-          .addOption("en", "en")
+          .addOption("ko", "한국어")
+          .addOption("en", "English")
           .setValue(this.plugin.settings.locale)
           .onChange(async (value) => {
             const previousLocale = this.plugin.settings.locale;
@@ -58,6 +39,25 @@ export class ParaZkSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
             refreshRegisteredLocaleLabels(this.plugin, previousLocale);
             this.display();
+          });
+      })
+      .addButton((button) => {
+        button
+          .setButtonText(labels.settingsSetupVaultButton)
+          .setCta()
+          .onClick(() => {
+            void this.runSetupAction(button, { installDeps: false });
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(labels.setupInstallDeps)
+      .setDesc(labels.setupInstallDepsDesc)
+      .addButton((button) => {
+        button
+          .setButtonText(labels.settingsInstallDepsButton)
+          .onClick(() => {
+            void this.runSetupAction(button, { installDeps: true });
           });
       });
 
@@ -78,15 +78,15 @@ export class ParaZkSettingTab extends PluginSettingTab {
       });
   }
 
-  private async runInitializeAction(button: ButtonComponent, options: Pick<InitOptions, "installDeps">): Promise<void> {
+  private async runSetupAction(button: ButtonComponent, options: Pick<SetupOptions, "installDeps">): Promise<void> {
     button.setDisabled(true);
     try {
-      const result = await this.plugin.initializeVault({
+      const result = await this.plugin.setupVault({
         locale: this.plugin.settings.locale,
         force: false,
         installDeps: options.installDeps
       });
-      new Notice(this.initNotice(result));
+      new Notice(this.setupNotice(result));
       this.display();
     } catch (error) {
       console.error(error);
@@ -96,11 +96,11 @@ export class ParaZkSettingTab extends PluginSettingTab {
     }
   }
 
-  private initNotice(result: InitResult): string {
+  private setupNotice(result: SetupResult): string {
     const messages = localePack(this.plugin.settings.locale).messages;
     const dependencyChanges = result.dependencies.filter((dependency) => dependency.action !== "none").length;
     const parts = [
-      `${messages.initReady}: ${result.created.length} created, ${result.updated.length} updated`
+      `${messages.setupReady}: ${result.created.length} created, ${result.updated.length} updated`
     ];
     if (dependencyChanges > 0) parts.push(`${dependencyChanges} dependency actions`);
     if (result.warnings.length > 0) parts.push(`${result.warnings.length} warnings`);

@@ -64,7 +64,7 @@ export const RIBBON_ACTIONS: RibbonAction[] = [
 export function statusCommandEntries(labels: Labels): Array<readonly [string, string]> {
   return [
     ["check-status", labels.statusCommandName],
-    ["initialize-vault", labels.initCommandName]
+    ["setup-vault", labels.setupCommandName]
   ];
 }
 

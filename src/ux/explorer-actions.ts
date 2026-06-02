@@ -39,7 +39,7 @@ function addEmptyTrashButton(plugin: ParaZkPluginContext, container: HTMLElement
     event.preventDefault();
     event.stopPropagation();
     if (!executeCommand(plugin, EMPTY_TRASH_COMMAND_ID)) {
-      new Notice("Trash Explorer is not enabled. Run para-zk:init installDeps=true.");
+      new Notice("Trash Explorer is not enabled. Run para-zk:setup installDeps=true.");
     }
   });
 }

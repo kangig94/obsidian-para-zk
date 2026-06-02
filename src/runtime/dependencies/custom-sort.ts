@@ -9,6 +9,7 @@ export const CUSTOM_SORT_PLUGIN_ID = "custom-sort";
 const CUSTOM_SORT_SETTINGS_PATH = ".obsidian/plugins/custom-sort/data.json";
 const BOOKMARKS_CONFIG_PATH = ".obsidian/bookmarks.json";
 const CUSTOM_SORT_BOOKMARKS_GROUP = "sortspec";
+const ATTACHMENT_FOLDER = "assets";
 
 type BookmarkItem = Record<string, unknown>;
 
@@ -135,7 +136,9 @@ function createCustomSortBookmarksGroup(settings: ParaZkSettings): BookmarkItem 
       bookmarkGroup(folderName(settings.paths.permanentFolder), nextCtime)
     ]),
     bookmarkGroup(folderName(settings.paths.journalFolder), nextCtime),
-    bookmarkGroup(folderName(settings.paths.templatesFolder), nextCtime)
+    bookmarkGroup(folderName(settings.paths.tasksFolder), nextCtime),
+    bookmarkGroup(folderName(settings.paths.templatesFolder), nextCtime),
+    bookmarkGroup(ATTACHMENT_FOLDER, nextCtime)
   ]);
 }
 

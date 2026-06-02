@@ -24,7 +24,7 @@ export function mergeSettings(loaded: unknown): ParaZkSettings {
     paths,
     layoutFolders: readLayoutFolders(data.layoutFolders, paths),
     locale: normalizeLocale(data.locale, DEFAULT_SETTINGS.locale),
-    initializedAt: typeof data.initializedAt === "string" ? data.initializedAt : undefined,
+    setupAt: typeof data.setupAt === "string" ? data.setupAt : undefined,
     managedFiles: readManagedFiles(data.managedFiles)
   };
 }

@@ -2,7 +2,7 @@ import { App, ButtonComponent, Modal, Setting, TextComponent } from "obsidian";
 import { localePack } from "../i18n";
 import type { Locale } from "../types";
 
-export type InitPromptOptions = {
+export type SetupPromptOptions = {
   locale: Locale;
   force: boolean;
   installDeps: boolean;
@@ -27,12 +27,12 @@ export function chooseValue(app: App, title: string, choices: Array<{ label: str
   });
 }
 
-export function promptInitOptions(
+export function promptSetupOptions(
   app: App,
-  initial: InitPromptOptions
-): Promise<InitPromptOptions | null> {
+  initial: SetupPromptOptions
+): Promise<SetupPromptOptions | null> {
   return new Promise((resolve) => {
-    new InitOptionsModal(app, initial, resolve).open();
+    new SetupOptionsModal(app, initial, resolve).open();
   });
 }
 
@@ -109,14 +109,14 @@ class TextPromptModal extends Modal {
   }
 }
 
-class InitOptionsModal extends Modal {
+class SetupOptionsModal extends Modal {
   private done = false;
-  private value: InitPromptOptions;
+  private value: SetupPromptOptions;
 
   constructor(
     app: App,
-    initial: InitPromptOptions,
-    private readonly resolve: (value: InitPromptOptions | null) => void
+    initial: SetupPromptOptions,
+    private readonly resolve: (value: SetupPromptOptions | null) => void
   ) {
     super(app);
     this.value = { ...initial };
@@ -130,11 +130,11 @@ class InitOptionsModal extends Modal {
     const { contentEl } = this;
     const labels = localePack(this.value.locale).labels;
     contentEl.empty();
-    contentEl.createEl("h2", { text: labels.initCommandName });
+    contentEl.createEl("h2", { text: labels.setupCommandName });
 
     new Setting(contentEl)
       .setName(labels.locale)
-      .setDesc(labels.initLocaleDesc)
+      .setDesc(labels.setupLocaleDesc)
       .addDropdown((dropdown) => {
         dropdown
           .addOption("ko", "ko")
@@ -147,8 +147,8 @@ class InitOptionsModal extends Modal {
       });
 
     new Setting(contentEl)
-      .setName(labels.initForce)
-      .setDesc(labels.initForceDesc)
+      .setName(labels.setupForce)
+      .setDesc(labels.setupForceDesc)
       .addToggle((toggle) => {
         toggle
           .setValue(this.value.force)
@@ -158,8 +158,8 @@ class InitOptionsModal extends Modal {
       });
 
     new Setting(contentEl)
-      .setName(labels.initInstallDeps)
-      .setDesc(labels.initInstallDepsDesc)
+      .setName(labels.setupInstallDeps)
+      .setDesc(labels.setupInstallDepsDesc)
       .addToggle((toggle) => {
         toggle
           .setValue(this.value.installDeps)

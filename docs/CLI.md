@@ -124,9 +124,9 @@ Important fields:
 - `pluginId`
 - `settings`
 
-### `para-zk:init`
+### `para-zk:setup`
 
-Initializes or syncs the PARA-ZK vault layout, managed templates, dashboards,
+Sets up or syncs the PARA-ZK vault layout, managed templates, dashboards,
 guide file, required Obsidian core settings, and required community plugins.
 
 Options:
@@ -177,7 +177,7 @@ unrelated user settings:
 Example:
 
 ```bash
-optsidian raw para-zk:init installDeps=true locale=ko format=json
+optsidian raw para-zk:setup installDeps=true locale=ko format=json
 ```
 
 When `locale` is omitted, PARA-ZK defaults to English. Pass `locale=ko` for

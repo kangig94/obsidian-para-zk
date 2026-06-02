@@ -1,6 +1,6 @@
 import type { App } from "obsidian";
 import { isRecord } from "../records";
-import type { InitResult, ParaZkSettings } from "../types";
+import type { SetupResult, ParaZkSettings } from "../types";
 import { normalizeVaultPath } from "../vault/paths";
 
 const APP_CONFIG_PATH = ".obsidian/app.json";
@@ -16,7 +16,7 @@ type ConfigState = {
 export async function configureObsidianCoreSettings(
   app: App,
   settings: ParaZkSettings,
-  result: InitResult,
+  result: SetupResult,
   dryRun: boolean
 ): Promise<void> {
   const appConfig = await readConfig(app, APP_CONFIG_PATH, result);
@@ -34,7 +34,7 @@ export async function configureObsidianCoreSettings(
   }
 }
 
-async function readConfig(app: App, path: string, result: InitResult): Promise<ConfigState | undefined> {
+async function readConfig(app: App, path: string, result: SetupResult): Promise<ConfigState | undefined> {
   const exists = await app.vault.adapter.exists(path);
   if (!exists) return { path, exists: false, value: {} };
 
@@ -58,7 +58,7 @@ async function writeConfig(
   app: App,
   current: ConfigState,
   next: Record<string, unknown>,
-  result: InitResult,
+  result: SetupResult,
   dryRun: boolean
 ): Promise<void> {
   if (JSON.stringify(current.value) === JSON.stringify(next)) {

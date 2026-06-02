@@ -1,7 +1,7 @@
 import { Plugin } from "obsidian";
 import { registerNativeCliHandlers } from "./cli/handlers";
 import { loadSettings as loadRuntimeSettings, saveSettings as saveRuntimeSettings } from "./runtime/settings";
-import { DEFAULT_SETTINGS, type InitOptions, type InitResult, type ParaZkSettings } from "./types";
+import { DEFAULT_SETTINGS, type SetupOptions, type SetupResult, type ParaZkSettings } from "./types";
 import { registerDashboardActionRenderers } from "./ux/dashboard-actions";
 import { registerDashboardSummaryRenderers } from "./ux/dashboard-summary";
 import { registerExplorerActions } from "./ux/explorer-actions";
@@ -46,10 +46,10 @@ export default class ParaZkPlugin extends Plugin {
     await saveRuntimeSettings(this, this.settings);
   }
 
-  async initializeVault(options: InitOptions = {}): Promise<InitResult> {
-    const { initializeVault } = await import("./runtime/init");
+  async setupVault(options: SetupOptions = {}): Promise<SetupResult> {
+    const { setupVault } = await import("./runtime/setup");
     const previousLocale = this.settings.locale;
-    const { result, settings } = await initializeVault(this.app, this.settings, options);
+    const { result, settings } = await setupVault(this.app, this.settings, options);
     if (!result.dryRun) {
       this.settings = settings;
       await this.saveSettings();

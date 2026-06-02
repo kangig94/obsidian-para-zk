@@ -8,7 +8,7 @@ When Obsidian is running, the plugin can expose native CLI handlers through Obsi
 
 GUI commands:
 
-- `PARA-ZK: Initialize PARA-ZK vault`
+- `PARA-ZK: Set up PARA-ZK vault`
 - `PARA-ZK: Check plugin status`
 - `PARA-ZK: Create project`
 - `PARA-ZK: Create area`
@@ -27,7 +27,7 @@ project, area, resource, ZK, daily note, and quick memo. It adds a file-explorer
 header shortcut for Trash Explorer's empty-trash command, replacing the old
 Commander explorer button.
 
-`PARA-ZK: Initialize PARA-ZK vault` opens an options modal in the Obsidian GUI.
+`PARA-ZK: Set up PARA-ZK vault` opens an options modal in the Obsidian GUI.
 When invoked through Obsidian's command passthrough, it also accepts command
 arguments. Use `force=true` to regenerate managed files instead of exposing a
 separate sync command.
@@ -36,10 +36,10 @@ Native CLI handlers, when supported by the running Obsidian app:
 
 ```bash
 obsidian para-zk:ping format=json
-obsidian para-zk:init format=json
-obsidian para-zk:init dryRun=true force=true locale=en format=json
-obsidian para-zk:init locale=ko format=json
-obsidian para-zk:init installDeps=true format=json
+obsidian para-zk:setup format=json
+obsidian para-zk:setup dryRun=true force=true locale=en format=json
+obsidian para-zk:setup locale=ko format=json
+obsidian para-zk:setup installDeps=true format=json
 obsidian para-zk:create-project title="Project name" area_titles='["AI","Software"]' status=in_progress priority=high format=json
 obsidian para-zk:read-project title="Project name" key=frontmatter/status format=json
 obsidian para-zk:read-project title="Finished project" archived=true key=summary format=json
@@ -82,10 +82,10 @@ section link lines.
 
 When `locale` is omitted, PARA-ZK defaults to English. Pass `locale=ko` when a
 Korean vault UI and generated Markdown are desired.
-Changing the locale from the GUI settings or init command refreshes command
+Changing the locale from the GUI settings or setup command refreshes command
 palette and ribbon labels in place, without moving existing ribbon icons.
 
-`para-zk:init` creates the PARA/ZK vault layout, managed template reference files under
+`para-zk:setup` creates the PARA/ZK vault layout, managed template reference files under
 `Templates/para-zk`, Dataview/Tasks dashboard files under `Dashboard`, and a root vault guide.
 It also merges required Obsidian core settings such as automatic link updates, the
 `assets` attachment folder, local Obsidian trash, excluded generated/reference folders,
@@ -93,7 +93,7 @@ hidden document properties, and the core Templates folder. It is idempotent.
 Existing non-managed files are skipped, and changed managed files are only overwritten
 with `force=true`.
 
-`para-zk:init` also checks required community plugin dependencies. It warns when
+`para-zk:setup` also checks required community plugin dependencies. It warns when
 Dataview, Tasks, Folder notes, Update time on edit, Trash Explorer, Custom
 File Explorer sorting, Homepage, or Open Tab Settings is missing or disabled. Pass `installDeps=true`
 to install and enable those dependencies. When Dataview is installed, PARA-ZK also
@@ -142,8 +142,17 @@ See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the current development changelog
 ```bash
 npm install
 npm run lint
+npm run test
 npm run build
 ```
+
+Tests are split by what they need to run. `npm run test` runs the Vitest unit
+suite (`test/`), which drives the workflow/CLI logic against an in-memory
+Obsidian mock (`test/harness`, `test/mocks/obsidian.ts`) plus the pure helper
+modules — no Obsidian process required. `npm run smoke:vault` keeps only the
+checks that need Obsidian's real engine (dependency install/config, GUI ribbon
+and command labels, Homepage runtime, rename link rewriting, backlink
+resolution, and the live reference/task-block renderers).
 
 The build treats the repository root as the Obsidian plugin deployment shape:
 `manifest.json`, `main.js`, and `styles.css`. CSS source lives in

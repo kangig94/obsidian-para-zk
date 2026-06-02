@@ -32,7 +32,7 @@ export type ParaZkSettings = {
   paths: ParaZkPaths;
   layoutFolders: string[];
   locale: Locale;
-  initializedAt?: string;
+  setupAt?: string;
   managedFiles: Record<string, ManagedFileState>;
 };
 
@@ -41,7 +41,7 @@ export type ManagedFileState = {
   updatedAt: string;
 };
 
-export type InitResult = {
+export type SetupResult = {
   dryRun: boolean;
   created: string[];
   updated: string[];
@@ -51,7 +51,7 @@ export type InitResult = {
   dependencies: DependencyResult[];
 };
 
-export type InitOptions = {
+export type SetupOptions = {
   locale?: Locale;
   force?: boolean;
   dryRun?: boolean;
