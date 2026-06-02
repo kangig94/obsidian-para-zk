@@ -105,11 +105,20 @@ function renderPropsGrid(
   if (!file) container.addClass("is-disabled");
 
   for (const row of schema.rows) {
+    const visibleFields = row.filter((field) => !isHiddenDisplayField(field, frontmatter));
+    if (visibleFields.length === 0) continue;
     const rowEl = container.createDiv({ cls: "para-zk-props-row" });
-    for (const field of row) {
+    for (const field of visibleFields) {
       renderField(plugin, schema, field, frontmatter, rowEl, sourcePath);
     }
   }
+}
+
+// Read-only display fields with no value (e.g. an area note's empty `parent`)
+// are skipped so they do not leave a half-empty row; editable controls always
+// render so the user can fill them.
+function isHiddenDisplayField(field: PropsField, frontmatter: Frontmatter): boolean {
+  return field.control === "display" && valueText(readFieldValue(field, frontmatter)).trim() === "";
 }
 
 function renderField(
@@ -168,7 +177,7 @@ function renderFieldControl(
       renderAreaListInput(plugin, field, frontmatter, container, sourcePath, rerender);
       return;
     case "display":
-      renderDisplayValue(field, frontmatter, container);
+      renderDisplayValue(plugin, field, frontmatter, container, sourcePath);
       return;
   }
 }
@@ -259,7 +268,12 @@ function renderAreaListInput(
 
   for (const [index, value] of values.entries()) {
     const chip = chips.createSpan({ cls: "para-zk-area-chip" });
-    chip.createSpan({ text: displayLinkLabel(value) });
+    const link = parseDisplayLink(value);
+    if (link) {
+      renderInternalLink(plugin, chip, link.target, link.label, sourcePath);
+    } else {
+      chip.createSpan({ text: displayLinkLabel(value) });
+    }
     const remove = new ButtonComponent(chip);
     remove.buttonEl.addClass("para-zk-area-remove");
     remove
@@ -294,12 +308,65 @@ function renderAreaListInput(
     });
 }
 
-function renderDisplayValue(field: PropsField, frontmatter: Frontmatter, container: HTMLElement): void {
+function renderDisplayValue(
+  plugin: ParaZkPluginContext,
+  field: PropsField,
+  frontmatter: Frontmatter,
+  container: HTMLElement,
+  sourcePath?: string
+): void {
   const value = readFieldValue(field, frontmatter);
-  container.createSpan({
-    cls: "para-zk-props-display",
-    text: valueText(value)
+  const tokens = Array.isArray(value) ? value.map((item) => String(item)) : [valueText(value)];
+  tokens.forEach((token, index) => {
+    if (index > 0) container.createSpan({ cls: "para-zk-props-display", text: ", " });
+    const link = parseDisplayLink(token);
+    if (link) {
+      renderInternalLink(plugin, container, link.target, link.label, sourcePath, "para-zk-props-display");
+    } else if (token) {
+      container.createSpan({ cls: "para-zk-props-display", text: token });
+    }
   });
+}
+
+function renderInternalLink(
+  plugin: ParaZkPluginContext,
+  container: HTMLElement,
+  target: string,
+  label: string,
+  sourcePath?: string,
+  extraClass?: string
+): void {
+  const link = container.createEl("a", {
+    cls: extraClass ? `internal-link ${extraClass}` : "internal-link",
+    text: label,
+    attr: { href: target, "data-href": target }
+  });
+  link.addEventListener("click", (event) => {
+    event.preventDefault();
+    void plugin.app.workspace.openLinkText(
+      target,
+      sourcePath ?? "",
+      event.ctrlKey || event.metaKey || event.button === 1
+    );
+  });
+  link.addEventListener("mouseover", (event) => {
+    plugin.app.workspace.trigger("hover-link", {
+      event,
+      source: "para-zk-props",
+      hoverParent: container,
+      targetEl: link,
+      linktext: target,
+      sourcePath: sourcePath ?? ""
+    });
+  });
+}
+
+function parseDisplayLink(value: string): { target: string; label: string } | undefined {
+  const match = value.match(/^\[\[(.*?)(?:\|(.*?))?\]\]$/);
+  if (!match) return undefined;
+  const target = match[1];
+  const label = match[2]?.trim() || target.split("/").pop()?.replace(/\.md$/i, "") || target;
+  return { target, label };
 }
 
 async function writeFrontmatterValue(

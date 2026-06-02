@@ -144,6 +144,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "updated:",
           "parent:"
         ]),
+        paraZkPropsBlock("area"),
         `# ${t.labels.overview}`,
         "",
         "{{cursor}}",
