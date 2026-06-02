@@ -178,6 +178,17 @@ describe("subarea and child bodies", () => {
 
     const children = await cli.run("para-zk:read-area", { title: "Ops", key: "children" });
     expect((children.value as Record<string, { path: string }>).Hiring.path).toBe(subarea.path);
+
+    const compact = await cli.run("para-zk:read-area", { title: "Ops" });
+    expect(compact.available_keys).toEqual(expect.arrayContaining([
+      "frontmatter",
+      "overview",
+      "tasks",
+      "references",
+      "backlinks",
+      "children"
+    ]));
+    expect(compact.available_keys).not.toContain("children/<title>/<key>");
   });
 
   it("appends to and reads a subnote body", async () => {

@@ -51,6 +51,16 @@ describe("read-project", () => {
     );
     expect("keys" in read).toBe(false);
     expect(read.mode).toBe("compact");
+    expect(read.available_keys).toEqual(expect.arrayContaining([
+      "frontmatter",
+      "summary",
+      "goals",
+      "tasks",
+      "references",
+      "backlinks",
+      "children"
+    ]));
+    expect(read.available_keys).not.toContain("tasks/<id>");
     expect(read.tasks).toBeUndefined();
   });
 

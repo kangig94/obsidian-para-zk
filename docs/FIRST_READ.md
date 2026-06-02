@@ -70,8 +70,10 @@ summaries in full reads. Exact
 collection root reads return a paged object with `count`, `offset`, `limit`,
 `returned`, `has_more`, and `items`; deeper keys such as
 `tasks/<id>/name` and `references/<i>/link` return a single item or field. Full
-read payloads must include `mode: "compact"` and exact key reads must include
-`mode: "exact"` so automation can reason about omitted data.
+read payloads must include `mode: "compact"` and compact top-level
+`available_keys`; exact key reads must include `mode: "exact"` so automation can
+reason about omitted data and discover stable follow-up roots without bloating
+full reads.
 Task collection reads are structured: each item exposes the literal checkbox
 status character, task name, and parsed Tasks metadata instead of returning the
 raw task section string. Tasks are not stored inline in project/area/journal

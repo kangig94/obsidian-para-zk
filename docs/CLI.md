@@ -265,9 +265,11 @@ optsidian raw para-zk:read-project title="Model Evaluation" key=children format=
 optsidian raw para-zk:read-project title="Model Evaluation" key="children/Planning Meeting/body" format=json
 ```
 
-Full read responses include `mode: "compact"` and `omits_empty: true`. Static
-schema keys, `archived: false`, null frontmatter values, empty sections, and
-template-only placeholders are omitted.
+Full read responses include `mode: "compact"`, `omits_empty: true`, and
+`available_keys`, a compact list of top-level stable `key=` roots that can be
+used for exact follow-up reads. Static schema keys, `archived: false`, null
+frontmatter values, empty sections, and template-only placeholders are omitted.
+Detailed nested key hints stay in CLI help and unknown-key errors.
 Frontmatter wikilinks are shown by display title in full reads; read the exact
 `frontmatter/<key>` when the stored wikilink path is needed.
 Use a `key` read when you need to distinguish an explicitly empty section from

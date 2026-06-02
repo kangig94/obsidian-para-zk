@@ -1799,6 +1799,7 @@ function compactReadEnvelope(
   return {
     mode: "compact",
     omits_empty: true,
+    available_keys: compactReadKeys(spec),
     path: file.path,
     title: file.basename,
     type,
@@ -2956,9 +2957,11 @@ function readSurfaceTopLevelKeys(spec: ReadSurfaceSpec): string[] {
 
 function readKeyHints(spec: ReadSurfaceSpec): string[] {
   const keys: string[] = [];
-  if (spec.frontmatter.length > 0) keys.push(`frontmatter/{${spec.frontmatter.join("|")}}`);
+  if (spec.frontmatter.length > 0) keys.push("frontmatter", `frontmatter/{${spec.frontmatter.join("|")}}`);
   for (const section of spec.sections ?? []) {
-    if (section.collection === "reference") {
+    if (section.collection === "task") {
+      keys.push("tasks", "tasks/<id>", "tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}");
+    } else if (section.collection === "reference") {
       keys.push("references", "references/<i>", "references/<i>/{link|description}");
     } else if (section.collection === "backlink") {
       keys.push("backlinks", "backlinks/<i>", "backlinks/<i>/{link|path|title|type}");
@@ -2967,7 +2970,16 @@ function readKeyHints(spec: ReadSurfaceSpec): string[] {
     }
   }
   if (spec.body) keys.push("body");
-  if (spec.children) keys.push("children/<title>/<key>");
+  if (spec.children) keys.push("children", "children/<title>/<key>");
+  return keys;
+}
+
+function compactReadKeys(spec: ReadSurfaceSpec): string[] {
+  const keys: string[] = [];
+  if (spec.frontmatter.length > 0) keys.push("frontmatter");
+  for (const section of spec.sections ?? []) keys.push(section.key);
+  if (spec.body) keys.push("body");
+  if (spec.children) keys.push("children");
   return keys;
 }
 
