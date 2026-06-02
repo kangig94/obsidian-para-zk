@@ -675,7 +675,10 @@ class ReferenceAnchorSuggest extends AbstractInputSuggest<ReferenceAnchorSuggest
   constructor(
     plugin: ParaZkPluginContext,
     inputEl: HTMLInputElement,
-    private readonly suggestions: () => ReferenceAnchorSuggestion[],
+    // NOTE: do not name this `suggestions` — that shadows an internal member of the
+    // AbstractInputSuggest/PopoverSuggest base used to render the popup, which silently
+    // breaks rendering (getSuggestions runs but renderSuggestion is never called).
+    private readonly getItems: () => ReferenceAnchorSuggestion[],
     private readonly onSelectAnchor: (suggestion: ReferenceAnchorSuggestion) => void
   ) {
     super(plugin.app, inputEl);
@@ -685,8 +688,8 @@ class ReferenceAnchorSuggest extends AbstractInputSuggest<ReferenceAnchorSuggest
   protected getSuggestions(query: string): ReferenceAnchorSuggestion[] {
     const normalized = normalizeReferenceAnchor(query).toLocaleLowerCase();
     const matches = normalized
-      ? this.suggestions().filter((suggestion) => suggestion.searchText.toLocaleLowerCase().includes(normalized))
-      : this.suggestions();
+      ? this.getItems().filter((suggestion) => suggestion.searchText.toLocaleLowerCase().includes(normalized))
+      : this.getItems();
     return matches.slice(0, 20);
   }
 
