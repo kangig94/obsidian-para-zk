@@ -5,6 +5,8 @@ import {
   Notice,
   Setting,
   TFile,
+  stripHeading,
+  stripHeadingForLink,
   type MarkdownPostProcessorContext
 } from "obsidian";
 import { localePack } from "../i18n";
@@ -600,14 +602,19 @@ class ReferenceEditModal extends Modal {
     const suggestions: ReferenceAnchorSuggestion[] = [];
 
     for (const heading of cache.headings ?? []) {
+      // stripHeadingForLink drops link-illegal chars like `|`, but keeps `[`/`]`/backtick.
+      // A heading that still contains those (e.g. a generated `## Title `PZK[action|label]``
+      // button heading) cannot be stored as a valid `[[file#anchor]]` wikilink, so skip it.
+      const value = stripHeadingForLink(heading.heading);
+      if (/[[\]`]/.test(value)) continue;
       suggestions.push({
         kind: "heading",
-        value: heading.heading,
-        label: heading.heading,
+        value,
+        label: stripHeading(heading.heading),
         detail: `H${heading.level}`,
         line: heading.position.start.line,
         level: heading.level,
-        searchText: heading.heading
+        searchText: stripHeading(heading.heading)
       });
     }
 
