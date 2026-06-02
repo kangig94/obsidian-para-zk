@@ -17,8 +17,21 @@ export function localDateTimeSpace(date = new Date()): string {
 
 export function dateFromCli(value: string | undefined): Date {
   if (!value) return new Date();
-  const parsed = new Date(`${value}T00:00:00`);
-  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) throw new Error(`date must be YYYY-MM-DD: ${value}`);
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(year, month - 1, day);
+  if (
+    parsed.getFullYear() !== year
+    || parsed.getMonth() !== month - 1
+    || parsed.getDate() !== day
+  ) {
+    throw new Error(`date must be a valid YYYY-MM-DD: ${value}`);
+  }
+  return parsed;
 }
 
 export function isoWeekInfo(date = new Date()): {

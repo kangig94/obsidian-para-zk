@@ -418,8 +418,8 @@ export async function createProject(ctx: WorkflowContext, options: CreateProject
   areas?: ProjectAreaResult[];
 }> {
   const title = requireTitle(options.title, "project title");
-  const folder = joinVaultPath(ctx.settings.paths.projectsFolder, title);
-  await ensureFolder(ctx.app, folder);
+  const target = uniqueFolderStyleMarkdownPath(ctx, ctx.settings.paths.projectsFolder, title);
+  await ensureFolder(ctx.app, target.folder);
 
   const createdAt = localDateTimeSpace();
   const statusCode = readOptionalCode(options.status, parseProjectStatusCode, "status", PROJECT_STATUS_CODE_HELP);
@@ -431,10 +431,9 @@ export async function createProject(ctx: WorkflowContext, options: CreateProject
     ...(options.areas ?? []),
     ...resolvedAreas.map((area) => area.link)
   ]);
-  const path = await uniqueMarkdownPath(ctx.app, joinVaultPath(folder, `${title}.md`));
-  const file = await createMarkdownFile(ctx, "project", path, {
+  const file = await createMarkdownFile(ctx, "project", target.path, {
     created: createdAt,
-    slug: slugify(title),
+    slug: slugify(target.title),
     areas: inlineList(areaLinks),
     status,
     priority,
@@ -447,7 +446,7 @@ export async function createProject(ctx: WorkflowContext, options: CreateProject
     if (areaLinks.length > 0) fm.areas = areaLinks;
     fm.status = fm.status ?? status;
     fm.priority = fm.priority ?? priority;
-    fm.tags = [`${tags.project}/${slugify(title)}`];
+    fm.tags = [`${tags.project}/${slugify(target.title)}`];
     applyCreatedUpdatedDefaults(fm, createdAt);
   });
 
@@ -459,59 +458,61 @@ export async function createProject(ctx: WorkflowContext, options: CreateProject
 }
 
 export async function readProject(ctx: WorkflowContext, options: ReadProjectOptions): Promise<Record<string, unknown>> {
-  return readSurface(ctx, resolveRequiredProject(ctx, options), PROJECT_READ_SPEC, options.key, options.collection);
+  return readSurface(ctx, await resolveRequiredProject(ctx, options), PROJECT_READ_SPEC, options.key, options.collection);
 }
 
 export async function readArea(ctx: WorkflowContext, options: ReadAreaOptions): Promise<Record<string, unknown>> {
-  return readSurface(ctx, resolveRequiredArea(ctx, options), AREA_READ_SPEC, options.key, options.collection);
+  return readSurface(ctx, await resolveRequiredArea(ctx, options), AREA_READ_SPEC, options.key, options.collection);
 }
 
 export async function readResource(ctx: WorkflowContext, options: ReadResourceOptions): Promise<Record<string, unknown>> {
-  return readSurface(ctx, resolveRequiredResource(ctx, options), RESOURCE_READ_SPEC, options.key, options.collection);
+  return readSurface(ctx, await resolveRequiredResource(ctx, options), RESOURCE_READ_SPEC, options.key, options.collection);
 }
 
 export async function readZk(ctx: WorkflowContext, options: ReadZkOptions): Promise<Record<string, unknown>> {
-  const file = resolveRequiredZk(ctx, options);
-  return readSurface(ctx, file, specForType(readType(fileFrontmatter(ctx, file))), options.key, options.collection);
+  const file = await resolveRequiredZk(ctx, options);
+  const type = await readFileTypeFresh(ctx, file);
+  return readSurface(ctx, file, specForType(type), options.key, options.collection);
 }
 
 export async function readJournal(ctx: WorkflowContext, options: ReadJournalOptions): Promise<Record<string, unknown>> {
-  return readSurface(ctx, resolveRequiredJournal(ctx, options), JOURNAL_READ_SPEC, options.key, options.collection);
+  return readSurface(ctx, await resolveRequiredJournal(ctx, options), JOURNAL_READ_SPEC, options.key, options.collection);
 }
 
 export async function readRetro(ctx: WorkflowContext, options: ReadRetroOptions): Promise<Record<string, unknown>> {
-  return readSurface(ctx, resolveRequiredRetro(ctx, options), RETRO_READ_SPEC, options.key, options.collection);
+  return readSurface(ctx, await resolveRequiredRetro(ctx, options), RETRO_READ_SPEC, options.key, options.collection);
 }
 
 export async function updateProject(ctx: WorkflowContext, options: UpdateProjectOptions): Promise<UpdateSurfaceResult> {
-  return updateSurface(ctx, resolveRequiredProject(ctx, options), PROJECT_READ_SPEC, options);
+  return updateSurface(ctx, await resolveRequiredProject(ctx, options), PROJECT_READ_SPEC, options);
 }
 
 export async function updateArea(ctx: WorkflowContext, options: UpdateAreaOptions): Promise<UpdateSurfaceResult> {
-  return updateSurface(ctx, resolveRequiredArea(ctx, options), AREA_READ_SPEC, options);
+  return updateSurface(ctx, await resolveRequiredArea(ctx, options), AREA_READ_SPEC, options);
 }
 
 export async function updateResource(ctx: WorkflowContext, options: UpdateResourceOptions): Promise<UpdateSurfaceResult> {
-  return updateSurface(ctx, resolveRequiredResource(ctx, options), RESOURCE_READ_SPEC, options);
+  return updateSurface(ctx, await resolveRequiredResource(ctx, options), RESOURCE_READ_SPEC, options);
 }
 
 export async function updateZk(ctx: WorkflowContext, options: UpdateZkOptions): Promise<UpdateSurfaceResult> {
-  const file = resolveRequiredZk(ctx, options);
-  return updateSurface(ctx, file, specForType(readType(fileFrontmatter(ctx, file))), options);
+  const file = await resolveRequiredZk(ctx, options);
+  const type = await readFileTypeFresh(ctx, file);
+  return updateSurface(ctx, file, specForType(type), options);
 }
 
 export async function updateJournal(ctx: WorkflowContext, options: UpdateJournalOptions): Promise<UpdateSurfaceResult> {
-  return updateSurface(ctx, resolveRequiredJournal(ctx, options), JOURNAL_READ_SPEC, options);
+  return updateSurface(ctx, await resolveRequiredJournal(ctx, options), JOURNAL_READ_SPEC, options);
 }
 
 export async function updateRetro(ctx: WorkflowContext, options: UpdateRetroOptions): Promise<UpdateSurfaceResult> {
-  return updateSurface(ctx, resolveRequiredRetro(ctx, options), RETRO_READ_SPEC, options);
+  return updateSurface(ctx, await resolveRequiredRetro(ctx, options), RETRO_READ_SPEC, options);
 }
 
 export async function renameProject(ctx: WorkflowContext, options: RenameByTitleOptions): Promise<RenameResult> {
   return renameFolderStyleNote(
     ctx,
-    resolveRequiredProject(ctx, options),
+    await resolveRequiredProject(ctx, options),
     requireTitle(options.newTitle, "new_title"),
     "project"
   );
@@ -520,7 +521,7 @@ export async function renameProject(ctx: WorkflowContext, options: RenameByTitle
 export async function renameArea(ctx: WorkflowContext, options: RenameByTitleOptions): Promise<RenameResult> {
   return renameFolderStyleNote(
     ctx,
-    resolveRequiredArea(ctx, options),
+    await resolveRequiredArea(ctx, options),
     requireTitle(options.newTitle, "new_title"),
     "area"
   );
@@ -529,7 +530,7 @@ export async function renameArea(ctx: WorkflowContext, options: RenameByTitleOpt
 export async function renameResource(ctx: WorkflowContext, options: RenameByTitleOptions): Promise<RenameResult> {
   return renameFlatNote(
     ctx,
-    resolveRequiredResource(ctx, options),
+    await resolveRequiredResource(ctx, options),
     requireTitle(options.newTitle, "new_title"),
     "resource"
   );
@@ -538,54 +539,53 @@ export async function renameResource(ctx: WorkflowContext, options: RenameByTitl
 export async function renameZk(ctx: WorkflowContext, options: RenameZkOptions): Promise<RenameResult> {
   return renameFlatNote(
     ctx,
-    resolveRequiredZk(ctx, options),
+    await resolveRequiredZk(ctx, options),
     requireTitle(options.newTitle, "new_title"),
     "knowledge"
   );
 }
 
 export async function deleteProject(ctx: WorkflowContext, options: DeleteByTitleOptions): Promise<DeleteResult> {
-  return deleteDomainNote(ctx, resolveRequiredProject(ctx, options), options);
+  return deleteDomainNote(ctx, await resolveRequiredProject(ctx, options), options);
 }
 
 export async function deleteArea(ctx: WorkflowContext, options: DeleteByTitleOptions): Promise<DeleteResult> {
-  return deleteDomainNote(ctx, resolveRequiredArea(ctx, options), options);
+  return deleteDomainNote(ctx, await resolveRequiredArea(ctx, options), options);
 }
 
 export async function deleteResource(ctx: WorkflowContext, options: DeleteByTitleOptions): Promise<DeleteResult> {
-  return deleteDomainNote(ctx, resolveRequiredResource(ctx, options), options);
+  return deleteDomainNote(ctx, await resolveRequiredResource(ctx, options), options);
 }
 
 export async function deleteZk(ctx: WorkflowContext, options: DeleteZkOptions): Promise<DeleteResult> {
-  return deleteDomainNote(ctx, resolveRequiredZk(ctx, options), options);
+  return deleteDomainNote(ctx, await resolveRequiredZk(ctx, options), options);
 }
 
 export async function deleteJournal(ctx: WorkflowContext, options: DeleteJournalOptions): Promise<DeleteResult> {
-  return deleteDomainNote(ctx, resolveRequiredJournal(ctx, options), options);
+  return deleteDomainNote(ctx, await resolveRequiredJournal(ctx, options), options);
 }
 
 export async function deleteRetro(ctx: WorkflowContext, options: DeleteRetroOptions): Promise<DeleteResult> {
-  return deleteDomainNote(ctx, resolveRequiredRetro(ctx, options), options);
+  return deleteDomainNote(ctx, await resolveRequiredRetro(ctx, options), options);
 }
 
 export async function createArea(ctx: WorkflowContext, options: CreateAreaOptions): Promise<NoteResult> {
   const title = requireTitle(options.title, "area title");
-  const folder = joinVaultPath(ctx.settings.paths.areasFolder, title);
-  await ensureFolder(ctx.app, folder);
+  const target = uniqueFolderStyleMarkdownPath(ctx, ctx.settings.paths.areasFolder, title);
+  await ensureFolder(ctx.app, target.folder);
 
   const createdAt = localDateTimeSpace();
-  const path = await uniqueMarkdownPath(ctx.app, joinVaultPath(folder, `${title}.md`));
   const parent = resolveOptionalFile(ctx, options.parentPath);
-  const file = await createMarkdownFile(ctx, "area", path, {
+  const file = await createMarkdownFile(ctx, "area", target.path, {
     created: createdAt,
-    slug: slugify(title),
+    slug: slugify(target.title),
     cursor: ""
   });
 
   const tags = localePack(ctx.settings.locale).tags;
   await ctx.app.fileManager.processFrontMatter(file, (fm) => {
     fm.type = "area";
-    fm.tags = [`${tags.area}/${slugify(title)}`];
+    fm.tags = [`${tags.area}/${slugify(target.title)}`];
     if (parent) fm.parent = linkToFile(parent);
     applyCreatedUpdatedDefaults(fm, createdAt);
   });
@@ -1078,6 +1078,10 @@ async function readFileFrontmatterFresh(ctx: WorkflowContext, file: TFile): Prom
   const cached = fileFrontmatter(ctx, file);
   if (contentHasYamlFrontmatterBlock(content) && hasFrontmatterKeys(cached)) return cached;
   return fresh;
+}
+
+async function readFileTypeFresh(ctx: WorkflowContext, file: TFile): Promise<string> {
+  return readType(await readFileFrontmatterFresh(ctx, file));
 }
 
 export async function readReferenceItemsFresh(ctx: WorkflowContext, file: TFile): Promise<ReferenceRead[]> {
@@ -1753,7 +1757,7 @@ async function readSurface(
 
 async function readSurfaceMap(ctx: WorkflowContext, file: TFile, spec: ReadSurfaceSpec): Promise<ReadMap> {
   const content = await ctx.app.vault.read(file);
-  const frontmatter = fileFrontmatter(ctx, file);
+  const frontmatter = await readFileFrontmatterFresh(ctx, file);
   const surface: ReadMap = {
     frontmatter: pickFrontmatter(frontmatter, spec.frontmatter)
   };
@@ -2966,19 +2970,25 @@ function childIndex(ctx: WorkflowContext, parent: TFile): Record<string, unknown
 }
 
 function childFiles(ctx: WorkflowContext, parent: TFile): TFile[] {
-  const directFolder = parent.parent?.path ?? parentFolder(parent.path);
+  const directFolder = folderStyleChildFolder(parent);
   const parentLink = linkToFile(parent);
   const byPath = new Map<string, TFile>();
 
   for (const file of ctx.app.vault.getMarkdownFiles()) {
     if (file.path === parent.path) continue;
     const frontmatter = fileFrontmatter(ctx, file);
-    if (file.parent?.path === directFolder || frontmatter.parent === parentLink) {
+    if ((directFolder && file.parent?.path === directFolder) || frontmatter.parent === parentLink) {
       byPath.set(file.path, file);
     }
   }
 
   return Array.from(byPath.values()).sort((left, right) => left.path.localeCompare(right.path));
+}
+
+function folderStyleChildFolder(file: TFile): string | undefined {
+  const parentPath = file.parent?.path ?? "";
+  const parentName = folderName(parentPath);
+  return parentPath && parentName === file.basename ? parentPath : undefined;
 }
 
 function findChild(ctx: WorkflowContext, parent: TFile, title: string): TFile | undefined {
@@ -4885,6 +4895,37 @@ async function uniqueMarkdownPath(app: App, path: string): Promise<string> {
   return candidate;
 }
 
+function uniqueFolderStyleMarkdownPath(
+  ctx: WorkflowContext,
+  rootFolder: string,
+  title: string
+): { title: string; folder: string; path: string } {
+  let index = 0;
+  while (true) {
+    const candidateTitle = index === 0 ? title : `${title} ${index}`;
+    const folder = joinVaultPath(rootFolder, candidateTitle);
+    const path = joinVaultPath(folder, `${candidateTitle}.md`);
+    const titleExists = ctx.app.vault.getMarkdownFiles().some((file) =>
+      file.basename === candidateTitle
+      && isDomainNotePathUnderRoot(file, rootFolder)
+    );
+    if (
+      !titleExists
+      && !ctx.app.vault.getAbstractFileByPath(folder)
+      && !ctx.app.vault.getAbstractFileByPath(path)
+    ) {
+      return { title: candidateTitle, folder, path };
+    }
+    index += 1;
+  }
+}
+
+function isDomainNotePathUnderRoot(file: TFile, rootFolder: string): boolean {
+  const root = normalizeVaultPath(rootFolder);
+  const parent = file.parent?.path ?? "";
+  return parent === root || parent === joinVaultPath(root, file.basename);
+}
+
 function ensureMdPath(path: string): string {
   const normalized = normalizeVaultPath(path);
   return /\.md$/i.test(normalized) ? normalized : `${normalized}.md`;
@@ -4896,70 +4937,70 @@ function folderForZkKind(settings: ParaZkSettings, kind: ZkKind | PromotionZkKin
   return settings.paths.fleetingFolder;
 }
 
-function resolveRequiredProject(ctx: WorkflowContext, options: ReadProjectOptions): TFile {
+async function resolveRequiredProject(ctx: WorkflowContext, options: ReadProjectOptions): Promise<TFile> {
   const file = options.path
     ? resolveRequiredFile(ctx, options.path, "project note")
     : findProjectByTitle(ctx, requireTitle(options.title, "project title"), options.archived);
   if (!file) throw new Error(`project not found: ${options.title}`);
 
-  const type = readType(fileFrontmatter(ctx, file));
+  const type = await readFileTypeFresh(ctx, file);
   if (type !== "project") throw new Error(`file is not a project note: ${file.path}`);
   return file;
 }
 
-function resolveRequiredArea(ctx: WorkflowContext, options: ReadAreaOptions): TFile {
+async function resolveRequiredArea(ctx: WorkflowContext, options: ReadAreaOptions): Promise<TFile> {
   const file = options.path
     ? resolveRequiredFile(ctx, options.path, "area note")
     : findAreaByTitleForRead(ctx, requireTitle(options.title, "area title"), options.archived);
   if (!file) throw new Error(`area not found: ${options.title}`);
 
-  const type = readType(fileFrontmatter(ctx, file));
+  const type = await readFileTypeFresh(ctx, file);
   if (type !== "area") throw new Error(`file is not an area note: ${file.path}`);
   return file;
 }
 
-function resolveRequiredResource(ctx: WorkflowContext, options: ReadResourceOptions): TFile {
+async function resolveRequiredResource(ctx: WorkflowContext, options: ReadResourceOptions): Promise<TFile> {
   const file = options.path
     ? resolveRequiredFile(ctx, options.path, "resource note")
     : findResourceByTitle(ctx, requireTitle(options.title, "resource title"), options.archived);
   if (!file) throw new Error(`resource not found: ${options.title}`);
 
-  const type = readType(fileFrontmatter(ctx, file));
+  const type = await readFileTypeFresh(ctx, file);
   if (type !== "resource") throw new Error(`file is not a resource note: ${file.path}`);
   return file;
 }
 
-function resolveRequiredZk(ctx: WorkflowContext, options: ReadZkOptions): TFile {
+async function resolveRequiredZk(ctx: WorkflowContext, options: ReadZkOptions): Promise<TFile> {
   const kind = readOptionalCode(options.kind, parseZkKind, "kind", ZK_KIND_CODE_HELP);
   const file = options.path
     ? resolveRequiredFile(ctx, options.path, "ZK note")
     : findZkByTitle(ctx, requireTitle(options.title, "ZK title"), kind);
   if (!file) throw new Error(`ZK note not found: ${options.title}`);
 
-  const type = readType(fileFrontmatter(ctx, file));
+  const type = await readFileTypeFresh(ctx, file);
   if (!type.startsWith("zk_")) throw new Error(`file is not a ZK note: ${file.path}`);
   if (kind && type !== typeForZkKind(kind)) throw new Error(`file is not a ${kind} ZK note: ${file.path}`);
   return file;
 }
 
-function resolveRequiredJournal(ctx: WorkflowContext, options: ReadJournalOptions): TFile {
+async function resolveRequiredJournal(ctx: WorkflowContext, options: ReadJournalOptions): Promise<TFile> {
   const file = options.path
     ? resolveRequiredFile(ctx, options.path, "journal note")
     : ctx.app.vault.getFileByPath(journalPath(ctx, options.date));
   if (!file) throw new Error(`journal not found: ${localDate(dateFromCli(options.date))}`);
 
-  const type = readType(fileFrontmatter(ctx, file));
+  const type = await readFileTypeFresh(ctx, file);
   if (type !== "journal") throw new Error(`file is not a journal note: ${file.path}`);
   return file;
 }
 
-function resolveRequiredRetro(ctx: WorkflowContext, options: ReadRetroOptions): TFile {
+async function resolveRequiredRetro(ctx: WorkflowContext, options: ReadRetroOptions): Promise<TFile> {
   const file = options.path
     ? resolveRequiredFile(ctx, options.path, "retro note")
     : findRetroByTitle(ctx, requireTitle(options.title, "retro title"), options.date, options.archived);
   if (!file) throw new Error(`retro not found: ${options.title}`);
 
-  const type = readType(fileFrontmatter(ctx, file));
+  const type = await readFileTypeFresh(ctx, file);
   if (type !== "retro") throw new Error(`file is not a retro note: ${file.path}`);
   return file;
 }

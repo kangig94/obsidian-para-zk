@@ -15,9 +15,13 @@ describe("dateFromCli", () => {
     expect(localDate(dateFromCli("2026-06-05"))).toBe("2026-06-05");
   });
 
-  it("falls back to the current date for missing or invalid input", () => {
+  it("falls back to the current date for missing input", () => {
     expect(dateFromCli(undefined)).toBeInstanceOf(Date);
-    expect(Number.isNaN(dateFromCli("not-a-date").getTime())).toBe(false);
+  });
+
+  it("rejects invalid date strings instead of normalizing them", () => {
+    expect(() => dateFromCli("not-a-date")).toThrow("date must be YYYY-MM-DD");
+    expect(() => dateFromCli("2026-02-31")).toThrow("date must be a valid YYYY-MM-DD");
   });
 });
 

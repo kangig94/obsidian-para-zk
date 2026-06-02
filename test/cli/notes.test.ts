@@ -192,6 +192,27 @@ describe("subarea and child bodies", () => {
     expect(compact.available_keys).not.toContain("children/<title>/<key>");
   });
 
+  it("allocates a unique folder-style container for duplicate area titles", async () => {
+    await cli.run("para-zk:create-area", { title: "Alpha", open: "false" });
+    const duplicate = await cli.run("para-zk:create-area", { title: "Alpha", open: "false" });
+    expect(duplicate.path).toBe("PARA/Areas/Alpha 1/Alpha 1.md");
+
+    const subarea = await cli.run("para-zk:create-subarea", {
+      title: "Nested",
+      path: "PARA/Areas/Alpha 1/Alpha 1.md",
+      open: "false"
+    });
+    expect(subarea.path).toBe("PARA/Areas/Alpha 1/Nested/Nested.md");
+
+    const renamed = await cli.run("para-zk:rename-area", {
+      title: "Alpha 1",
+      new_title: "Beta"
+    });
+    expect(renamed.path).toBe("PARA/Areas/Beta/Beta.md");
+    expect(cli.app.readPath("PARA/Areas/Beta/Nested/Nested.md")).toBeDefined();
+    expect(cli.app.readPath("PARA/Areas/Alpha/Alpha 1.md")).toBeUndefined();
+  });
+
   it("appends to and reads a subnote body", async () => {
     await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
     await cli.run("para-zk:create-subnote", {
@@ -290,5 +311,23 @@ describe("resource body updates", () => {
       all: "true"
     });
     expect(all.matches).toBe(2);
+  });
+});
+
+describe("date arguments", () => {
+  it("rejects invalid calendar dates", async () => {
+    const journal = await cli.run("para-zk:capture-journal", {
+      content: "Bad date",
+      date: "2026-02-31"
+    });
+    expect(journal.ok).toBe(false);
+    expect(String(journal.error)).toContain("date must be a valid YYYY-MM-DD");
+
+    const retro = await cli.run("para-zk:create-retro", {
+      title: "Bad date retro",
+      date: "not-a-date"
+    });
+    expect(retro.ok).toBe(false);
+    expect(String(retro.error)).toContain("date must be YYYY-MM-DD");
   });
 });

@@ -56,6 +56,27 @@ describe("create-project", () => {
     expect(subnoteContent).not.toContain("```para-zk-managed");
     expect(subnoteContent.endsWith("\n\n")).toBe(false);
   });
+
+  it("allocates a unique folder-style container for duplicate titles", async () => {
+    await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
+    const duplicate = await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
+    expect(duplicate.path).toBe("PARA/Projects/Alpha 1/Alpha 1.md");
+
+    const child = await cli.run("para-zk:create-subnote", {
+      title: "Child",
+      path: "PARA/Projects/Alpha 1/Alpha 1.md",
+      open: "false"
+    });
+    expect(child.path).toBe("PARA/Projects/Alpha 1/Child.md");
+
+    const renamed = await cli.run("para-zk:rename-project", {
+      title: "Alpha 1",
+      new_title: "Beta"
+    });
+    expect(renamed.path).toBe("PARA/Projects/Beta/Beta.md");
+    expect(cli.app.readPath("PARA/Projects/Beta/Child.md")).toBeDefined();
+    expect(cli.app.readPath("PARA/Projects/Alpha/Alpha 1.md")).toBeUndefined();
+  });
 });
 
 describe("read-project", () => {
@@ -112,6 +133,62 @@ describe("read-project", () => {
       key: "children/Kickoff/frontmatter/subnote_type"
     });
     expect(type.value).toBe("meeting");
+  });
+
+  it("does not treat root siblings as children of a flat project note", async () => {
+    await cli.app.vault.create("PARA/Projects/Alpha.md", [
+      "---",
+      "type: project",
+      "---",
+      "# Summary",
+      ""
+    ].join("\n"));
+    await cli.app.vault.create("PARA/Projects/Beta.md", [
+      "---",
+      "type: project",
+      "---",
+      "# Summary",
+      ""
+    ].join("\n"));
+    await cli.app.vault.create("PARA/Projects/Child.md", [
+      "---",
+      "type: doc",
+      "parent: \"[[PARA/Projects/Alpha.md|Alpha]]\"",
+      "---",
+      "Child body",
+      ""
+    ].join("\n"));
+
+    const read = await cli.run("para-zk:read-project", {
+      path: "PARA/Projects/Alpha.md",
+      key: "children"
+    });
+    const children = read.value as Record<string, { path: string }>;
+    expect(children.Child.path).toBe("PARA/Projects/Child.md");
+    expect(children.Beta).toBeUndefined();
+
+    const rejected = await cli.run("para-zk:read-project", {
+      path: "PARA/Projects/Alpha.md",
+      key: "children/Beta/summary"
+    });
+    expect(rejected.ok).toBe(false);
+    expect(String(rejected.error)).toContain("child not found");
+  });
+
+  it("type-checks against fresh frontmatter when metadata cache lags", async () => {
+    await createBaseProject();
+    const originalGetFileCache = cli.app.metadataCache.getFileCache;
+    cli.app.metadataCache.getFileCache = (file) => {
+      if (file.path === "PARA/Projects/Alpha/Alpha.md") return { frontmatter: {} };
+      return originalGetFileCache(file);
+    };
+
+    try {
+      const read = await cli.run("para-zk:read-project", { title: "Alpha", key: "frontmatter/status" });
+      expect(read.value).toBe("in_progress");
+    } finally {
+      cli.app.metadataCache.getFileCache = originalGetFileCache;
+    }
   });
 });
 
