@@ -25,8 +25,10 @@ Notable changes for PARA-ZK are tracked here.
   generated/reference paths, hidden document properties, and the core Templates folder.
 - Added locale-neutral workflow arguments for CLI automation while keeping localized
   labels in the Obsidian GUI.
-- Added native PARA-ZK inline action buttons with `PZK[...]` tokens, replacing the
-  prior Meta Bind button dependency.
+- Added native PARA-ZK view toolbar actions, replacing the prior Meta Bind button
+  dependency and the removed `PZK[...]` workflow action token path.
+- Added `para-zk-latest-retro-summary`, replacing the long project-template
+  DataviewJS latest-retro callout with a native renderer.
 - Added native PARA-ZK props controls with `para-zk-props` and `PZK_INPUT[...]`,
   replacing Meta Bind input controls while writing frontmatter directly.
 - Added native PARA-ZK ribbon actions for project, area, resource, ZK, daily
@@ -83,8 +85,12 @@ Notable changes for PARA-ZK are tracked here.
   unit suite instead.
 - Added Open Tab Settings (`open-tab-settings`) to the required community plugin
   dependencies so PARA-ZK navigation opens notes with consistent
-  open-in-new-tab / no-duplicate-tab behavior; `installDeps=true` installs and
-  enables it (options are not forced).
+  open-in-new-tab / no-duplicate-tab behavior; `installDeps=true` installs,
+  enables, and configures it, including focused explicitly-created new tabs.
+- Added Remember cursor position (`remember-cursor-position`) to the required
+  community plugin dependencies so frequent movement across dashboards, root
+  notes, and child notes restores note cursor and scroll position; `installDeps=true`
+  installs and enables it (options are not forced).
 - `unknown read key` and `unknown update key` CLI errors now list the valid keys for
   the selected note type (read errors list readable keys; update errors list writable
   keys with their supported operations), so callers can self-correct without docs.

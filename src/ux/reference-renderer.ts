@@ -12,6 +12,7 @@ import {
 import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import {
+  createResource,
   deleteReferenceItem,
   insertReferenceItem,
   isExternalReference,
@@ -24,6 +25,7 @@ import {
   type ReferenceRead,
   type WorkflowContext
 } from "../workflows";
+import { promptText } from "./prompts";
 import {
   beginRegistryBlockRender,
   canRegistryDragReorder,
@@ -61,6 +63,10 @@ type ReferenceEditValue = {
   originalLink?: string;
   prefilledTarget?: string;
   prefilledAnchor?: string;
+};
+
+type ReferenceEditModalOptions = {
+  suppressInitialTargetFocus?: boolean;
 };
 
 type ReferenceAnchorSuggestion = {
@@ -181,6 +187,7 @@ function renderReferenceToolbar(
         .setIcon("plus")
         .setButtonText(addLabel)
         .setTooltip(addLabel)
+        .setCta()
         .onClick(() => {
           new ReferenceEditModal(
             plugin,
@@ -195,6 +202,38 @@ function renderReferenceToolbar(
               await options.rerender();
             }
           ).open();
+        });
+
+      const createResourceButton = new ButtonComponent(controls);
+      const createResourceButtonEl = createResourceButton.buttonEl;
+      const createResourceLabel = labelValue(labels.createResource, "Create resource");
+      createResourceButtonEl.addClass("para-zk-reference-toolbar-button", "para-zk-reference-create-resource");
+      createResourceButtonEl.setAttr("aria-label", createResourceLabel);
+      createResourceButton
+        .setIcon("file-plus")
+        .setButtonText(createResourceLabel)
+        .setTooltip(createResourceLabel)
+        .setCta()
+        .onClick(async () => {
+          await runRegistryBlockAction(createResourceButtonEl, async () => {
+            const title = await promptText(
+              plugin.app,
+              labelValue(labels.createResourceCommandName, createResourceLabel),
+              labelValue(labels.promptResourceTitle, "Resource title"),
+              "",
+              labels.confirm,
+              labels.cancel
+            );
+            if (!title) return;
+
+            await createResource(referenceContext(plugin), {
+              title,
+              sourcePath: options.rootFile.path,
+              linkToSource: true,
+              open: true
+            });
+            await options.rerender();
+          });
         });
     }
   });
@@ -236,9 +275,15 @@ function renderReferenceRow(
       });
       link.setAttr("href", referenceHref(item.reference));
       link.setAttr("title", referenceTargetHint(item.reference));
+      attachReferenceLinkBehavior(plugin, link, item.reference, body, options.ctx.sourcePath);
       link.addEventListener("click", (event) => {
         event.preventDefault();
-        void openReferenceLink(plugin, item.reference, options.ctx.sourcePath).catch((error: unknown) => {
+        void openReferenceLink(
+          plugin,
+          item.reference,
+          options.ctx.sourcePath,
+          event.ctrlKey || event.metaKey || event.button === 1
+        ).catch((error: unknown) => {
           new Notice(registryErrorMessage(error));
         });
       });
@@ -268,7 +313,8 @@ function renderReferenceRow(
             async (value) => {
               await updateReferenceFromEditor(plugin, item, value);
               await options.rerender();
-            }
+            },
+            { suppressInitialTargetFocus: true }
           ).open();
         });
 
@@ -448,18 +494,21 @@ class ReferenceEditModal extends Modal {
   private value: ReferenceEditValue;
   private saving = false;
   private targetSuggest?: ReferenceTargetSuggest;
+  private targetInputEl?: HTMLInputElement;
   private anchorSuggest?: ReferenceAnchorSuggest;
   private anchorInputEl?: HTMLInputElement;
   private anchorSuggestions: ReferenceAnchorSuggestion[] = [];
   private anchorLineCache = new Map<string, string[]>();
   private anchorRefreshGeneration = 0;
+  private readonly suppressInitialTargetFocus: boolean;
 
   constructor(
     private readonly plugin: ParaZkPluginContext,
     private readonly heading: string,
     private readonly sourcePath: string,
     value: ReferenceEditValue,
-    private readonly save: (value: ReferenceEditValue) => Promise<void>
+    private readonly save: (value: ReferenceEditValue) => Promise<void>,
+    options: ReferenceEditModalOptions = {}
   ) {
     super(plugin.app);
     this.value = {
@@ -467,6 +516,7 @@ class ReferenceEditModal extends Modal {
       prefilledTarget: value.prefilledTarget ?? value.target,
       prefilledAnchor: normalizeReferenceAnchor(value.prefilledAnchor ?? value.anchor)
     };
+    this.suppressInitialTargetFocus = options.suppressInitialTargetFocus === true;
   }
 
   onOpen(): void {
@@ -489,6 +539,7 @@ class ReferenceEditModal extends Modal {
             void this.refreshAnchorSuggestions();
           });
         text.inputEl.addClass("para-zk-reference-edit-target");
+        this.targetInputEl = text.inputEl;
         this.targetSuggest = new ReferenceTargetSuggest(this.plugin, text.inputEl, (file) => {
           this.value.target = file.path;
           void this.refreshAnchorSuggestions();
@@ -544,6 +595,8 @@ class ReferenceEditModal extends Modal {
           .setButtonText(labels.cancel)
           .onClick(() => this.close());
       });
+
+    this.suppressInitialTargetAutoFocus();
   }
 
   onClose(): void {
@@ -551,9 +604,24 @@ class ReferenceEditModal extends Modal {
     this.targetSuggest?.close();
     this.anchorSuggest?.close();
     this.targetSuggest = undefined;
+    this.targetInputEl = undefined;
     this.anchorSuggest = undefined;
     this.anchorInputEl = undefined;
     this.contentEl.empty();
+  }
+
+  private suppressInitialTargetAutoFocus(): void {
+    if (!this.suppressInitialTargetFocus || !this.targetInputEl) return;
+
+    this.contentEl.tabIndex = -1;
+    window.setTimeout(() => {
+      if (!this.targetInputEl || !this.contentEl.isConnected) return;
+      if (this.targetInputEl.ownerDocument.activeElement !== this.targetInputEl) return;
+
+      this.targetSuggest?.close();
+      this.targetInputEl.blur();
+      this.contentEl.focus();
+    }, 0);
   }
 
   private async submit(): Promise<void> {
@@ -644,8 +712,8 @@ class ReferenceEditModal extends Modal {
 
     for (const heading of cache.headings ?? []) {
       // stripHeadingForLink drops link-illegal chars like `|`, but keeps `[`/`]`/backtick.
-      // A heading that still contains those (e.g. a generated `## Title `PZK[action|label]``
-      // button heading) cannot be stored as a valid `[[file#anchor]]` wikilink, so skip it.
+      // A heading that still contains those cannot be stored as a valid
+      // `[[file#anchor]]` wikilink, so skip it.
       const value = stripHeadingForLink(heading.heading);
       if (/[[\]`]/.test(value)) continue;
       suggestions.push({
@@ -763,13 +831,43 @@ class ReferenceAnchorSuggest extends AbstractInputSuggest<ReferenceAnchorSuggest
 async function openReferenceLink(
   plugin: ParaZkPluginContext,
   reference: ReferenceRead,
-  sourcePath: string
+  sourcePath: string,
+  newLeaf = false
 ): Promise<void> {
   if (isExternalReference(reference.link)) {
     window.open(reference.link, "_blank", "noopener");
     return;
   }
-  await plugin.app.workspace.openLinkText(referenceOpenText(reference), sourcePath);
+  await plugin.app.workspace.openLinkText(referenceOpenText(reference), sourcePath, newLeaf);
+}
+
+function attachReferenceLinkBehavior(
+  plugin: ParaZkPluginContext,
+  link: HTMLAnchorElement,
+  reference: ReferenceRead,
+  hoverParent: HTMLElement,
+  sourcePath: string
+): void {
+  if (!isInternalReference(reference)) return;
+
+  const linktext = referenceOpenText(reference);
+  link.addClass("internal-link");
+  link.setAttr("href", linktext);
+  link.setAttr("data-href", linktext);
+  link.addEventListener("mouseover", (event) => {
+    plugin.app.workspace.trigger("hover-link", {
+      event,
+      source: "para-zk-references",
+      hoverParent,
+      targetEl: link,
+      linktext,
+      sourcePath
+    });
+  });
+}
+
+function isInternalReference(reference: ReferenceRead): boolean {
+  return reference.kind === "note" || reference.kind === "file" || reference.kind === "wiki";
 }
 
 function referenceHref(reference: ReferenceRead): string {

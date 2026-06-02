@@ -115,6 +115,54 @@ describe("retro", () => {
     });
     expect(update.changed).toBe(true);
   });
+
+  it("links a project retro even when metadata cache has not caught up", async () => {
+    await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
+
+    const originalGetFileCache = cli.app.metadataCache.getFileCache;
+    cli.app.metadataCache.getFileCache = (file) => {
+      if (file.path === "PARA/Projects/Alpha/Alpha.md") return { frontmatter: {} };
+      return originalGetFileCache(file);
+    };
+
+    try {
+      const retro = await cli.run("para-zk:create-retro", {
+        path: "PARA/Projects/Alpha/Alpha.md",
+        date: "2026-06-02",
+        open: "false"
+      });
+
+      const project = await cli.run("para-zk:read-retro", { path: String(retro.path), key: "frontmatter/project" });
+      expect(project.value).toBe("[[PARA/Projects/Alpha/Alpha.md|Alpha]]");
+    } finally {
+      cli.app.metadataCache.getFileCache = originalGetFileCache;
+    }
+  });
+
+  it("opens the existing project retro for the same source and week", async () => {
+    await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
+    const created = await cli.run("para-zk:create-retro", {
+      path: "PARA/Projects/Alpha/Alpha.md",
+      date: "2026-06-02",
+      open: "false"
+    });
+    expect(created.created).toBe(true);
+
+    const original = cli.app.vault.getFileByPath(String(created.path));
+    expect(original).toBeTruthy();
+    await cli.app.fileManager.renameFile(original!, "PARA/Retros/2026_W23/Alpha weekly review.md");
+
+    const reopened = await cli.run("para-zk:create-retro", {
+      path: "PARA/Projects/Alpha/Alpha.md",
+      date: "2026-06-02",
+      open: "true"
+    });
+
+    expect(reopened.created).toBe(false);
+    expect(reopened.path).toBe("PARA/Retros/2026_W23/Alpha weekly review.md");
+    expect(cli.app.readPath(String(created.path))).toBeUndefined();
+    expect(cli.app.opened.at(-1)).toBe("PARA/Retros/2026_W23/Alpha weekly review.md");
+  });
 });
 
 describe("subarea and child bodies", () => {

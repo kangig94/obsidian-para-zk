@@ -181,32 +181,6 @@ function renderTaskToolbar(
     summaryText: taskSummaryText(options.items, options.visible, labels),
     renderControls: (controls) => {
       const rootFile = options.rootFile;
-      if (options.args.root === "current" && rootFile) {
-        const add = new ButtonComponent(controls);
-        const addButton = add.buttonEl;
-        addButton.addClass("para-zk-task-toolbar-button", "para-zk-task-add");
-        addButton.setAttr("aria-label", labels.addTask);
-        add
-          .setIcon("plus")
-          .setButtonText(labels.addTask)
-          .setTooltip(labels.addTask)
-          .onClick(async () => {
-            await runRegistryBlockAction(addButton, async () => {
-              const name = await promptText(
-                plugin.app,
-                labels.tasks,
-                labels.title,
-                "",
-                labels.confirm,
-                labels.cancel
-              );
-              if (!name) return;
-              await queueRootTaskWrite(rootFile, () => insertRootTask(taskContext(plugin), rootFile, { name }));
-              await renderTaskBlock(plugin, source, el, ctx);
-            });
-          });
-      }
-
       renderRegistryToolbarSelect(controls, {
         selectClass: "para-zk-task-toolbar-select",
         label: labels.taskOrder,
@@ -237,6 +211,33 @@ function renderTaskToolbar(
           void renderTaskBlock(plugin, source, el, ctx);
         }
       });
+
+      if (options.args.root === "current" && rootFile) {
+        const add = new ButtonComponent(controls);
+        const addButton = add.buttonEl;
+        addButton.addClass("para-zk-task-toolbar-button", "para-zk-task-add");
+        addButton.setAttr("aria-label", labels.addTask);
+        add
+          .setIcon("plus")
+          .setButtonText(labels.addTask)
+          .setTooltip(labels.addTask)
+          .setCta()
+          .onClick(async () => {
+            await runRegistryBlockAction(addButton, async () => {
+              const name = await promptText(
+                plugin.app,
+                labels.tasks,
+                labels.title,
+                "",
+                labels.confirm,
+                labels.cancel
+              );
+              if (!name) return;
+              await queueRootTaskWrite(rootFile, () => insertRootTask(taskContext(plugin), rootFile, { name }));
+              await renderTaskBlock(plugin, source, el, ctx);
+            });
+          });
+      }
     }
   });
   options.blockState.summaryEl = rendered.summaryEl;

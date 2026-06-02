@@ -14,6 +14,10 @@ import {
   HOMEPAGE_PLUGIN_ID
 } from "./homepage";
 import {
+  openTabSettingsDependencyConfiguration,
+  OPEN_TAB_SETTINGS_PLUGIN_ID
+} from "./open-tab-settings";
+import {
   updateTimeOnEditDependencyConfiguration,
   UPDATE_TIME_PLUGIN_ID
 } from "./update-time-on-edit";
@@ -131,10 +135,17 @@ const REQUIRED_DEPENDENCIES: DependencySpec[] = [
     configuration: homepageDependencyConfiguration
   },
   {
-    id: "open-tab-settings",
+    id: OPEN_TAB_SETTINGS_PLUGIN_ID,
     name: "Open Tab Settings",
     repo: "jesse-r-s-hines/obsidian-open-tab-settings",
-    reason: "PARA-ZK navigation opens notes from ribbon, dashboard, and inline actions; consistent open-in-new-tab and no-duplicate-tab behavior keeps the PARA/ZK workflow navigable"
+    reason: "PARA-ZK navigation opens notes from ribbon, dashboard, and view toolbar actions; consistent open-in-new-tab, focused-new-tab, and no-duplicate-tab behavior keeps the PARA/ZK workflow navigable",
+    configuration: openTabSettingsDependencyConfiguration
+  },
+  {
+    id: "remember-cursor-position",
+    name: "Remember cursor position",
+    repo: "dy-sh/obsidian-remember-cursor-position",
+    reason: "PARA-ZK users frequently move between generated dashboards, root notes, and child notes; restoring each note's cursor and scroll position keeps context intact"
   }
 ];
 

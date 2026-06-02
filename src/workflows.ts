@@ -740,8 +740,8 @@ export async function createRetro(ctx: WorkflowContext, options: CreateRetroOpti
   const createdAt = localDateTimeSpace();
   const week = isoWeekInfo(date);
   const weekSegment = week.weekIso.replace("-", "_");
-  const sourceFm = source ? ctx.app.metadataCache.getFileCache(source)?.frontmatter ?? {} : {};
-  const sourceType = String(sourceFm.type ?? "").toLowerCase();
+  const sourceFm = source ? await readFileFrontmatterFresh(ctx, source) : {};
+  const sourceType = source ? retroSourceType(ctx, source, sourceFm) : "";
   const labels = localePack(ctx.settings.locale).labels;
   const sourceLink = source ? linkToFile(source) : "";
   const project = sourceType === "project" ? sourceLink : "";
@@ -750,6 +750,18 @@ export async function createRetro(ctx: WorkflowContext, options: CreateRetroOpti
     : sourceType === "project"
       ? frontmatterLinks(sourceFm.areas)
       : [];
+  const existingSourceRetro = source && !options.title
+    ? await findExistingSourceRetroForWeek(ctx, source, sourceType, weekSegment)
+    : undefined;
+  if (existingSourceRetro) {
+    await openIfRequested(ctx, existingSourceRetro, options.open);
+    return {
+      ...noteResult(existingSourceRetro, false, options.open),
+      sourcePath: source?.path,
+      weekIso: week.weekIso
+    };
+  }
+
   const defaultName = source
     ? `${sourceType === "area" ? labels.retroNameAreaPrefix : sourceType === "project" ? labels.retroNameProjectPrefix : labels.retroNameNotePrefix}-${source.basename}`
     : labels.retroNameGeneral;
@@ -1047,6 +1059,10 @@ export function readReferenceItems(ctx: WorkflowContext, file: TFile): Reference
 // so reference reads on the mutation/render path must parse the file's current content instead
 // of trusting the cache.
 async function readReferenceFrontmatterFresh(ctx: WorkflowContext, file: TFile): Promise<Frontmatter> {
+  return readFileFrontmatterFresh(ctx, file);
+}
+
+async function readFileFrontmatterFresh(ctx: WorkflowContext, file: TFile): Promise<Frontmatter> {
   const content = await ctx.app.vault.read(file);
   const fresh = parseFrontmatterFromContent(content);
   if (hasFrontmatterKeys(fresh)) return fresh;
@@ -3929,6 +3945,9 @@ function minFoundIndex(left: number, right: number): number {
 }
 
 function stripProjectSummaryManagedBlock(content: string): string {
+  const nativeBlock = stripLeadingFencedBlock(content, "para-zk-latest-retro-summary");
+  if (nativeBlock !== content) return nativeBlock;
+
   const lines = content.split("\n");
   if (!lines[0]?.trim().startsWith("> [!tip]")) return content;
 
@@ -3937,6 +3956,24 @@ function stripProjectSummaryManagedBlock(content: string): string {
   for (; index < lines.length; index += 1) {
     if (lines[index].trim() === "> ```") fenceCount += 1;
     if (fenceCount === 2) {
+      index += 1;
+      break;
+    }
+  }
+
+  while (lines[index]?.trim() === "") index += 1;
+  return trimMarkdownBlock(lines.slice(index).join("\n"));
+}
+
+function stripLeadingFencedBlock(content: string, language: string): string {
+  const lines = content.split("\n");
+  const firstMeaningful = lines.findIndex((line) => line.trim() !== "");
+  if (firstMeaningful === -1) return content;
+  if (lines[firstMeaningful].trim() !== `\`\`\`${language}`) return content;
+
+  let index = firstMeaningful + 1;
+  for (; index < lines.length; index += 1) {
+    if (lines[index].trim() === "```") {
       index += 1;
       break;
     }
@@ -3990,6 +4027,48 @@ function fileFrontmatter(ctx: WorkflowContext, file: TFile): Frontmatter {
 function readType(frontmatter: Frontmatter): string {
   const type = frontmatter.type;
   return typeof type === "string" && type.trim() ? type : "note";
+}
+
+function retroSourceType(ctx: WorkflowContext, file: TFile, frontmatter: Frontmatter): string {
+  const type = String(frontmatter.type ?? "").trim().toLowerCase();
+  if (type) return type;
+  if (isCanonicalFolderNote(file, ctx.settings.paths.projectsFolder)) return "project";
+  if (isCanonicalFolderNote(file, ctx.settings.paths.areasFolder)) return "area";
+  return "";
+}
+
+async function findExistingSourceRetroForWeek(
+  ctx: WorkflowContext,
+  source: TFile,
+  sourceType: string,
+  weekSegment: string
+): Promise<TFile | undefined> {
+  const domain = sourceType === "project" || sourceType === "area" ? sourceType : undefined;
+  if (!domain) return undefined;
+
+  const matches: TFile[] = [];
+  for (const file of ctx.app.vault.getMarkdownFiles()) {
+    if (!isInFolder(file, ctx.settings.paths.retrosFolder)) continue;
+    const frontmatter = await readFileFrontmatterFresh(ctx, file);
+    if (readType(frontmatter) !== "retro") continue;
+    if (retroWeekSegment(file, frontmatter) !== weekSegment) continue;
+    if (!isSourceScopedRetro(ctx, file, frontmatter, source, domain)) continue;
+    matches.push(file);
+  }
+
+  return matches.sort((left, right) => {
+    const leftDefault = isDefaultSourceRetroFilename(ctx, left.basename, domain, source.basename, weekSegment);
+    const rightDefault = isDefaultSourceRetroFilename(ctx, right.basename, domain, source.basename, weekSegment);
+    if (leftDefault !== rightDefault) return leftDefault ? -1 : 1;
+    return left.path.localeCompare(right.path);
+  })[0];
+}
+
+function isCanonicalFolderNote(file: TFile, rootFolder: string): boolean {
+  if (!isInFolder(file, rootFolder)) return false;
+  const directPath = joinVaultPath(rootFolder, `${file.basename}.md`);
+  const folderStylePath = joinVaultPath(rootFolder, file.basename, `${file.basename}.md`);
+  return file.path === directPath || file.path === folderStylePath;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

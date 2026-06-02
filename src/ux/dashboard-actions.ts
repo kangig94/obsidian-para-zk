@@ -1,7 +1,7 @@
 import { ButtonComponent, type MarkdownPostProcessorContext } from "obsidian";
 import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
-import { createWorkflowButton } from "./inline-actions";
+import { createWorkflowButton } from "./workflow-buttons";
 
 type DashboardAction = {
   kind: "command" | "link";

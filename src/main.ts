@@ -6,7 +6,7 @@ import { registerDashboardActionRenderers } from "./ux/dashboard-actions";
 import { registerDashboardSummaryRenderers } from "./ux/dashboard-summary";
 import { registerDataviewViewRenderers } from "./ux/dataview-views";
 import { registerExplorerActions } from "./ux/explorer-actions";
-import { registerInlineActionRenderers } from "./ux/inline-actions";
+import { registerLatestRetroSummaryRenderers } from "./ux/latest-retro-summary";
 import { refreshRegisteredLocaleLabels } from "./ux/locale-labels";
 import { registerPropsControlRenderers } from "./ux/props-controls";
 import { registerRibbonActions } from "./ux/ribbon-actions";
@@ -31,7 +31,7 @@ export default class ParaZkPlugin extends Plugin {
     registerDashboardActionRenderers(this);
     registerDashboardSummaryRenderers(this);
     registerDataviewViewRenderers(this);
-    registerInlineActionRenderers(this);
+    registerLatestRetroSummaryRenderers(this);
     registerPropsControlRenderers(this);
     registerTaskRenderers(this);
     registerReferenceRenderers(this);

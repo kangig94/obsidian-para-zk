@@ -9,12 +9,6 @@
   color: var(--text-muted);
 }
 
-.para-zk-button-container {
-  display: inline-flex;
-  margin: 0.25em 0;
-  width: fit-content;
-}
-
 .para-zk-command-button {
   cursor: pointer;
 }
@@ -41,37 +35,6 @@
 .theme-light .workspace-ribbon .para-zk-ribbon-action:hover,
 .theme-light .workspace-ribbon .para-zk-ribbon-action:hover svg {
   color: var(--para-zk-ribbon-color-light, var(--para-zk-ribbon-color, var(--interactive-accent)));
-}
-
-.para-zk-block-button,
-.para-zk-inline-button {
-  flex: 0 0 auto;
-  font-size: var(--font-ui-small);
-  line-height: var(--line-height-tight);
-  min-height: 28px;
-  padding: 2px 10px;
-}
-
-.markdown-preview-view :is(h1,h2,h3,h4,h5,h6).para-zk-action-heading,
-.markdown-reading-view :is(h1,h2,h3,h4,h5,h6).para-zk-action-heading,
-.markdown-source-view.is-live-preview :is(h1,h2,h3,h4,h5,h6).para-zk-action-heading {
-  align-items: center;
-  display: flex;
-  gap: 10px;
-  justify-content: space-between;
-}
-
-.para-zk-action-heading .para-zk-inline-button:first-of-type {
-  margin-left: auto;
-}
-
-.para-zk-action-heading .para-zk-inline-button + .para-zk-inline-button {
-  margin-left: 6px;
-}
-
-.markdown-source-view .para-zk-editor-inline-button {
-  float: right;
-  margin-left: 10px;
 }
 
 .para-zk-prompt-input {
@@ -206,6 +169,105 @@
 .para-zk-summary-muted {
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
+}
+
+.para-zk-view {
+  margin: 0.75em 0 1em;
+  min-width: 0;
+}
+
+.para-zk-view-toolbar {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-bottom: 7px;
+  min-width: 0;
+  width: min(100%, var(--line-width, 100%));
+}
+
+.para-zk-view-toolbar-controls {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.para-zk-view-toolbar-button {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 5px;
+  box-shadow: none;
+  min-height: 28px;
+}
+
+.para-zk-view-toolbar-button.mod-cta {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: var(--text-on-accent, #fff);
+}
+
+.para-zk-view-toolbar-button.mod-cta:hover {
+  background: color-mix(in srgb, var(--interactive-accent) 86%, white 14%);
+  border-color: color-mix(in srgb, var(--interactive-accent) 86%, white 14%);
+  color: var(--text-on-accent, #fff);
+}
+
+.para-zk-view-action {
+  align-items: center;
+  display: inline-flex;
+  font-size: var(--font-ui-small);
+  gap: 5px;
+  font-weight: 600;
+  padding: 3px 9px;
+}
+
+.para-zk-view-body {
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .para-zk-view-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .para-zk-view-toolbar-controls {
+    justify-content: flex-start;
+  }
+}
+
+.para-zk-latest-retro-summary {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-left: 4px solid var(--interactive-accent);
+  border-radius: 6px;
+  margin: 0.75em 0 1em;
+  padding: 8px 10px;
+}
+
+.para-zk-latest-retro-summary-title {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: 700;
+  line-height: var(--line-height-tight);
+  margin-bottom: 4px;
+}
+
+.para-zk-latest-retro-summary-body {
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.para-zk-latest-retro-summary-body.is-empty {
+  color: var(--text-faint);
+}
+
+.para-zk-latest-retro-summary.is-error {
+  border-left-color: var(--text-error);
 }
 
 .para-zk-props {
@@ -347,6 +409,18 @@
   border-radius: 5px;
   box-shadow: none;
   min-height: 28px;
+}
+
+.para-zk-task-toolbar-button.mod-cta {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: var(--text-on-accent, #fff);
+}
+
+.para-zk-task-toolbar-button.mod-cta:hover {
+  background: color-mix(in srgb, var(--interactive-accent) 86%, white 14%);
+  border-color: color-mix(in srgb, var(--interactive-accent) 86%, white 14%);
+  color: var(--text-on-accent, #fff);
 }
 
 .para-zk-task-add {
@@ -624,8 +698,24 @@
   min-height: 28px;
 }
 
+.para-zk-reference-toolbar-button.mod-cta,
+.para-zk-references-toolbar-button.mod-cta {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: var(--text-on-accent, #fff);
+}
+
+.para-zk-reference-toolbar-button.mod-cta:hover,
+.para-zk-references-toolbar-button.mod-cta:hover {
+  background: color-mix(in srgb, var(--interactive-accent) 86%, white 14%);
+  border-color: color-mix(in srgb, var(--interactive-accent) 86%, white 14%);
+  color: var(--text-on-accent, #fff);
+}
+
 .para-zk-reference-add,
-.para-zk-references-add {
+.para-zk-reference-create-resource,
+.para-zk-references-add,
+.para-zk-references-create-resource {
   align-items: center;
   display: inline-flex;
   font-size: var(--font-ui-small);

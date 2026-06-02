@@ -81,40 +81,6 @@ export async function runGuiWorkflow(plugin: ParaZkPluginContext, command: strin
   }
 }
 
-export function workflowButtonLabel(plugin: ParaZkPluginContext, command: string | undefined): string | undefined {
-  if (!command) return undefined;
-  const labels = localePack(plugin.settings.locale).labels;
-  const labelByCommand: Record<string, string> = {
-    "create-project": labels.createProjectCommandName,
-    "create-area": labels.createAreaCommandName,
-    "add-reference": labels.addReference,
-    "create-resource": labels.createResource,
-    "create-subnote": labels.createSubnote,
-    "create-subarea": labels.createSubarea,
-    "create-retro": labels.createRetro,
-    "create-zk": labels.createZkCommandName,
-    "open-journal": labels.openJournalCommandName,
-    "capture-journal": labels.captureJournalCommandName,
-    "promote-resource": labels.promoteToZk,
-    "promote-fleeting": labels.promote
-  };
-  return labelByCommand[command];
-}
-
-export function normalizeWorkflowCommand(value: string | undefined): string | undefined {
-  const command = value?.trim();
-  if (!command) return undefined;
-  const aliases: Record<string, string> = {
-    "create-project-subnote": "create-subnote",
-    "daily-journal": "open-journal",
-    "open-daily-journal": "open-journal",
-    "connect-reference": "add-reference",
-    "connect-references": "add-reference",
-    "promote-to-zk": "promote-resource"
-  };
-  return aliases[command] ?? command;
-}
-
 async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: string, sourcePath?: string): Promise<unknown | undefined> {
   const workflows = await import("../workflows");
   const ctx = workflowContext(plugin);

@@ -22,7 +22,8 @@ const requiredDependencyIds = [
   "obsidian-trash-explorer",
   "custom-sort",
   "homepage",
-  "open-tab-settings"
+  "open-tab-settings",
+  "remember-cursor-position"
 ];
 const guiLocaleExpectations = {
   en: {
@@ -102,6 +103,7 @@ function assertSetupEnvironment(setupPayload) {
   assertUpdateTimeOnEditConfig();
   assertCustomSortConfig();
   assertHomepageConfig();
+  assertOpenTabSettingsConfig();
   assertHomepageRuntime();
 }
 
@@ -161,6 +163,54 @@ function runLiveScenario() {
     "format=json"
   ]);
   assertTaskBlockRendererRegression(taskProject.path, `Smoke render task ${stamp}`);
+  assertDataviewToolbarLayout(taskProject.path);
+  assertCreateRetroButtonProjectLink();
+}
+
+function assertDataviewToolbarLayout(path) {
+  const snapshot = guiJson(`(async () => {
+    const path = ${JSON.stringify(path)};
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    document.getElementById("para-zk-layout-probe-style")?.remove();
+    const leaf = app.workspace.getLeaf(false);
+    await leaf.setViewState({ type: "markdown", state: { file: path, mode: "preview" }, active: true });
+
+    let taskToolbar = null;
+    let referenceToolbar = null;
+    let viewToolbar = null;
+    let viewRoot = null;
+    for (let index = 0; index < 50; index += 1) {
+      const root = leaf.view.containerEl;
+      taskToolbar = root.querySelector(".para-zk-task-toolbar");
+      referenceToolbar = root.querySelector(".para-zk-reference-toolbar");
+      viewToolbar = root.querySelector(".para-zk-view-project-subnotes .para-zk-view-toolbar");
+      viewRoot = root.querySelector(".para-zk-view-project-subnotes");
+      if (taskToolbar && referenceToolbar && viewToolbar && viewRoot) break;
+      await sleep(100);
+    }
+
+    const rect = (el) => {
+      if (!el) return null;
+      const box = el.getBoundingClientRect();
+      return {
+        left: Math.round(box.left * 100) / 100,
+        right: Math.round(box.right * 100) / 100,
+        width: Math.round(box.width * 100) / 100
+      };
+    };
+
+    console.log(JSON.stringify({
+      ok: true,
+      taskToolbar: rect(taskToolbar),
+      referenceToolbar: rect(referenceToolbar),
+      viewToolbar: rect(viewToolbar),
+      viewRoot: rect(viewRoot)
+    }));
+  })()`);
+
+  assert(snapshot.taskToolbar && snapshot.referenceToolbar && snapshot.viewToolbar, `toolbar layout snapshot incomplete: ${JSON.stringify(snapshot)}`);
+  assertNearlyEqual(snapshot.viewToolbar.right, snapshot.taskToolbar.right, 1, `Dataview toolbar right edge differs from task toolbar: ${JSON.stringify(snapshot)}`);
+  assertNearlyEqual(snapshot.viewToolbar.right, snapshot.referenceToolbar.right, 1, `Dataview toolbar right edge differs from reference toolbar: ${JSON.stringify(snapshot)}`);
 }
 
 function assertRenameAreaLinkRewrite() {
@@ -600,6 +650,189 @@ function assertTaskBlockRendererRegression(path, taskName) {
   );
 }
 
+function assertCreateRetroButtonProjectLink() {
+  const projectTitle = `Smoke Retro Link ${stamp}`;
+  const summaryText = `Smoke retro summary linked through Create retro ${stamp}`;
+  const project = cliJson("para-zk:create-project", [
+    `title=${projectTitle}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(project, "retro link project");
+
+  const created = guiJson(`(async () => {
+    const path = ${JSON.stringify(project.path)};
+    const title = ${JSON.stringify(projectTitle)};
+    const plugin = app.plugins.plugins["para-zk"];
+    const retrosRoot = plugin?.settings?.paths?.retrosFolder ?? "PARA/Retros";
+    const file = app.vault.getFileByPath(path);
+    if (!file) throw new Error("retro source project not found: " + path);
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const leaf = app.workspace.getLeaf(false);
+    await leaf.setViewState({ type: "markdown", state: { file: path, mode: "preview" }, active: true });
+
+    let button = null;
+    for (let index = 0; index < 30; index += 1) {
+      button = leaf.view.containerEl.querySelector(".para-zk-view-project-retros .para-zk-view-toolbar-button");
+      if (button) break;
+      await sleep(100);
+    }
+    if (!button) throw new Error("Create retro button did not render for " + path);
+
+    button.click();
+
+    let retroPath = null;
+    for (let index = 0; index < 50; index += 1) {
+      const candidates = app.vault.getMarkdownFiles()
+        .filter((candidate) => candidate.path.startsWith(retrosRoot + "/") && candidate.basename.includes(title))
+        .sort((left, right) => right.stat.ctime - left.stat.ctime || right.path.localeCompare(left.path));
+      retroPath = candidates[0]?.path ?? null;
+      if (retroPath) break;
+      await sleep(100);
+    }
+
+    console.log(JSON.stringify({
+      ok: true,
+      buttonText: button.textContent?.trim() ?? "",
+      retroPath
+    }));
+  })()`);
+
+  assert(created.buttonText === "Create retro", `Create retro button text mismatch: ${created.buttonText}`);
+  assert(typeof created.retroPath === "string" && created.retroPath.length > 0, "Create retro button did not create a retro");
+
+  let frontmatter = {};
+  let projectLink = "";
+  for (let index = 0; index < 20; index += 1) {
+    frontmatter = cliJson("para-zk:read-retro", [
+      `path=${created.retroPath}`,
+      "key=frontmatter",
+      "format=json"
+    ]);
+    projectLink = String(frontmatter.value?.project ?? "");
+    if (projectLink.includes(project.path) && projectLink.includes(project.title)) break;
+    sleepMs(100);
+  }
+  assert(
+    projectLink.includes(project.path) && projectLink.includes(project.title),
+    `retro project link mismatch: ${projectLink}`
+  );
+  const retroDate = String(frontmatter.value?.date ?? "");
+  assert(/^\d{4}-\d{2}-\d{2}$/.test(retroDate), `retro date missing or invalid: ${retroDate}`);
+
+  const retroTitle = basename(created.retroPath, ".md");
+  const retroWeekLabel = created.retroPath.match(/(?:^|\/)(\d{4}_W\d{2})(?:\/|$)/)?.[1]
+    ?? retroTitle.match(/(\d{4}_W\d{2})$/)?.[1]
+    ?? "";
+  assert(retroWeekLabel.length > 0, `Could not derive retro week label from ${created.retroPath}`);
+
+  const reopened = cliJson("para-zk:create-retro", [
+    `path=${project.path}`,
+    `date=${retroDate}`,
+    "open=false",
+    "format=json"
+  ]);
+  assert(reopened.created === false, `Create retro should reuse existing weekly retro, got created=${reopened.created}`);
+  assert(reopened.path === created.retroPath, `Create retro reopened the wrong retro: ${reopened.path}`);
+
+  const beforeSummary = guiJson(`(async () => {
+    const path = ${JSON.stringify(project.path)};
+    const retroTitle = ${JSON.stringify(retroTitle)};
+    const retroWeekLabel = ${JSON.stringify(retroWeekLabel)};
+    const file = app.vault.getFileByPath(path);
+    if (!file) throw new Error("summary project not found: " + path);
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const leaf = app.workspace.getLeaf(false);
+    await leaf.setViewState({ type: "markdown", state: { file: path, mode: "preview" }, active: true });
+
+    let hasComponent = false;
+    let hasRetroInView = false;
+    let hasUpdatedColumn = false;
+    let retrosText = "";
+    for (let index = 0; index < 50; index += 1) {
+      const root = leaf.view.containerEl;
+      hasComponent = Boolean(root.querySelector(".para-zk-latest-retro-summary"));
+      retrosText = root.querySelector(".para-zk-view-project-retros")?.textContent?.trim() ?? "";
+      hasUpdatedColumn = Array.from(root.querySelectorAll(".para-zk-view-project-retros th, .para-zk-view-project-retros .table-view-th"))
+        .some((el) => el.textContent?.trim() === "Updated") || retrosText.includes("Updated");
+      hasRetroInView = retrosText.includes(retroWeekLabel) && !retrosText.includes(retroTitle);
+      if (hasComponent && hasRetroInView && hasUpdatedColumn) break;
+      await sleep(100);
+    }
+
+    console.log(JSON.stringify({ ok: true, hasComponent, hasRetroInView, hasUpdatedColumn, retrosText }));
+  })()`);
+  assert(beforeSummary.hasComponent === true, "latest retro summary component did not render before retro summary update");
+  assert(beforeSummary.hasRetroInView === true, `Project Retros Dataview did not include created retro before summary update: ${beforeSummary.retrosText}`);
+  assert(beforeSummary.hasUpdatedColumn === true, `Project Retros Dataview did not include Updated before summary update: ${beforeSummary.retrosText}`);
+
+  const update = cliJson("para-zk:update-retro", [
+    `path=${created.retroPath}`,
+    "key=retro_summary",
+    "op=set",
+    `value=${summaryText}`,
+    "format=json"
+  ]);
+  assert(update.ok === true && update.changed === true, "retro summary update failed");
+
+  const rendered = guiJson(`(async () => {
+    const path = ${JSON.stringify(project.path)};
+    const summaryText = ${JSON.stringify(summaryText)};
+    const retroTitle = ${JSON.stringify(retroTitle)};
+    const retroWeekLabel = ${JSON.stringify(retroWeekLabel)};
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const leaves = app.workspace.getLeavesOfType("markdown").filter((item) => item.view?.file?.path === path);
+    const leaf = leaves.find((item) => item.view?.containerEl?.querySelector(".para-zk-view-project-retros"))
+      ?? leaves.find((item) => item.view?.containerEl?.querySelector(".para-zk-latest-retro-summary"))
+      ?? leaves[0]
+      ?? app.workspace.getLeaf(false);
+    if (leaf.view?.file?.path !== path) throw new Error("summary project leaf is not open: " + path);
+
+    let body = "";
+    let retrosText = "";
+    let hasComponent = false;
+    let hasRetroInView = false;
+    let hasUpdatedColumn = false;
+    let codeBlocks = 0;
+    for (let index = 0; index < 50; index += 1) {
+      const root = leaf.view.containerEl;
+      const component = root.querySelector(".para-zk-latest-retro-summary");
+      const retrosView = root.querySelector(".para-zk-view-project-retros");
+      hasComponent = Boolean(component);
+      body = component?.querySelector(".para-zk-latest-retro-summary-body")?.textContent?.trim() ?? "";
+      retrosText = retrosView?.textContent?.trim() ?? "";
+      hasUpdatedColumn = Array.from(root.querySelectorAll(".para-zk-view-project-retros th, .para-zk-view-project-retros .table-view-th"))
+        .some((el) => el.textContent?.trim() === "Updated") || retrosText.includes("Updated");
+      hasRetroInView = retrosText.includes(retroWeekLabel) && !retrosText.includes(retroTitle);
+      codeBlocks = Array.from(root.querySelectorAll("code"))
+        .filter((code) => code.textContent?.includes("para-zk-latest-retro-summary")).length;
+      if (body.includes(summaryText) && hasRetroInView && hasUpdatedColumn) break;
+      await sleep(100);
+    }
+
+    console.log(JSON.stringify({ ok: true, hasComponent, body, hasRetroInView, hasUpdatedColumn, retrosText, codeBlocks }));
+  })()`);
+
+  assert(rendered.hasComponent === true, "latest retro summary component did not render");
+  assert(rendered.body.includes(summaryText), `latest retro summary did not include updated summary: ${rendered.body}`);
+  assert(rendered.hasRetroInView === true, `Project Retros Dataview did not include created retro: ${rendered.retrosText}`);
+  assert(rendered.hasUpdatedColumn === true, `Project Retros Dataview did not include Updated: ${rendered.retrosText}`);
+  assert(rendered.codeBlocks === 0, "latest retro summary leaked as a code block");
+
+  const clear = cliJson("para-zk:update-retro", [
+    `path=${created.retroPath}`,
+    "key=retro_summary",
+    "op=set",
+    "value=",
+    "format=json"
+  ]);
+  assert(clear.ok === true, "retro summary cleanup failed");
+  assertFileNotContains(created.retroPath, [summaryText]);
+}
+
 function readFrontmatterReferences(path) {
   const snapshot = guiJson(`(async () => {
     const file = app.vault.getFileByPath(${JSON.stringify(path)});
@@ -1025,6 +1258,21 @@ function assertHomepageConfig() {
   assert(homepage.autoCreate === false, "homepage autoCreate should be disabled");
 }
 
+function assertOpenTabSettingsConfig() {
+  if (!installDeps) return;
+
+  const config = readVaultJson(".obsidian/plugins/open-tab-settings/data.json");
+  assert(config.openInNewTab === true, "open-tab-settings openInNewTab is not enabled");
+  assert(config.deduplicateTabs === true, "open-tab-settings deduplicateTabs is not enabled");
+  assert(config.deduplicateAcrossTabGroups === true, "open-tab-settings deduplicateAcrossTabGroups is not enabled");
+  assert(config.newTabPlacement === "after-active", "open-tab-settings newTabPlacement is not after-active");
+  assert(config.newTabTabGroupPlacement === "same", "open-tab-settings newTabTabGroupPlacement is not same");
+  assert(config.modClickBehavior === "tab", "open-tab-settings modClickBehavior is not tab");
+
+  const appConfig = readVaultJson(".obsidian/app.json");
+  assert(appConfig.focusNewTab === true, "app.json focusNewTab is not enabled");
+}
+
 function assertHomepageRuntime() {
   if (!installDeps) return;
 
@@ -1148,6 +1396,13 @@ function assertFileNotContains(path, needles) {
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+function assertNearlyEqual(actual, expected, tolerance, message) {
+  assert(
+    typeof actual === "number" && typeof expected === "number" && Math.abs(actual - expected) <= tolerance,
+    message
+  );
 }
 
 function samePath(left, right) {

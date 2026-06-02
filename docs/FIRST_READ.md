@@ -10,7 +10,7 @@ PARA-ZK is a native Obsidian plugin that turns a hand-built PARA and
 Zettelkasten vault setup into repeatable plugin-owned workflows.
 
 It owns the vault layout, generated templates, dashboards, workflow commands,
-inline actions, frontmatter controls, dependency configuration, and native CLI
+view toolbars, frontmatter controls, dependency configuration, and native CLI
 surface needed to operate a PARA/ZK knowledge system from Obsidian or automation.
 
 The main product goal is not only to make Obsidian nicer for a person. It is to
@@ -146,13 +146,16 @@ Important modules:
 - `src/templates.ts`: managed templates, vault guide, and dashboard artifacts.
 - `src/cli/handlers.ts`: LLM-friendly native CLI adapter over workflows.
 - `src/ux/workflow-commands.ts`: human-friendly Obsidian command adapter.
-- `src/ux/inline-actions.ts`: `PZK[...]` Markdown action buttons.
+- `src/ux/dataview-views.ts`: native `para-zk-view` wrappers around managed Dataview queries and their toolbar actions.
+- `src/ux/latest-retro-summary.ts`: native project latest-retro summary widget.
+- `src/ux/workflow-buttons.ts`: shared GUI workflow button creation.
 - `src/ux/props-controls.ts`: native `para-zk-props` controls for frontmatter.
 - `src/ux/dashboard-actions.ts`: native Home dashboard action block.
 - `src/ux/dashboard-summary.ts`: native dashboard summary cards.
 - `src/runtime/setup.ts`: idempotent vault setup and managed file writes.
 - `src/runtime/dependencies/index.ts`: Dataview, Tasks, Folder Notes, Update
-  time on edit, Trash Explorer, Custom File Explorer sorting, and Homepage dependency handling.
+  time on edit, Trash Explorer, Custom File Explorer sorting, Homepage, Open
+  Tab Settings, and Remember cursor position dependency handling.
 
 The architecture lint intentionally rejects content-blank modules and enforces
 layer boundaries. Keep core workflow/template modules independent from CLI, UX,
@@ -166,9 +169,10 @@ vault guide. Existing non-managed files are skipped. Managed files are updated
 only when safe or when `force=true` is requested.
 
 Generated templates should not depend on Meta Bind, QuickAdd, or Templater.
-Native plugin blocks and tokens replace legacy prompt/script mechanisms:
+Native plugin blocks and controls replace legacy prompt/script mechanisms:
 
-- `PZK[...]` replaces Meta Bind buttons for workflow actions.
+- `para-zk-view` integrates relationship Dataview queries with matching workflow buttons.
+- `para-zk-latest-retro-summary` replaces the old project-summary DataviewJS callout.
 - `para-zk-props` and `PZK_INPUT[...]` replace Meta Bind input controls.
 - `para-zk-dashboard-actions` replaces Home dashboard button callouts.
 - `para-zk-dashboard-summary` replaces DataviewJS-only summary cards.
@@ -191,7 +195,11 @@ Homepage is required for opening the generated Home dashboard on startup and whe
 the workspace is empty.
 Open Tab Settings is required so PARA-ZK navigation (ribbon, dashboard, inline
 actions) opens notes with consistent open-in-new-tab / no-duplicate-tab behavior;
-PARA-ZK installs and enables it but does not force its options.
+PARA-ZK configures it to open in new tabs, prevent duplicate tabs, and focus
+explicitly-created new tabs.
+Remember cursor position is required so frequent navigation across dashboards,
+root notes, and child notes restores each note's cursor and scroll position;
+PARA-ZK installs and enables Remember cursor position but does not force its options.
 
 Folder-style notes are part of the workflow. Projects and areas are created as
 folders containing their main note. Child documents and child areas should link

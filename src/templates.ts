@@ -102,7 +102,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         ]),
         paraZkPropsBlock("project"),
         `# ${t.labels.summary}`,
-        ...latestRetroSummaryTip(t, settings),
+        ...latestRetroSummaryBlock(),
         "",
         "{{cursor}}",
         "",
@@ -118,12 +118,12 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         ...paraZkTasksBlock("current"),
         "",
         "---",
-        `# ${t.labels.subnotes} ${paraZkInlineAction("create-subnote", t.labels.createSubnote)}`,
+        `# ${t.labels.subnotes}`,
         "",
         paraZkViewBlock("project-subnotes"),
         "",
         "---",
-        `# ${t.labels.retros} ${paraZkInlineAction("create-retro", t.labels.createRetro)}`,
+        `# ${t.labels.retros}`,
         "",
         paraZkViewBlock("project-retros"),
         "",
@@ -159,17 +159,17 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         ...paraZkTasksBlock("current"),
         "",
         "---",
-        `# ${t.labels.subareas} ${paraZkInlineAction("create-subarea", t.labels.createSubarea)}`,
+        `# ${t.labels.subareas}`,
         "",
         paraZkViewBlock("area-subareas"),
         "",
         "---",
-        `# ${t.labels.subnotes} ${paraZkInlineAction("create-subnote", t.labels.createSubnote)}`,
+        `# ${t.labels.subnotes}`,
         "",
         paraZkViewBlock("area-subnotes"),
         "",
         "---",
-        `# ${t.labels.retros} ${paraZkInlineAction("create-retro", t.labels.createRetro)}`,
+        `# ${t.labels.retros}`,
         "",
         paraZkViewBlock("area-retros"),
         "",
@@ -199,7 +199,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         "",
         "",
         "---",
-        `## ${t.labels.promoteToZk} ${paraZkInlineAction("promote-resource", t.labels.promoteToZk)}`,
+        `## ${t.labels.promoteToZk}`,
         "",
         paraZkViewBlock("resource-zk-links"),
         "",
@@ -255,7 +255,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "week_iso: {{week_iso}}",
           "week_start: {{week_start}}",
           "week_end: {{week_end}}",
-          "areas:{{areas_frontmatter}}",
+          "areas: {{areas_frontmatter}}",
           "tags:",
           `  - ${tags.retro}`,
           `created: ${nowPlaceholder}`,
@@ -280,7 +280,6 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         "",
         "---",
         `# ${t.labels.retroSummary}`,
-        `> ###### ${retroSummaryPlaceholder(t.locale)}`,
         "",
         "---",
         `## ${t.labels.references}`,
@@ -322,7 +321,9 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         "- ",
         "",
         "---",
-        `## ${t.labels.promote} ${paraZkInlineAction("promote-fleeting", t.labels.promote)}`,
+        `## ${t.labels.promote}`,
+        "",
+        paraZkViewBlock("fleeting-promotion"),
         "",
         "---",
         `## ${t.labels.tasks}`,
@@ -440,36 +441,8 @@ function paraZkReferencesBlock(root: "current"): string[] {
   ]);
 }
 
-function paraZkInlineAction(command: string, label: string): string {
-  return `\`PZK[${command}|${label}]\``;
-}
-
-function latestRetroSummaryTip(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
-  return [
-    `> [!tip] ${latestRetroSummaryTitle(t.locale)}`,
-    ...quotedDataviewJs([
-      "const current = dv.current();",
-      `const heading = ${jsString(t.labels.retroSummary)};`,
-      `const placeholder = ${jsString(`> ###### ${retroSummaryPlaceholder(t.locale)}`)};`,
-      "const placeholderText = placeholder.replace(/^>\\s*/, '');",
-      `const retros = pages(${dataviewJsSource(settings.paths.retrosFolder)})`,
-      "  .filter(p => sameLink(p.project, current))",
-      "  .sort((a,b) => timeOf(b.date ?? b.file.ctime) - timeOf(a.date ?? a.file.ctime));",
-      "const sectionBody = (text, title) => {",
-      "  const escaped = title.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');",
-      "  const pattern = new RegExp(`^#{1,6}\\\\s+${escaped}\\\\s*\\\\n([\\\\s\\\\S]*?)(?=\\\\n#{1,6}\\\\s+|$)`, 'm');",
-      "  const raw = text.match(pattern)?.[1]?.trim() ?? '';",
-      "  return raw.split('\\n').filter(line => {",
-      "    const trimmed = line.trim();",
-      "    return trimmed !== placeholder && trimmed !== placeholderText;",
-      "  }).join('\\n').trim();",
-      "};",
-      "for (const retro of retros) {",
-      "  const summary = sectionBody(await dv.io.load(retro.file.path), heading);",
-      "  if (summary) { dv.paragraph(summary); break; }",
-      "}"
-    ])
-  ];
+function latestRetroSummaryBlock(): string[] {
+  return fenced("para-zk-latest-retro-summary", []);
 }
 
 function fenced(language: string, lines: string[]): string[] {
@@ -480,10 +453,6 @@ function fenced(language: string, lines: string[]): string[] {
   ];
 }
 
-function latestRetroSummaryTitle(locale: Locale): string {
-  return locale === "ko" ? "최근 회고 요약" : "Latest retro summary";
-}
-
 function quoteExampleTitle(locale: Locale): string {
   return locale === "ko" ? "하이라이트 예시" : "Highlight example";
 }
@@ -492,69 +461,75 @@ function noteContextHint(locale: Locale): string {
   return locale === "ko" ? "(나의 생각/맥락)" : "(my thought/context)";
 }
 
-function retroSummaryPlaceholder(locale: Locale): string {
-  return locale === "ko" ? "(다음 주에 바로 도움이 될 핵심 한 줄)" : "(one line that helps next week)";
-}
-
-function dataviewProjectChildDocs(): string[] {
+function dataviewProjectChildDocs(t: ReturnType<typeof localePack>, sourcePath?: string): string[] {
   return fenced("dataview", [
-    "LIST FROM \"\"",
-    "WHERE parent = this.file.link AND type = \"doc\"",
+    `TABLE WITHOUT ID file.link AS "${t.labels.filename}", file.mtime AS "${t.labels.updated}"`,
+    "FROM \"\"",
+    `WHERE parent = ${dataviewCurrentFileLink(sourcePath)} AND type = "doc"`,
     "SORT file.name ASC"
   ]);
 }
 
-function dataviewProjectRetros(settings: ParaZkSettings): string[] {
+function dataviewProjectRetros(t: ReturnType<typeof localePack>, settings: ParaZkSettings, sourcePath?: string): string[] {
   return fenced("dataview", [
-    `LIST FROM ${dataviewSource(settings.paths.retrosFolder)}`,
-    "WHERE project = this.file.link",
+    `TABLE WITHOUT ID link(file.path, replace(week_iso, "-", "_")) AS "${t.labels.retros}", file.mtime AS "${t.labels.updated}"`,
+    `FROM ${dataviewSource(settings.paths.retrosFolder)}`,
+    `WHERE project = ${dataviewCurrentFileLink(sourcePath)}`,
     "SORT date DESC",
     "LIMIT 10"
   ]);
 }
 
-function dataviewAreaProjects(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
+function dataviewAreaProjects(t: ReturnType<typeof localePack>, settings: ParaZkSettings, sourcePath?: string): string[] {
   return fenced("dataview", [
     `TABLE status AS "${t.labels.status}", priority AS "${t.labels.priority}"`,
     `FROM ${dataviewSource(settings.paths.projectsFolder)}`,
-    "WHERE contains(areas, this.file.link)",
+    `WHERE contains(areas, ${dataviewCurrentFileLink(sourcePath)})`,
     "SORT due_date ASC, priority DESC"
   ]);
 }
 
-function dataviewChildAreas(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
+function dataviewChildAreas(t: ReturnType<typeof localePack>, settings: ParaZkSettings, sourcePath?: string): string[] {
   return fenced("dataview", [
     `TABLE WITHOUT ID file.link AS "${t.labels.area}", file.mtime AS "${t.labels.updated}"`,
     `FROM ${dataviewSource(settings.paths.areasFolder)}`,
-    "WHERE parent = this.file.link AND type = \"area\"",
+    `WHERE parent = ${dataviewCurrentFileLink(sourcePath)} AND type = "area"`,
     "SORT file.name ASC"
   ]);
 }
 
-function dataviewChildDocs(t: ReturnType<typeof localePack>): string[] {
+function dataviewChildDocs(t: ReturnType<typeof localePack>, sourcePath?: string): string[] {
   return fenced("dataview", [
-    `TABLE WITHOUT ID file.link AS "${t.labels.subnotes}", file.mtime AS "${t.labels.updated}"`,
+    `TABLE WITHOUT ID file.link AS "${t.labels.filename}", file.mtime AS "${t.labels.updated}"`,
     "FROM \"\"",
-    "WHERE parent = this.file.link AND type = \"doc\"",
+    `WHERE parent = ${dataviewCurrentFileLink(sourcePath)} AND type = "doc"`,
     "SORT file.name ASC"
   ]);
 }
 
-function dataviewAreaRetros(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
+function dataviewAreaRetros(t: ReturnType<typeof localePack>, settings: ParaZkSettings, sourcePath?: string): string[] {
   return fenced("dataview", [
-    `TABLE WITHOUT ID file.link AS "${t.labels.retros}", file.mtime AS "${t.labels.updated}"`,
+    `TABLE WITHOUT ID link(file.path, replace(week_iso, "-", "_")) AS "${t.labels.retros}", file.mtime AS "${t.labels.updated}"`,
     `FROM ${dataviewSource(settings.paths.retrosFolder)}`,
-    "WHERE contains(areas, this.file.link)",
+    `WHERE contains(areas, ${dataviewCurrentFileLink(sourcePath)})`,
     "SORT date DESC",
     "LIMIT 10"
   ]);
 }
 
-function dataviewResourceZkLinks(settings: ParaZkSettings): string[] {
+function dataviewResourceZkLinks(t: ReturnType<typeof localePack>, settings: ParaZkSettings, sourcePath?: string): string[] {
   return fenced("dataview", [
-    `LIST FROM ${dataviewSources(zkSourceFolders(settings))}`,
-    "WHERE contains(file.outlinks, this.file.link)",
+    `TABLE WITHOUT ID file.link AS "${t.labels.filename}", file.mtime AS "${t.labels.updated}"`,
+    `FROM ${dataviewSources(zkSourceFolders(settings))}`,
+    `WHERE contains(file.outlinks, ${dataviewCurrentFileLink(sourcePath)})`,
     "SORT file.mtime DESC"
+  ]);
+}
+
+function dataviewFleetingPromotion(t: ReturnType<typeof localePack>): string[] {
+  return fenced("dataview", [
+    `TABLE WITHOUT ID promoted_to AS "${t.labels.promoteToZk}"`,
+    "WHERE file.path = this.file.path AND promoted_to"
   ]);
 }
 
@@ -565,7 +540,8 @@ export const DATAVIEW_VIEW_KEYS = [
   "area-subareas",
   "area-subnotes",
   "area-retros",
-  "resource-zk-links"
+  "resource-zk-links",
+  "fleeting-promotion"
 ] as const;
 
 export type DataviewViewKey = typeof DATAVIEW_VIEW_KEYS[number];
@@ -575,18 +551,23 @@ export type DataviewViewKey = typeof DATAVIEW_VIEW_KEYS[number];
  * compact `para-zk-view` token instead of the full query. The query (and its
  * localized column labels) stays in code; the renderer expands it at view time.
  */
-export function dataviewViewBlock(key: string, settings: ParaZkSettings): string | undefined {
+export function dataviewViewBlock(key: string, settings: ParaZkSettings, sourcePath?: string): string | undefined {
   const t = localePack(settings.locale);
   switch (key) {
-    case "project-subnotes": return dataviewProjectChildDocs().join("\n");
-    case "project-retros": return dataviewProjectRetros(settings).join("\n");
-    case "area-projects": return dataviewAreaProjects(t, settings).join("\n");
-    case "area-subareas": return dataviewChildAreas(t, settings).join("\n");
-    case "area-subnotes": return dataviewChildDocs(t).join("\n");
-    case "area-retros": return dataviewAreaRetros(t, settings).join("\n");
-    case "resource-zk-links": return dataviewResourceZkLinks(settings).join("\n");
+    case "project-subnotes": return dataviewProjectChildDocs(t, sourcePath).join("\n");
+    case "project-retros": return dataviewProjectRetros(t, settings, sourcePath).join("\n");
+    case "area-projects": return dataviewAreaProjects(t, settings, sourcePath).join("\n");
+    case "area-subareas": return dataviewChildAreas(t, settings, sourcePath).join("\n");
+    case "area-subnotes": return dataviewChildDocs(t, sourcePath).join("\n");
+    case "area-retros": return dataviewAreaRetros(t, settings, sourcePath).join("\n");
+    case "resource-zk-links": return dataviewResourceZkLinks(t, settings, sourcePath).join("\n");
+    case "fleeting-promotion": return dataviewFleetingPromotion(t).join("\n");
     default: return undefined;
   }
+}
+
+function dataviewCurrentFileLink(sourcePath: string | undefined): string {
+  return sourcePath ? `link(${JSON.stringify(sourcePath)})` : "this.file.link";
 }
 
 function renderGuide(settings: ParaZkSettings): string {
@@ -887,10 +868,6 @@ function dataviewJs(lines: string[]): string[] {
     "const dayOf = (value) => { const d = new Date(timeOf(value)); d.setHours(0,0,0,0); return d.getTime(); };",
     ...lines
   ]);
-}
-
-function quotedDataviewJs(lines: string[]): string[] {
-  return dataviewJs(lines).map((line) => `> ${line}`);
 }
 
 function dashboardHomeSummary(_t: ReturnType<typeof localePack>): string[] {

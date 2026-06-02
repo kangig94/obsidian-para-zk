@@ -98,20 +98,22 @@ with `force=true`.
 
 `para-zk:setup` also checks required community plugin dependencies. It warns when
 Dataview, Tasks, Folder notes, Update time on edit, Trash Explorer, Custom
-File Explorer sorting, Homepage, or Open Tab Settings is missing or disabled. Pass `installDeps=true`
-to install and enable those dependencies. When Dataview is installed, PARA-ZK also
+File Explorer sorting, Homepage, Open Tab Settings, or Remember cursor position
+is missing or disabled. Pass `installDeps=true` to install and enable those dependencies. When Dataview is installed, PARA-ZK also
 enables Dataview JavaScript queries because the generated dashboards use `dataviewjs`
 blocks. When Update time on edit is installed, PARA-ZK configures `created` and
 `updated` frontmatter maintenance for editable notes while excluding generated
 templates, dashboards, assets, and the managed root guide. When Custom File Explorer
 sorting is installed, PARA-ZK configures bookmark-based sorting with a baseline
 `sortspec` group. When Homepage is installed, PARA-ZK opens `Dashboard/HomePage`
-on startup and when the workspace is empty.
+on startup and when the workspace is empty. Remember cursor position is installed
+and enabled so note cursor and scroll positions survive navigation.
 
-The generated templates use native inline action tokens such as
-`` `PZK[create-subnote|Create subnote]` `` instead of Meta Bind buttons. The inline action
-token is rendered as a compact button inside the Markdown heading and calls the same
-workflow implementation as the matching CLI handler.
+The generated templates use native PARA-ZK view blocks for relationship lists.
+Views such as subnotes, retros, and ZK promotion render their workflow buttons
+inside the view toolbar, so action controls live with the list they modify.
+Project templates also use `para-zk-latest-retro-summary` for the latest retro
+summary instead of embedding a long DataviewJS snippet in the note body.
 
 The generated Home dashboard uses a native `para-zk-dashboard-actions` block to render
 grouped action buttons and dashboard navigation without Meta Bind or callout wrappers.
@@ -131,8 +133,10 @@ codes such as `status: in_progress` while rendering localized labels in the GUI.
 Individual controls can be embedded with inline tokens such as
 `` `PZK_INPUT[project.status]` ``.
 
-Query/dashboard sections are generated as Dataview and Tasks blocks. PARA-ZK does not try
-to replace those plugins.
+Query/dashboard sections are generated as PARA-ZK view, Dataview, and Tasks
+blocks. PARA-ZK wraps selected relationship Dataview queries with native
+toolbars and owns project-local summary widgets, while Dataview remains the
+query engine for broader dashboard tables.
 
 ## Development
 

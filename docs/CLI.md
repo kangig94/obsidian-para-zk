@@ -149,6 +149,7 @@ Required dependencies:
 - Custom File Explorer sorting
 - Homepage
 - Open Tab Settings
+- Remember cursor position
 
 Dataview JavaScript queries are enabled when Dataview is installed.
 Update time on edit is configured to maintain `created` and `updated`
@@ -161,8 +162,12 @@ baseline `sortspec` bookmarks group. Existing `sortspec` groups are preserved.
 Homepage is configured to open `Dashboard/HomePage` on startup and when the
 workspace is empty.
 Open Tab Settings is installed and enabled so PARA-ZK navigation (ribbon,
-dashboard, and inline actions) opens notes with consistent open-in-new-tab and
-no-duplicate-tab behavior. It is installed/enabled only; no settings are forced.
+dashboard, and view toolbar actions) opens notes with consistent open-in-new-tab and
+no-duplicate-tab behavior. PARA-ZK configures it to open in new tabs, prevent
+duplicates, and focus explicitly-created new tabs.
+Remember cursor position is installed and enabled so each note restores its last
+cursor and scroll position after navigation. It is installed/enabled only; no
+settings are forced.
 
 Obsidian core settings are merged into existing config files without deleting
 unrelated user settings:
