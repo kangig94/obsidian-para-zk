@@ -59,6 +59,9 @@ Notable changes for PARA-ZK are tracked here.
 - Added a Vitest unit suite (`npm run test`) covering pure helper modules and the
   workflow/CLI logic through an in-memory Obsidian mock, so most behavior is
   verified without a running Obsidian.
+- Added the read-only `key=backlinks` collection to PARA, ZK, journal, retro,
+  document, and fallback note reads. It returns Obsidian-resolved inbound links
+  with paging, `query=`, and source note `type=` filtering.
 
 ### Changed
 
@@ -69,6 +72,10 @@ Notable changes for PARA-ZK are tracked here.
   name no longer fit. Managed files PARA-ZK owns that the user has not edited
   now regenerate to match the current settings without `force=true`; files the
   user modified still require it.
+- The disposable-vault smoke test now wipes the vault contents and
+  re-initializes from scratch by default (including the custom-sort
+  sortspec), so every run verifies a clean setup; pass `--no-clean` to
+  run against the vault's current contents.
 - Trimmed the disposable-vault smoke test to live-only checks (dependency
   install/config, GUI labels, Homepage runtime, rename link rewriting, backlink
   resolution, and the live reference/task-block renderers); CRUD, references,

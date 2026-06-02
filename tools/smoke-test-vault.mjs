@@ -135,6 +135,7 @@ function runLiveScenario() {
   assertObjectReferenceDeleteCleanup();
   assertObjectReferenceRenameSurvival();
   assertRenameAreaLinkRewrite();
+  assertBacklinkReadKeyScenario();
 
   const reorderProject = cliJson("para-zk:create-project", [
     `title=Smoke Reorder ${stamp}`,
@@ -183,6 +184,73 @@ function assertRenameAreaLinkRewrite() {
     `[[${renamedAreaTitle}|${renamedAreaTitle}]]`
   ]);
   assertFileNotContains(project.path, [areaTitle]);
+}
+
+function assertBacklinkReadKeyScenario() {
+  const targetTitle = `Smoke Backlink Target ${stamp}`;
+  const projectTitle = `Smoke Backlink Project ${stamp}`;
+  const areaTitle = `Smoke Backlink Area ${stamp}`;
+  const target = cliJson("para-zk:create-resource", [
+    `title=${targetTitle}`,
+    "link=false",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(target, "backlink read target");
+  const project = cliJson("para-zk:create-project", [
+    `title=${projectTitle}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(project, "backlink read project source");
+  const area = cliJson("para-zk:create-area", [
+    `title=${areaTitle}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(area, "backlink read area source");
+
+  const projectLink = cliJson("para-zk:update-project", [
+    `title=${projectTitle}`,
+    "key=summary",
+    "op=set",
+    `value=Project backlink smoke [[${target.path}]]`,
+    "format=json"
+  ]);
+  assert(projectLink.ok === true, "backlink read project link setup failed");
+  const areaLink = cliJson("para-zk:update-area", [
+    `title=${areaTitle}`,
+    "key=overview",
+    "op=set",
+    `value=Area backlink smoke [[${target.path}]]`,
+    "format=json"
+  ]);
+  assert(areaLink.ok === true, "backlink read area link setup failed");
+
+  assert(waitForBacklink(target.path, project.path), "project source did not resolve as a backlink");
+  assert(waitForBacklink(target.path, area.path), "area source did not resolve as a backlink");
+
+  const backlinks = cliJson("para-zk:read-resource", [
+    `title=${targetTitle}`,
+    "key=backlinks",
+    "limit=all",
+    "format=json"
+  ]);
+  const items = Object.values(backlinks.value?.items ?? {});
+  assert(backlinks.value?.count === 2, `backlink read returned unexpected item count: ${JSON.stringify(backlinks.value)}`);
+  assert(items.some((item) => item.path === project.path && item.type === "project"), "backlink read did not include project source");
+  assert(items.some((item) => item.path === area.path && item.type === "area"), "backlink read did not include area source");
+
+  const projectBacklinks = cliJson("para-zk:read-resource", [
+    `title=${targetTitle}`,
+    "key=backlinks",
+    "type=project",
+    "limit=all",
+    "format=json"
+  ]);
+  const projectItems = Object.values(projectBacklinks.value?.items ?? {});
+  assert(projectItems.some((item) => item.path === project.path), "backlink type=project filter excluded the project source");
+  assert(!projectItems.some((item) => item.path === area.path), "backlink type=project filter included a non-project source");
 }
 
 function assertReferenceSubpathScenario() {
@@ -640,13 +708,15 @@ function assertDryRunInit() {
 function parseArgs(rawArgs) {
   const parsed = {
     build: true,
-    clean: false,
+    clean: true,
     installDeps: true
   };
 
   for (const arg of rawArgs) {
     if (arg === "--clean") {
       parsed.clean = true;
+    } else if (arg === "--no-clean") {
+      parsed.clean = false;
     } else if (arg === "--no-build") {
       parsed.build = false;
     } else if (arg === "--no-install-deps") {
@@ -680,11 +750,14 @@ function takeNext(rawArgs, flag) {
 }
 
 function printHelp() {
-  console.log(`Usage: npm run smoke:vault -- [--vault <path>] [--clean] [--no-build] [--no-install-deps]
+  console.log(`Usage: npm run smoke:vault -- [--vault <path>] [--no-clean] [--no-build] [--no-install-deps]
+
+By default the vault contents are wiped and fully re-initialized before the run
+so verification always starts from a clean state.
 
 Options:
   --vault <path>       Disposable test vault path. Defaults to PARA_ZK_TEST_VAULT or a local para-zk vault.
-  --clean              Delete all top-level vault contents except .obsidian and remove para-zk plugin data.
+  --no-clean           Skip the default wipe; run against the vault's current contents.
   --no-build           Skip npm run build and plugin sync.
   --no-install-deps    Run para-zk:setup without installing required dependencies.
   --stamp <value>      Stable suffix for generated smoke-test notes.
@@ -722,6 +795,9 @@ function cleanVault(path, paraZkPluginDir) {
   }
 
   rmSync(join(paraZkPluginDir, "data.json"), { force: true });
+  // Drop the PARA-ZK-generated bookmarks so setup regenerates the custom-sort
+  // sortspec from scratch (it is only created when missing).
+  rmSync(join(path, ".obsidian", "bookmarks.json"), { force: true });
 }
 
 function ensureGuiVault(path) {

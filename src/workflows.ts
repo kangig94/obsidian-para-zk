@@ -148,6 +148,7 @@ export type CollectionReadOptions = {
   offset?: number;
   limit?: number | "all";
   query?: string;
+  type?: string;
   checkbox?: string;
   priority?: string;
   dueBefore?: string;
@@ -316,7 +317,7 @@ type SectionTransformContext = {
   range?: TextRange;
   section: ReadSectionSpec;
 };
-type ReadCollectionKind = "task" | "reference";
+type ReadCollectionKind = "task" | "reference" | "backlink";
 type ReadSectionSpec = {
   key: string;
   labelKey?: string;
@@ -375,6 +376,12 @@ export type ReferenceRead = {
   path?: string;
   target?: string;
 };
+export type BacklinkRead = {
+  link: string;
+  path: string;
+  title: string;
+  type: string;
+};
 type NormalizedReferenceItem = {
   link: string;
   description?: string;
@@ -395,6 +402,7 @@ type NormalizedCollectionReadOptions = {
   offset: number;
   limit: number | "all";
   query?: string;
+  type?: string;
   checkbox?: string;
   priority?: string;
   dueBefore?: string;
@@ -1573,13 +1581,21 @@ function countListItems(section: string, prefix: string): number {
   return section.split(/\n/).filter((line) => numberRe.test(line) || bulletRe.test(line)).length;
 }
 
+const BACKLINK_READ_SECTION: ReadSectionSpec = {
+  key: "backlinks",
+  labelKey: "backlinks",
+  transform: readBacklinks,
+  collection: "backlink"
+};
+
 const PROJECT_READ_SPEC: ReadSurfaceSpec = {
   frontmatter: ["areas", "status", "priority", "start_date", "due_date", "done_date"],
   sections: [
     { key: "summary", labelKey: "summary", skipManagedPrelude: true, transform: stripProjectSummaryManagedBlock },
     { key: "goals", labelKey: "goals" },
     { key: "tasks", labelKey: "tasks", transform: readTasks, collection: "task" },
-    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" }
+    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" },
+    BACKLINK_READ_SECTION
   ],
   children: true
 };
@@ -1589,7 +1605,8 @@ const AREA_READ_SPEC: ReadSurfaceSpec = {
   sections: [
     { key: "overview", labelKey: "overview" },
     { key: "tasks", labelKey: "tasks", transform: readTasks, collection: "task" },
-    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" }
+    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" },
+    BACKLINK_READ_SECTION
   ],
   children: true
 };
@@ -1599,7 +1616,8 @@ const RESOURCE_READ_SPEC: ReadSurfaceSpec = {
   sections: [
     { key: "overview", labelKey: "overview" },
     { key: "body", labelKey: "body" },
-    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" }
+    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" },
+    BACKLINK_READ_SECTION
   ]
 };
 
@@ -1611,7 +1629,8 @@ const JOURNAL_READ_SPEC: ReadSurfaceSpec = {
     { key: "timeline", labelKey: "timeline" },
     { key: "tasks", labelKey: "tasks", transform: readTasks, collection: "task" },
     { key: "short_review", labelKey: "shortReview" },
-    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" }
+    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" },
+    BACKLINK_READ_SECTION
   ]
 };
 
@@ -1624,12 +1643,16 @@ const RETRO_READ_SPEC: ReadSurfaceSpec = {
     { key: "risks", labelKey: "risks" },
     { key: "tasks", labelKey: "tasks", transform: readTasks, collection: "task" },
     { key: "retro_summary", labelKey: "retroSummary" },
-    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" }
+    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" },
+    BACKLINK_READ_SECTION
   ]
 };
 
 const DOC_READ_SPEC: ReadSurfaceSpec = {
   frontmatter: ["subnote_type"],
+  sections: [
+    BACKLINK_READ_SECTION
+  ],
   body: true
 };
 
@@ -1639,7 +1662,8 @@ const ZK_FLEETING_READ_SPEC: ReadSurfaceSpec = {
     { key: "thought_summary", labelKey: "thoughtSummary" },
     { key: "memo", labelKey: "memo" },
     { key: "tasks", labelKey: "tasks", transform: readTasks, collection: "task" },
-    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" }
+    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" },
+    BACKLINK_READ_SECTION
   ]
 };
 
@@ -1650,7 +1674,8 @@ const ZK_LITERATURE_READ_SPEC: ReadSurfaceSpec = {
     { key: "summary", labelKey: "summary" },
     { key: "insight", labelKey: "insight" },
     { key: "evidence", labelKey: "evidence" },
-    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" }
+    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" },
+    BACKLINK_READ_SECTION
   ]
 };
 
@@ -1661,12 +1686,16 @@ const ZK_PERMANENT_READ_SPEC: ReadSurfaceSpec = {
     { key: "body", labelKey: "body" },
     { key: "limitations", labelKey: "limitations" },
     { key: "related_questions", labelKey: "relatedQuestions" },
-    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" }
+    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" },
+    BACKLINK_READ_SECTION
   ]
 };
 
 const NOTE_READ_SPEC: ReadSurfaceSpec = {
   frontmatter: [],
+  sections: [
+    BACKLINK_READ_SECTION
+  ],
   body: true
 };
 
@@ -1710,6 +1739,7 @@ async function readSurfaceMap(ctx: WorkflowContext, file: TFile, spec: ReadSurfa
   if (spec.body) surface.body = stripManagedPrelude(content);
 
   for (const section of spec.sections ?? []) {
+    if (section.collection === "backlink") continue;
     if (section.collection === "reference" && section.transform) {
       surface[section.key] = await section.transform("", {
         ctx,
@@ -1744,6 +1774,12 @@ function compactReadEnvelope(
   surface: ReadMap,
   spec: ReadSurfaceSpec
 ): Record<string, unknown> {
+  const compact = compactReadMap(surface, spec);
+  if (specHasBacklinkSection(spec)) {
+    const backlinkCount = countBacklinks(ctx, file);
+    if (backlinkCount > 0) compact.backlinks = { count: backlinkCount };
+  }
+
   return {
     mode: "compact",
     omits_empty: true,
@@ -1751,7 +1787,7 @@ function compactReadEnvelope(
     title: file.basename,
     type,
     ...archivedReadFlag(ctx, file),
-    ...compactReadMap(surface, spec)
+    ...compact
   };
 }
 
@@ -1837,6 +1873,9 @@ async function readSurfaceKey(
   if (parts.length === 0) throw new Error("key is required");
 
   if (parts[0] !== "children") {
+    if (parts[0] === "backlinks") {
+      return readBacklinkSurfaceKey(ctx, source, spec, parts, key, collectionOptions);
+    }
     return readSurfaceMapKey(surface, spec, parts, key, collectionOptions);
   }
 
@@ -1851,11 +1890,47 @@ async function readSurfaceKey(
 
   const childType = readType(fileFrontmatter(ctx, child));
   const childSpec = specForType(childType);
+  if (parts.length > 2) {
+    const childParts = parts.slice(2);
+    if (childParts[0] === "backlinks") {
+      return readBacklinkSurfaceKey(ctx, child, childSpec, childParts, key, collectionOptions);
+    }
+  }
+
   const childSurface = await readSurfaceMap(ctx, child, childSpec);
   if (parts.length === 2) {
     return compactReadEnvelope(ctx, child, childType, childSurface, childSpec);
   }
   return readSurfaceMapKey(childSurface, childSpec, parts.slice(2), key, collectionOptions);
+}
+
+function readBacklinkSurfaceKey(
+  ctx: WorkflowContext,
+  file: TFile,
+  spec: ReadSurfaceSpec,
+  parts: string[],
+  originalKey: string,
+  collectionOptions?: CollectionReadOptions
+): unknown {
+  if (!specHasBacklinkSection(spec)) throw unknownReadKeyError(spec, originalKey);
+  if (parts.length === 1) {
+    return readCollectionPage(readBacklinks("", {
+      ctx,
+      file,
+      content: "",
+      section: BACKLINK_READ_SECTION
+    }), "backlink", collectionOptions);
+  }
+
+  if (hasCollectionReadOptions(collectionOptions)) {
+    throw new Error("collection read options require key to select a collection root");
+  }
+  return readMapPath({ backlinks: readBacklinks("", {
+    ctx,
+    file,
+    content: "",
+    section: BACKLINK_READ_SECTION
+  }) }, parts, originalKey);
 }
 
 function readSurfaceMapKey(
@@ -1900,6 +1975,10 @@ function collectionKindForKey(spec: ReadSurfaceSpec, key: string): ReadCollectio
   return (spec.sections ?? []).find((section) => section.key === key)?.collection;
 }
 
+function specHasBacklinkSection(spec: ReadSurfaceSpec): boolean {
+  return collectionKindForKey(spec, "backlinks") === "backlink";
+}
+
 function readCollectionPage(
   value: unknown,
   kind: ReadCollectionKind,
@@ -1942,6 +2021,7 @@ function normalizeCollectionReadOptions(rawOptions?: CollectionReadOptions): Nor
     offset,
     limit,
     query: trimOptional(rawOptions?.query),
+    type: trimOptional(rawOptions?.type),
     checkbox: normalizeCheckboxFilter(rawOptions?.checkbox),
     priority: trimOptional(rawOptions?.priority),
     dueBefore: normalizeIsoDateFilter(rawOptions?.dueBefore, "due_before"),
@@ -1962,7 +2042,8 @@ function matchesCollectionItem(
   }
 
   if (kind === "task") return matchesTaskCollectionItem(item, options);
-  return matchesReferenceCollectionItem(item, options);
+  if (kind === "reference") return matchesReferenceCollectionItem(item, options);
+  return matchesBacklinkCollectionItem(item, options);
 }
 
 function matchesTaskCollectionItem(
@@ -1984,10 +2065,20 @@ function matchesReferenceCollectionItem(
   return true;
 }
 
+function matchesBacklinkCollectionItem(
+  item: Record<string, unknown>,
+  options: NormalizedCollectionReadOptions
+): boolean {
+  if (options.type && readRecordString(item, "type") !== options.type) return false;
+  return true;
+}
+
 function collectionSearchText(kind: ReadCollectionKind, item: Record<string, unknown>): string {
   const keys = kind === "task"
     ? ["name", "checkbox", "priority", "due", "scheduled", "start", "created", "done", "cancelled"]
-    : ["link", "kind", "description", "target", "path"];
+    : kind === "reference"
+      ? ["link", "kind", "description", "target", "path"]
+      : ["title", "path"];
   return keys.map((key) => readRecordString(item, key) ?? "").join("\n");
 }
 
@@ -2853,6 +2944,8 @@ function readKeyHints(spec: ReadSurfaceSpec): string[] {
   for (const section of spec.sections ?? []) {
     if (section.collection === "reference") {
       keys.push("references", "references/<i>", "references/<i>/{link|description}");
+    } else if (section.collection === "backlink") {
+      keys.push("backlinks", "backlinks/<i>", "backlinks/<i>/{link|path|title|type}");
     } else {
       keys.push(section.key);
     }
@@ -2870,6 +2963,8 @@ function writeKeyHints(spec: ReadSurfaceSpec): string[] {
       keys.push("tasks=insert", "tasks/<id>=delete", "tasks/<id>/<field>=set");
     } else if (section.collection === "reference") {
       keys.push("references=insert", "references/<i>=delete", "references/<i>/{link|description}=set");
+    } else if (section.collection === "backlink") {
+      continue;
     } else {
       keys.push(`${section.key}=set|append|prepend|replace`);
     }
@@ -2954,6 +3049,51 @@ function readReferences(_content: string, context: SectionTransformContext): Rec
   return Object.fromEntries(
     readReferenceItems(context.ctx, context.file).map((item, index) => [String(index), item])
   );
+}
+
+type BacklinkSourceVisitor = (sourceFile: TFile, index: number) => void;
+
+export const backlinkReadInstrumentation = {
+  enumerateSources: enumerateBacklinkSources
+};
+
+function countBacklinks(ctx: WorkflowContext, file: TFile): number {
+  return backlinkReadInstrumentation.enumerateSources(ctx, file);
+}
+
+function readBacklinks(_content: string, context: SectionTransformContext): Record<string, BacklinkRead> {
+  const items: Record<string, BacklinkRead> = {};
+  backlinkReadInstrumentation.enumerateSources(context.ctx, context.file, (sourceFile, index) => {
+    items[String(index)] = {
+      link: wikiLink(sourceFile.path),
+      path: sourceFile.path,
+      title: sourceFile.basename,
+      type: readType(fileFrontmatter(context.ctx, sourceFile))
+    };
+  });
+  return items;
+}
+
+function enumerateBacklinkSources(
+  ctx: WorkflowContext,
+  targetFile: TFile,
+  visitor?: BacklinkSourceVisitor
+): number {
+  const sourcePaths = Object.entries(ctx.app.metadataCache.resolvedLinks)
+    .filter(([sourcePath, targets]) => sourcePath !== targetFile.path
+      && isRecord(targets)
+      && Object.prototype.hasOwnProperty.call(targets, targetFile.path))
+    .map(([sourcePath]) => sourcePath)
+    .sort((left, right) => left.localeCompare(right));
+
+  let count = 0;
+  for (const sourcePath of sourcePaths) {
+    const sourceFile = ctx.app.vault.getFileByPath(sourcePath);
+    if (!sourceFile || sourceFile.path === targetFile.path) continue;
+    visitor?.(sourceFile, count);
+    count += 1;
+  }
+  return count;
 }
 
 function readReferenceWritableField(value: string, originalKey: string): ReferenceWritableField {

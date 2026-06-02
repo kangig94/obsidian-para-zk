@@ -45,6 +45,7 @@ obsidian para-zk:read-project title="Project name" key=frontmatter/status format
 obsidian para-zk:read-project title="Finished project" archived=true key=summary format=json
 obsidian para-zk:read-project title="Project name" key="children/Meeting notes/body" format=json
 obsidian para-zk:read-area title="AI" key=children format=json
+obsidian para-zk:read-area title="AI" key=backlinks type=project format=json
 obsidian para-zk:read-resource title="Source" key=body format=json
 obsidian para-zk:read-zk title="Idea" kind=fleeting key=memo format=json
 obsidian para-zk:read-journal date=2026-05-30 key=quick_memo format=json
@@ -68,7 +69,9 @@ CLI option values use locale-neutral codes only. For example, pass
 localized label inside the generated note.
 Read commands use the same rule: `key=frontmatter/status`, `key=summary`, and
 `key="children/Meeting notes/body"` are stable CLI map paths and do not depend
-on the generated Markdown locale.
+on the generated Markdown locale. Read commands also support
+`key=backlinks`, a paged inbound resolved-link collection; pass `type=project`
+or another source note frontmatter type to filter backlinks by source type.
 Update commands use the same stable keys, but only for writable leaves:
 frontmatter keys use `op=set`, while section/body keys support `set`, `append`,
 `prepend`, and exact literal `replace`.
@@ -165,11 +168,13 @@ npm run watch
 npm run sync
 ```
 
-For disposable-vault smoke testing:
+For disposable-vault smoke testing. By default it wipes the vault contents and
+re-initializes from scratch so each run verifies a clean setup; pass `--no-clean`
+to run against the vault's current contents instead:
 
 ```bash
 npm run smoke:vault -- --vault /path/to/test-vault
-npm run smoke:vault -- --vault /path/to/test-vault --clean
+npm run smoke:vault -- --vault /path/to/test-vault --no-clean
 ```
 
 `npm run lint` runs the structural architecture guard and TypeScript check. The

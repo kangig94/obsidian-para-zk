@@ -234,6 +234,7 @@ Options:
 | `offset` | number | Collection key reads only. Zero-based offset, default `0`. |
 | `limit` | number or `all` | Collection key reads only. Maximum items to return, default `50`. |
 | `query` | string | Collection key reads only. Case-insensitive item text filter. |
+| `type` | note type | Backlink collection reads only. Filters source notes by frontmatter `type`. |
 | `checkbox` | string | Task collection reads only. Literal checkbox status; `space`, `blank`, `todo`, and `open` match `[ ]`. |
 | `priority` | string | Task collection reads only. Parsed Tasks priority such as `high` or `medium`. |
 | `due_before` | `YYYY-MM-DD` | Task collection reads only. Includes tasks due on or before this date. |
@@ -243,7 +244,7 @@ Options:
 Top-level keys:
 
 ```text
-frontmatter | summary | goals | tasks | references | children
+frontmatter | summary | goals | tasks | references | backlinks | children
 ```
 
 Examples:
@@ -254,6 +255,7 @@ optsidian raw para-zk:read-project title="Model Evaluation" key=frontmatter/stat
 optsidian raw para-zk:read-project title="Model Evaluation" key=tasks limit=20 format=json
 optsidian raw para-zk:read-project title="Model Evaluation" key=tasks checkbox=/ query="blocked" format=json
 optsidian raw para-zk:read-project title="Model Evaluation" key=references ref_kind=url format=json
+optsidian raw para-zk:read-project title="Model Evaluation" key=backlinks type=project limit=20 format=json
 optsidian raw para-zk:read-project title="Model Evaluation" key=children format=json
 optsidian raw para-zk:read-project title="Model Evaluation" key="children/Planning Meeting/body" format=json
 ```
@@ -281,13 +283,17 @@ selector and type information needed for follow-up reads:
 }
 ```
 
-Task and reference surfaces are structured collections rather than raw Markdown.
+DOC and fallback NOTE children also expose read-only backlinks through
+`key="children/<title>/backlinks"` for paged collection reads and
+`key="children/<title>/backlinks/<i>"` for a single item.
+
+Task, reference, and backlink surfaces are structured collections rather than raw Markdown.
 Full compact reads return only `count`; collection items are omitted by design.
 Tasks are stored in PARA-ZK's managed `Tasks/current` or `Tasks/archives`
 registry and rendered back into root notes through `para-zk-tasks` blocks. Each
 task shard is named after the root note's `id` and contains only a `# Tasks`
 heading plus task lines, not duplicated root frontmatter. Exact collection root
-reads such as `key=tasks` and `key=references` return a paged collection object.
+reads such as `key=tasks`, `key=references`, and `key=backlinks` return a paged collection object.
 Task items are keyed by their stable task id; reference items are keyed by their
 absolute 0-based list index in frontmatter:
 
@@ -315,6 +321,16 @@ Use `key=tasks/<id>` or `key=tasks/<id>/<field>` to read one task, and use
 0-based index. When filters are provided, `count` is the number of matching
 items before pagination.
 
+Use `key=backlinks` to read notes whose Obsidian-resolved links point at the
+selected note. Backlinks are computed from `metadataCache.resolvedLinks`, so
+they include body links and frontmatter links after Obsidian has resolved them.
+Backlink items are keyed by 0-based source-path order and expose `link`, `path`,
+`title`, and source note `type`. `query=` matches backlink source title and
+path; `type=` filters by the source note's frontmatter `type`, for example
+`type=project`. Use `key=backlinks/<i>` or
+`key=backlinks/<i>/{link|path|title|type}` to read one backlink item or field.
+Backlinks are read-only.
+
 ```json
 {
   "mode": "compact",
@@ -323,6 +339,9 @@ items before pagination.
   },
   "references": {
     "count": 12
+  },
+  "backlinks": {
+    "count": 3
   }
 }
 ```
@@ -338,6 +357,9 @@ Important fields:
 - `references`: structured frontmatter reference collection. Items expose
   stored `link`, derived `kind`, optional `description`, and derived
   `path` or `target` where applicable.
+- `backlinks`: read-only inbound resolved-link collection. Items expose the
+  source note `link`, `path`, `title`, and `type`; use `type=` to filter by
+  source note type.
 - `children`: child-note index; child bodies are read only when requested with
   a `children/<title>/...` key.
 - `value`: present when `key` is provided.
@@ -351,24 +373,25 @@ When selecting by `title`, `read-project`, `read-area`, `read-resource`, and
 
 | Command | Selector | Top-level keys |
 | --- | --- | --- |
-| `para-zk:read-area` | `title` or `path` | `frontmatter`, `overview`, `tasks`, `references`, `children` |
-| `para-zk:read-resource` | `title` or `path` | `frontmatter`, `overview`, `body`, `references` |
+| `para-zk:read-area` | `title` or `path` | `frontmatter`, `overview`, `tasks`, `references`, `backlinks`, `children` |
+| `para-zk:read-resource` | `title` or `path` | `frontmatter`, `overview`, `body`, `references`, `backlinks` |
 | `para-zk:read-zk` | `title` plus optional `kind`, or `path` | depends on ZK type |
-| `para-zk:read-journal` | `date` or `path` | `frontmatter`, `focus`, `quick_memo`, `timeline`, `tasks`, `short_review`, `references` |
-| `para-zk:read-retro` | `title` plus optional `date`, or `path` | `frontmatter`, `week_progress`, `good`, `improve`, `risks`, `tasks`, `retro_summary`, `references` |
+| `para-zk:read-journal` | `date` or `path` | `frontmatter`, `focus`, `quick_memo`, `timeline`, `tasks`, `short_review`, `references`, `backlinks` |
+| `para-zk:read-retro` | `title` plus optional `date`, or `path` | `frontmatter`, `week_progress`, `good`, `improve`, `risks`, `tasks`, `retro_summary`, `references`, `backlinks` |
 
 ZK top-level keys:
 
 ```text
-zk_fleeting: frontmatter | thought_summary | memo | tasks | references
-zk_literature: frontmatter | highlight_block | summary | insight | evidence | references
-zk_permanent: frontmatter | one_sentence_summary | body | limitations | related_questions | references
+zk_fleeting: frontmatter | thought_summary | memo | tasks | references | backlinks
+zk_literature: frontmatter | highlight_block | summary | insight | evidence | references | backlinks
+zk_permanent: frontmatter | one_sentence_summary | body | limitations | related_questions | references | backlinks
 ```
 
 Examples:
 
 ```bash
 optsidian raw para-zk:read-area title="AI" key=children format=json
+optsidian raw para-zk:read-area title="AI" key=backlinks type=project format=json
 optsidian raw para-zk:read-project title="Finished Project" archived=true key=summary format=json
 optsidian raw para-zk:read-resource title="Source Paper" key=body format=json
 optsidian raw para-zk:read-zk title="Stable Interface Contracts" kind=permanent key=frontmatter/maturity format=json
@@ -445,7 +468,8 @@ serialized back as a bare string. Delete one item with
 Derived reference fields are read-only. `kind`, `path`, and `target` can be read
 through `key=references/<i>/<field>`, but cannot be updated.
 
-Read-only keys include `children`, `path`, `title`, `type`, and `archived`.
+Read-only keys include `children`, `backlinks`, `path`, `title`, `type`, and
+`archived`.
 
 Examples:
 

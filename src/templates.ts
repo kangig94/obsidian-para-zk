@@ -120,12 +120,12 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         "---",
         `# ${t.labels.subnotes} ${paraZkInlineAction("create-subnote", t.labels.createSubnote)}`,
         "",
-        ...dataviewProjectChildDocs(),
+        paraZkViewBlock("project-subnotes"),
         "",
         "---",
         `# ${t.labels.retros} ${paraZkInlineAction("create-retro", t.labels.createRetro)}`,
         "",
-        ...dataviewProjectRetros(settings),
+        paraZkViewBlock("project-retros"),
         "",
         "---",
         `## ${t.labels.references}`,
@@ -151,7 +151,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         "",
         `# ${t.labels.dashboardProjects}`,
         "",
-        ...dataviewAreaProjects(t, settings),
+        paraZkViewBlock("area-projects"),
         "",
         "---",
         `# ${t.labels.tasks}`,
@@ -161,17 +161,17 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         "---",
         `# ${t.labels.subareas} ${paraZkInlineAction("create-subarea", t.labels.createSubarea)}`,
         "",
-        ...dataviewChildAreas(t, settings),
+        paraZkViewBlock("area-subareas"),
         "",
         "---",
         `# ${t.labels.subnotes} ${paraZkInlineAction("create-subnote", t.labels.createSubnote)}`,
         "",
-        ...dataviewChildDocs(t),
+        paraZkViewBlock("area-subnotes"),
         "",
         "---",
         `# ${t.labels.retros} ${paraZkInlineAction("create-retro", t.labels.createRetro)}`,
         "",
-        ...dataviewAreaRetros(t, settings),
+        paraZkViewBlock("area-retros"),
         "",
         "---",
         `## ${t.labels.references}`,
@@ -201,7 +201,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         "---",
         `## ${t.labels.promoteToZk} ${paraZkInlineAction("promote-resource", t.labels.promoteToZk)}`,
         "",
-        ...dataviewResourceZkLinks(settings),
+        paraZkViewBlock("resource-zk-links"),
         "",
         "---",
         `## ${t.labels.references}`,
@@ -423,6 +423,10 @@ function paraZkPropsBlock(type: PropsViewType): string {
   ].join("\n");
 }
 
+function paraZkViewBlock(key: DataviewViewKey): string {
+  return fenced("para-zk-view", [key]).join("\n");
+}
+
 function paraZkTasksBlock(root: "current" | "all", extra: string[] = []): string[] {
   return fenced("para-zk-tasks", [
     `root: ${root}`,
@@ -552,6 +556,37 @@ function dataviewResourceZkLinks(settings: ParaZkSettings): string[] {
     "WHERE contains(file.outlinks, this.file.link)",
     "SORT file.mtime DESC"
   ]);
+}
+
+export const DATAVIEW_VIEW_KEYS = [
+  "project-subnotes",
+  "project-retros",
+  "area-projects",
+  "area-subareas",
+  "area-subnotes",
+  "area-retros",
+  "resource-zk-links"
+] as const;
+
+export type DataviewViewKey = typeof DATAVIEW_VIEW_KEYS[number];
+
+/**
+ * Returns the fenced Dataview block for a named view, so notes can embed a
+ * compact `para-zk-view` token instead of the full query. The query (and its
+ * localized column labels) stays in code; the renderer expands it at view time.
+ */
+export function dataviewViewBlock(key: string, settings: ParaZkSettings): string | undefined {
+  const t = localePack(settings.locale);
+  switch (key) {
+    case "project-subnotes": return dataviewProjectChildDocs().join("\n");
+    case "project-retros": return dataviewProjectRetros(settings).join("\n");
+    case "area-projects": return dataviewAreaProjects(t, settings).join("\n");
+    case "area-subareas": return dataviewChildAreas(t, settings).join("\n");
+    case "area-subnotes": return dataviewChildDocs(t).join("\n");
+    case "area-retros": return dataviewAreaRetros(t, settings).join("\n");
+    case "resource-zk-links": return dataviewResourceZkLinks(settings).join("\n");
+    default: return undefined;
+  }
 }
 
 function renderGuide(settings: ParaZkSettings): string {

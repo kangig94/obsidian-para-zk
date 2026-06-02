@@ -73,6 +73,7 @@ const READ_COLLECTION_OPTIONS: Record<string, CliOptionSpec> = {
   offset: { value: "<number>", description: "Collection key reads only: zero-based item offset (default: 0)." },
   limit: { value: "<number|all>", description: "Collection key reads only: maximum items to return (default: 50)." },
   query: { value: "<text>", description: "Collection key reads only: case-insensitive item text filter." },
+  type: { value: "<note-type>", description: "Backlink collection reads only: filter source notes by frontmatter type." },
   checkbox: { value: "<status>", description: "Task collection reads only: checkbox status character. Use space/blank/todo/open for [ ]." },
   priority: { value: "<priority>", description: "Task collection reads only: parsed Tasks priority such as high or medium." },
   due_before: { value: "<YYYY-MM-DD>", description: "Task collection reads only: include tasks due on or before this date." },
@@ -208,7 +209,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       const result = await readZk(workflowContext(plugin), {
         title: readCliTitle(args),
         path: readCliPath(args),
-        kind: readCliKind(args),
+        kind: readCliReadZkKind(args),
         key: readCliString(args, "key"),
         collection: readCliCollectionOptions(args)
       });
@@ -933,6 +934,10 @@ function readCliKind(args: CliArgs): string | undefined {
   return readCliString(args, "kind");
 }
 
+function readCliReadZkKind(args: CliArgs): string | undefined {
+  return readCliString(args, "kind");
+}
+
 function readCliAreaTitles(args: CliArgs): string | undefined {
   rejectCliAliases(args, { areaTitles: "area_titles" });
   return readCliString(args, "area_titles");
@@ -978,6 +983,7 @@ function readCliCollectionOptions(args: CliArgs): CollectionReadOptions | undefi
     offset: readCliInteger(args, "offset"),
     limit: readCliCollectionLimit(args),
     query: readCliString(args, "query"),
+    type: readCliString(args, "type"),
     checkbox: readCliString(args, "checkbox"),
     priority: readCliString(args, "priority"),
     dueBefore: readCliString(args, "due_before"),
