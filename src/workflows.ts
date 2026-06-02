@@ -982,7 +982,15 @@ function applyTemplateVariables(content: string, variables: TemplateVariables): 
   for (const [key, value] of Object.entries(variables)) {
     result = result.replace(new RegExp(`{{\\s*${escapeRegExp(key)}\\s*}}`, "g"), value ?? "");
   }
-  return result.replace(/{{\s*[A-Za-z0-9_]+\s*}}/g, "");
+  return normalizeTemplateOutput(collapseExcessBlankLines(result.replace(/{{\s*[A-Za-z0-9_]+\s*}}/g, "")));
+}
+
+function collapseExcessBlankLines(content: string): string {
+  return content.replace(/\n[ \t]*\n[ \t]*\n+/g, "\n\n");
+}
+
+function normalizeTemplateOutput(content: string): string {
+  return content.replace(/\n+$/, "\n");
 }
 
 async function appendLineUnderHeader(
@@ -2562,10 +2570,20 @@ function spliceTextRange(content: string, range: TextRange, value: string): stri
   const before = content.slice(0, range.start);
   const after = content.slice(range.end);
   let replacement = value;
-  if (replacement && after && !replacement.endsWith("\n") && !after.startsWith("\n") && !after.startsWith("\r\n")) {
-    replacement = `${replacement}\n`;
+  if (replacement && after && !replacement.endsWith("\n")) {
+    if (after.startsWith("\r\n") || after.startsWith("\n")) {
+      if (startsWithMarkdownBoundary(after.replace(/^\r?\n/, "")) && !after.match(/^\r?\n\r?\n/)) {
+        replacement = `${replacement}\n`;
+      }
+    } else {
+      replacement = `${replacement}${startsWithMarkdownBoundary(after) ? "\n\n" : "\n"}`;
+    }
   }
   return `${before}${replacement}${after}`;
+}
+
+function startsWithMarkdownBoundary(content: string): boolean {
+  return /^(?:#{1,6}\s+|(?:-{3,}|\*{3,}|_{3,})\s*(?:\r?\n|$))/.test(content);
 }
 
 function writableSectionRange(content: string, section: ReadSectionSpec, originalKey: string): TextRange {
@@ -2633,6 +2651,9 @@ function markdownBodyRange(content: string): TextRange {
 }
 
 function skipProjectSummaryManagedBlock(content: string, start: number, end: number): number {
+  const nativeEnd = skipLeadingFencedBlock(content, start, end, "para-zk-latest-retro-summary");
+  if (nativeEnd !== start) return nativeEnd;
+
   let cursor = start;
   const first = readLineSpan(content, cursor, end);
   if (!first?.text.trim().startsWith("> [!tip]")) return start;
@@ -2646,6 +2667,32 @@ function skipProjectSummaryManagedBlock(content: string, start: number, end: num
     if (fenceCount === 2) break;
   }
   if (fenceCount < 2) return start;
+
+  while (cursor < end) {
+    const line = readLineSpan(content, cursor, end);
+    if (!line || line.text.trim() !== "") break;
+    cursor = line.next;
+  }
+  return cursor;
+}
+
+function skipLeadingFencedBlock(content: string, start: number, end: number, language: string): number {
+  let cursor = start;
+  const first = readLineSpan(content, cursor, end);
+  if (!first || first.text.trim() !== `\`\`\`${language}`) return start;
+
+  cursor = first.next;
+  let closed = false;
+  while (cursor < end) {
+    const line = readLineSpan(content, cursor, end);
+    if (!line) break;
+    cursor = line.next;
+    if (line.text.trim() === "```") {
+      closed = true;
+      break;
+    }
+  }
+  if (!closed) return start;
 
   while (cursor < end) {
     const line = readLineSpan(content, cursor, end);

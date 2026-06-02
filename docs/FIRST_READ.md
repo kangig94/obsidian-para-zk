@@ -148,6 +148,7 @@ Important modules:
 - `src/templates.ts`: managed templates, vault guide, and dashboard artifacts.
 - `src/cli/handlers.ts`: LLM-friendly native CLI adapter over workflows.
 - `src/ux/workflow-commands.ts`: human-friendly Obsidian command adapter.
+- `src/ux/managed-sections.ts`: `para-zk-managed` wrapper for template-managed UI tails.
 - `src/ux/dataview-views.ts`: native `para-zk-view` wrappers around managed Dataview queries and their toolbar actions.
 - `src/ux/latest-retro-summary.ts`: native project latest-retro summary widget.
 - `src/ux/workflow-buttons.ts`: shared GUI workflow button creation.
@@ -173,6 +174,7 @@ only when safe or when `force=true` is requested.
 Generated templates should not depend on Meta Bind, QuickAdd, or Templater.
 Native plugin blocks and controls replace legacy prompt/script mechanisms:
 
+- `para-zk-managed` keeps generated template UI tails in one compact block.
 - `para-zk-view` integrates relationship Dataview queries with matching workflow buttons.
 - `para-zk-latest-retro-summary` replaces the old project-summary DataviewJS callout.
 - `para-zk-props` and `PZK_INPUT[...]` replace Meta Bind input controls.

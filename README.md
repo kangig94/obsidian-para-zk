@@ -109,11 +109,13 @@ sorting is installed, PARA-ZK configures bookmark-based sorting with a baseline
 on startup and when the workspace is empty. Remember cursor position is installed
 and enabled so note cursor and scroll positions survive navigation.
 
-The generated templates use native PARA-ZK view blocks for relationship lists.
-Views such as subnotes, retros, and ZK promotion render their workflow buttons
-inside the view toolbar, so action controls live with the list they modify.
-Project templates also use `para-zk-latest-retro-summary` for the latest retro
-summary instead of embedding a long DataviewJS snippet in the note body.
+The generated templates use a single `para-zk-managed` block for the managed UI
+tail below user-authored content. It expands to native PARA-ZK view blocks for
+relationship lists and task/reference widgets. Project templates keep
+`para-zk-latest-retro-summary` directly under the Summary heading, replacing the
+old long DataviewJS snippet without moving that summary out of context. Views
+such as subnotes, retros, and ZK promotion render their workflow buttons inside
+the view toolbar, so action controls live with the list they modify.
 
 The generated Home dashboard uses a native `para-zk-dashboard-actions` block to render
 grouped action buttons and dashboard navigation without Meta Bind or callout wrappers.

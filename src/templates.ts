@@ -103,7 +103,6 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         paraZkPropsBlock("project"),
         `# ${t.labels.summary}`,
         ...latestRetroSummaryBlock(),
-        "",
         "{{cursor}}",
         "",
         `# ${t.labels.goals}`,
@@ -112,26 +111,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         "| --- | --- |",
         "| | |",
         "",
-        "---",
-        `# ${t.labels.tasks}`,
-        "",
-        ...paraZkTasksBlock("current"),
-        "",
-        "---",
-        `# ${t.labels.subnotes}`,
-        "",
-        paraZkViewBlock("project-subnotes"),
-        "",
-        "---",
-        `# ${t.labels.retros}`,
-        "",
-        paraZkViewBlock("project-retros"),
-        "",
-        "---",
-        `## ${t.labels.references}`,
-        "",
-        ...paraZkReferencesBlock("current"),
-        "",
+        paraZkManagedBlock(),
         ""
       ].join("\n");
     case "area":
@@ -149,35 +129,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         "",
         "{{cursor}}",
         "",
-        `# ${t.labels.dashboardProjects}`,
-        "",
-        paraZkViewBlock("area-projects"),
-        "",
-        "---",
-        `# ${t.labels.tasks}`,
-        "",
-        ...paraZkTasksBlock("current"),
-        "",
-        "---",
-        `# ${t.labels.subareas}`,
-        "",
-        paraZkViewBlock("area-subareas"),
-        "",
-        "---",
-        `# ${t.labels.subnotes}`,
-        "",
-        paraZkViewBlock("area-subnotes"),
-        "",
-        "---",
-        `# ${t.labels.retros}`,
-        "",
-        paraZkViewBlock("area-retros"),
-        "",
-        "---",
-        `## ${t.labels.references}`,
-        "",
-        ...paraZkReferencesBlock("current"),
-        "",
+        paraZkManagedBlock(),
         ""
       ].join("\n");
     case "resource":
@@ -197,17 +149,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         "---",
         `# ${t.labels.body}`,
         "",
-        "",
-        "---",
-        `## ${t.labels.promoteToZk}`,
-        "",
-        paraZkViewBlock("resource-zk-links"),
-        "",
-        "---",
-        `## ${t.labels.references}`,
-        "",
-        ...paraZkReferencesBlock("current"),
-        "",
+        paraZkManagedBlock(),
         ""
       ].join("\n");
     case "journal":
@@ -227,23 +169,15 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         "",
         `# ${t.labels.quickMemo}`,
         "",
-        "",
         `# ${t.labels.timeline}`,
         "- 09:00 ",
         "- 14:30 ",
         "",
-        `# ${t.labels.tasks}`,
-        ...paraZkTasksBlock("current"),
-        "",
-        "---",
         `# ${t.labels.shortReview}`,
         `- ${t.labels.whatWentWell}:`,
         `- ${t.labels.improvements}:`,
         "",
-        "---",
-        `## ${t.labels.references}`,
-        "",
-        ...paraZkReferencesBlock("current"),
+        paraZkManagedBlock(),
         ""
       ].join("\n");
     case "retro":
@@ -275,16 +209,9 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         `# ${t.labels.risks}`,
         "- ",
         "",
-        `# ${t.labels.tasks}`,
-        ...paraZkTasksBlock("current"),
-        "",
-        "---",
         `# ${t.labels.retroSummary}`,
         "",
-        "---",
-        `## ${t.labels.references}`,
-        "",
-        ...paraZkReferencesBlock("current"),
+        paraZkManagedBlock(),
         ""
       ].join("\n");
     case "subnote":
@@ -320,19 +247,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         "",
         "- ",
         "",
-        "---",
-        `## ${t.labels.promote}`,
-        "",
-        paraZkViewBlock("fleeting-promotion"),
-        "",
-        "---",
-        `## ${t.labels.tasks}`,
-        ...paraZkTasksBlock("current"),
-        "",
-        "---",
-        `## ${t.labels.references}`,
-        "",
-        ...paraZkReferencesBlock("current"),
+        paraZkManagedBlock(),
         ""
       ].join("\n");
     case "zk_literature":
@@ -363,15 +278,11 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         "",
         `# ${t.labels.insight}`,
         "",
-        "",
         `# ${t.labels.evidence}`,
         "",
         "> ",
         "",
-        "---",
-        `## ${t.labels.references}`,
-        "",
-        ...paraZkReferencesBlock("current"),
+        paraZkManagedBlock(),
         ""
       ].join("\n");
     case "zk_permanent":
@@ -392,17 +303,13 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         "",
         `# ${t.labels.body}`,
         "",
-        "",
         `## ${t.labels.limitations}`,
         "- ",
         "",
         `## ${t.labels.relatedQuestions}`,
         "- ",
         "",
-        "---",
-        `## ${t.labels.references}`,
-        "",
-        ...paraZkReferencesBlock("current"),
+        paraZkManagedBlock(),
         ""
       ].join("\n");
   }
@@ -424,20 +331,29 @@ function paraZkPropsBlock(type: PropsViewType): string {
   ].join("\n");
 }
 
-function paraZkViewBlock(key: DataviewViewKey): string {
-  return fenced("para-zk-view", [key]).join("\n");
+function paraZkManagedBlock(): string {
+  return fenced("para-zk-managed", []).join("\n");
 }
 
-function paraZkTasksBlock(root: "current" | "all", extra: string[] = []): string[] {
+function paraZkViewBlock(key: DataviewViewKey, title?: string): string {
+  return fenced("para-zk-view", title ? [
+    `key: ${key}`,
+    `title: ${title}`
+  ] : [key]).join("\n");
+}
+
+function paraZkTasksBlock(root: "current" | "all", extra: string[] = [], title?: string): string[] {
   return fenced("para-zk-tasks", [
     `root: ${root}`,
+    ...(title ? [`title: ${title}`] : []),
     ...extra
   ]);
 }
 
-function paraZkReferencesBlock(root: "current"): string[] {
+function paraZkReferencesBlock(root: "current", title?: string): string[] {
   return fenced("para-zk-references", [
-    `root: ${root}`
+    `root: ${root}`,
+    ...(title ? [`title: ${title}`] : [])
   ]);
 }
 
@@ -451,6 +367,69 @@ function fenced(language: string, lines: string[]): string[] {
     ...lines,
     "```"
   ];
+}
+
+export function managedUiBlockForType(type: string, settings: ParaZkSettings): string | undefined {
+  const t = localePack(settings.locale);
+  switch (type.trim().toLocaleLowerCase()) {
+    case "project":
+      return joinManagedUiBlocks([
+        paraZkTasksBlock("current", [], t.labels.tasks),
+        paraZkViewBlock("project-subnotes", t.labels.subnotes),
+        paraZkViewBlock("project-retros", t.labels.retros),
+        paraZkReferencesBlock("current", t.labels.references)
+      ]);
+    case "area":
+      return joinManagedUiBlocks([
+        paraZkViewBlock("area-projects", t.labels.dashboardProjects),
+        paraZkTasksBlock("current", [], t.labels.tasks),
+        paraZkViewBlock("area-subareas", t.labels.subareas),
+        paraZkViewBlock("area-subnotes", t.labels.subnotes),
+        paraZkViewBlock("area-retros", t.labels.retros),
+        paraZkReferencesBlock("current", t.labels.references)
+      ]);
+    case "resource":
+      return joinManagedUiBlocks([
+        paraZkViewBlock("resource-zk-links", t.labels.promoteToZk),
+        paraZkReferencesBlock("current", t.labels.references)
+      ]);
+    case "journal":
+      return joinManagedUiBlocks([
+        paraZkTasksBlock("current", [], t.labels.tasks),
+        paraZkReferencesBlock("current", t.labels.references)
+      ]);
+    case "retro":
+      return joinManagedUiBlocks([
+        paraZkTasksBlock("current", [], t.labels.tasks),
+        paraZkReferencesBlock("current", t.labels.references)
+      ]);
+    case "zk_fleeting":
+      return joinManagedUiBlocks([
+        paraZkViewBlock("fleeting-promotion", t.labels.promote),
+        paraZkTasksBlock("current", [], t.labels.tasks),
+        paraZkReferencesBlock("current", t.labels.references)
+      ]);
+    case "zk_literature":
+    case "zk_permanent":
+      return joinManagedUiBlocks([
+        paraZkReferencesBlock("current", t.labels.references)
+      ]);
+    default:
+      return undefined;
+  }
+}
+
+function managedUiLines(body: string | string[]): string[] {
+  return Array.isArray(body) ? body : body.split(/\r?\n/);
+}
+
+function joinManagedUiBlocks(blocks: Array<string | string[]>): string {
+  const lines: string[] = ["", "---"];
+  for (const [index, block] of blocks.entries()) {
+    if (index > 0) lines.push("", "---");
+    lines.push(...managedUiLines(block));
+  }
+  return [...lines, ""].join("\n");
 }
 
 function quoteExampleTitle(locale: Locale): string {

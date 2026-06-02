@@ -7,7 +7,13 @@ import {
 import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { DATAVIEW_VIEW_KEYS, dataviewViewBlock, type DataviewViewKey } from "../templates";
+import { parseCodeBlockKeyValues } from "./code-block-args";
 import { createWorkflowButton } from "./workflow-buttons";
+
+type DataviewViewArgs = {
+  key: string;
+  title?: string;
+};
 
 type DataviewViewAction = {
   command: string;
@@ -27,7 +33,7 @@ const DATAVIEW_CHANGE_RERENDER_DELAYS_MS = [300, 3200] as const;
 // is passed so the query's `this.file` resolves to the host note.
 export function registerDataviewViewRenderers(plugin: ParaZkPluginContext): void {
   plugin.registerMarkdownCodeBlockProcessor("para-zk-view", (source, el, ctx) => {
-    ctx.addChild(new DataviewViewRenderChild(plugin, el, readViewKey(source), ctx.sourcePath));
+    ctx.addChild(new DataviewViewRenderChild(plugin, el, readViewArgs(source), ctx.sourcePath));
   });
 }
 
@@ -38,7 +44,7 @@ class DataviewViewRenderChild extends MarkdownRenderChild {
   constructor(
     private readonly plugin: ParaZkPluginContext,
     containerEl: HTMLElement,
-    private readonly key: string,
+    private readonly args: DataviewViewArgs,
     private readonly sourcePath: MarkdownPostProcessorContext["sourcePath"]
   ) {
     super(containerEl);
@@ -75,7 +81,7 @@ class DataviewViewRenderChild extends MarkdownRenderChild {
 
   private renderNow(): void {
     if (this.unloaded) return;
-    void renderDataviewView(this.plugin, this.key, this.containerEl, this.sourcePath, this)
+    void renderDataviewView(this.plugin, this.args, this.containerEl, this.sourcePath, this)
       .catch((error: unknown) => {
         if (!this.unloaded) renderDataviewViewError(this.containerEl, error);
       });
@@ -84,11 +90,12 @@ class DataviewViewRenderChild extends MarkdownRenderChild {
 
 function renderDataviewView(
   plugin: ParaZkPluginContext,
-  key: string,
+  args: DataviewViewArgs,
   el: HTMLElement,
   sourcePath: MarkdownPostProcessorContext["sourcePath"],
   child: MarkdownRenderChild
 ): Promise<void> {
+  const key = args.key;
   const block = dataviewViewBlock(key, plugin.settings, sourcePath);
 
   el.empty();
@@ -100,13 +107,22 @@ function renderDataviewView(
   }
 
   const viewKey = readDataviewViewKey(key);
-  if (viewKey) renderDataviewViewToolbar(plugin, el, viewKey, sourcePath);
+  if (viewKey || args.title) renderDataviewViewToolbar(plugin, el, viewKey, sourcePath, args.title);
 
   const body = el.createDiv({ cls: "para-zk-view-body" });
   return MarkdownRenderer.render(plugin.app, block, body, sourcePath, child);
 }
 
-function readViewKey(source: string): string {
+function readViewArgs(source: string): DataviewViewArgs {
+  const raw = parseCodeBlockKeyValues(source);
+  const key = raw.key?.trim() || raw.view?.trim() || legacyViewKey(source);
+  return {
+    key,
+    title: raw.title?.trim() || undefined
+  };
+}
+
+function legacyViewKey(source: string): string {
   return source.split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? "";
 }
 
@@ -122,16 +138,20 @@ function renderDataviewViewError(el: HTMLElement, error: unknown): void {
 function renderDataviewViewToolbar(
   plugin: ParaZkPluginContext,
   el: HTMLElement,
-  key: DataviewViewKey,
-  sourcePath: string
+  key: DataviewViewKey | undefined,
+  sourcePath: string,
+  title?: string
 ): void {
-  const toolbar = dataviewViewToolbar(plugin, key);
-  if (!toolbar || toolbar.actions.length === 0) return;
+  const toolbar = key ? dataviewViewToolbar(plugin, key) : undefined;
+  const actions = toolbar?.actions ?? [];
+  const titleText = title?.trim();
+  if (!titleText && actions.length === 0) return;
 
   const toolbarEl = el.createDiv({ cls: "para-zk-view-toolbar" });
+  if (titleText) toolbarEl.createDiv({ cls: "para-zk-view-toolbar-heading", text: titleText });
   const controls = toolbarEl.createDiv({ cls: "para-zk-view-toolbar-controls" });
 
-  for (const action of toolbar.actions) {
+  for (const action of actions) {
     const button = createWorkflowButton(plugin, action.label, action.command, sourcePath, { icon: action.icon });
     button.addClass("para-zk-view-toolbar-button", "para-zk-view-action");
     button.setAttr("aria-label", action.label);

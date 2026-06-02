@@ -119,6 +119,7 @@ export function renderRegistryToolbar(
     headingClass: string;
     summaryClass: string;
     controlsClass: string;
+    titleText?: string;
     summaryText: string;
     renderControls: (controls: HTMLElement) => void;
   }
@@ -130,6 +131,11 @@ export function renderRegistryToolbar(
 } {
   const toolbar = parent.createDiv({ cls: options.toolbarClass });
   const heading = toolbar.createDiv({ cls: options.headingClass });
+  const titleText = options.titleText?.trim();
+  if (titleText) heading.createDiv({
+    cls: `${options.headingClass}-title`,
+    text: titleText
+  });
   const summaryEl = heading.createDiv({
     cls: options.summaryClass,
     text: options.summaryText

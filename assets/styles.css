@@ -176,19 +176,35 @@
   min-width: 0;
 }
 
+.para-zk-managed {
+  min-width: 0;
+}
+
 .para-zk-view-toolbar {
   align-items: center;
   display: flex;
   gap: 10px;
-  justify-content: flex-end;
+  justify-content: space-between;
   margin-bottom: 7px;
   min-width: 0;
-  width: min(100%, var(--line-width, 100%));
+  width: 100%;
+}
+
+.para-zk-view-toolbar-heading {
+  color: var(--text-normal);
+  flex: 0 1 auto;
+  font-size: 1.15em;
+  font-weight: 700;
+  line-height: var(--line-height-tight);
+  margin-right: auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .para-zk-view-toolbar-controls {
   align-items: center;
   display: flex;
+  flex: 1 1 auto;
   flex-wrap: wrap;
   gap: 6px;
   justify-content: flex-end;
@@ -384,7 +400,20 @@
 }
 
 .para-zk-task-toolbar-heading {
-  min-width: 92px;
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: auto;
+  min-width: 0;
+}
+
+.para-zk-task-toolbar-heading-title {
+  color: var(--text-normal);
+  font-size: 1.15em;
+  font-weight: 700;
+  line-height: var(--line-height-tight);
+  overflow-wrap: anywhere;
 }
 
 .para-zk-task-toolbar-summary {
@@ -669,7 +698,21 @@
 
 .para-zk-reference-toolbar-heading,
 .para-zk-references-toolbar-heading {
-  min-width: 92px;
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: auto;
+  min-width: 0;
+}
+
+.para-zk-reference-toolbar-heading-title,
+.para-zk-references-toolbar-heading-title {
+  color: var(--text-normal);
+  font-size: 1.15em;
+  font-weight: 700;
+  line-height: var(--line-height-tight);
+  overflow-wrap: anywhere;
 }
 
 .para-zk-reference-toolbar-summary,

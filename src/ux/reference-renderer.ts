@@ -44,6 +44,7 @@ import { parseCodeBlockKeyValues } from "./code-block-args";
 
 type ReferenceBlockArgs = {
   root: "current" | string;
+  title?: string;
 };
 
 type ReferenceToolbarState = Record<string, never>;
@@ -135,6 +136,7 @@ async function renderReferenceBlock(
 
     renderReferenceToolbar(plugin, el, {
       rootFile,
+      title: args.title,
       items,
       rerender: () => renderReferenceBlock(plugin, source, el, ctx)
     });
@@ -166,6 +168,7 @@ function renderReferenceToolbar(
   el: HTMLElement,
   options: {
     rootFile: TFile;
+    title?: string;
     items: RenderableReference[];
     rerender: () => Promise<void>;
   }
@@ -176,6 +179,7 @@ function renderReferenceToolbar(
     headingClass: "para-zk-reference-toolbar-heading",
     summaryClass: "para-zk-reference-toolbar-summary",
     controlsClass: "para-zk-reference-toolbar-controls",
+    titleText: options.title,
     summaryText: referenceSummaryText(options.items, labels),
     renderControls: (controls) => {
       const add = new ButtonComponent(controls);
@@ -940,6 +944,7 @@ function isCurrentReferenceBlockGeneration(el: HTMLElement, generation: number):
 function parseReferenceBlockArgs(source: string): ReferenceBlockArgs {
   const raw = parseCodeBlockKeyValues(source);
   return {
-    root: raw.root?.trim() || "current"
+    root: raw.root?.trim() || "current",
+    title: raw.title?.trim() || undefined
   };
 }

@@ -50,6 +50,7 @@ assertGuiLocale("ko");
 
 setupVaultCli(["locale=en", "force=true"], "en locale init");
 assertGuiLocale("en");
+assertManagedTemplateFiles();
 
 const today = todayIso();
 assertGuiJournalCommand(today);
@@ -160,6 +161,7 @@ function runLiveScenario() {
   // the live reference/task-block renderers. Pure workflow logic (CRUD,
   // references, tasks, archive, rename, delete) is covered by the vitest unit
   // suite (npm test) and is no longer re-checked here.
+  assertGeneratedTemplateShapes();
   assertReferenceSubpathScenario();
   assertObjectReferenceDeleteCleanup();
   assertObjectReferenceRenameSurvival();
@@ -182,6 +184,7 @@ function runLiveScenario() {
     "format=json"
   ]);
   assertCreated(taskProject, "task render project");
+  assertGeneratedNoteTemplateShape(taskProject.path, "project");
   cliJson("para-zk:update-project", [
     `title=Smoke Task Render ${stamp}`,
     "key=tasks",
@@ -192,6 +195,180 @@ function runLiveScenario() {
   assertTaskBlockRendererRegression(taskProject.path, `Smoke render task ${stamp}`);
   assertDataviewToolbarLayout(taskProject.path);
   assertCreateRetroButtonProjectLink();
+}
+
+function assertManagedTemplateFiles() {
+  const templateNames = [
+    "project",
+    "area",
+    "resource",
+    "journal",
+    "retro",
+    "subnote",
+    "zk_fleeting",
+    "zk_literature",
+    "zk_permanent"
+  ];
+
+  for (const name of templateNames) {
+    const path = `Templates/para-zk/template_${name}.md`;
+    const text = readVaultText(path);
+    assertNoTemplateDrift(path, text);
+
+    if (name === "subnote") {
+      assert(!text.includes("```para-zk-managed"), `${path} should not include managed UI`);
+    } else {
+      assert(countOccurrences(text, "```para-zk-managed") === 1, `${path} must include exactly one managed block`);
+      assert(text.includes("```para-zk-managed\n```"), `${path} managed block must stay compact`);
+    }
+  }
+
+  const project = readVaultText("Templates/para-zk/template_project.md");
+  assert(
+    project.includes("# Summary\n```para-zk-latest-retro-summary\n```\n{{cursor}}\n\n# Goals"),
+    "template_project.md summary must keep latest-retro block directly under Summary"
+  );
+
+  const retro = readVaultText("Templates/para-zk/template_retro.md");
+  assert(retro.includes("areas: {{areas_frontmatter}}"), "template_retro.md must keep YAML-safe areas placeholder spacing");
+  assert(retro.includes("# Retro summary\n\n```para-zk-managed"), "template_retro.md must keep Retro summary empty before managed UI");
+  assertFileNotContains("Templates/para-zk/template_retro.md", [
+    "다음 주에 바로 도움이 될 핵심 한 줄",
+    "one line that helps next week"
+  ]);
+}
+
+function assertGeneratedTemplateShapes() {
+  const project = cliJson("para-zk:create-project", [
+    `title=Smoke Template Project ${stamp}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(project, "template-shape project");
+  assertGeneratedNoteTemplateShape(project.path, "project");
+
+  const area = cliJson("para-zk:create-area", [
+    `title=Smoke Template Area ${stamp}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(area, "template-shape area");
+  assertGeneratedNoteTemplateShape(area.path, "area");
+
+  const resource = cliJson("para-zk:create-resource", [
+    `title=Smoke Template Resource ${stamp}`,
+    "link=false",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(resource, "template-shape resource");
+  assertGeneratedNoteTemplateShape(resource.path, "resource");
+
+  const subnote = cliJson("para-zk:create-subnote", [
+    `title=Smoke Template Subnote ${stamp}`,
+    `path=${project.path}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(subnote, "template-shape subnote");
+  assertGeneratedNoteTemplateShape(subnote.path, "subnote");
+
+  const retro = cliJson("para-zk:create-retro", [
+    `title=Smoke Template Retro ${stamp}`,
+    `date=${todayIso()}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(retro, "template-shape retro");
+  assertGeneratedNoteTemplateShape(retro.path, "retro");
+
+  const fleeting = cliJson("para-zk:create-zk", [
+    `title=Smoke Template Fleeting ${stamp}`,
+    "kind=fleeting",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(fleeting, "template-shape fleeting");
+  assertGeneratedNoteTemplateShape(fleeting.path, "zk_fleeting");
+
+  const literature = cliJson("para-zk:create-zk", [
+    `title=Smoke Template Literature ${stamp}`,
+    "kind=literature",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(literature, "template-shape literature");
+  assertGeneratedNoteTemplateShape(literature.path, "zk_literature");
+
+  const permanent = cliJson("para-zk:create-zk", [
+    `title=Smoke Template Permanent ${stamp}`,
+    "kind=permanent",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(permanent, "template-shape permanent");
+  assertGeneratedNoteTemplateShape(permanent.path, "zk_permanent");
+}
+
+function assertGeneratedNoteTemplateShape(path, type) {
+  assertVaultTextEventually(path, (text) => {
+    assertNoTemplateDrift(path, text);
+    assert(text.includes("```para-zk-props"), `${path} is missing para-zk props block`);
+
+    if (type === "subnote") {
+      assert(!text.includes("```para-zk-managed"), `${path} subnote should not include managed UI`);
+    } else {
+      assert(countOccurrences(text, "```para-zk-managed") === 1, `${path} must include exactly one managed block`);
+      assert(text.includes("```para-zk-managed\n```"), `${path} managed block must stay compact`);
+    }
+
+    if (type === "project") {
+      assertProjectSummaryText(path, text);
+    } else if (type === "retro") {
+      assert(text.includes("# Retro summary\n\n```para-zk-managed"), `${path} retro summary should be empty before managed UI`);
+    }
+  });
+}
+
+function assertProjectSummaryShape(path, summaryText = "") {
+  assertVaultTextEventually(path, (text) => assertProjectSummaryText(path, text, summaryText));
+}
+
+function assertProjectSummaryText(path, text, summaryText = "") {
+  const expected = summaryText
+    ? `# Summary\n\`\`\`para-zk-latest-retro-summary\n\`\`\`\n${summaryText}\n\n# Goals`
+    : "# Summary\n```para-zk-latest-retro-summary\n```\n\n# Goals";
+  assert(text.includes(expected), `${path} project summary shape drifted`);
+  assert(!text.includes("```\n\n\n# Goals"), `${path} has extra blank lines before Goals`);
+  assert(!text.includes("para-zk-latest-retro-summary\n```\n\n\n"), `${path} has extra blank lines after latest-retro block`);
+}
+
+function assertVaultTextEventually(path, check) {
+  const deadline = Date.now() + 3000;
+  let lastError = undefined;
+  while (Date.now() <= deadline) {
+    try {
+      check(readVaultText(path));
+      return;
+    } catch (error) {
+      lastError = error;
+      sleepMs(100);
+    }
+  }
+  if (lastError) throw lastError;
+  throw new Error(`timed out reading ${path}`);
+}
+
+function assertNoTemplateDrift(path, text) {
+  assert(!text.includes("PZK["), `${path} contains legacy PZK syntax`);
+  assert(!text.includes("dataviewjs"), `${path} contains raw dataviewjs noise`);
+  assert(!text.includes("sameLink"), `${path} contains old latest-retro summary helper code`);
+  assert(!text.includes("```para-zk-view"), `${path} contains expanded Dataview UI instead of para-zk-managed`);
+  assert(!text.includes("```para-zk-tasks"), `${path} contains expanded Tasks UI instead of para-zk-managed`);
+  assert(!text.includes("```para-zk-references"), `${path} contains expanded References UI instead of para-zk-managed`);
+  assert(!/\n[ \t]*\n[ \t]*\n/.test(text), `${path} contains 3+ consecutive blank lines`);
+  assert(text.endsWith("\n"), `${path} must end with one newline`);
+  assert(!text.endsWith("\n\n"), `${path} must not end with multiple blank lines`);
 }
 
 function assertDataviewToolbarLayout(path) {
@@ -206,12 +383,20 @@ function assertDataviewToolbarLayout(path) {
     let referenceToolbar = null;
     let viewToolbar = null;
     let viewRoot = null;
+    let viewButton = null;
+    let taskTitle = "";
+    let referenceTitle = "";
+    let viewTitle = "";
     for (let index = 0; index < 50; index += 1) {
       const root = leaf.view.containerEl;
       taskToolbar = root.querySelector(".para-zk-task-toolbar");
       referenceToolbar = root.querySelector(".para-zk-reference-toolbar");
       viewToolbar = root.querySelector(".para-zk-view-project-subnotes .para-zk-view-toolbar");
       viewRoot = root.querySelector(".para-zk-view-project-subnotes");
+      viewButton = root.querySelector(".para-zk-view-project-subnotes .para-zk-view-toolbar-button");
+      taskTitle = taskToolbar?.querySelector(".para-zk-task-toolbar-heading-title")?.textContent?.trim() ?? "";
+      referenceTitle = referenceToolbar?.querySelector(".para-zk-reference-toolbar-heading-title")?.textContent?.trim() ?? "";
+      viewTitle = viewToolbar?.querySelector(".para-zk-view-toolbar-heading")?.textContent?.trim() ?? "";
       if (taskToolbar && referenceToolbar && viewToolbar && viewRoot) break;
       await sleep(100);
     }
@@ -231,11 +416,21 @@ function assertDataviewToolbarLayout(path) {
       taskToolbar: rect(taskToolbar),
       referenceToolbar: rect(referenceToolbar),
       viewToolbar: rect(viewToolbar),
-      viewRoot: rect(viewRoot)
+      viewRoot: rect(viewRoot),
+      viewButton: rect(viewButton),
+      taskTitle,
+      referenceTitle,
+      viewTitle
     }));
   })()`);
 
   assert(snapshot.taskToolbar && snapshot.referenceToolbar && snapshot.viewToolbar, `toolbar layout snapshot incomplete: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.viewButton, `Dataview toolbar button missing: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.taskTitle === "Tasks", `task toolbar title missing: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.referenceTitle === "References", `reference toolbar title missing: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.viewTitle === "Subnotes", `Dataview toolbar title missing: ${JSON.stringify(snapshot)}`);
+  assertNearlyEqual(snapshot.viewButton.right, snapshot.viewToolbar.right, 1, `Dataview button right edge differs from toolbar: ${JSON.stringify(snapshot)}`);
+  assertNearlyEqual(snapshot.viewButton.right, snapshot.viewRoot.right, 1, `Dataview button right edge differs from view root: ${JSON.stringify(snapshot)}`);
   assertNearlyEqual(snapshot.viewToolbar.right, snapshot.taskToolbar.right, 1, `Dataview toolbar right edge differs from task toolbar: ${JSON.stringify(snapshot)}`);
   assertNearlyEqual(snapshot.viewToolbar.right, snapshot.referenceToolbar.right, 1, `Dataview toolbar right edge differs from reference toolbar: ${JSON.stringify(snapshot)}`);
 }
@@ -295,6 +490,7 @@ function assertBacklinkReadKeyScenario() {
     "format=json"
   ]);
   assert(projectLink.ok === true, "backlink read project link setup failed");
+  assertProjectSummaryShape(project.path, `Project backlink smoke [[${target.path}]]`);
   const areaLink = cliJson("para-zk:update-area", [
     `title=${areaTitle}`,
     "key=overview",
@@ -1347,6 +1543,18 @@ function assertHomepageRuntime() {
 
 function readVaultJson(path) {
   return JSON.parse(readFileSync(join(vaultPath, path), "utf8"));
+}
+
+function readVaultText(path) {
+  const absolute = join(vaultPath, path);
+  assert(existsSync(absolute), `missing file: ${path}`);
+  assert(statSync(absolute).isFile(), `not a file: ${path}`);
+  return readFileSync(absolute, "utf8");
+}
+
+function countOccurrences(text, needle) {
+  if (!needle) return 0;
+  return text.split(needle).length - 1;
 }
 
 function assertCreated(payload, label) {

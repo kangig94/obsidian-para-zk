@@ -40,6 +40,7 @@ import {
 
 type TaskBlockArgs = {
   root: "current" | "all";
+  title?: string;
   checkbox?: "open" | "done" | string;
   due?: "today" | "upcoming7" | "upcoming30";
   limit?: number;
@@ -178,6 +179,7 @@ function renderTaskToolbar(
     headingClass: "para-zk-task-toolbar-heading",
     summaryClass: "para-zk-task-toolbar-summary",
     controlsClass: "para-zk-task-toolbar-controls",
+    titleText: options.args.title,
     summaryText: taskSummaryText(options.items, options.visible, labels),
     renderControls: (controls) => {
       const rootFile = options.rootFile;
@@ -808,6 +810,7 @@ function parseTaskBlockArgs(source: string): TaskBlockArgs {
   }
   return {
     root,
+    title: raw.title?.trim() || undefined,
     checkbox: raw.checkbox,
     due: parseDueFilter(raw.due),
     limit: limit !== undefined && Number.isInteger(limit) && limit > 0 ? limit : root === "all" ? 50 : undefined,

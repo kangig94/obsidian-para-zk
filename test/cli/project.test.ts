@@ -31,6 +31,31 @@ describe("create-project", () => {
     expect(areas.find((a) => a.title === "AI")?.created).toBe(false);
     expect(areas.find((a) => a.title === "Software")?.created).toBe(true);
   });
+
+  it("creates notes with the current managed project template shape", async () => {
+    const project = await cli.run("para-zk:create-project", {
+      title: "Template Shape",
+      open: "false"
+    });
+    expect(project.ok).toBe(true);
+
+    const content = cli.app.readPath("PARA/Projects/Template Shape/Template Shape.md") ?? "";
+    expect(content).toContain("# Summary\n```para-zk-latest-retro-summary\n```\n\n# Goals");
+    expect(content).toContain("```para-zk-managed\n```");
+    expect(content).not.toContain("```\n\n\n# Goals");
+    expect(content.endsWith("\n\n")).toBe(false);
+
+    const subnote = await cli.run("para-zk:create-subnote", {
+      title: "Template Child",
+      path: "PARA/Projects/Template Shape/Template Shape.md",
+      open: "false"
+    });
+    expect(subnote.ok).toBe(true);
+    const subnoteContent = cli.app.readPath("PARA/Projects/Template Shape/Template Child.md") ?? "";
+    expect(subnoteContent).toContain("```para-zk-props\ntype: subnote\n```");
+    expect(subnoteContent).not.toContain("```para-zk-managed");
+    expect(subnoteContent.endsWith("\n\n")).toBe(false);
+  });
 });
 
 describe("read-project", () => {
@@ -112,6 +137,10 @@ describe("update-project", () => {
 
     const read = await cli.run("para-zk:read-project", { title: "Alpha", key: "summary" });
     expect(read.value).toBe("Final summary");
+
+    const content = cli.app.readPath("PARA/Projects/Alpha/Alpha.md") ?? "";
+    expect(content).toContain("# Summary\n```para-zk-latest-retro-summary\n```\nFinal summary\n\n# Goals");
+    expect(content).not.toContain("Final summary\n\n\n# Goals");
   });
 
   it("rejects the operation alias", async () => {

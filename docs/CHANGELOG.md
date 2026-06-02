@@ -27,6 +27,8 @@ Notable changes for PARA-ZK are tracked here.
   labels in the Obsidian GUI.
 - Added native PARA-ZK view toolbar actions, replacing the prior Meta Bind button
   dependency and the removed `PZK[...]` workflow action token path.
+- Added `para-zk-managed`, collapsing generated template UI tails into one
+  compact block while preserving native task, reference, and Dataview renderers.
 - Added `para-zk-latest-retro-summary`, replacing the long project-template
   DataviewJS latest-retro callout with a native renderer.
 - Added native PARA-ZK props controls with `para-zk-props` and `PZK_INPUT[...]`,
