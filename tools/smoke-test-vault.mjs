@@ -42,6 +42,7 @@ prepareVault();
 
 const setupResult = setupVaultCli([], "setup");
 assertSetupEnvironment(setupResult);
+ensureDataviewIndexReady();
 assertGuiLocale("en");
 
 setupVaultCli(["locale=ko", "force=true"], "ko locale init");
@@ -105,6 +106,32 @@ function assertSetupEnvironment(setupPayload) {
   assertHomepageConfig();
   assertOpenTabSettingsConfig();
   assertHomepageRuntime();
+}
+
+function ensureDataviewIndexReady() {
+  if (!installDeps) return;
+
+  run("optsidian", ["raw", "plugin:reload", "id=dataview"], { allowFailure: true });
+  const snapshot = guiJson(`(async () => {
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const plugin = app.plugins.plugins.dataview;
+    let count = 0;
+    for (let index = 0; index < 40; index += 1) {
+      count = plugin?.api?.pages?.()?.array?.().length ?? 0;
+      if (count > 0) break;
+      await sleep(250);
+    }
+    console.log(JSON.stringify({
+      ok: true,
+      enabled: app.plugins.enabledPlugins.has("dataview"),
+      loaded: plugin?._loaded === true,
+      count
+    }));
+  })()`);
+
+  assert(snapshot.enabled === true, "Dataview plugin is not enabled");
+  assert(snapshot.loaded === true, "Dataview plugin is not loaded");
+  assert(snapshot.count > 0, `Dataview index is empty: ${JSON.stringify(snapshot)}`);
 }
 
 function assertGuiLocale(locale) {

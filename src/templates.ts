@@ -482,7 +482,7 @@ function dataviewProjectRetros(t: ReturnType<typeof localePack>, settings: ParaZ
 
 function dataviewAreaProjects(t: ReturnType<typeof localePack>, settings: ParaZkSettings, sourcePath?: string): string[] {
   return fenced("dataview", [
-    `TABLE status AS "${t.labels.status}", priority AS "${t.labels.priority}"`,
+    `TABLE WITHOUT ID file.link AS "${t.labels.project}", status AS "${t.labels.status}", priority AS "${t.labels.priority}"`,
     `FROM ${dataviewSource(settings.paths.projectsFolder)}`,
     `WHERE contains(areas, ${dataviewCurrentFileLink(sourcePath)})`,
     "SORT due_date ASC, priority DESC"
