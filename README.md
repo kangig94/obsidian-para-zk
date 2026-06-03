@@ -41,6 +41,9 @@ obsidian para-zk:setup format=json
 obsidian para-zk:setup dryRun=true force=true locale=en format=json
 obsidian para-zk:setup locale=ko format=json
 obsidian para-zk:setup installDeps=true format=json
+obsidian para-zk:attach-file source="/tmp/image.png" format=json
+obsidian para-zk:attach-file sources='["/tmp/image.png","/tmp/spec.pdf"]' format=json
+obsidian para-zk:attach-file source="/tmp/media" recursive=true format=json
 obsidian para-zk:create-project title="Project name" area_titles='["AI","Software"]' status=in_progress priority=high format=json
 obsidian para-zk:read-project title="Project name" key=frontmatter/status format=json
 obsidian para-zk:read-project title="Finished project" archived=true key=summary format=json
@@ -70,6 +73,12 @@ CLI option values use locale-neutral codes only. For example, pass
 localized label inside the generated note.
 Use `para-zk:describe` to inspect supported surface types, stable read/write
 keys, and collection filters in compact JSON form.
+Use `para-zk:attach-file` to copy local files or directories into the vault
+attachment folder (`assets` by default); it returns both `link` and `embed`
+strings for Markdown insertion. Single file sources return one attached file.
+Multiple sources or directory sources return `count` and `files`; directory
+sources are copied under `assets/<directory-name>/...` and include nested files
+unless `recursive=false`.
 Read commands use the same rule: `key=frontmatter/status`, `key=summary`, and
 `key="children/Meeting notes/body"` are stable CLI map paths and do not depend
 on the generated Markdown locale. Read commands also support

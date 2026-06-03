@@ -40,6 +40,7 @@ function parsedFrontmatter(content: string): Record<string, unknown> | undefined
 
 export class MockApp {
   private contents = new Map<string, string>();
+  private binaryContents = new Map<string, Uint8Array>();
   private fileObjs = new Map<string, TFile>();
   private folderObjs = new Map<string, TFolder>();
   private root = new TFolder();
@@ -60,6 +61,8 @@ export class MockApp {
     read: async (file: TFile): Promise<string> => this.contents.get(file.path) ?? "",
     cachedRead: async (file: TFile): Promise<string> => this.contents.get(file.path) ?? "",
     create: async (path: string, content: string): Promise<TFile> => this.createFile(path, content),
+    createBinary: async (path: string, content: ArrayBuffer): Promise<TFile> =>
+      this.createBinaryFile(path, new Uint8Array(content)),
     createFolder: async (path: string): Promise<void> => {
       this.ensureFolderPath(path);
     },
@@ -131,7 +134,12 @@ export class MockApp {
 
   /** Test-only: list every file path that currently exists. */
   listPaths(): string[] {
-    return [...this.contents.keys()];
+    return [...this.fileObjs.keys()];
+  }
+
+  /** Test-only: read a binary file's current content by path. */
+  readBinaryPath(path: string): Uint8Array | undefined {
+    return this.binaryContents.get(path);
   }
 
   private createFile(path: string, content: string): TFile {
@@ -141,8 +149,23 @@ export class MockApp {
     this.ensureFolderPath(parentPath(path));
     const file = new TFile();
     this.assignFileFields(file, path);
+    file.stat.size = content.length;
     this.fileObjs.set(path, file);
     this.contents.set(path, content);
+    this.rewire();
+    return file;
+  }
+
+  private createBinaryFile(path: string, content: Uint8Array): TFile {
+    if (this.fileObjs.has(path) || this.folderObjs.has(path)) {
+      throw new Error(`file already exists: ${path}`);
+    }
+    this.ensureFolderPath(parentPath(path));
+    const file = new TFile();
+    this.assignFileFields(file, path);
+    file.stat.size = content.byteLength;
+    this.fileObjs.set(path, file);
+    this.binaryContents.set(path, content);
     this.rewire();
     return file;
   }
@@ -163,12 +186,13 @@ export class MockApp {
   }
 
   private removePath(path: string, system: boolean): void {
-    const targets = [...this.contents.keys(), ...this.folderObjs.keys()].filter(
+    const targets = [...this.fileObjs.keys(), ...this.folderObjs.keys()].filter(
       (candidate) => candidate === path || candidate.startsWith(`${path}/`)
     );
     for (const target of targets) {
       this.trashed.push({ path: target, system });
       this.contents.delete(target);
+      this.binaryContents.delete(target);
       this.fileObjs.delete(target);
       this.folderObjs.delete(target);
     }
@@ -177,7 +201,7 @@ export class MockApp {
 
   private relocate(oldPath: string, newPath: string): void {
     this.ensureFolderPath(parentPath(newPath));
-    const affected = [...this.contents.keys(), ...this.folderObjs.keys()].filter(
+    const affected = [...this.fileObjs.keys(), ...this.folderObjs.keys()].filter(
       (candidate) => candidate === oldPath || candidate.startsWith(`${oldPath}/`)
     );
     for (const from of affected) {
@@ -190,6 +214,9 @@ export class MockApp {
         const content = this.contents.get(from);
         this.contents.delete(from);
         if (content !== undefined) this.contents.set(to, content);
+        const binaryContent = this.binaryContents.get(from);
+        this.binaryContents.delete(from);
+        if (binaryContent !== undefined) this.binaryContents.set(to, binaryContent);
       }
       const folderObj = this.folderObjs.get(from);
       if (folderObj) {

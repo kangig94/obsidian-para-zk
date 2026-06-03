@@ -1,3 +1,5 @@
+import { readFile as readLocalFile, readdir as readLocalDir, stat as statLocalPath } from "node:fs/promises";
+import { join as joinLocalPath } from "node:path";
 import type { Plugin } from "obsidian";
 import { localePack, normalizeLocale } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
@@ -11,6 +13,7 @@ import {
 } from "../vocabulary";
 import { PROMOTION_ZK_KIND_CODE_HELP, ZK_KIND_CODE_HELP } from "../zk/kinds";
 import { parseList } from "./parse";
+import { joinVaultPath, normalizeVaultPath, sanitizeFileName, wikiLink } from "../vault/paths";
 import {
   describeSurface,
   describeSurfaces,
@@ -96,6 +99,26 @@ const COLLECTION_FILTERS: Record<string, string[]> = {
   backlink: ["offset", "limit", "query", "type"]
 };
 
+const DEFAULT_ATTACHMENT_FOLDER = "assets";
+
+let attachmentCreateQueue: Promise<void> = Promise.resolve();
+
+type AttachmentJob = {
+  sourcePath: string;
+  targetFolder: string;
+  requestedName?: string;
+};
+
+type AttachedFile = {
+  source: string;
+  path: string;
+  name: string;
+  kind: string;
+  size: number;
+  link: string;
+  embed: string;
+};
+
 const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
   {
     command: "para-zk:describe",
@@ -138,6 +161,20 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
         ...result
       };
     }
+  },
+  {
+    command: "para-zk:attach-file",
+    description: "Copy local files or directories into the vault attachment folder",
+    options: {
+      source: { value: "<local-path>", description: "Local file or directory path to copy into the vault." },
+      sources: { value: "<json|comma-list>", description: "Additional local file or directory paths to copy." },
+      folder: { value: "<vault-folder>", description: "Vault-relative target folder (default: assets)." },
+      name: { value: "<filename>", description: "Optional destination filename. The source extension is preserved when omitted." },
+      recursive: { value: "<true|false>", description: "For directory sources, include nested files (default: true)." },
+      format: { value: "<text|json>", description: "Output format (default: text)." }
+    },
+    text: "file attached",
+    run: async (plugin, args) => attachLocalFile(plugin, args)
   },
   {
     command: "para-zk:read-project",
@@ -910,6 +947,251 @@ function workflowContext(plugin: ParaZkPluginContext): WorkflowContext {
     app: plugin.app,
     settings: plugin.settings
   };
+}
+
+async function attachLocalFile(plugin: ParaZkPluginContext, args: CliArgs): Promise<Record<string, unknown>> {
+  rejectCliAliases(args, {
+    file: "source",
+    file_path: "source",
+    filePath: "source",
+    sourcePath: "source"
+  });
+
+  const sourcePaths = readAttachmentSources(args);
+  const folder = normalizeAttachmentFolder(readCliString(args, "folder"));
+  const requestedName = readCliString(args, "name")?.trim();
+  if (requestedName && sourcePaths.length !== 1) {
+    throw new Error("name is only valid for a single file source");
+  }
+
+  const recursive = readCliBoolean(args, "recursive") ?? true;
+  const { jobs, collectionMode } = await collectAttachmentJobs(sourcePaths, folder, requestedName, recursive);
+  const files: AttachedFile[] = [];
+  for (const job of jobs) {
+    files.push(await attachAttachmentJob(plugin, job));
+  }
+
+  if (!collectionMode && files[0]) return files[0];
+  return { count: files.length, files };
+}
+
+function readAttachmentSources(args: CliArgs): string[] {
+  const source = readCliString(args, "source")?.trim();
+  const sources = parseList(readCliString(args, "sources"));
+  const paths = [source, ...sources].filter((value): value is string => Boolean(value));
+  if (paths.length === 0) throw new Error("source or sources is required");
+  return paths;
+}
+
+async function collectAttachmentJobs(
+  sourcePaths: string[],
+  folder: string,
+  requestedName: string | undefined,
+  recursive: boolean
+): Promise<{ jobs: AttachmentJob[]; collectionMode: boolean }> {
+  const jobs: AttachmentJob[] = [];
+  let collectionMode = sourcePaths.length > 1;
+
+  for (const sourcePath of sourcePaths) {
+    const info = await statLocalPath(sourcePath);
+    if (info.isFile()) {
+      jobs.push({ sourcePath, targetFolder: folder, requestedName });
+      continue;
+    }
+
+    if (info.isDirectory()) {
+      if (requestedName) throw new Error("name is only valid for a single file source");
+      collectionMode = true;
+      const rootFolder = joinVaultPath(folder, vaultPathSegment(localFileName(sourcePath), "directory name"));
+      await collectDirectoryAttachmentJobs(sourcePath, rootFolder, recursive, jobs);
+      continue;
+    }
+
+    throw new Error(`source is not a file or directory: ${sourcePath}`);
+  }
+
+  return { jobs, collectionMode };
+}
+
+async function collectDirectoryAttachmentJobs(
+  sourceDir: string,
+  targetFolder: string,
+  recursive: boolean,
+  jobs: AttachmentJob[]
+): Promise<void> {
+  async function visit(localFolder: string, vaultFolder: string): Promise<void> {
+    const entries = (await readLocalDir(localFolder, { withFileTypes: true }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    for (const entry of entries) {
+      const localPath = joinLocalPath(localFolder, entry.name);
+      if (entry.isFile()) {
+        jobs.push({ sourcePath: localPath, targetFolder: vaultFolder });
+        continue;
+      }
+      if (entry.isDirectory() && recursive) {
+        await visit(localPath, joinVaultPath(vaultFolder, vaultPathSegment(entry.name, "directory name")));
+      }
+    }
+  }
+
+  await visit(sourceDir, targetFolder);
+}
+
+async function attachAttachmentJob(plugin: ParaZkPluginContext, job: AttachmentJob): Promise<AttachedFile> {
+  const bytes = await readLocalFile(job.sourcePath);
+  const filename = attachmentFileName(job.sourcePath, job.requestedName);
+  const file = await createUniqueVaultBinary(plugin, job.targetFolder, filename, bytes);
+  const link = wikiLink(file.path);
+
+  return {
+    source: job.sourcePath,
+    path: file.path,
+    name: file.name,
+    kind: attachmentKind(file.name),
+    size: bytes.byteLength,
+    link,
+    embed: `!${link}`
+  };
+}
+
+function normalizeAttachmentFolder(value: string | undefined): string {
+  const folder = normalizeVaultPath(value || DEFAULT_ATTACHMENT_FOLDER);
+  if (!folder) throw new Error("folder is required");
+  assertVaultPathSafe(folder, "folder");
+  return folder;
+}
+
+function attachmentFileName(sourcePath: string, requestedName: string | undefined): string {
+  const sourceName = localFileName(sourcePath);
+  const sourceExtension = fileExtension(sourceName);
+  let filename = sanitizeFileName(requestedName?.trim() || sourceName);
+  if (!filename) throw new Error("attachment filename is required");
+  if (requestedName?.trim() && !fileExtension(filename) && sourceExtension) {
+    filename = `${filename}${sourceExtension}`;
+  }
+  assertVaultPathSafe(filename, "name");
+  return filename;
+}
+
+function vaultPathSegment(value: string, label: string): string {
+  const segment = sanitizeFileName(value.trim());
+  if (!segment) throw new Error(`${label} is required`);
+  assertVaultPathSafe(segment, label);
+  return segment;
+}
+
+function localFileName(path: string): string {
+  return path.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? "";
+}
+
+function fileExtension(filename: string): string {
+  const index = filename.lastIndexOf(".");
+  return index > 0 ? filename.slice(index) : "";
+}
+
+function attachmentKind(filename: string): string {
+  const extension = fileExtension(filename).slice(1).toLowerCase();
+  if (["apng", "avif", "bmp", "gif", "heic", "heif", "jpeg", "jpg", "png", "svg", "webp"].includes(extension)) return "image";
+  if (["avi", "m4v", "mkv", "mov", "mp4", "mpeg", "mpg", "ogv", "webm"].includes(extension)) return "video";
+  if (["aac", "aiff", "flac", "m4a", "mp3", "ogg", "oga", "opus", "wav", "weba"].includes(extension)) return "audio";
+  if (extension === "pdf") return "pdf";
+  return "file";
+}
+
+async function createUniqueVaultBinary(
+  plugin: ParaZkPluginContext,
+  folder: string,
+  filename: string,
+  bytes: Uint8Array
+): Promise<{ path: string; name: string }> {
+  return withAttachmentCreateLock(async () => {
+    await ensureVaultFolder(plugin, folder);
+    const extension = fileExtension(filename);
+    const stem = extension ? filename.slice(0, -extension.length) : filename;
+    for (let index = 0; index < 1000; index += 1) {
+      const candidateName = index === 0 ? filename : `${stem} ${index}${extension}`;
+      const candidatePath = joinVaultPath(folder, candidateName);
+      if (await vaultPathExists(plugin, candidatePath)) continue;
+      try {
+        return await createVaultBinary(plugin, candidatePath, bytes);
+      } catch (error) {
+        if (!isAlreadyExistsError(error)) throw error;
+      }
+    }
+    throw new Error(`failed to allocate unique attachment path: ${joinVaultPath(folder, filename)}`);
+  });
+}
+
+async function withAttachmentCreateLock<T>(fn: () => Promise<T>): Promise<T> {
+  const previous = attachmentCreateQueue.catch(() => undefined);
+  let release: () => void = () => {};
+  attachmentCreateQueue = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await previous;
+  try {
+    return await fn();
+  } finally {
+    release();
+  }
+}
+
+async function vaultPathExists(plugin: ParaZkPluginContext, path: string): Promise<boolean> {
+  const adapter = plugin.app.vault.adapter as { exists?: (path: string) => Promise<boolean> };
+  if (adapter.exists) return adapter.exists(path);
+  return plugin.app.vault.getAbstractFileByPath(path) !== null;
+}
+
+async function ensureVaultFolder(plugin: ParaZkPluginContext, folder: string): Promise<void> {
+  const parts = normalizeVaultPath(folder).split("/").filter(Boolean);
+  let current = "";
+  for (const part of parts) {
+    current = current ? `${current}/${part}` : part;
+    const existing = plugin.app.vault.getAbstractFileByPath(current);
+    if (existing) {
+      if (!isFolderLike(existing)) throw new Error(`target folder path is a file: ${current}`);
+      continue;
+    }
+    try {
+      await plugin.app.vault.createFolder(current);
+    } catch (error) {
+      const after = plugin.app.vault.getAbstractFileByPath(current);
+      if (isAlreadyExistsError(error) && (!after || isFolderLike(after))) continue;
+      if (after && !isFolderLike(after)) throw new Error(`target folder path is a file: ${current}`);
+      throw error;
+    }
+  }
+}
+
+function isFolderLike(value: unknown): boolean {
+  return typeof value === "object" && value !== null && Array.isArray((value as { children?: unknown }).children);
+}
+
+async function createVaultBinary(
+  plugin: ParaZkPluginContext,
+  path: string,
+  bytes: Uint8Array
+): Promise<{ path: string; name: string }> {
+  const vault = plugin.app.vault as typeof plugin.app.vault & {
+    createBinary?: (path: string, data: ArrayBuffer) => Promise<{ path: string; name: string }>;
+  };
+  if (!vault.createBinary) throw new Error("binary file creation is unavailable in this Obsidian runtime");
+  return vault.createBinary(path, bytesToArrayBuffer(bytes));
+}
+
+function isAlreadyExistsError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /\bEEXIST\b/i.test(message) || /already exists/i.test(message) || /file exists/i.test(message);
+}
+
+function bytesToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
+function assertVaultPathSafe(path: string, label: string): void {
+  const bad = normalizeVaultPath(path).split("/").some((part) => part === "." || part === "..");
+  if (bad) throw new Error(`${label} must not contain . or .. path segments`);
 }
 
 function describeCollectionFilters(surfaces: SurfaceDescription[]): Record<string, string[]> {

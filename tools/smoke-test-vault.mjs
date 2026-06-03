@@ -1,12 +1,15 @@
 import { spawnSync } from "node:child_process";
 import {
   existsSync,
+  mkdtempSync,
   mkdirSync,
   readFileSync,
   readdirSync,
   rmSync,
-  statSync
+  statSync,
+  writeFileSync
 } from "node:fs";
+import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 
 const args = parseArgs(process.argv.slice(2));
@@ -167,6 +170,7 @@ function runLiveScenario() {
   assertObjectReferenceRenameSurvival();
   assertRenameAreaLinkRewrite();
   assertBacklinkReadKeyScenario();
+  assertAttachFileCliScenario();
 
   const reorderProject = cliJson("para-zk:create-project", [
     `title=Smoke Reorder ${stamp}`,
@@ -195,6 +199,45 @@ function runLiveScenario() {
   assertTaskBlockRendererRegression(taskProject.path, `Smoke render task ${stamp}`);
   assertDataviewToolbarLayout(taskProject.path);
   assertCreateRetroButtonProjectLink();
+}
+
+function assertAttachFileCliScenario() {
+  const localTemp = mkdtempSync(join(tmpdir(), "para-zk-smoke-attach-"));
+  const vaultTarget = `assets/smoke-attach-${stamp}`;
+
+  try {
+    const singleSource = join(localTemp, "attach smoke.png");
+    writeFileSync(singleSource, Buffer.from([1, 2, 3]));
+    const single = cliJson("para-zk:attach-file", [
+      `source=${singleSource}`,
+      `folder=${vaultTarget}`,
+      "format=json"
+    ]);
+    assert(single.ok === true, `attach-file single failed: ${JSON.stringify(single)}`);
+    assert(single.path === `${vaultTarget}/attach smoke.png`, `unexpected attach-file path: ${single.path}`);
+    assert(single.kind === "image", `unexpected attach-file kind: ${single.kind}`);
+    assertFileExists(single.path, "attach-file single did not create file");
+
+    const mediaDir = join(localTemp, "media");
+    mkdirSync(join(mediaDir, "nested"), { recursive: true });
+    writeFileSync(join(mediaDir, "a.png"), Buffer.from([4]));
+    writeFileSync(join(mediaDir, "nested", "sound.mp3"), Buffer.from([5]));
+    const directory = cliJson("para-zk:attach-file", [
+      `source=${mediaDir}`,
+      `folder=${vaultTarget}`,
+      "format=json"
+    ]);
+    assert(directory.ok === true, `attach-file directory failed: ${JSON.stringify(directory)}`);
+    assert(directory.count === 2, `attach-file directory count mismatch: ${JSON.stringify(directory)}`);
+    const paths = Array.isArray(directory.files) ? directory.files.map((file) => file.path) : [];
+    assert(paths.includes(`${vaultTarget}/media/a.png`), `attach-file directory missing root file: ${JSON.stringify(directory)}`);
+    assert(paths.includes(`${vaultTarget}/media/nested/sound.mp3`), `attach-file directory missing nested file: ${JSON.stringify(directory)}`);
+    assertFileExists(`${vaultTarget}/media/a.png`, "attach-file directory did not create root file");
+    assertFileExists(`${vaultTarget}/media/nested/sound.mp3`, "attach-file directory did not create nested file");
+  } finally {
+    rmSync(localTemp, { recursive: true, force: true });
+    rmSync(join(vaultPath, vaultTarget), { recursive: true, force: true });
+  }
 }
 
 function assertManagedTemplateFiles() {
