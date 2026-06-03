@@ -1,13 +1,16 @@
 import {
   ButtonComponent,
   DropdownComponent,
+  MarkdownView,
   Notice,
   SuggestModal,
   TFile,
   TextComponent,
   type App,
-  type MarkdownPostProcessorContext
+  type MarkdownPostProcessorContext,
+  type WorkspaceLeaf
 } from "obsidian";
+import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import {
   findPropsField,
@@ -58,12 +61,15 @@ function renderPropsCodeBlock(
   const type = parsePropsViewType(args.type) ?? inferPropsViewType(frontmatter);
 
   el.empty();
+  el.removeClass("para-zk-props", "is-disabled");
+  el.addClass("para-zk-props-block");
   if (!type) {
     renderMuted(el, "PARA-ZK props type is missing or unsupported.");
     return;
   }
 
-  renderPropsGrid(plugin, propsSchemaForType(type, plugin.settings.locale), el, ctx.sourcePath);
+  renderPropsToolbar(plugin, el, ctx.sourcePath);
+  renderPropsGrid(plugin, propsSchemaForType(type, plugin.settings.locale), el.createDiv(), ctx.sourcePath);
 }
 
 function renderInlinePropsInputs(plugin: ParaZkPluginContext, el: HTMLElement, ctx: MarkdownPostProcessorContext): void {
@@ -102,6 +108,7 @@ function renderPropsGrid(
 
   container.empty();
   container.addClass("para-zk-props");
+  container.removeClass("is-disabled");
   if (!file) container.addClass("is-disabled");
 
   for (const row of schema.rows) {
@@ -112,6 +119,60 @@ function renderPropsGrid(
       renderField(plugin, schema, field, frontmatter, rowEl, sourcePath);
     }
   }
+}
+
+function renderPropsToolbar(plugin: ParaZkPluginContext, container: HTMLElement, sourcePath?: string): void {
+  const labels = localePack(plugin.settings.locale).labels;
+  const toolbar = container.createDiv({ cls: "para-zk-props-toolbar" });
+  const controls = toolbar.createDiv({ cls: "para-zk-props-toolbar-controls" });
+
+  renderPropsModeButton(plugin, controls, {
+    sourcePath,
+    label: labelValue(labels.edit, "Edit"),
+    icon: "pencil",
+    className: "para-zk-props-edit",
+    mode: "source"
+  });
+  renderPropsModeButton(plugin, controls, {
+    sourcePath,
+    label: labelValue(labels.view, "View"),
+    icon: "eye",
+    className: "para-zk-props-view",
+    mode: "preview"
+  });
+}
+
+function renderPropsModeButton(
+  plugin: ParaZkPluginContext,
+  container: HTMLElement,
+  options: {
+    sourcePath?: string;
+    label: string;
+    icon: string;
+    className: string;
+    mode: "source" | "preview";
+  }
+): void {
+  const buttonComponent = new ButtonComponent(container);
+  const button = buttonComponent.buttonEl;
+  button.addClass("para-zk-props-toolbar-button", options.className);
+  button.setAttr("aria-label", options.label);
+  buttonComponent
+    .setIcon(options.icon)
+    .setButtonText(options.label)
+    .setTooltip(options.label)
+    .setDisabled(!options.sourcePath)
+    .onClick(async () => {
+      button.disabled = true;
+      try {
+        await focusMarkdownMode(plugin, options.sourcePath, options.mode);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        new Notice(`PARA-ZK: ${message}`);
+      } finally {
+        button.disabled = false;
+      }
+    });
 }
 
 // Read-only display fields with no value (e.g. an area note's empty `parent`)
@@ -361,6 +422,98 @@ function renderInternalLink(
   });
 }
 
+async function focusMarkdownMode(
+  plugin: ParaZkPluginContext,
+  sourcePath: string | undefined,
+  mode: "source" | "preview"
+): Promise<void> {
+  const file = sourceFile(plugin, sourcePath);
+  if (!file) throw new Error("current note not found");
+
+  const leaf = findMarkdownLeafForPath(plugin, file.path) ?? plugin.app.workspace.getLeaf(false);
+  let view = leaf.view instanceof MarkdownView ? leaf.view : undefined;
+  if (!view || view.file?.path !== file.path) {
+    await leaf.openFile(file, {
+      active: true,
+      state: { mode }
+    });
+    view = leaf.view instanceof MarkdownView ? leaf.view : undefined;
+  } else {
+    await plugin.app.workspace.revealLeaf(leaf);
+    plugin.app.workspace.setActiveLeaf(leaf, { focus: true });
+    if (view.getMode() !== mode) {
+      await view.setState({
+        ...view.getState(),
+        mode
+      }, { history: false });
+    }
+  }
+
+  if (!view) throw new Error("markdown editor not available");
+  plugin.app.workspace.setActiveLeaf(view.leaf, { focus: true });
+  if (mode === "source") {
+    window.setTimeout(() => {
+      if (!view) return;
+      view.editor.setCursor(cursorAfterPropsHeading(view.editor.getValue()));
+      view.editor.focus();
+    }, 0);
+  }
+}
+
+function cursorAfterPropsHeading(content: string): { line: number; ch: number } {
+  const lines = content.split(/\r?\n/);
+  const propsEnd = propsBlockEndLine(lines);
+  const headingLine = firstHeadingLineAfter(lines, propsEnd + 1);
+  if (headingLine === undefined) return { line: Math.min(lines.length, propsEnd + 1), ch: 0 };
+  return { line: headingBodyStartLine(lines, headingLine + 1), ch: 0 };
+}
+
+function propsBlockEndLine(lines: string[]): number {
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!/^\s*```para-zk-props(?:\s|$)/.test(lines[index])) continue;
+    const close = closingFenceLine(lines, index + 1);
+    return close ?? index;
+  }
+  return -1;
+}
+
+function firstHeadingLineAfter(lines: string[], startLine: number): number | undefined {
+  for (let index = Math.max(0, startLine); index < lines.length; index += 1) {
+    if (/^#{1,6}\s+\S/.test(lines[index])) return index;
+  }
+  return undefined;
+}
+
+function headingBodyStartLine(lines: string[], startLine: number): number {
+  let line = startLine;
+  if (/^\s*```para-zk-[^\r\n]*\s*$/.test(lines[line] ?? "")) {
+    line = (closingFenceLine(lines, line + 1) ?? line) + 1;
+  }
+
+  return Math.min(line, lines.length);
+}
+
+function closingFenceLine(lines: string[], startLine: number): number | undefined {
+  for (let index = startLine; index < lines.length; index += 1) {
+    if (/^\s*```\s*$/.test(lines[index])) return index;
+  }
+  return undefined;
+}
+
+function findMarkdownLeafForPath(plugin: ParaZkPluginContext, path: string): WorkspaceLeaf | undefined {
+  const activeView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
+  if (activeView?.file?.path === path) return activeView.leaf;
+
+  return plugin.app.workspace.getLeavesOfType("markdown")
+    .find((leaf) => markdownLeafPath(leaf) === path);
+}
+
+function markdownLeafPath(leaf: WorkspaceLeaf): string | undefined {
+  if (leaf.view instanceof MarkdownView) return leaf.view.file?.path;
+  const stateFile = leaf.getViewState().state?.file;
+  return typeof stateFile === "string" ? stateFile : undefined;
+}
+
 function parseDisplayLink(value: string): { target: string; label: string } | undefined {
   const match = value.match(/^\[\[(.*?)(?:\|(.*?))?\]\]$/);
   if (!match) return undefined;
@@ -493,6 +646,10 @@ function valueText(value: unknown): string {
   if (Array.isArray(value)) return value.map(String).join(", ");
   if (value === null || value === undefined) return "";
   return String(value);
+}
+
+function labelValue(value: string | undefined, fallback: string): string {
+  return value?.trim() ? value : fallback;
 }
 
 function toDateTimeInputValue(value: string): string {
