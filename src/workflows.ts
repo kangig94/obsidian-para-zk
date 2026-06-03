@@ -333,6 +333,13 @@ type ReadSurfaceSpec = {
   body?: boolean;
   children?: boolean;
 };
+export type SurfaceDescription = {
+  type: string;
+  readKeys: string[];
+  writeKeys: string[];
+  frontmatterKeys?: string[];
+  collections: Record<string, ReadCollectionKind>;
+};
 export type TaskRead = {
   checkbox: string;
   name: string;
@@ -1615,6 +1622,21 @@ const BACKLINK_READ_SECTION: ReadSectionSpec = {
   transform: readBacklinks,
   collection: "backlink"
 };
+
+const SURFACE_TYPES = [
+  "project",
+  "area",
+  "resource",
+  "journal",
+  "retro",
+  "doc",
+  "zk_fleeting",
+  "zk_literature",
+  "zk_permanent",
+  "note"
+] as const;
+
+type SurfaceType = typeof SURFACE_TYPES[number];
 
 const PROJECT_READ_SPEC: ReadSurfaceSpec = {
   frontmatter: ["areas", "status", "priority", "start_date", "due_date", "done_date"],
@@ -3047,6 +3069,26 @@ function compactReadKeys(spec: ReadSurfaceSpec): string[] {
   return keys;
 }
 
+function compactWriteKeys(spec: ReadSurfaceSpec): string[] {
+  const keys: string[] = [];
+  if (spec.frontmatter.length > 0) keys.push("frontmatter");
+  for (const section of spec.sections ?? []) {
+    if (section.collection === "backlink") continue;
+    keys.push(section.key);
+  }
+  if (spec.body) keys.push("body");
+  if (spec.children) keys.push("children");
+  return keys;
+}
+
+function collectionMap(spec: ReadSurfaceSpec): Record<string, ReadCollectionKind> {
+  const collections: Record<string, ReadCollectionKind> = {};
+  for (const section of spec.sections ?? []) {
+    if (section.collection) collections[section.key] = section.collection;
+  }
+  return collections;
+}
+
 function writeKeyHints(spec: ReadSurfaceSpec): string[] {
   const keys: string[] = [];
   if (spec.frontmatter.length > 0) keys.push(`frontmatter/{${spec.frontmatter.join("|")}}=set`);
@@ -3080,6 +3122,44 @@ export function surfaceReadKeys(type: string): string[] {
 
 export function surfaceWriteKeys(type: string): string[] {
   return writeKeyHints(specForType(type));
+}
+
+export function surfaceTypes(): string[] {
+  return [...SURFACE_TYPES];
+}
+
+export function describeSurface(type: string): SurfaceDescription {
+  const normalized = normalizeSurfaceType(type);
+  return describeSurfaceSpec(normalized, specForSurfaceType(normalized));
+}
+
+export function describeSurfaces(): SurfaceDescription[] {
+  return SURFACE_TYPES.map((type) => describeSurfaceSpec(type, specForSurfaceType(type)));
+}
+
+function normalizeSurfaceType(type: string): SurfaceType {
+  const normalized = type.trim().toLocaleLowerCase();
+  if (normalized === "fleeting") return "zk_fleeting";
+  if (normalized === "literature") return "zk_literature";
+  if (normalized === "permanent") return "zk_permanent";
+  if ((SURFACE_TYPES as readonly string[]).includes(normalized)) return normalized as SurfaceType;
+  throw new Error(`unknown surface type: ${type} (valid: ${SURFACE_TYPES.join(", ")})`);
+}
+
+function specForSurfaceType(type: SurfaceType): ReadSurfaceSpec {
+  if (type === "note") return NOTE_READ_SPEC;
+  return specForType(type);
+}
+
+function describeSurfaceSpec(type: SurfaceType, spec: ReadSurfaceSpec): SurfaceDescription {
+  const frontmatterKeys = [...spec.frontmatter];
+  return {
+    type,
+    readKeys: compactReadKeys(spec),
+    writeKeys: compactWriteKeys(spec),
+    ...(frontmatterKeys.length > 0 ? { frontmatterKeys } : {}),
+    collections: collectionMap(spec)
+  };
 }
 
 function readMapPath(map: ReadMap, parts: string[], originalKey: string): unknown {

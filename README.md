@@ -35,7 +35,8 @@ separate sync command.
 Native CLI handlers, when supported by the running Obsidian app:
 
 ```bash
-obsidian para-zk:ping format=json
+obsidian para-zk:describe format=json
+obsidian para-zk:describe type=project format=json
 obsidian para-zk:setup format=json
 obsidian para-zk:setup dryRun=true force=true locale=en format=json
 obsidian para-zk:setup locale=ko format=json
@@ -67,6 +68,8 @@ obsidian para-zk:capture-journal content="Quick memo" energy=normal format=json
 CLI option values use locale-neutral codes only. For example, pass
 `status=in_progress` instead of `status="1. 진행중"`; the plugin renders the
 localized label inside the generated note.
+Use `para-zk:describe` to inspect supported surface types, stable read/write
+keys, and collection filters in compact JSON form.
 Read commands use the same rule: `key=frontmatter/status`, `key=summary`, and
 `key="children/Meeting notes/body"` are stable CLI map paths and do not depend
 on the generated Markdown locale. Read commands also support

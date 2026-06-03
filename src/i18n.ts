@@ -280,7 +280,6 @@ const ko: LocalePack = {
     retroNameGeneral: "General"
   },
   messages: {
-    pong: "pong",
     setupReady: "PARA-ZK vault 구성 완료",
     statusReady: "PARA-ZK plugin loaded",
     commandComplete: "완료",
@@ -533,7 +532,6 @@ const en: LocalePack = {
     retroNameGeneral: "General"
   },
   messages: {
-    pong: "pong",
     setupReady: "PARA-ZK vault set up",
     statusReady: "PARA-ZK plugin loaded",
     commandComplete: "Done",

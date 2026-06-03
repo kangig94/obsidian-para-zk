@@ -11,7 +11,16 @@ import {
 } from "../vocabulary";
 import { PROMOTION_ZK_KIND_CODE_HELP, ZK_KIND_CODE_HELP } from "../zk/kinds";
 import { parseList } from "./parse";
-import { surfaceReadKeys, surfaceWriteKeys, type CollectionReadOptions, type WorkflowContext } from "../workflows";
+import {
+  describeSurface,
+  describeSurfaces,
+  surfaceReadKeys,
+  surfaceTypes,
+  surfaceWriteKeys,
+  type CollectionReadOptions,
+  type SurfaceDescription,
+  type WorkflowContext
+} from "../workflows";
 
 type CliCapablePlugin = Plugin & {
   registerCliHandler?: (
@@ -81,19 +90,29 @@ const READ_COLLECTION_OPTIONS: Record<string, CliOptionSpec> = {
   ref_kind: { value: "<url|note|file|wiki|text>", description: "Reference collection reads only: filter references by kind." }
 };
 
+const COLLECTION_FILTERS: Record<string, string[]> = {
+  task: ["offset", "limit", "query", "checkbox", "priority", "due_before", "due_after"],
+  reference: ["offset", "limit", "query", "ref_kind"],
+  backlink: ["offset", "limit", "query", "type"]
+};
+
 const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
   {
-    command: "para-zk:ping",
-    description: "Check that the PARA-ZK native CLI handler is loaded",
+    command: "para-zk:describe",
+    description: "Describe PARA-ZK CLI surface types, stable read/write keys, and collection filters",
     options: {
+      type: { value: `<${surfaceTypes().join("|")}>`, description: "Optional surface type. Omit to describe all supported surfaces." },
       format: { value: "<text|json>", description: "Output format (default: text)" }
     },
-    text: "pong",
-    run: async (plugin) => ({
-      pluginId: plugin.manifest.id,
-      message: localePack(plugin.settings.locale).messages.pong,
-      settings: plugin.settings
-    })
+    text: "CLI surface described",
+    run: async (_plugin, args) => {
+      const type = readCliString(args, "type");
+      const surfaces = type ? [describeSurface(type)] : describeSurfaces();
+      return {
+        collectionFilters: describeCollectionFilters(surfaces),
+        surfaces
+      };
+    }
   },
   {
     command: "para-zk:setup",
@@ -891,6 +910,17 @@ function workflowContext(plugin: ParaZkPluginContext): WorkflowContext {
     app: plugin.app,
     settings: plugin.settings
   };
+}
+
+function describeCollectionFilters(surfaces: SurfaceDescription[]): Record<string, string[]> {
+  const collectionKinds = new Set<string>(
+    surfaces.flatMap((surface) => Object.values(surface.collections))
+  );
+  return Object.fromEntries(
+    Object.entries(COLLECTION_FILTERS)
+      .filter(([kind]) => collectionKinds.has(kind))
+      .map(([kind, keys]) => [kind, [...keys]])
+  );
 }
 
 function renderCli(args: CliArgs, payload: Record<string, unknown>, text: string): string {
