@@ -1830,8 +1830,6 @@ function compactReadEnvelope(
 
   return {
     mode: "compact",
-    omits_empty: true,
-    available_keys: compactReadKeys(spec),
     path: file.path,
     title: file.basename,
     type,
@@ -1852,7 +1850,7 @@ function compactReadMap(value: ReadMap, spec: ReadSurfaceSpec): ReadMap {
       ? compactFrontmatter(item)
       : collectionKeys.has(key)
         ? compactCollectionCount(item)
-        : compactReadValue(item);
+        : compactSectionLength(item);
     if (compact !== undefined) result[key] = compact;
   }
   return result;
@@ -1865,6 +1863,16 @@ function compactCollectionCount(value: unknown): unknown {
   return {
     count: entries.length
   };
+}
+
+// Compact reads summarize prose sections by character count, mirroring the
+// count-only treatment of collections, so a full read stays bounded for
+// long-form notes. The full text is read on demand with `key=<section>`.
+function compactSectionLength(value: unknown): unknown {
+  if (typeof value !== "string") return compactReadValue(value);
+  const trimmed = trimMarkdownBlock(value);
+  if (trimmed.length === 0 || isMarkdownScaffold(trimmed)) return undefined;
+  return { chars: trimmed.length };
 }
 
 function compactFrontmatter(value: unknown): unknown {

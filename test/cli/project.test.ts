@@ -97,17 +97,21 @@ describe("read-project", () => {
     );
     expect("keys" in read).toBe(false);
     expect(read.mode).toBe("compact");
-    expect(read.available_keys).toEqual(expect.arrayContaining([
-      "frontmatter",
-      "summary",
-      "goals",
-      "tasks",
-      "references",
-      "backlinks",
-      "children"
-    ]));
-    expect(read.available_keys).not.toContain("tasks/<id>");
+    expect(read).not.toHaveProperty("available_keys");
+    expect(read).not.toHaveProperty("omits_empty");
     expect(read.tasks).toBeUndefined();
+  });
+
+  it("summarizes prose sections by character count in compact reads", async () => {
+    await createBaseProject();
+    const summary = "A concise project summary.";
+    await cli.run("para-zk:update-project", { title: "Alpha", key: "summary", op: "set", value: summary });
+
+    const compact = await cli.run("para-zk:read-project", { title: "Alpha" });
+    expect(compact.summary).toEqual({ chars: summary.length });
+
+    const exact = await cli.run("para-zk:read-project", { title: "Alpha", key: "summary" });
+    expect(exact.value).toBe(summary);
   });
 
   it("reads scalar keys in exact mode", async () => {

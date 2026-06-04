@@ -112,9 +112,10 @@ describe("retro", () => {
     expect(content).not.toContain("```para-zk-tasks");
     expect(content).not.toContain("```para-zk-references");
 
-    const compact = await cli.run("para-zk:read-retro", { path: String(retro.path) });
-    expect(compact.available_keys).not.toContain("tasks");
-    expect(compact.available_keys).not.toContain("references");
+    const described = await cli.run("para-zk:describe", { type: "retro" });
+    const retroSurface = (described.surfaces as Array<{ type: string; readKeys: string[] }>)[0];
+    expect(retroSurface.readKeys).not.toContain("tasks");
+    expect(retroSurface.readKeys).not.toContain("references");
   });
 
   it("links a project retro even when metadata cache has not caught up", async () => {
@@ -180,8 +181,9 @@ describe("subarea and child bodies", () => {
     const children = await cli.run("para-zk:read-area", { title: "Ops", key: "children" });
     expect((children.value as Record<string, { path: string }>).Hiring.path).toBe(subarea.path);
 
-    const compact = await cli.run("para-zk:read-area", { title: "Ops" });
-    expect(compact.available_keys).toEqual(expect.arrayContaining([
+    const described = await cli.run("para-zk:describe", { type: "area" });
+    const areaSurface = (described.surfaces as Array<{ type: string; readKeys: string[] }>)[0];
+    expect(areaSurface.readKeys).toEqual(expect.arrayContaining([
       "frontmatter",
       "overview",
       "tasks",
@@ -189,7 +191,7 @@ describe("subarea and child bodies", () => {
       "backlinks",
       "children"
     ]));
-    expect(compact.available_keys).not.toContain("children/<title>/<key>");
+    expect(areaSurface.readKeys).not.toContain("children/<title>/<key>");
   });
 
   it("allocates a unique folder-style container for duplicate area titles", async () => {
