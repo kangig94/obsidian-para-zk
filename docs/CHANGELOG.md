@@ -79,7 +79,7 @@ Notable changes for PARA-ZK are tracked here.
   `clients/.mcp.codex.json` with a relative `cwd` it rebases to the plugin root) —
   so any MCP client can discover the vault and drive it through the native CLI.
   Install in Claude with `/plugin marketplace add kangig94/obsidian-para-zk` then
-  `/plugin install para-zk@kangig94`, or in Codex with
+  `/plugin install para-zk@obsidian-para-zk`, or in Codex with
   `codex plugin marketplace add kangig94/obsidian-para-zk`; the `describe` tool
   returns the live CLI contract.
 - Added shell-safe MCP section-mutation tools `replace`, `set`, and `add` that

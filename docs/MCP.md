@@ -11,7 +11,7 @@ PARA-ZK ships a thin MCP server for discovery plus shell-safe section edits. It 
 
 ```text
 /plugin marketplace add kangig94/obsidian-para-zk
-/plugin install para-zk@kangig94
+/plugin install para-zk@obsidian-para-zk
 ```
 
 ## Codex CLI

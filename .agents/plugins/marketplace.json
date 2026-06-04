@@ -1,6 +1,6 @@
 {
-  "name": "kangig94",
-  "displayName": "kangig94 PARA-ZK",
+  "name": "obsidian-para-zk",
+  "displayName": "PARA-ZK",
   "plugins": [
     {
       "name": "para-zk",
