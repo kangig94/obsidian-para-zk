@@ -71,8 +71,9 @@ obsidian para-zk:capture-journal content="Quick memo" energy=normal format=json
 CLI option values use locale-neutral codes only. For example, pass
 `status=in_progress` instead of `status="1. 진행중"`; the plugin renders the
 localized label inside the generated note.
-Use `para-zk:describe` to inspect supported surface types, stable read/write
-keys, and collection filters in compact JSON form.
+Use `para-zk:describe` for the compact list of supported surface types and
+collection filters; add `type=<surface>` to drill into that surface's stable
+read/write keys and frontmatter fields.
 Use `para-zk:attach-file` to copy local files or directories into the vault
 attachment folder (`assets` by default); it returns both `link` and `embed`
 strings for Markdown insertion. Single file sources return one attached file.

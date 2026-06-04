@@ -48,17 +48,18 @@ describe("describe", () => {
     });
   });
 
-  it("reports collection filters and rejects unknown surface types", async () => {
+  it("lists surface types and global collection filters; rejects unknown types", async () => {
     const all = await cli.run("para-zk:describe");
     expect(all.ok).toBe(true);
-    expect((all.surfaces as unknown[]).length).toBeGreaterThan(1);
+    expect(all).not.toHaveProperty("surfaces");
+    expect(all.surfaceTypes).toEqual(
+      expect.arrayContaining(["project", "area", "resource", "retro", "note"])
+    );
+    expect((all.surfaceTypes as unknown[]).length).toBeGreaterThan(1);
     expect(all.collectionFilters).toMatchObject({
       task: expect.arrayContaining(["due_before"]),
       backlink: expect.arrayContaining(["type"])
     });
-    const resource = (all.surfaces as Array<Record<string, unknown>>)
-      .find((surface) => surface.type === "resource");
-    expect(resource).not.toHaveProperty("frontmatterKeys");
 
     const retro = await cli.run("para-zk:describe", { type: "retro" });
     expect(retro.collectionFilters).toEqual({

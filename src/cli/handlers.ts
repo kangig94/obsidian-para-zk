@@ -130,7 +130,13 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     text: "CLI surface described",
     run: async (_plugin, args) => {
       const type = readCliString(args, "type");
-      const surfaces = type ? [describeSurface(type)] : describeSurfaces();
+      if (!type) {
+        return {
+          surfaceTypes: surfaceTypes(),
+          collectionFilters: describeCollectionFilters(describeSurfaces())
+        };
+      }
+      const surfaces = [describeSurface(type)];
       return {
         collectionFilters: describeCollectionFilters(surfaces),
         surfaces

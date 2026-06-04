@@ -8,8 +8,6 @@ export type ParaZkCli = "optsidian" | "obsidian";
 
 type DescribePayload = {
   ok: true;
-  surfaces: unknown;
-  collectionFilters: unknown;
   [key: string]: unknown;
 };
 
@@ -53,6 +51,10 @@ export function howtoFor(cli: ParaZkCli): string {
 }
 
 function surfaceTypes(describe: DescribePayload): string[] {
+  const direct = describe.surfaceTypes;
+  if (Array.isArray(direct)) {
+    return direct.filter((type): type is string => typeof type === "string");
+  }
   const surfaces = describe.surfaces;
   if (!Array.isArray(surfaces)) return [];
   return surfaces
