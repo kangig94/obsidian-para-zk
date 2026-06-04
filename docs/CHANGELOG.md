@@ -72,11 +72,14 @@ Notable changes for PARA-ZK are tracked here.
 - Added `para-zk:describe`, a self-description command for LLMs: with no type it
   returns a compact index of surface types and collection filters; `type=<surface>`
   returns that surface's stable read/write keys and filters.
-- Added a thin MCP server (`para-zk`) and Claude Code plugin packaging
-  (`.claude-plugin/` marketplace + plugin) so any MCP client can discover the
-  vault and drive it through the native CLI. Install with
-  `/plugin marketplace add kangig94/obsidian-para-zk` then
-  `/plugin install para-zk@kangig94`; its `describe` tool returns the live CLI contract.
+- Added a thin MCP server (`para-zk`) packaged as both a Claude Code plugin and a
+  Codex plugin — they share `clients/` (`.claude-plugin/` and `.codex-plugin/`
+  manifests over one bundled `para-zk-mcp.mjs`, each declaring the server inline) —
+  so any MCP client can discover the vault and drive it through the native CLI.
+  Install in Claude with `/plugin marketplace add kangig94/obsidian-para-zk` then
+  `/plugin install para-zk@kangig94`, or in Codex with
+  `codex plugin marketplace add kangig94/obsidian-para-zk`; the `describe` tool
+  returns the live CLI contract.
 - Added shell-safe MCP section-mutation tools `replace`, `set`, and `add` that
   wrap `para-zk:update-*` through `execFile` (never a shell), so multi-line,
   quoted, and `$`/backtick content edits reach the note verbatim instead of being

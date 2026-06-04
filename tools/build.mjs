@@ -43,7 +43,7 @@ const mcpBuildOptions = {
   format: "esm",
   logLevel: "info",
   minify: production,
-  outfile: "clients/claude/para-zk-mcp.mjs",
+  outfile: "clients/para-zk-mcp.mjs",
   platform: "node",
   sourcemap: production ? false : "inline",
   target: "node18",

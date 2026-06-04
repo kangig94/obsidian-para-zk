@@ -1,6 +1,6 @@
 # PARA-ZK MCP
 
-PARA-ZK ships a thin MCP server for discovery plus shell-safe section edits. It exposes `describe` for the live PARA-ZK surface index, and `replace`, `set`, and `add` for section body mutations. Frontmatter and task mutations stay CLI-only.
+PARA-ZK ships a thin MCP server for discovery plus shell-safe section edits. It exposes `describe` for the live PARA-ZK surface index, and `replace`, `set`, and `add` for section body mutations. Frontmatter and task mutations stay CLI-only. The same server is packaged as both a Claude Code plugin and a Codex plugin that share `clients/` (`.claude-plugin/` + `.codex-plugin/` manifests over one bundled `para-zk-mcp.mjs`, each declaring the server inline), or it can be registered as a plain MCP server in any client.
 
 ## Prerequisites
 
@@ -14,18 +14,42 @@ PARA-ZK ships a thin MCP server for discovery plus shell-safe section edits. It 
 /plugin install para-zk@kangig94
 ```
 
-## Codex And Other MCP Clients
+## Codex CLI
 
-Use an absolute path to this repo's built MCP bundle:
+Codex has a plugin system like Claude Code. Install the bundled plugin:
+
+```text
+codex plugin marketplace add kangig94/obsidian-para-zk
+codex /plugins   # open the list and install "para-zk"
+```
+
+The Codex plugin manifest is `clients/.codex-plugin/plugin.json` (inline `mcpServers`)
+and launches the bundled server with `node ${PLUGIN_ROOT}/para-zk-mcp.mjs`.
+
+Or register the MCP server directly, without a plugin:
+
+```bash
+codex mcp add para-zk -- node /absolute/path/to/obsidian-para-zk/clients/para-zk-mcp.mjs
+```
+
+or in `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.para-zk]
+command = "node"
+args = ["/absolute/path/to/obsidian-para-zk/clients/para-zk-mcp.mjs"]
+```
+
+## Other MCP Clients
+
+Clients that take a JSON `mcpServers` config point at the built bundle by absolute path:
 
 ```json
 {
   "mcpServers": {
     "para-zk": {
       "command": "node",
-      "args": [
-        "/absolute/path/to/obsidian-para-zk/clients/claude/para-zk-mcp.mjs"
-      ]
+      "args": ["/absolute/path/to/obsidian-para-zk/clients/para-zk-mcp.mjs"]
     }
   }
 }

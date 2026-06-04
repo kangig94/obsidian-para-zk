@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "para-zk",
-      "source": "./clients/claude",
+      "source": "./clients",
       "description": "Discover and drive the PARA-ZK Obsidian vault from any LLM via its native CLI.",
       "version": "0.0.1",
       "author": {
