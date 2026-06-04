@@ -66,9 +66,29 @@ Notable changes for PARA-ZK are tracked here.
 - Added the read-only `key=backlinks` collection to PARA, ZK, journal, retro,
   document, and fallback note reads. It returns Obsidian-resolved inbound links
   with paging, `query=`, and source note `type=` filtering.
+- Added `para-zk-view` blocks that render managed Dataview sections from a terse
+  view key, keeping the Markdown token-efficient while the rendered output
+  matches an inline Dataview block.
+- Added `para-zk:describe`, a self-description command for LLMs: with no type it
+  returns a compact index of surface types and collection filters; `type=<surface>`
+  returns that surface's stable read/write keys and filters.
+- Added a thin MCP server (`para-zk`) and Claude Code plugin packaging
+  (`.claude-plugin/` marketplace + plugin) so any MCP client can discover the
+  vault and drive it through the native CLI. Install with
+  `/plugin marketplace add kangig94/obsidian-para-zk` then
+  `/plugin install para-zk@kangig94`; its `describe` tool returns the live CLI contract.
+- Added shell-safe MCP section-mutation tools `replace`, `set`, and `add` that
+  wrap `para-zk:update-*` through `execFile` (never a shell), so multi-line,
+  quoted, and `$`/backtick content edits reach the note verbatim instead of being
+  mangled by shell expansion. Frontmatter and task mutations stay on the CLI.
 
 ### Changed
 
+- Full (no-key) reads now summarize prose sections as `{ chars: N }` (mirroring
+  collections' `{ count: N }`) instead of inlining full section text, so a
+  compact read stays bounded for long-form notes; full text is read with
+  `key=<section>`. The `available_keys` and `omits_empty` fields were dropped —
+  the per-type key set comes from `para-zk:describe`.
 - Renamed the vault setup action to `para-zk:setup` (GUI command "Set up
   PARA-ZK vault" / "PARA-ZK vault 구성", settings button "Set up" / "구성").
   It both creates the vault layout and re-applies the current settings — e.g.
