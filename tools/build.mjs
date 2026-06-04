@@ -11,7 +11,7 @@ const watchMode = process.argv.includes("--watch");
 const filesToDeploy = ["main.js", "manifest.json", "styles.css"];
 const nodeBuiltins = [...builtinModules, ...builtinModules.map((name) => `node:${name}`)];
 
-const buildOptions = {
+const pluginBuildOptions = {
   banner: {
     js: "/* PARA-ZK Obsidian plugin */"
   },
@@ -30,6 +30,23 @@ const buildOptions = {
   platform: "browser",
   sourcemap: production ? false : "inline",
   target: "es2022",
+  treeShaking: true
+};
+
+const mcpBuildOptions = {
+  banner: {
+    js: "#!/usr/bin/env node"
+  },
+  bundle: true,
+  entryPoints: ["src/mcp/server.ts"],
+  external: nodeBuiltins,
+  format: "esm",
+  logLevel: "info",
+  minify: production,
+  outfile: "clients/claude/para-zk-mcp.mjs",
+  platform: "node",
+  sourcemap: production ? false : "inline",
+  target: "node18",
   treeShaking: true
 };
 
@@ -57,8 +74,8 @@ async function afterBuild() {
 }
 
 if (watchMode) {
-  const ctx = await context({
-    ...buildOptions,
+  const pluginCtx = await context({
+    ...pluginBuildOptions,
     plugins: [
       {
         name: "para-zk-after-build",
@@ -71,7 +88,9 @@ if (watchMode) {
       }
     ]
   });
-  await ctx.watch();
+  const mcpCtx = await context(mcpBuildOptions);
+  await pluginCtx.watch();
+  await mcpCtx.watch();
   await afterBuild();
 
   watch("assets/styles.css", async () => {
@@ -81,7 +100,8 @@ if (watchMode) {
   const syncTarget = process.env.OBSIDIAN_PLUGIN_DIR ? ` (auto-sync to ${process.env.OBSIDIAN_PLUGIN_DIR})` : "";
   console.log(`Watching PARA-ZK build${syncTarget}`);
 } else {
-  await build(buildOptions);
+  await build(pluginBuildOptions);
+  await build(mcpBuildOptions);
   await afterBuild();
 }
 

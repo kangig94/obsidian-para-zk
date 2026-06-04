@@ -23,6 +23,7 @@
   "author": "kangig94",
   "license": "MIT",
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/node": "^25.9.1",
     "esbuild": "^0.28.0",
     "obsidian": "^1.12.3",

@@ -1,0 +1,19 @@
+{
+  "name": "para-zk",
+  "version": "0.0.1",
+  "description": "Thin MCP that surfaces the PARA-ZK Obsidian CLI contract so any LLM can discover and operate the vault.",
+  "author": {
+    "name": "kangig94",
+    "url": "https://github.com/kangig94"
+  },
+  "repository": "https://github.com/kangig94/obsidian-para-zk",
+  "license": "MIT",
+  "mcpServers": {
+    "para-zk": {
+      "command": "node",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/para-zk-mcp.mjs"
+      ]
+    }
+  }
+}

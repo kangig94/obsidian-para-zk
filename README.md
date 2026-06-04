@@ -158,6 +158,7 @@ Start with [docs/FIRST_READ.md](docs/FIRST_READ.md) for the project intent,
 test-vault rules, and the GUI/CLI contract.
 
 See [docs/CLI.md](docs/CLI.md) for the LLM-facing native CLI contract.
+See [docs/MCP.md](docs/MCP.md) for Claude Code and generic MCP client registration.
 See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the current development changelog.
 
 ```bash
