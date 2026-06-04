@@ -21,9 +21,9 @@ import {
   surfaceTypes,
   surfaceWriteKeys,
   type CollectionReadOptions,
-  type SurfaceDescription,
-  type WorkflowContext
-} from "../workflows";
+  type SurfaceDescription
+} from "../workflows/surfaces";
+import type { WorkflowContext } from "../workflows";
 
 type CliCapablePlugin = Plugin & {
   registerCliHandler?: (
