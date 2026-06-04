@@ -1,4 +1,4 @@
-import { App, TAbstractFile, TFile, TFolder, parseYaml } from "obsidian";
+import { App, TAbstractFile, TFile, TFolder } from "obsidian";
 import { localePack } from "./i18n";
 import { renderTemplate, type TemplateName } from "./templates";
 import {
@@ -44,6 +44,59 @@ import {
   parseZkKind
 } from "./zk/kinds";
 import { slugify } from "./text/slug";
+import {
+  findSectionContentRangeByHeading,
+  isMarkdownScaffold,
+  markdownBodyRange,
+  readSection,
+  skipProjectSummaryManagedBlock,
+  spliceTextRange,
+  stripManagedPrelude,
+  stripProjectSummaryManagedBlock,
+  trimMarkdownBlock,
+  trimTextRange,
+  trailingManagedBlockStart,
+  type TextRange
+} from "./workflows/markdown-sections";
+import {
+  canonicalWikiLink,
+  isExternalReference as isExternalReferenceTarget,
+  normalizedReferenceTargetWithSubpath,
+  parseMarkdownLink,
+  parseWikiLink as parseWikiLinkTarget,
+  pathBasenameWithoutExtension as pathBasenameWithoutExtensionTarget,
+  referenceTargetWithSubpath,
+  splitObsidianSubpath as splitObsidianSubpathTarget
+} from "./workflows/reference-targets";
+import {
+  fileFrontmatter,
+  parseFrontmatterFromContent,
+  pickFrontmatter,
+  readFileFrontmatterFresh,
+  readFileTypeFresh,
+  readType,
+  type Frontmatter
+} from "./workflows/note-frontmatter";
+import {
+  ROOT_ID_FRONTMATTER_KEY,
+  assertRootTaskExists,
+  cycleTaskCheckbox as cycleTaskCheckboxTask,
+  deleteRootTask as deleteRootTaskTask,
+  insertRootTask as insertRootTaskTask,
+  newRootId,
+  readAllTaskItems as readAllTaskItemsTask,
+  readRootTaskMap as readRootTaskMapTask,
+  readTaskShardFile,
+  readTaskWritableField,
+  reorderRootTasks as reorderRootTasksTask,
+  rootIdFromFrontmatter,
+  setRootTaskField as setRootTaskFieldTask,
+  taskShardPath,
+  type RootTaskItem,
+  type TaskRead as TaskReadModel,
+  type TaskWritableField as TaskWritableFieldModel
+} from "./workflows/tasks";
+import { ensureFolder, isInFolder, parentFolder } from "./workflows/vault-files";
 
 export type WorkflowContext = {
   app: App;
@@ -308,7 +361,6 @@ export type DeleteResult = {
 };
 
 type TemplateVariables = Record<string, string | undefined>;
-type Frontmatter = Record<string, unknown>;
 type ReadMap = Record<string, unknown>;
 type SectionTransformContext = {
   ctx: WorkflowContext;
@@ -340,37 +392,8 @@ export type SurfaceDescription = {
   frontmatterKeys?: string[];
   collections: Record<string, ReadCollectionKind>;
 };
-export type TaskRead = {
-  checkbox: string;
-  name: string;
-  due?: string;
-  scheduled?: string;
-  start?: string;
-  created?: string;
-  done?: string;
-  cancelled?: string;
-  priority?: string;
-};
-type TaskLineRead = {
-  id: string;
-  task: TaskRead;
-};
-type TaskWrite = {
-  task: TaskRead;
-  position: number | "end";
-};
-type TaskMetadata = Pick<TaskRead, "due" | "scheduled" | "start" | "created" | "done" | "cancelled" | "priority">;
-type TaskDateMetadataField = Exclude<keyof TaskMetadata, "priority">;
-export type TaskWritableField = keyof TaskRead;
-type EditableTaskLine = {
-  id: string;
-  range: TextRange & { endWithoutBreak: number };
-  prefix: string;
-  checkboxSuffix: string;
-  task: TaskRead;
-  taskId?: string;
-  blockId?: string;
-};
+export type TaskRead = TaskReadModel;
+export type TaskWritableField = TaskWritableFieldModel;
 type ReferenceKind = "url" | "note" | "file" | "wiki" | "text";
 export type ReferenceStoredItem = string | {
   link: string;
@@ -419,7 +442,6 @@ type NormalizedCollectionReadOptions = {
 
 const DEFAULT_COLLECTION_READ_LIMIT = 50;
 const REFERENCE_KINDS = new Set<string>(["url", "note", "file", "wiki", "text"]);
-const ROOT_ID_FRONTMATTER_KEY = "id";
 
 export async function createProject(ctx: WorkflowContext, options: CreateProjectOptions): Promise<NoteResult & {
   areas?: ProjectAreaResult[];
@@ -1065,8 +1087,7 @@ function readWikiLinkLabel(value: string): string | undefined {
 }
 
 export function pathBasenameWithoutExtension(path: string): string {
-  const last = path.split("/").filter(Boolean).pop() ?? path;
-  return last.replace(/\.md$/i, "");
+  return pathBasenameWithoutExtensionTarget(path);
 }
 
 export function readReferenceItems(ctx: WorkflowContext, file: TFile): ReferenceRead[] {
@@ -1074,73 +1095,13 @@ export function readReferenceItems(ctx: WorkflowContext, file: TFile): Reference
     .map((item) => deriveReferenceRead(ctx, file, item));
 }
 
-// metadataCache.getFileCache() lags behind processFrontMatter writes (the cache updates
-// asynchronously), so any read immediately after a write returns stale frontmatter. The GUI
-// renderer re-renders right after its own write, and rapid mutations chain reads-after-writes,
-// so reference reads on the mutation/render path must parse the file's current content instead
-// of trusting the cache.
 async function readReferenceFrontmatterFresh(ctx: WorkflowContext, file: TFile): Promise<Frontmatter> {
   return readFileFrontmatterFresh(ctx, file);
-}
-
-async function readFileFrontmatterFresh(ctx: WorkflowContext, file: TFile): Promise<Frontmatter> {
-  const content = await ctx.app.vault.read(file);
-  const fresh = parseFrontmatterFromContent(content);
-  if (hasFrontmatterKeys(fresh)) return fresh;
-
-  const cached = fileFrontmatter(ctx, file);
-  if (contentHasYamlFrontmatterBlock(content) && hasFrontmatterKeys(cached)) return cached;
-  return fresh;
-}
-
-async function readFileTypeFresh(ctx: WorkflowContext, file: TFile): Promise<string> {
-  return readType(await readFileFrontmatterFresh(ctx, file));
 }
 
 export async function readReferenceItemsFresh(ctx: WorkflowContext, file: TFile): Promise<ReferenceRead[]> {
   return referenceItemsFromFrontmatter(await readReferenceFrontmatterFresh(ctx, file))
     .map((item) => deriveReferenceRead(ctx, file, item));
-}
-
-function parseFrontmatterFromContent(content: string): Frontmatter {
-  const match = stripLeadingUtf8Bom(content).match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
-  if (!match) return {};
-  try {
-    const parsed = parseYaml(match[1]);
-    return parsed && typeof parsed === "object" ? parsed as Frontmatter : {};
-  } catch {
-    return {};
-  }
-}
-
-function stripLeadingUtf8Bom(content: string): string {
-  return content.startsWith("\uFEFF") ? content.slice(1) : content;
-}
-
-function hasFrontmatterKeys(frontmatter: Frontmatter): boolean {
-  return Object.keys(frontmatter).length > 0;
-}
-
-function contentHasYamlFrontmatterBlock(content: string): boolean {
-  const normalized = stripLeadingUtf8Bom(content);
-  return yamlFrontmatterRange(normalized) !== undefined
-    || /^[ \t\r\n]*---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.test(normalized);
-}
-
-function yamlFrontmatterRange(content: string): TextRange | undefined {
-  const openStart = content.startsWith("\uFEFF") ? 1 : 0;
-  if (!content.startsWith("---\n", openStart) && !content.startsWith("---\r\n", openStart)) {
-    return undefined;
-  }
-
-  const delimiter = /\r?\n---(?:\r?\n|$)/g;
-  delimiter.lastIndex = openStart + 3;
-  const match = delimiter.exec(content);
-  if (!match) return undefined;
-  return {
-    start: 0,
-    end: match.index + match[0].length
-  };
 }
 
 export async function insertReferenceItem(
@@ -1520,21 +1481,7 @@ function parseReferenceTargetInput(value: string): ParsedReferenceTarget {
 }
 
 export function parseWikiLink(value: string): { target: string; alias?: string } | undefined {
-  const match = value.trim().match(/^\[\[([^\]|]+)(?:\|([^\]]*))?\]\]$/);
-  const target = match?.[1]?.trim();
-  if (!target) return undefined;
-  return {
-    target,
-    ...(match?.[2] !== undefined ? { alias: match[2].trim() } : {})
-  };
-}
-
-function parseMarkdownLink(value: string): { target: string } | undefined {
-  const match = value.trim().match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-  const text = match?.[1]?.trim();
-  const target = match?.[2]?.trim();
-  if (!text || !target) return undefined;
-  return { target };
+  return parseWikiLinkTarget(value);
 }
 
 function resolveWikiReferenceFile(
@@ -1582,36 +1529,11 @@ function resolveRawReferenceFile(
 }
 
 export function splitObsidianSubpath(value: string): { base: string; subpath: string } {
-  const normalizedSeparators = value.trim().replace(/\\/g, "/");
-  const hash = normalizedSeparators.indexOf("#");
-  if (hash === -1) {
-    return {
-      base: normalizeVaultPath(normalizedSeparators),
-      subpath: ""
-    };
-  }
-  return {
-    base: normalizeVaultPath(normalizedSeparators.slice(0, hash)),
-    subpath: normalizedSeparators.slice(hash).trim()
-  };
-}
-
-function normalizedReferenceTargetWithSubpath(value: string): string {
-  const split = splitObsidianSubpath(value);
-  return referenceTargetWithSubpath(split.base, split.subpath);
-}
-
-function referenceTargetWithSubpath(base: string, subpath: string): string {
-  return `${base}${subpath}`;
-}
-
-function canonicalWikiLink(target: string): string {
-  return `[[${target}]]`;
+  return splitObsidianSubpathTarget(value);
 }
 
 export function isExternalReference(value: string): boolean {
-  const trimmed = value.trim();
-  return /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) || /^(mailto|tel):/i.test(trimmed);
+  return isExternalReferenceTarget(value);
 }
 
 function hasOwn(value: object, key: string): boolean {
@@ -2210,8 +2132,7 @@ type WritableSurfaceTarget =
   | {
     kind: "taskItem";
     file: TFile;
-    shardFile: TFile;
-    line: EditableTaskLine;
+    taskId: string;
     field?: TaskWritableField;
   }
   | {
@@ -2224,11 +2145,6 @@ type WritableSurfaceTarget =
     index: number;
     field?: ReferenceWritableField;
   };
-
-type TextRange = {
-  start: number;
-  end: number;
-};
 
 type TextUpdateResult = {
   changed: boolean;
@@ -2377,18 +2293,12 @@ async function resolveWritableCollectionTarget(
     };
   }
   if (parts.length === 2 || parts.length === 3) {
-    const shardFile = await readTaskShardFile(ctx, file);
-    if (!shardFile) throw new Error(`task not found: ${parts[1]}`);
-    const content = await ctx.app.vault.read(shardFile);
-    const range = taskShardTaskRange(content);
-    const line = range ? findEditableTaskLine(shardFile.path, content, range, parts[1]) : undefined;
-    if (!line) throw new Error(`task not found: ${parts[1]}`);
+    await assertRootTaskExists(ctx, file, parts[1]);
     const field = parts.length === 3 ? readTaskWritableField(parts[2], originalKey) : undefined;
     return {
       kind: "taskItem",
       file,
-      shardFile,
-      line,
+      taskId: parts[1],
       field
     };
   }
@@ -2485,19 +2395,8 @@ async function updateTaskCollectionSurface(
   if (operation !== "insert") throw new Error("task collection root only supports op=insert");
 
   if (options.valueSource === "value") throw new Error("task insert requires value_json object");
-  const write = normalizeTaskWriteValue(requireUpdateValue(options));
-  const taskId = await newTaskId(ctx);
-  const line = serializeNewTaskLine(write.task, taskId);
-  const shardFile = await ensureTaskShard(ctx, target.file);
-  const base = await ctx.app.vault.read(shardFile);
-  const normalized = ensureTaskShardTaskSection(base);
-  const current = normalized.content.slice(normalized.range.start, normalized.range.end);
-  const next = insertTaskLine(current, line, write.position);
-  if (current === next && base === normalized.content) return { changed: false };
-
-  const after = spliceTextRange(normalized.content, normalized.range, next);
-  if (base !== after) await ctx.app.vault.modify(shardFile, after);
-  return { changed: base !== after };
+  await insertRootTaskTask(ctx, target.file, requireUpdateValue(options));
+  return { changed: true };
 }
 
 async function updateTaskItemSurface(
@@ -2508,24 +2407,14 @@ async function updateTaskItemSurface(
 ): Promise<TextUpdateResult> {
   if (!target.field) {
     if (operation !== "delete") throw new Error("task item keys only support op=delete; use tasks/<id>/<field> for op=set");
-    const before = await ctx.app.vault.read(target.shardFile);
-    const after = removeTextRanges(before, [target.line.range]);
-    if (before !== after) await ctx.app.vault.modify(target.shardFile, after);
-    return { changed: before !== after };
+    return { changed: await deleteRootTaskTask(ctx, target.file, target.taskId) };
   }
 
   if (operation !== "set") throw new Error("task fields only support op=set");
   if (options.valueSource === "value_json") throw new Error("task field updates require value");
-  const value = normalizeTaskFieldUpdateValue(target.field, requireUpdateValue(options));
-  const nextTask = applyTaskFieldUpdate(target.line.task, target.field, value);
-  const nextLine = serializeEditableTaskLine(target.line, nextTask);
-  const before = await ctx.app.vault.read(target.shardFile);
-  const currentLine = before.slice(target.line.range.start, target.line.range.endWithoutBreak);
-  if (currentLine === nextLine) return { changed: false };
-
-  const after = spliceTextRange(before, target.line.range, nextLine);
-  if (before !== after) await ctx.app.vault.modify(target.shardFile, after);
-  return { changed: before !== after };
+  return {
+    changed: await setRootTaskFieldTask(ctx, target.file, target.taskId, target.field, requireUpdateValue(options))
+  };
 }
 
 async function updateReferenceCollectionSurface(
@@ -2625,28 +2514,6 @@ function applyTextOperation(
   }
 }
 
-function spliceTextRange(content: string, range: TextRange, value: string): string {
-  const before = content.slice(0, range.start);
-  const after = content.slice(range.end);
-  let replacement = value;
-  if (replacement && after && !replacement.endsWith("\n")) {
-    if (after.startsWith("\r\n") || after.startsWith("\n")) {
-      if (startsWithMarkdownBoundary(after.replace(/^\r?\n/, "")) && !after.match(/^\r?\n\r?\n/)) {
-        replacement = `${replacement}\n`;
-      }
-    } else {
-      replacement = `${replacement}${startsWithMarkdownBoundary(after) ? "\n\n" : "\n"}`;
-    }
-  } else if (replacement && !after && !replacement.endsWith("\n")) {
-    replacement = `${replacement}\n`;
-  }
-  return `${before}${replacement}${after}`;
-}
-
-function startsWithMarkdownBoundary(content: string): boolean {
-  return /^(?:#{1,6}\s+|```|(?:-{3,}|\*{3,}|_{3,})\s*(?:\r?\n|$))/.test(content);
-}
-
 function writableSectionRange(content: string, section: ReadSectionSpec, originalKey: string): TextRange {
   const range = findSectionContentRange(content, section);
   if (!range) throw new Error(`section not found for update key: ${originalKey}`);
@@ -2676,125 +2543,6 @@ function findSectionContentRange(content: string, section: ReadSectionSpec): Tex
     if (range) return range;
   }
   return undefined;
-}
-
-function findSectionContentRangeByHeading(
-  content: string,
-  heading: string,
-  options: {
-    includeSubsections: boolean;
-    offset: number;
-  }
-): TextRange | undefined {
-  const headingPattern = escapeRegExp(heading).replace(/\s+/g, "\\s+");
-  const headerRe = new RegExp(`^\\s*(?<hashes>#{1,6})\\s+${headingPattern}(?=\\s|$).*?$`, "im");
-  const match = content.match(headerRe);
-  if (!match) return undefined;
-
-  const level = match.groups?.hashes.length ?? 6;
-  const headerEnd = (match.index ?? 0) + match[0].length;
-  const sectionStart = headerEnd + lineBreakLengthAt(content, headerEnd);
-  const after = content.slice(sectionStart);
-  const nextBoundaryRel = nextSectionBoundary(after, options.includeSubsections ? level : undefined);
-  const sectionEnd = nextBoundaryRel === -1 ? content.length : sectionStart + nextBoundaryRel;
-  return {
-    start: options.offset + sectionStart,
-    end: options.offset + sectionEnd
-  };
-}
-
-function markdownBodyRange(content: string): TextRange {
-  const frontmatter = yamlFrontmatterRange(content);
-  if (!frontmatter) return { start: 0, end: content.length };
-  return {
-    start: frontmatter.end,
-    end: content.length
-  };
-}
-
-function skipProjectSummaryManagedBlock(content: string, start: number, end: number): number {
-  const nativeEnd = skipLeadingFencedBlock(content, start, end, "para-zk-latest-retro-summary");
-  if (nativeEnd !== start) return nativeEnd;
-
-  let cursor = start;
-  const first = readLineSpan(content, cursor, end);
-  if (!first?.text.trim().startsWith("> [!tip]")) return start;
-
-  let fenceCount = 0;
-  while (cursor < end) {
-    const line = readLineSpan(content, cursor, end);
-    if (!line) break;
-    cursor = line.next;
-    if (line.text.trim() === "> ```") fenceCount += 1;
-    if (fenceCount === 2) break;
-  }
-  if (fenceCount < 2) return start;
-
-  while (cursor < end) {
-    const line = readLineSpan(content, cursor, end);
-    if (!line || line.text.trim() !== "") break;
-    cursor = line.next;
-  }
-  return cursor;
-}
-
-function skipLeadingFencedBlock(content: string, start: number, end: number, language: string): number {
-  let cursor = start;
-  const first = readLineSpan(content, cursor, end);
-  if (!first || first.text.trim() !== `\`\`\`${language}`) return start;
-
-  cursor = first.next;
-  let closed = false;
-  while (cursor < end) {
-    const line = readLineSpan(content, cursor, end);
-    if (!line) break;
-    cursor = line.next;
-    if (line.text.trim() === "```") {
-      closed = true;
-      break;
-    }
-  }
-  if (!closed) return start;
-
-  while (cursor < end) {
-    const line = readLineSpan(content, cursor, end);
-    if (!line || line.text.trim() !== "") break;
-    cursor = line.next;
-  }
-  return cursor;
-}
-
-function trailingManagedBlockStart(content: string, start: number, end: number): number | undefined {
-  const slice = content.slice(start, end);
-  const match = slice.match(/(?:\r?\n[ \t]*)*```para-zk-managed[^\r\n]*\r?\n```[ \t]*(?:\r?\n[ \t]*)*$/);
-  return match?.index === undefined ? undefined : start + match.index;
-}
-
-function readLineSpan(text: string, start: number, end: number): { text: string; next: number } | undefined {
-  if (start >= end) return undefined;
-  const lf = text.indexOf("\n", start);
-  const rawEnd = lf === -1 || lf >= end ? end : lf;
-  const lineEnd = rawEnd > start && text.charAt(rawEnd - 1) === "\r" ? rawEnd - 1 : rawEnd;
-  return {
-    text: text.slice(start, lineEnd),
-    next: lf === -1 || lf >= end ? end : lf + 1
-  };
-}
-
-function trimTextRange(content: string, start: number, end: number): TextRange {
-  let trimmedStart = start;
-  let trimmedEnd = end;
-  while (trimmedStart < trimmedEnd && /\s/.test(content.charAt(trimmedStart))) trimmedStart += 1;
-  while (trimmedEnd > trimmedStart && /\s/.test(content.charAt(trimmedEnd - 1))) trimmedEnd -= 1;
-  return {
-    start: trimmedStart,
-    end: trimmedEnd
-  };
-}
-
-function lineBreakLengthAt(content: string, index: number): number {
-  if (content.slice(index, index + 2) === "\r\n") return 2;
-  return content.charAt(index) === "\n" ? 1 : 0;
 }
 
 function requireUpdateKey(value: string | undefined): string {
@@ -3212,46 +2960,6 @@ function keyParts(key: string): string[] {
   return key.split("/").map((part) => part.trim()).filter(Boolean);
 }
 
-function isMarkdownScaffold(value: string): boolean {
-  const text = value.trim();
-  if (!text) return true;
-  if (text === "-" || text === "*" || text === "+") return true;
-  if (isEmptyMarkdownTable(text)) return true;
-  if (isPlaceholderBulletBlock(text)) return true;
-  if (isHeadingOnlyBlock(text)) return true;
-  return /^>\s*#{1,6}\s+\(.+\)\s*$/.test(text);
-}
-
-function isEmptyMarkdownTable(value: string): boolean {
-  const lines = value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  if (lines.length < 2 || !lines.every((line) => line.includes("|"))) return false;
-  const separatorIndex = lines.findIndex((line) => /^\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?$/.test(line));
-  if (separatorIndex === -1) return false;
-  const body = lines.slice(separatorIndex + 1);
-  if (body.length === 0) return true;
-  return body.every((line) => {
-    const cells = line.replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
-    return cells.every((cell) => cell === "");
-  });
-}
-
-function isPlaceholderBulletBlock(value: string): boolean {
-  const lines = value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  if (lines.length === 0) return true;
-  return lines.every((line) => {
-    const match = line.match(/^(?:[-*+]|\d+[.)])\s+(.*)$/);
-    if (!match) return false;
-    let body = (match[1] ?? "").trim();
-    body = body.replace(/^\[[^\]\r\n]?\]\s*/, "").trim();
-    return body === "" || body === "-" || /^\d{1,2}:\d{2}$/.test(body) || /^[^:]{1,80}:\s*$/.test(body);
-  });
-}
-
-function isHeadingOnlyBlock(value: string): boolean {
-  const lines = value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  return lines.length > 0 && lines.every((line) => /^#{1,6}\s+\S/.test(line));
-}
-
 function readReferences(_content: string, context: SectionTransformContext): Record<string, ReferenceRead> {
   return Object.fromEntries(
     readReferenceItems(context.ctx, context.file).map((item, index) => [String(index), item])
@@ -3342,323 +3050,20 @@ function readReferenceFieldUpdateValue(field: ReferenceWritableField, options: U
   return value;
 }
 
-const TASK_DATE_FIELDS: Array<{ key: TaskDateMetadataField; re: RegExp }> = [
-  { key: "due", re: /\u{1F4C5}\s*(\d{4}-\d{2}-\d{2})/gu },
-  { key: "scheduled", re: /\u{23F3}\s*(\d{4}-\d{2}-\d{2})/gu },
-  { key: "start", re: /\u{1F6EB}\s*(\d{4}-\d{2}-\d{2})/gu },
-  { key: "created", re: /\u{2795}\s*(\d{4}-\d{2}-\d{2})/gu },
-  { key: "done", re: /\u{2705}\s*(\d{4}-\d{2}-\d{2})/gu },
-  { key: "cancelled", re: /\u{274C}\s*(\d{4}-\d{2}-\d{2})/gu }
-];
-
-const TASK_PRIORITY_FIELDS: Array<{ value: string; re: RegExp }> = [
-  { value: "highest", re: /\u{1F53A}/gu },
-  { value: "high", re: /\u{23EB}/gu },
-  { value: "medium", re: /\u{1F53C}/gu },
-  { value: "low", re: /\u{1F53D}/gu },
-  { value: "lowest", re: /\u{23EC}/gu }
-];
-
-const TASK_ID_SYMBOL = "\u{1F194}";
-const TASK_ID_REGEX = /\u{1F194}\s*([a-zA-Z0-9-_]+)/u;
-const TASK_ID_GLOBAL_REGEX = /\u{1F194}\s*([a-zA-Z0-9-_]+)/gu;
-const TASK_ID_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
-const TASK_ID_LENGTH = 8;
-const TASK_DATE_FIELD_SYMBOLS: Record<TaskDateMetadataField, string> = {
-  due: "\u{1F4C5}",
-  scheduled: "\u{23F3}",
-  start: "\u{1F6EB}",
-  created: "\u{2795}",
-  done: "\u{2705}",
-  cancelled: "\u{274C}"
-};
-const TASK_PRIORITY_FIELD_SYMBOLS: Record<string, string> = {
-  highest: "\u{1F53A}",
-  high: "\u{23EB}",
-  medium: "\u{1F53C}",
-  low: "\u{1F53D}",
-  lowest: "\u{23EC}"
-};
-
-async function ensureTaskShard(ctx: WorkflowContext, rootFile: TFile): Promise<TFile> {
-  const rootId = await ensureRootId(ctx, rootFile);
-  const path = taskShardPath(ctx, rootId, isArchivedFile(ctx, rootFile));
-  await ensureFolder(ctx.app, parentFolder(path));
-
-  let shardFile = ctx.app.vault.getFileByPath(path);
-  if (!shardFile) {
-    shardFile = await ctx.app.vault.create(path, "# Tasks\n");
-  }
-  return shardFile;
-}
-
-async function ensureRootId(ctx: WorkflowContext, file: TFile): Promise<string> {
-  const existing = rootIdFromFrontmatter(fileFrontmatter(ctx, file));
-  if (existing) return existing;
-
-  const id = newRootId();
-  let resolved = id;
-  await ctx.app.fileManager.processFrontMatter(file, (fm) => {
-    const current = rootIdFromFrontmatter(fm);
-    if (current) {
-      resolved = current;
-    } else {
-      fm[ROOT_ID_FRONTMATTER_KEY] = id;
-      resolved = id;
-    }
-  });
-  return resolved;
-}
-
-function taskShardFile(ctx: WorkflowContext, rootFile: TFile): TFile | undefined {
-  const rootId = rootIdFromFrontmatter(fileFrontmatter(ctx, rootFile));
-  return rootId ? ctx.app.vault.getFileByPath(taskShardPath(ctx, rootId, isArchivedFile(ctx, rootFile))) ?? undefined : undefined;
-}
-
-function readTaskShardFile(ctx: WorkflowContext, rootFile: TFile): TFile | undefined {
-  return taskShardFile(ctx, rootFile);
-}
-
-function taskShardPath(ctx: WorkflowContext, rootId: string, archived: boolean): string {
-  return joinVaultPath(taskShardFolder(ctx, archived), `${sanitizeFileName(rootId)}.md`);
-}
-
-function taskShardFolder(ctx: WorkflowContext, archived: boolean): string {
-  return archived ? taskArchivesFolder(ctx) : taskCurrentFolder(ctx);
-}
-
-function taskCurrentFolder(ctx: WorkflowContext): string {
-  return joinVaultPath(ctx.settings.paths.tasksFolder, "current");
-}
-
-function taskArchivesFolder(ctx: WorkflowContext): string {
-  return joinVaultPath(ctx.settings.paths.tasksFolder, "archives");
-}
-
-function taskRegistryFolder(ctx: WorkflowContext): string {
-  return normalizeVaultPath(ctx.settings.paths.tasksFolder);
-}
-
-function rootIdFromFrontmatter(frontmatter: Frontmatter): string | undefined {
-  const value = frontmatter[ROOT_ID_FRONTMATTER_KEY];
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
-}
-
-function taskShardTaskRange(content: string): TextRange | undefined {
-  const range = findSectionContentRange(content, {
-    key: "tasks",
-    labels: ["Tasks"]
-  });
-  return range ? trimTextRange(content, range.start, range.end) : undefined;
-}
-
-function ensureTaskShardTaskSection(content: string): { content: string; range: TextRange } {
-  const existing = taskShardTaskRange(content);
-  if (existing) return { content, range: existing };
-
-  const next = `${content.replace(/\s*$/, "")}\n\n# Tasks\n`;
-  return {
-    content: next,
-    range: {
-      start: next.length,
-      end: next.length
-    }
-  };
-}
-
-function insertTaskLine(content: string, line: string, position: number | "end"): string {
-  const current = isMarkdownScaffold(content) ? "" : content;
-  if (!current.trim()) return line;
-  if (position === "end") return `${current}${current.endsWith("\n") ? "" : "\n"}${line}`;
-
-  const taskLines = editableTaskLineSpans(current);
-  if (position > taskLines.length) return `${current}${current.endsWith("\n") ? "" : "\n"}${line}`;
-  const target = taskLines[position - 1];
-  return spliceTextRange(current, { start: target.start, end: target.start }, `${line}\n`);
-}
-
-function editableTaskLineSpans(content: string): Array<TextRange & { endWithoutBreak: number }> {
-  const spans: Array<TextRange & { endWithoutBreak: number }> = [];
-  let cursor = 0;
-  while (cursor < content.length) {
-    const span = lineTextRangeAt(content, cursor, content.length);
-    if (!span) break;
-    const text = content.slice(span.start, span.endWithoutBreak);
-    if (/^\s*(?:[-*+]|\d+[.)])\s+\[[^\]\r\n]?\]\s*/.test(text)) spans.push(span);
-    cursor = span.end;
-  }
-  return spans;
-}
-
-function newRootId(): string {
-  return newId();
-}
-
-async function newTaskId(ctx: WorkflowContext): Promise<string> {
-  const existing = await existingTaskIds(ctx);
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    const id = randomAlphabetId(TASK_ID_LENGTH, TASK_ID_ALPHABET);
-    if (!existing.has(id)) return id;
-  }
-  throw new Error("failed to generate a unique task id");
-}
-
-function newId(): string {
-  if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
-    return globalThis.crypto.randomUUID();
-  }
-  return fallbackUuid();
-}
-
-function fallbackUuid(): string {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (token) => {
-    const random = Math.floor(Math.random() * 16);
-    const value = token === "x" ? random : (random & 0x3) | 0x8;
-    return value.toString(16);
-  });
-}
-
-async function existingTaskIds(ctx: WorkflowContext): Promise<Set<string>> {
-  const ids = new Set<string>();
-  const tasksFolder = taskRegistryFolder(ctx);
-  for (const file of ctx.app.vault.getMarkdownFiles()) {
-    if (tasksFolder && !isInFolder(file, tasksFolder)) continue;
-    const content = await ctx.app.vault.cachedRead(file);
-    collectTaskIds(content, ids);
-  }
-  return ids;
-}
-
-function collectTaskIds(content: string, ids: Set<string>): void {
-  for (const match of content.matchAll(TASK_ID_GLOBAL_REGEX)) {
-    const id = match[1]?.trim();
-    if (id) ids.add(id);
-  }
-}
-
-function randomAlphabetId(length: number, alphabet: string): string {
-  const chars: string[] = [];
-  const limit = 256 - (256 % alphabet.length);
-  while (chars.length < length) {
-    for (const byte of randomBytes(length - chars.length)) {
-      if (byte >= limit) continue;
-      chars.push(alphabet[byte % alphabet.length] ?? alphabet[0]);
-      if (chars.length === length) break;
-    }
-  }
-  return chars.join("");
-}
-
-function randomBytes(length: number): Uint8Array {
-  const bytes = new Uint8Array(length);
-  if (globalThis.crypto && typeof globalThis.crypto.getRandomValues === "function") {
-    globalThis.crypto.getRandomValues(bytes);
-    return bytes;
-  }
-  for (let index = 0; index < bytes.length; index += 1) {
-    bytes[index] = Math.floor(Math.random() * 256);
-  }
-  return bytes;
-}
-
 async function readTasks(_content: string, context: SectionTransformContext): Promise<Record<string, TaskRead>> {
-  return readRootTaskMap(context.ctx, context.file);
+  return readRootTaskMapTask(context.ctx, context.file);
 }
 
 export async function readRootTaskMap(ctx: WorkflowContext, rootFile: TFile): Promise<Record<string, TaskRead>> {
-  const items: Record<string, TaskRead> = {};
-  const shardFile = await readTaskShardFile(ctx, rootFile);
-  if (!shardFile) return items;
-
-  const content = await ctx.app.vault.read(shardFile);
-  const range = taskShardTaskRange(content);
-  if (!range) return items;
-
-  let cursor = range.start;
-  while (cursor < range.end) {
-    const span = readLineSpan(content, cursor, range.end);
-    if (!span) break;
-
-    const task = readTaskLine(span.text);
-    if (task) {
-      const id = uniqueReadId(task.id, items);
-      items[id] = task.task;
-    }
-
-    cursor = span.next;
-  }
-
-  return items;
+  return readRootTaskMapTask(ctx, rootFile);
 }
 
-export async function readAllTaskItems(ctx: WorkflowContext): Promise<Array<{
-  rootPath: string;
-  rootTitle: string;
-  rootType: string;
-  id: string;
-  task: TaskRead;
-}>> {
-  const rootFiles = rootFilesById(ctx);
-  const results: Array<{
-    rootPath: string;
-    rootTitle: string;
-    rootType: string;
-    id: string;
-    task: TaskRead;
-  }> = [];
-  for (const file of ctx.app.vault.getMarkdownFiles()) {
-    if (!isInFolder(file, taskCurrentFolder(ctx))) continue;
-    const rootFile = rootFiles.get(file.basename);
-    if (!rootFile) continue;
-    const content = await ctx.app.vault.read(file);
-    const range = taskShardTaskRange(content);
-    if (!range) continue;
-    let cursor = range.start;
-    const seen: Record<string, true> = {};
-    while (cursor < range.end) {
-      const span = readLineSpan(content, cursor, range.end);
-      if (!span) break;
-      const task = readTaskLine(span.text);
-      if (task) {
-        const id = uniqueReadId(task.id, seen);
-        seen[id] = true;
-        results.push({
-          rootPath: rootFile.path,
-          rootTitle: rootFile.basename,
-          rootType: readType(fileFrontmatter(ctx, rootFile)),
-          id,
-          task: task.task
-        });
-      }
-      cursor = span.next;
-    }
-  }
-  return results;
-}
-
-function rootFilesById(ctx: WorkflowContext): Map<string, TFile> {
-  const roots = new Map<string, TFile>();
-  for (const file of ctx.app.vault.getMarkdownFiles()) {
-    if (isInFolder(file, taskRegistryFolder(ctx)) || isArchivedFile(ctx, file)) continue;
-    const rootId = rootIdFromFrontmatter(fileFrontmatter(ctx, file));
-    if (rootId && !roots.has(rootId)) roots.set(rootId, file);
-  }
-  return roots;
+export async function readAllTaskItems(ctx: WorkflowContext): Promise<RootTaskItem[]> {
+  return readAllTaskItemsTask(ctx);
 }
 
 export async function insertRootTask(ctx: WorkflowContext, rootFile: TFile, value: unknown): Promise<string> {
-  const write = normalizeTaskWriteValue(value);
-  const taskId = await newTaskId(ctx);
-  const line = serializeNewTaskLine(write.task, taskId);
-  const shardFile = await ensureTaskShard(ctx, rootFile);
-  const base = await ctx.app.vault.read(shardFile);
-  const normalized = ensureTaskShardTaskSection(base);
-  const current = normalized.content.slice(normalized.range.start, normalized.range.end);
-  const next = insertTaskLine(current, line, write.position);
-  if (current !== next || base !== normalized.content) {
-    await ctx.app.vault.modify(shardFile, spliceTextRange(normalized.content, normalized.range, next));
-  }
-  return taskId;
+  return insertRootTaskTask(ctx, rootFile, value);
 }
 
 export async function setRootTaskField(
@@ -3668,511 +3073,19 @@ export async function setRootTaskField(
   field: TaskWritableField,
   value: unknown
 ): Promise<boolean> {
-  const shardFile = await readTaskShardFile(ctx, rootFile);
-  if (!shardFile) throw new Error(`task not found: ${taskId}`);
-  const before = await ctx.app.vault.read(shardFile);
-  const range = taskShardTaskRange(before);
-  const line = range ? findEditableTaskLine(shardFile.path, before, range, taskId) : undefined;
-  if (!line) throw new Error(`task not found: ${taskId}`);
-  const nextValue = normalizeTaskFieldUpdateValue(field, value);
-  const nextTask = applyTaskFieldUpdate(line.task, field, nextValue);
-  const nextLine = serializeEditableTaskLine(line, nextTask);
-  const currentLine = before.slice(line.range.start, line.range.endWithoutBreak);
-  if (currentLine === nextLine) return false;
-  await ctx.app.vault.modify(shardFile, spliceTextRange(before, line.range, nextLine));
-  return true;
+  return setRootTaskFieldTask(ctx, rootFile, taskId, field, value);
 }
 
 export async function reorderRootTasks(ctx: WorkflowContext, rootFile: TFile, taskIds: string[]): Promise<boolean> {
-  const shardFile = await readTaskShardFile(ctx, rootFile);
-  if (!shardFile) throw new Error("task list not found");
-  const before = await ctx.app.vault.read(shardFile);
-  const range = taskShardTaskRange(before);
-  if (!range) throw new Error("task list not found");
-
-  const lines = readEditableTaskLines(shardFile.path, before, range);
-  validateTaskReorderIds(lines, taskIds);
-
-  const byId = new Map(lines.map((line) => [line.id, line]));
-  const section = before.slice(range.start, range.end);
-  const nonTaskContent = removeTextRanges(
-    section,
-    lines.map((line) => ({
-      start: line.range.start - range.start,
-      end: line.range.end - range.start
-    }))
-  );
-  if (nonTaskContent.trim()) throw new Error("task reorder only supports managed task lines");
-
-  const nextSection = taskIds
-    .map((id) => {
-      const line = byId.get(id);
-      if (!line) throw new Error(`task not found: ${id}`);
-      return before.slice(line.range.start, line.range.endWithoutBreak);
-    })
-    .join("\n");
-  if (section === nextSection) return false;
-
-  await ctx.app.vault.modify(shardFile, spliceTextRange(before, range, nextSection));
-  return true;
+  return reorderRootTasksTask(ctx, rootFile, taskIds);
 }
 
 export async function deleteRootTask(ctx: WorkflowContext, rootFile: TFile, taskId: string): Promise<boolean> {
-  const shardFile = await readTaskShardFile(ctx, rootFile);
-  if (!shardFile) throw new Error(`task not found: ${taskId}`);
-  const before = await ctx.app.vault.read(shardFile);
-  const range = taskShardTaskRange(before);
-  const line = range ? findEditableTaskLine(shardFile.path, before, range, taskId) : undefined;
-  if (!line) throw new Error(`task not found: ${taskId}`);
-  const after = removeTextRanges(before, [line.range]);
-  if (before === after) return false;
-  await ctx.app.vault.modify(shardFile, after);
-  return true;
+  return deleteRootTaskTask(ctx, rootFile, taskId);
 }
 
 export function cycleTaskCheckbox(checkbox: string): string {
-  const cycle = [" ", "/", "x", "-"];
-  const index = cycle.indexOf(checkbox);
-  return cycle[index === -1 || index === cycle.length - 1 ? 0 : index + 1];
-}
-
-function readTaskLine(text: string): TaskLineRead | undefined {
-  const match = text.match(/^\s*(?:[-*+]|\d+[.)])\s+\[([^\]\r\n]?)\]\s*(.*)$/);
-  if (!match) return undefined;
-
-  const checkbox = match[1] ?? " ";
-  const parsed = parseTaskBody(match[2] ?? "");
-  if (!parsed.name || !parsed.taskId) return undefined;
-
-  return {
-    id: parsed.taskId,
-    task: {
-      checkbox,
-      name: parsed.name,
-      ...parsed.metadata
-    }
-  };
-}
-
-function findEditableTaskLine(path: string, content: string, range: TextRange, taskId: string): EditableTaskLine | undefined {
-  const seen: Record<string, true> = {};
-  let cursor = range.start;
-  let line = lineNumberAt(content, range.start);
-  while (cursor < range.end) {
-    const span = lineTextRangeAt(content, cursor, range.end);
-    if (!span) break;
-
-    const text = content.slice(span.start, span.endWithoutBreak);
-    const task = readEditableTaskLine(path, line, text, span);
-    if (task) {
-      const id = uniqueReadId(task.id, seen);
-      seen[id] = true;
-      if (id === taskId) return {
-        ...task,
-        id
-      };
-    }
-
-    cursor = span.end;
-    line += 1;
-  }
-  return undefined;
-}
-
-function readEditableTaskLines(path: string, content: string, range: TextRange): EditableTaskLine[] {
-  const lines: EditableTaskLine[] = [];
-  const seen: Record<string, true> = {};
-  let cursor = range.start;
-  let line = lineNumberAt(content, range.start);
-  while (cursor < range.end) {
-    const span = lineTextRangeAt(content, cursor, range.end);
-    if (!span) break;
-
-    const text = content.slice(span.start, span.endWithoutBreak);
-    const task = readEditableTaskLine(path, line, text, span);
-    if (task) {
-      const id = uniqueReadId(task.id, seen);
-      seen[id] = true;
-      lines.push({
-        ...task,
-        id
-      });
-    }
-
-    cursor = span.end;
-    line += 1;
-  }
-  return lines;
-}
-
-function validateTaskReorderIds(lines: EditableTaskLine[], taskIds: string[]): void {
-  if (lines.length !== taskIds.length) {
-    throw new Error("task reorder requires the full current task id order");
-  }
-  const ids = new Set<string>();
-  for (const id of taskIds) {
-    if (ids.has(id)) throw new Error(`duplicate task id in reorder: ${id}`);
-    ids.add(id);
-  }
-  for (const line of lines) {
-    if (!ids.has(line.id)) throw new Error(`missing task id in reorder: ${line.id}`);
-  }
-}
-
-function readEditableTaskLine(
-  path: string,
-  line: number,
-  text: string,
-  range: TextRange & { endWithoutBreak: number }
-): EditableTaskLine | undefined {
-  const match = text.match(/^(\s*(?:[-*+]|\d+[.)])\s+\[)([^\]\r\n]?)(\]\s*)(.*)$/);
-  if (!match) return undefined;
-
-  const parsed = parseTaskBody(match[4] ?? "");
-  if (!parsed.name) return undefined;
-
-  return {
-    id: parsed.taskId ?? syntheticTaskReadId(path, line),
-    range,
-    prefix: match[1] ?? "- [",
-    checkboxSuffix: match[3] ?? "] ",
-    task: {
-      checkbox: match[2] ?? " ",
-      name: parsed.name,
-      ...parsed.metadata
-    },
-    taskId: parsed.taskId,
-    blockId: parsed.blockId
-  };
-}
-
-const TASK_WRITABLE_FIELDS: TaskWritableField[] = [
-  "checkbox",
-  "name",
-  "priority",
-  "due",
-  "scheduled",
-  "start",
-  "created",
-  "done",
-  "cancelled"
-];
-
-const TASK_METADATA_WRITE_FIELDS: Array<keyof TaskMetadata> = [
-  "priority",
-  "due",
-  "scheduled",
-  "start",
-  "created",
-  "done",
-  "cancelled"
-];
-
-const TASK_PRIORITIES = new Set(["highest", "high", "medium", "low", "lowest"]);
-
-function readTaskWritableField(value: string, originalKey: string): TaskWritableField {
-  if (TASK_WRITABLE_FIELDS.includes(value as TaskWritableField)) return value as TaskWritableField;
-  throw new Error(`unknown task field for update key: ${originalKey}`);
-}
-
-function normalizeTaskWriteValue(value: unknown): TaskWrite {
-  if (!isRecord(value)) throw new Error("task insert requires value_json object");
-  assertKnownTaskWriteKeys(value);
-
-  const name = normalizeTaskNameValue(value.name);
-  const task: TaskRead = {
-    checkbox: hasOwn(value, "checkbox") ? normalizeTaskCheckboxValue(value.checkbox) : " ",
-    name
-  };
-
-  for (const field of TASK_METADATA_WRITE_FIELDS) {
-    if (!hasOwn(value, field)) continue;
-    const normalized = normalizeTaskMetadataWriteValue(field, value[field]);
-    if (normalized !== undefined) task[field] = normalized;
-  }
-  return {
-    task,
-    position: normalizeTaskInsertPosition(value.position)
-  };
-}
-
-function assertKnownTaskWriteKeys(value: Record<string, unknown>): void {
-  for (const key of Object.keys(value)) {
-    if (key !== "position" && !TASK_WRITABLE_FIELDS.includes(key as TaskWritableField)) {
-      throw new Error(`unknown task field: ${key}`);
-    }
-  }
-}
-
-function normalizeTaskInsertPosition(value: unknown): number | "end" {
-  if (value === undefined || value === null || value === "" || value === "end") return "end";
-  if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
-    throw new Error("task position must be a positive integer or end");
-  }
-  return value;
-}
-
-function normalizeTaskFieldUpdateValue(field: TaskWritableField, value: unknown): string | undefined {
-  if (field === "checkbox") return normalizeTaskCheckboxValue(value);
-  if (field === "name") return normalizeTaskNameValue(value);
-  return normalizeTaskMetadataWriteValue(field, value);
-}
-
-function normalizeTaskCheckboxValue(value: unknown): string {
-  if (typeof value !== "string") throw new Error("task checkbox must be a string");
-  const checkbox = normalizeCheckboxFilter(value);
-  if (checkbox === undefined) throw new Error("task checkbox is required");
-  if (checkbox.length > 1 || checkbox === "]" || checkbox.includes("\n") || checkbox.includes("\r")) {
-    throw new Error("task checkbox must be a single status character");
-  }
-  return checkbox;
-}
-
-function normalizeTaskNameValue(value: unknown): string {
-  if (typeof value !== "string") throw new Error("task name must be a string");
-  const name = value.trim();
-  if (!name) throw new Error("task name is required");
-  if (/[\r\n]/.test(name)) throw new Error("task name must be a single line");
-  return name;
-}
-
-function normalizeTaskMetadataWriteValue(field: keyof TaskMetadata, value: unknown): string | undefined {
-  if (typeof value !== "string") throw new Error(`task ${field} must be a string`);
-  const normalized = normalizeTaskMetadataValue(field, value.trim());
-  if (!normalized) return undefined;
-  if (field !== "priority" && !/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
-    throw new Error(`task ${field} must be YYYY-MM-DD`);
-  }
-  if (field === "priority" && !TASK_PRIORITIES.has(normalized)) {
-    throw new Error("task priority must be one of: highest|high|medium|low|lowest");
-  }
-  return normalized;
-}
-
-function applyTaskFieldUpdate(task: TaskRead, field: TaskWritableField, value: string | undefined): TaskRead {
-  const next: TaskRead = { ...task };
-  if (value === undefined) {
-    if (field === "checkbox" || field === "name") throw new Error(`task ${field} is required`);
-    delete next[field];
-  } else {
-    next[field] = value;
-  }
-  return next;
-}
-
-function serializeNewTaskLine(task: TaskRead, taskId: string): string {
-  return `- [${task.checkbox}] ${serializeTaskBody(task, { taskId })}`;
-}
-
-function serializeEditableTaskLine(line: EditableTaskLine, task: TaskRead): string {
-  return `${line.prefix}${task.checkbox}${line.checkboxSuffix}${serializeTaskBody(task, {
-    taskId: line.taskId,
-    blockId: line.blockId
-  })}`;
-}
-
-function serializeTaskBody(task: TaskRead, options: { taskId?: string; blockId?: string } = {}): string {
-  const name = normalizeTaskNameValue(task.name);
-  const parts = [name];
-  if (options.taskId) parts.push(`${TASK_ID_SYMBOL} ${options.taskId}`);
-  for (const field of TASK_METADATA_WRITE_FIELDS) {
-    const value = task[field];
-    if (typeof value === "string" && value.trim()) {
-      parts.push(serializeTaskMetadataField(field, value));
-    }
-  }
-  if (options.blockId) parts.push(`^${options.blockId}`);
-  return parts.join(" ");
-}
-
-function serializeTaskMetadataField(field: keyof TaskMetadata, value: string): string {
-  const normalized = normalizeTaskMetadataWriteValue(field, value);
-  if (!normalized) return "";
-  if (field === "priority") return TASK_PRIORITY_FIELD_SYMBOLS[normalized];
-  return `${TASK_DATE_FIELD_SYMBOLS[field]} ${normalized}`;
-}
-
-function parseTaskBody(value: string): { name: string; taskId?: string; blockId?: string; metadata: TaskMetadata } {
-  let body = value.trim();
-  const blockId = readTrailingBlockId(body);
-  if (blockId) body = body.replace(/\s+\^[A-Za-z0-9_-]+\s*$/, "").trim();
-
-  const metadata: TaskMetadata = {};
-  const taskId = readTaskId(body);
-  body = stripTaskIdField(body);
-  body = stripEmojiTaskDates(body, metadata);
-  body = stripEmojiTaskPriority(body, metadata);
-
-  return {
-    name: body.replace(/\s{2,}/g, " ").trim(),
-    taskId,
-    blockId,
-    metadata
-  };
-}
-
-function readTaskId(value: string): string | undefined {
-  return value.match(TASK_ID_REGEX)?.[1];
-}
-
-function stripTaskIdField(value: string): string {
-  return value.replace(TASK_ID_GLOBAL_REGEX, " ");
-}
-
-function readTrailingBlockId(value: string): string | undefined {
-  return value.match(/\s+\^([A-Za-z0-9_-]+)\s*$/)?.[1];
-}
-
-function stripEmojiTaskDates(value: string, metadata: TaskMetadata): string {
-  let result = value;
-  for (const field of TASK_DATE_FIELDS) {
-    result = result.replace(field.re, (_match, rawDate: string) => {
-      if (metadata[field.key] === undefined) metadata[field.key] = rawDate;
-      return " ";
-    });
-  }
-  return result;
-}
-
-function stripEmojiTaskPriority(value: string, metadata: TaskMetadata): string {
-  let result = value;
-  for (const priority of TASK_PRIORITY_FIELDS) {
-    result = result.replace(priority.re, () => {
-      if (metadata.priority === undefined) metadata.priority = priority.value;
-      return " ";
-    });
-  }
-  return result;
-}
-
-function normalizeTaskMetadataValue(key: keyof TaskMetadata, value: string): string {
-  return key === "priority" ? value.toLowerCase() : value;
-}
-
-function uniqueReadId(id: string, items: Record<string, unknown>): string {
-  if (!hasOwn(items, id)) return id;
-  let index = 2;
-  while (hasOwn(items, `${id}-${index}`)) index += 1;
-  return `${id}-${index}`;
-}
-
-function syntheticTaskReadId(path: string, line: number): string {
-  return `task-${hashReadId(`${path}:${line}`)}`;
-}
-
-function hashReadId(value: string): string {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(16).padStart(8, "0");
-}
-
-function lineNumberAt(content: string, index: number): number {
-  let line = 1;
-  for (let cursor = 0; cursor < index; cursor += 1) {
-    if (content.charCodeAt(cursor) === 10) line += 1;
-  }
-  return line;
-}
-
-function readSection(
-  content: string,
-  labels: string[],
-  options: { includeSubsections?: boolean } = {}
-): string {
-  const body = stripYamlFrontmatter(content);
-  for (const label of labels) {
-    const section = readSectionByHeading(body, label, options);
-    if (section !== undefined) return section;
-  }
-  return "";
-}
-
-function readSectionByHeading(
-  content: string,
-  heading: string,
-  options: { includeSubsections?: boolean } = {}
-): string | undefined {
-  const headingPattern = escapeRegExp(heading).replace(/\s+/g, "\\s+");
-  const headerRe = new RegExp(`^\\s*(?<hashes>#{1,6})\\s+${headingPattern}(?=\\s|$).*?$`, "im");
-  const match = content.match(headerRe);
-  if (!match) return undefined;
-
-  const level = match.groups?.hashes.length ?? 6;
-  const headerEnd = (match.index ?? 0) + match[0].length;
-  const sectionStart = content.charAt(headerEnd) === "\n" ? headerEnd + 1 : headerEnd;
-  const after = content.slice(sectionStart);
-  const nextBoundaryRel = nextSectionBoundary(after, options.includeSubsections ? level : undefined);
-  const sectionEnd = nextBoundaryRel === -1 ? content.length : sectionStart + nextBoundaryRel;
-  return trimMarkdownBlock(stripTrailingManagedBlock(content.slice(sectionStart, sectionEnd)));
-}
-
-function nextSectionBoundary(content: string, maxHeadingLevel: number | undefined): number {
-  const headingRe = maxHeadingLevel
-    ? new RegExp(`^\\s*#{1,${maxHeadingLevel}}\\s+`, "m")
-    : /^\s*#{1,6}\s+/m;
-  const thematicBreakRe = /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/m;
-  return minFoundIndex(content.search(headingRe), content.search(thematicBreakRe));
-}
-
-function minFoundIndex(left: number, right: number): number {
-  if (left === -1) return right;
-  if (right === -1) return left;
-  return Math.min(left, right);
-}
-
-function stripProjectSummaryManagedBlock(content: string): string {
-  const nativeBlock = stripLeadingFencedBlock(content, "para-zk-latest-retro-summary");
-  if (nativeBlock !== content) return nativeBlock;
-
-  const lines = content.split("\n");
-  if (!lines[0]?.trim().startsWith("> [!tip]")) return content;
-
-  let fenceCount = 0;
-  let index = 0;
-  for (; index < lines.length; index += 1) {
-    if (lines[index].trim() === "> ```") fenceCount += 1;
-    if (fenceCount === 2) {
-      index += 1;
-      break;
-    }
-  }
-
-  while (lines[index]?.trim() === "") index += 1;
-  return trimMarkdownBlock(lines.slice(index).join("\n"));
-}
-
-function stripLeadingFencedBlock(content: string, language: string): string {
-  const lines = content.split("\n");
-  const firstMeaningful = lines.findIndex((line) => line.trim() !== "");
-  if (firstMeaningful === -1) return content;
-  if (lines[firstMeaningful].trim() !== `\`\`\`${language}`) return content;
-
-  let index = firstMeaningful + 1;
-  for (; index < lines.length; index += 1) {
-    if (lines[index].trim() === "```") {
-      index += 1;
-      break;
-    }
-  }
-
-  while (lines[index]?.trim() === "") index += 1;
-  return trimMarkdownBlock(lines.slice(index).join("\n"));
-}
-
-function stripTrailingManagedBlock(content: string): string {
-  return content.replace(/(?:\r?\n[ \t]*)*```para-zk-managed[^\r\n]*\r?\n```[ \t]*(?:\r?\n[ \t]*)*$/, "");
-}
-
-function stripManagedPrelude(content: string): string {
-  return trimMarkdownBlock(stripYamlFrontmatter(content).replace(/^\s*```para-zk-props\n[\s\S]*?\n```\s*/, ""));
-}
-
-function stripYamlFrontmatter(content: string): string {
-  const frontmatter = yamlFrontmatterRange(content);
-  return frontmatter ? content.slice(frontmatter.end) : content;
+  return cycleTaskCheckboxTask(checkbox);
 }
 
 function sectionLabels(labelKey: string): string[] {
@@ -4187,29 +3100,6 @@ function sectionHeadingCandidates(section: ReadSectionSpec): string[] {
     ...(section.labelKey ? sectionLabels(section.labelKey) : []),
     ...(section.labels ?? [])
   ]);
-}
-
-function trimMarkdownBlock(value: string): string {
-  return value
-    .replace(/^(?:[ \t]*\n)+/, "")
-    .replace(/(?:\n[ \t]*)+$/, "");
-}
-
-function pickFrontmatter(frontmatter: Frontmatter, keys: string[]): Frontmatter {
-  const result: Frontmatter = {};
-  for (const key of keys) {
-    if (frontmatter[key] !== undefined) result[key] = frontmatter[key];
-  }
-  return result;
-}
-
-function fileFrontmatter(ctx: WorkflowContext, file: TFile): Frontmatter {
-  return ctx.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
-}
-
-function readType(frontmatter: Frontmatter): string {
-  const type = frontmatter.type;
-  return typeof type === "string" && type.trim() ? type : "note";
 }
 
 function retroSourceType(ctx: WorkflowContext, file: TFile, frontmatter: Frontmatter): string {
@@ -4832,34 +3722,6 @@ function referenceFrontmatterItemReferencesAnyTarget(
   return stringReferencesAnyTarget(ctx, sourcePath, item.link, targets);
 }
 
-function lineTextRangeAt(
-  content: string,
-  start: number,
-  maxEnd: number
-): (TextRange & { endWithoutBreak: number }) | undefined {
-  if (start >= maxEnd) return undefined;
-  const newline = content.indexOf("\n", start);
-  const end = newline === -1 || newline + 1 > maxEnd ? maxEnd : newline + 1;
-  const rawEndWithoutBreak = newline === -1 || newline >= maxEnd ? maxEnd : newline;
-  const endWithoutBreak = rawEndWithoutBreak > start && content.charAt(rawEndWithoutBreak - 1) === "\r"
-    ? rawEndWithoutBreak - 1
-    : rawEndWithoutBreak;
-  return {
-    start,
-    end,
-    endWithoutBreak
-  };
-}
-
-function removeTextRanges(content: string, ranges: TextRange[]): string {
-  let result = content;
-  const ordered = [...ranges].sort((left, right) => right.start - left.start);
-  for (const range of ordered) {
-    result = `${result.slice(0, range.start)}${result.slice(range.end)}`;
-  }
-  return result;
-}
-
 function stringReferencesAnyTarget(
   ctx: WorkflowContext,
   sourcePath: string,
@@ -4966,21 +3828,6 @@ async function ensureFolderStyleParent(ctx: WorkflowContext, file: TFile): Promi
   const moved = ctx.app.vault.getFileByPath(newPath);
   if (!moved) throw new Error(`failed to move ${file.path} to ${newPath}`);
   return { file: moved, childFolder };
-}
-
-async function ensureFolder(app: App, folder: string): Promise<void> {
-  const normalized = normalizeVaultPath(folder);
-  if (!normalized) return;
-
-  const parts = normalized.split("/");
-  let current = "";
-  for (const part of parts) {
-    current = current ? `${current}/${part}` : part;
-    const existing = app.vault.getAbstractFileByPath(current);
-    if (existing instanceof TFolder) continue;
-    if (existing) throw new Error(`cannot create folder; a file exists at ${current}`);
-    await app.vault.createFolder(current);
-  }
 }
 
 async function uniqueMarkdownPath(app: App, path: string): Promise<string> {
@@ -5424,20 +4271,9 @@ function areaResult(file: TFile, created: boolean): ProjectAreaResult {
   };
 }
 
-function isInFolder(file: TFile, folder: string): boolean {
-  const normalized = normalizeVaultPath(folder);
-  return file.path === normalized || file.path.startsWith(`${normalized}/`);
-}
-
 async function openIfRequested(ctx: WorkflowContext, file: TFile, open?: boolean): Promise<void> {
   if (!open) return;
   await ctx.app.workspace.getLeaf(true).openFile(file);
-}
-
-function parentFolder(path: string): string {
-  const normalized = normalizeVaultPath(path);
-  const index = normalized.lastIndexOf("/");
-  return index === -1 ? "" : normalized.slice(0, index);
 }
 
 function frontmatterListBlock(values: string[] | undefined): string {
