@@ -1,6 +1,6 @@
 # PARA-ZK MCP
 
-PARA-ZK ships a thin MCP server for discovery plus shell-safe section edits. It exposes `describe` for the live PARA-ZK surface index, and `replace`, `set`, and `add` for section body mutations. Frontmatter and task mutations stay CLI-only. The same server is packaged as both a Claude Code plugin and a Codex plugin that share `clients/` (`.claude-plugin/` + `.codex-plugin/` manifests, one bundled `para-zk-mcp.mjs`, and one shared `clients/.mcp.json` both manifests point at), or it can be registered as a plain MCP server in any client.
+PARA-ZK ships a thin MCP server for discovery plus shell-safe section edits. It exposes `describe` for the live PARA-ZK surface index, and `replace`, `set`, and `add` for section body mutations. Frontmatter and task mutations stay CLI-only. The same server is packaged as both a Claude Code plugin and a Codex plugin that share `clients/` (`.claude-plugin/` + `.codex-plugin/` manifests and one bundled `para-zk-mcp.mjs`), or it can be registered as a plain MCP server in any client. The two platforms resolve plugin MCP paths differently, so each manifest declares its own config: Claude inlines `mcpServers` directly in `.claude-plugin/plugin.json` (`${CLAUDE_PLUGIN_ROOT}/para-zk-mcp.mjs`), while Codex points at `clients/.mcp.codex.json` (relative `para-zk-mcp.mjs` plus `cwd: "."`, which Codex rebases to the plugin root, since Codex neither expands `${CLAUDE_PLUGIN_ROOT}` in `args` nor accepts an inline `mcpServers` object).
 
 ## Prerequisites
 
@@ -23,8 +23,9 @@ codex plugin marketplace add kangig94/obsidian-para-zk
 codex /plugins   # open the list and install "para-zk"
 ```
 
-The Codex plugin manifest is `clients/.codex-plugin/plugin.json` (`mcpServers` → `./.mcp.json`)
-and launches the bundled server with `node ${CLAUDE_PLUGIN_ROOT}/para-zk-mcp.mjs`.
+The Codex plugin manifest is `clients/.codex-plugin/plugin.json` (`mcpServers` → `./.mcp.codex.json`).
+Codex does not expand `${CLAUDE_PLUGIN_ROOT}` in MCP server `args`, but it does rebase a relative
+`cwd` to the plugin root, so the Codex config launches `node para-zk-mcp.mjs` with `cwd: "."`.
 
 Or register the MCP server directly, without a plugin:
 

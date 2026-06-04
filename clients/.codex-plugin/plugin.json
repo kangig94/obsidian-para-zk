@@ -9,7 +9,7 @@
   "repository": "https://github.com/kangig94/obsidian-para-zk",
   "license": "MIT",
   "keywords": ["obsidian", "para", "zettelkasten"],
-  "mcpServers": "./.mcp.json",
+  "mcpServers": "./.mcp.codex.json",
   "interface": {
     "displayName": "PARA-ZK",
     "shortDescription": "Discover and edit a PARA-ZK Obsidian vault via its CLI",

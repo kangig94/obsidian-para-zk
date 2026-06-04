@@ -9,5 +9,10 @@
   "repository": "https://github.com/kangig94/obsidian-para-zk",
   "license": "MIT",
   "keywords": ["obsidian", "para", "zettelkasten"],
-  "mcpServers": "./.mcp.json"
+  "mcpServers": {
+    "para-zk": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/para-zk-mcp.mjs"]
+    }
+  }
 }
