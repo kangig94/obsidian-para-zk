@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isRecord } from "../../src/records";
+import { hasOwn, isRecord } from "../../src/infra/records";
 
 describe("isRecord", () => {
   it("accepts plain objects", () => {
@@ -13,5 +13,15 @@ describe("isRecord", () => {
     expect(isRecord("x")).toBe(false);
     expect(isRecord(3)).toBe(false);
     expect(isRecord(undefined)).toBe(false);
+  });
+});
+
+describe("hasOwn", () => {
+  it("checks own properties without accepting prototype properties", () => {
+    const value = Object.create({ inherited: true }) as Record<string, unknown>;
+    value.own = true;
+
+    expect(hasOwn(value, "own")).toBe(true);
+    expect(hasOwn(value, "inherited")).toBe(false);
   });
 });

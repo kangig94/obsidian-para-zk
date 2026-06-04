@@ -1,7 +1,7 @@
 import { Notice } from "obsidian";
 import { localePack, normalizeLocale } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
-import { isRecord } from "../records";
+import { isRecord } from "../infra/records";
 import type { WorkflowContext } from "../workflows";
 import {
   statusCommandEntries,

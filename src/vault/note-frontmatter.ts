@@ -1,5 +1,5 @@
 import { parseYaml, type App, type TFile } from "obsidian";
-import { yamlFrontmatterRange } from "./markdown-sections";
+import { yamlFrontmatterRange } from "../markdown/sections";
 
 export type Frontmatter = Record<string, unknown>;
 

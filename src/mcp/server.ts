@@ -3,7 +3,7 @@ import { pathToFileURL } from "node:url";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult, type ListToolsResult } from "@modelcontextprotocol/sdk/types.js";
-import { isRecord } from "../records";
+import { isRecord } from "../infra/records";
 
 export type ParaZkCli = "optsidian" | "obsidian";
 export type UpdateTool = "replace" | "set" | "add";

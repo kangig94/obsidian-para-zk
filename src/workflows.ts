@@ -1,5 +1,6 @@
 import { App, TAbstractFile, TFile, TFolder } from "obsidian";
 import { localePack } from "./i18n";
+import { hasOwn, isRecord } from "./infra/records";
 import { renderTemplate, type TemplateName } from "./templates";
 import {
   dateFromCli,
@@ -57,17 +58,36 @@ import {
   trimTextRange,
   trailingManagedBlockStart,
   type TextRange
-} from "./workflows/markdown-sections";
+} from "./markdown/sections";
 import {
-  canonicalWikiLink,
   isExternalReference as isExternalReferenceTarget,
-  normalizedReferenceTargetWithSubpath,
   parseMarkdownLink,
   parseWikiLink as parseWikiLinkTarget,
   pathBasenameWithoutExtension as pathBasenameWithoutExtensionTarget,
   referenceTargetWithSubpath,
   splitObsidianSubpath as splitObsidianSubpathTarget
 } from "./workflows/reference-targets";
+import {
+  deleteReferenceItem as deleteReferenceItemModel,
+  insertReferenceItem as insertReferenceItemModel,
+  readReferenceItems as readReferenceItemsModel,
+  readReferenceItemsFresh as readReferenceItemsFreshModel,
+  readReferenceWritableField,
+  reorderReferenceItems as reorderReferenceItemsModel,
+  setReferenceItemField as setReferenceItemFieldModel,
+  updateReferenceItem as updateReferenceItemModel,
+  type ReferenceMutationResult as ReferenceMutationResultModel,
+  type ReferenceRead as ReferenceReadModel,
+  type ReferenceStoredItem as ReferenceStoredItemModel,
+  type ReferenceWritableField as ReferenceWritableFieldModel,
+  type ReferenceWriteInput as ReferenceWriteInputModel
+} from "./workflows/reference-items";
+import {
+  hasCollectionReadOptions,
+  readCollectionPage,
+  type CollectionKind as ReadCollectionKindModel,
+  type CollectionReadOptions as CollectionReadOptionsModel
+} from "./workflows/collection-pages";
 import {
   fileFrontmatter,
   parseFrontmatterFromContent,
@@ -76,7 +96,7 @@ import {
   readFileTypeFresh,
   readType,
   type Frontmatter
-} from "./workflows/note-frontmatter";
+} from "./vault/note-frontmatter";
 import {
   ROOT_ID_FRONTMATTER_KEY,
   assertRootTaskExists,
@@ -96,7 +116,7 @@ import {
   type TaskRead as TaskReadModel,
   type TaskWritableField as TaskWritableFieldModel
 } from "./workflows/tasks";
-import { ensureFolder, isInFolder, parentFolder } from "./workflows/vault-files";
+import { ensureFolder, isInFolder, parentFolder } from "./vault/files";
 
 export type WorkflowContext = {
   app: App;
@@ -197,17 +217,7 @@ export type PromoteFleetingOptions = {
   open?: boolean;
 };
 
-export type CollectionReadOptions = {
-  offset?: number;
-  limit?: number | "all";
-  query?: string;
-  type?: string;
-  checkbox?: string;
-  priority?: string;
-  dueBefore?: string;
-  dueAfter?: string;
-  refKind?: string;
-};
+export type CollectionReadOptions = CollectionReadOptionsModel;
 
 type ReadOptionsWithCollection = {
   collection?: CollectionReadOptions;
@@ -369,7 +379,7 @@ type SectionTransformContext = {
   range?: TextRange;
   section: ReadSectionSpec;
 };
-type ReadCollectionKind = "task" | "reference" | "backlink";
+type ReadCollectionKind = ReadCollectionKindModel;
 type ReadSectionSpec = {
   key: string;
   labelKey?: string;
@@ -394,55 +404,17 @@ export type SurfaceDescription = {
 };
 export type TaskRead = TaskReadModel;
 export type TaskWritableField = TaskWritableFieldModel;
-type ReferenceKind = "url" | "note" | "file" | "wiki" | "text";
-export type ReferenceStoredItem = string | {
-  link: string;
-  description?: string;
-};
-export type ReferenceRead = {
-  link: string;
-  kind: ReferenceKind;
-  description?: string;
-  path?: string;
-  target?: string;
-};
+export type ReferenceStoredItem = ReferenceStoredItemModel;
+export type ReferenceRead = ReferenceReadModel;
 export type BacklinkRead = {
   link: string;
   path: string;
   title: string;
   type: string;
 };
-type NormalizedReferenceItem = {
-  link: string;
-  description?: string;
-};
-type ReferenceWritableField = "link" | "description";
-type ReferenceWriteInput = {
-  link: unknown;
-  description?: unknown;
-  position?: unknown;
-};
-type ReferenceMutationResult = {
-  changed: boolean;
-  index: number;
-  link: string;
-  added?: boolean;
-};
-type NormalizedCollectionReadOptions = {
-  offset: number;
-  limit: number | "all";
-  query?: string;
-  type?: string;
-  checkbox?: string;
-  priority?: string;
-  dueBefore?: string;
-  dueAfter?: string;
-  refKind?: string;
-};
-
-const DEFAULT_COLLECTION_READ_LIMIT = 50;
-const REFERENCE_KINDS = new Set<string>(["url", "note", "file", "wiki", "text"]);
-
+type ReferenceWritableField = ReferenceWritableFieldModel;
+type ReferenceWriteInput = ReferenceWriteInputModel;
+type ReferenceMutationResult = ReferenceMutationResultModel;
 export async function createProject(ctx: WorkflowContext, options: CreateProjectOptions): Promise<NoteResult & {
   areas?: ProjectAreaResult[];
 }> {
@@ -1091,17 +1063,11 @@ export function pathBasenameWithoutExtension(path: string): string {
 }
 
 export function readReferenceItems(ctx: WorkflowContext, file: TFile): ReferenceRead[] {
-  return referenceItemsFromFrontmatter(fileFrontmatter(ctx, file))
-    .map((item) => deriveReferenceRead(ctx, file, item));
-}
-
-async function readReferenceFrontmatterFresh(ctx: WorkflowContext, file: TFile): Promise<Frontmatter> {
-  return readFileFrontmatterFresh(ctx, file);
+  return readReferenceItemsModel(ctx, file);
 }
 
 export async function readReferenceItemsFresh(ctx: WorkflowContext, file: TFile): Promise<ReferenceRead[]> {
-  return referenceItemsFromFrontmatter(await readReferenceFrontmatterFresh(ctx, file))
-    .map((item) => deriveReferenceRead(ctx, file, item));
+  return readReferenceItemsFreshModel(ctx, file);
 }
 
 export async function insertReferenceItem(
@@ -1109,36 +1075,7 @@ export async function insertReferenceItem(
   file: TFile,
   input: ReferenceWriteInput
 ): Promise<ReferenceMutationResult> {
-  const canonical = canonicalizeReferenceTarget(ctx, file, input.link);
-  const description = hasOwn(input, "description")
-    ? normalizeReferenceOptionalField(input.description, "description")
-    : undefined;
-  const item = normalizeReferenceItem({
-    link: canonical.link,
-    description
-  });
-  const items = referenceItemsFromFrontmatter(await readReferenceFrontmatterFresh(ctx, file));
-  const itemKey = referenceDedupeKey(ctx, file, item.link);
-  const duplicateIndex = items.findIndex((candidate) => referenceDedupeKey(ctx, file, candidate.link) === itemKey);
-  if (duplicateIndex !== -1) {
-    return {
-      changed: false,
-      index: duplicateIndex,
-      link: item.link,
-      added: false
-    };
-  }
-
-  const position = normalizeReferenceInsertPosition(input.position, items.length);
-  const next = [...items];
-  next.splice(position, 0, item);
-  await writeReferenceItems(ctx, file, next);
-  return {
-    changed: true,
-    index: position,
-    link: item.link,
-    added: true
-  };
+  return insertReferenceItemModel(ctx, file, input);
 }
 
 export async function updateReferenceItem(
@@ -1150,47 +1087,7 @@ export async function updateReferenceItem(
     description?: unknown;
   }
 ): Promise<ReferenceMutationResult> {
-  const items = referenceItemsFromFrontmatter(await readReferenceFrontmatterFresh(ctx, file));
-  assertReferenceIndex(items, index);
-
-  const current = items[index];
-  const hasLink = hasOwn(patch, "link");
-  const hasDescription = hasOwn(patch, "description");
-
-  let link = current.link;
-  let description = current.description;
-
-  if (hasLink) {
-    const canonical = canonicalizeReferenceTarget(ctx, file, patch.link);
-    link = canonical.link;
-  }
-  if (hasDescription) {
-    description = normalizeReferenceOptionalField(patch.description, "description");
-  }
-
-  const linkKey = referenceDedupeKey(ctx, file, link);
-  const duplicateIndex = items.findIndex((candidate, candidateIndex) => candidateIndex !== index && referenceDedupeKey(ctx, file, candidate.link) === linkKey);
-  if (duplicateIndex !== -1) {
-    throw new Error(`duplicate reference target: ${link}`);
-  }
-
-  const nextItem = normalizeReferenceItem({ link, description });
-  if (referenceItemsEqual(current, nextItem)) {
-    return {
-      changed: false,
-      index,
-      link: nextItem.link
-    };
-  }
-
-  const next = [...items];
-  next[index] = nextItem;
-  await writeReferenceItems(ctx, file, next);
-  return {
-    changed: true,
-    index,
-    link: nextItem.link
-  };
+  return updateReferenceItemModel(ctx, file, index, patch);
 }
 
 export async function setReferenceItemField(
@@ -1200,8 +1097,7 @@ export async function setReferenceItemField(
   field: string,
   value: unknown
 ): Promise<ReferenceMutationResult> {
-  const writableField = readReferenceWritableField(field, `references/${index}/${field}`);
-  return updateReferenceItem(ctx, file, index, { [writableField]: value });
+  return setReferenceItemFieldModel(ctx, file, index, field, value);
 }
 
 export async function deleteReferenceItem(
@@ -1209,15 +1105,7 @@ export async function deleteReferenceItem(
   file: TFile,
   index: number
 ): Promise<ReferenceMutationResult> {
-  const items = referenceItemsFromFrontmatter(await readReferenceFrontmatterFresh(ctx, file));
-  assertReferenceIndex(items, index);
-  const [removed] = items.splice(index, 1);
-  await writeReferenceItems(ctx, file, items);
-  return {
-    changed: true,
-    index,
-    link: removed.link
-  };
+  return deleteReferenceItemModel(ctx, file, index);
 }
 
 export async function reorderReferenceItems(
@@ -1225,307 +1113,11 @@ export async function reorderReferenceItems(
   file: TFile,
   links: string[]
 ): Promise<{ changed: boolean; items: ReferenceRead[] }> {
-  const items = referenceItemsFromFrontmatter(await readReferenceFrontmatterFresh(ctx, file));
-  if (links.length !== items.length) throw new Error("reference reorder requires the full current link order");
-
-  const byLink = new Map<string, NormalizedReferenceItem>();
-  for (const item of items) {
-    if (byLink.has(item.link)) throw new Error(`duplicate reference link in current frontmatter: ${item.link}`);
-    byLink.set(item.link, item);
-  }
-
-  const seen = new Set<string>();
-  const next: NormalizedReferenceItem[] = [];
-  for (const link of links) {
-    if (seen.has(link)) throw new Error(`duplicate reference link in reorder: ${link}`);
-    seen.add(link);
-    const item = byLink.get(link);
-    if (!item) throw new Error(`reference no longer present: ${link}`);
-    next.push(item);
-  }
-
-  const changed = !items.every((item, itemIndex) => item.link === next[itemIndex]?.link);
-  if (changed) await writeReferenceItems(ctx, file, next);
-  return {
-    changed,
-    items: next.map((item) => deriveReferenceRead(ctx, file, item))
-  };
-}
-
-function referenceItemsFromFrontmatter(frontmatter: Frontmatter): NormalizedReferenceItem[] {
-  const value = frontmatter.references;
-  if (value === undefined || value === null) return [];
-  if (!Array.isArray(value)) throw new Error("references frontmatter must be an array");
-  return value.map((item, index) => normalizeReferenceStoredItem(item, index));
-}
-
-function normalizeReferenceStoredItem(value: unknown, index: number): NormalizedReferenceItem {
-  if (typeof value === "string") {
-    return normalizeReferenceItem({ link: value }, index);
-  }
-  if (!isRecord(value)) {
-    throw new Error(`references[${index}] must be a string or object`);
-  }
-  return normalizeReferenceItem({
-    link: value.link,
-    description: hasOwn(value, "description") ? value.description : undefined
-  }, index);
-}
-
-function normalizeReferenceItem(value: {
-  link: unknown;
-  description?: unknown;
-}, index?: number): NormalizedReferenceItem {
-  const keyPrefix = index === undefined ? "reference" : `references[${index}]`;
-  const link = normalizeReferenceLinkValue(value.link, `${keyPrefix}.link`);
-  const description = normalizeReferenceOptionalField(value.description, "description");
-  return {
-    link,
-    ...(description !== undefined ? { description } : {})
-  };
-}
-
-async function writeReferenceItems(
-  ctx: WorkflowContext,
-  file: TFile,
-  items: NormalizedReferenceItem[]
-): Promise<void> {
-  const stored = items.map(serializeReferenceStoredItem);
-  await ctx.app.fileManager.processFrontMatter(file, (fm) => {
-    if (stored.length === 0) {
-      delete fm.references;
-    } else {
-      fm.references = stored;
-    }
-  });
-}
-
-function serializeReferenceStoredItem(item: NormalizedReferenceItem): ReferenceStoredItem {
-  if (item.description === undefined) return item.link;
-  return {
-    link: item.link,
-    description: item.description
-  };
-}
-
-function referenceItemsEqual(left: NormalizedReferenceItem, right: NormalizedReferenceItem): boolean {
-  return left.link === right.link && left.description === right.description;
-}
-
-function assertReferenceIndex(items: NormalizedReferenceItem[], index: number): void {
-  if (!Number.isInteger(index) || index < 0 || index >= items.length) {
-    throw new Error(`reference not found: ${index}`);
-  }
-}
-
-function normalizeReferenceInsertPosition(value: unknown, length: number): number {
-  if (value === undefined || value === null || value === "" || value === "end") return length;
-  if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > length) {
-    throw new Error(`reference position must be an integer between 0 and ${length}`);
-  }
-  return value;
-}
-
-function normalizeReferenceLinkValue(value: unknown, key: string): string {
-  if (typeof value !== "string") throw new Error(`${key} must be a string`);
-  const link = value.trim();
-  if (!link) throw new Error(`${key} is required`);
-  return link;
-}
-
-function normalizeReferenceOptionalField(value: unknown, key: "description"): string | undefined {
-  if (value === undefined || value === null) return undefined;
-  if (typeof value !== "string") throw new Error(`reference ${key} must be a string or null`);
-  const trimmed = value.trim();
-  return trimmed ? trimmed : undefined;
-}
-
-function deriveReferenceRead(ctx: WorkflowContext, file: TFile, item: NormalizedReferenceItem): ReferenceRead {
-  const link = item.link;
-  const wiki = parseWikiLink(link);
-  let derived: ReferenceRead;
-  if (wiki) {
-    derived = deriveWikiReferenceRead(ctx, file, link, wiki.target);
-  } else if (isExternalReference(link)) {
-    derived = { link, kind: "url", target: link };
-  } else {
-    derived = { link, kind: "text" };
-  }
-
-  return {
-    ...derived,
-    ...(item.description !== undefined ? { description: item.description } : {})
-  };
-}
-
-function deriveWikiReferenceRead(ctx: WorkflowContext, file: TFile, link: string, target: string): ReferenceRead {
-  const resolved = resolveWikiReferenceFile(ctx, file, target);
-  const normalized = normalizedReferenceTargetWithSubpath(target);
-  if (resolved) {
-    return {
-      link,
-      kind: resolved.file.path.endsWith(".md") ? "note" : "file",
-      path: resolved.file.path
-    };
-  }
-  return {
-    link,
-    kind: "wiki",
-    target: normalized
-  };
-}
-
-// Dedupe identity for a stored reference link. Resolution-based so two textual forms of
-// the same vault target collide — e.g. a stored `[[full/path/Note.md]]` and the bare
-// `[[Note]]` that Obsidian's rename auto-update normalizes it to both key to the same file.
-// Distinct Obsidian subpaths stay distinct; URLs and unresolved/plain links fall back to
-// their normalized text.
-function referenceDedupeKey(ctx: WorkflowContext, source: TFile, link: string): string {
-  const wiki = parseWikiLink(link);
-  if (wiki) {
-    const resolved = resolveWikiReferenceFile(ctx, source, wiki.target);
-    if (resolved) return `file:${resolved.file.path}#${resolved.subpath}`;
-    return `wiki:${normalizedReferenceTargetWithSubpath(wiki.target)}`;
-  }
-  if (isExternalReference(link)) return `url:${link.trim()}`;
-  return `text:${link}`;
-}
-
-function canonicalizeReferenceTarget(
-  ctx: WorkflowContext,
-  source: TFile,
-  target: unknown
-): {
-  link: string;
-  targetPath?: string;
-} {
-  const value = normalizeReferenceLinkValue(target, "reference target");
-  const parsed = parseReferenceTargetInput(value);
-
-  if (parsed.syntax === "url" || (parsed.syntax === "markdown" && isExternalReference(parsed.target))) {
-    return {
-      link: parsed.target.trim()
-    };
-  }
-
-  if (parsed.syntax === "wiki") {
-    const resolved = resolveWikiReferenceFile(ctx, source, parsed.target);
-    if (resolved) {
-      return {
-        link: canonicalWikiLink(referenceTargetWithSubpath(resolved.file.path, resolved.subpath)),
-        targetPath: resolved.file.path
-      };
-    }
-    return {
-      link: canonicalWikiLink(normalizedReferenceTargetWithSubpath(parsed.target))
-    };
-  }
-
-  if (parsed.syntax === "markdown") {
-    const resolved = resolveRawReferenceFile(ctx, source, parsed.target);
-    if (!resolved) {
-      throw new Error(`markdown reference target must be a URL or existing vault file: ${parsed.target}`);
-    }
-    return {
-      link: canonicalWikiLink(referenceTargetWithSubpath(resolved.file.path, resolved.subpath)),
-      targetPath: resolved.file.path
-    };
-  }
-
-  const resolved = resolveRawReferenceFile(ctx, source, parsed.target);
-  if (resolved) {
-    return {
-      link: canonicalWikiLink(referenceTargetWithSubpath(resolved.file.path, resolved.subpath)),
-      targetPath: resolved.file.path
-    };
-  }
-
-  return {
-    link: value
-  };
-}
-
-type ParsedReferenceTarget = {
-  syntax: "wiki" | "markdown" | "url" | "raw";
-  target: string;
-};
-
-function parseReferenceTargetInput(value: string): ParsedReferenceTarget {
-  const wiki = parseWikiLink(value);
-  if (wiki) {
-    return {
-      syntax: "wiki",
-      target: wiki.target
-    };
-  }
-
-  const markdown = parseMarkdownLink(value);
-  if (markdown) {
-    return {
-      syntax: "markdown",
-      target: markdown.target
-    };
-  }
-
-  if (isExternalReference(value)) {
-    return {
-      syntax: "url",
-      target: value
-    };
-  }
-
-  return {
-    syntax: "raw",
-    target: value
-  };
+  return reorderReferenceItemsModel(ctx, file, links);
 }
 
 export function parseWikiLink(value: string): { target: string; alias?: string } | undefined {
   return parseWikiLinkTarget(value);
-}
-
-function resolveWikiReferenceFile(
-  ctx: WorkflowContext,
-  source: TFile,
-  target: string
-): { file: TFile; subpath: string } | undefined {
-  const split = splitObsidianSubpath(target);
-  const normalized = referenceTargetWithSubpath(split.base, split.subpath);
-  const resolved = ctx.app.metadataCache.getFirstLinkpathDest(normalized, source.path)
-    ?? (split.base ? ctx.app.metadataCache.getFirstLinkpathDest(split.base, source.path) : null);
-  if (resolved) {
-    return {
-      file: resolved,
-      subpath: split.subpath
-    };
-  }
-  if (!split.base && split.subpath) {
-    return {
-      file: source,
-      subpath: split.subpath
-    };
-  }
-  return undefined;
-}
-
-function resolveRawReferenceFile(
-  ctx: WorkflowContext,
-  source: TFile,
-  target: string
-): { file: TFile; subpath: string } | undefined {
-  const split = splitObsidianSubpath(target);
-  if (!split.base && split.subpath) {
-    return {
-      file: source,
-      subpath: split.subpath
-    };
-  }
-  const file = ctx.app.vault.getAbstractFileByPath(split.base);
-  if (!(file instanceof TFile)) return undefined;
-  return {
-    file,
-    subpath: split.subpath
-  };
 }
 
 export function splitObsidianSubpath(value: string): { base: string; subpath: string } {
@@ -1534,10 +1126,6 @@ export function splitObsidianSubpath(value: string): { base: string; subpath: st
 
 export function isExternalReference(value: string): boolean {
   return isExternalReferenceTarget(value);
-}
-
-function hasOwn(value: object, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(value, key);
 }
 
 function countListItems(section: string, prefix: string): number {
@@ -1949,10 +1537,6 @@ function readSurfaceMapKey(
   return readMapPath(surface, parts, originalKey);
 }
 
-function hasCollectionReadOptions(options?: CollectionReadOptions): boolean {
-  return !!options && Object.values(options).some((value) => value !== undefined);
-}
-
 function collectionKeysForSpec(spec: ReadSurfaceSpec): Set<string> {
   return new Set((spec.sections ?? [])
     .filter((section) => section.collection)
@@ -1965,153 +1549,6 @@ function collectionKindForKey(spec: ReadSurfaceSpec, key: string): ReadCollectio
 
 function specHasBacklinkSection(spec: ReadSurfaceSpec): boolean {
   return collectionKindForKey(spec, "backlinks") === "backlink";
-}
-
-function readCollectionPage(
-  value: unknown,
-  kind: ReadCollectionKind,
-  rawOptions?: CollectionReadOptions
-): Record<string, unknown> {
-  if (!isRecord(value)) throw new Error("collection read target is not a map");
-
-  const options = normalizeCollectionReadOptions(rawOptions);
-  const entries = Object.entries(value).filter(([, item]) => matchesCollectionItem(kind, item, options));
-  const pageEntries = options.limit === "all"
-    ? entries.slice(options.offset)
-    : entries.slice(options.offset, options.offset + options.limit);
-  return {
-    count: entries.length,
-    offset: options.offset,
-    limit: options.limit,
-    returned: pageEntries.length,
-    has_more: options.offset + pageEntries.length < entries.length,
-    items: Object.fromEntries(pageEntries)
-  };
-}
-
-function normalizeCollectionReadOptions(rawOptions?: CollectionReadOptions): NormalizedCollectionReadOptions {
-  const offset = rawOptions?.offset ?? 0;
-  if (!Number.isInteger(offset) || offset < 0) {
-    throw new Error("offset must be a non-negative integer");
-  }
-
-  const limit = rawOptions?.limit ?? DEFAULT_COLLECTION_READ_LIMIT;
-  if (limit !== "all" && (!Number.isInteger(limit) || limit < 1)) {
-    throw new Error("limit must be a positive integer or all");
-  }
-
-  const refKind = trimOptional(rawOptions?.refKind);
-  if (refKind && !REFERENCE_KINDS.has(refKind)) {
-    throw new Error(`ref_kind must be one of ${Array.from(REFERENCE_KINDS).join(", ")}`);
-  }
-
-  return {
-    offset,
-    limit,
-    query: trimOptional(rawOptions?.query),
-    type: trimOptional(rawOptions?.type),
-    checkbox: normalizeCheckboxFilter(rawOptions?.checkbox),
-    priority: trimOptional(rawOptions?.priority),
-    dueBefore: normalizeIsoDateFilter(rawOptions?.dueBefore, "due_before"),
-    dueAfter: normalizeIsoDateFilter(rawOptions?.dueAfter, "due_after"),
-    refKind
-  };
-}
-
-function matchesCollectionItem(
-  kind: ReadCollectionKind,
-  item: unknown,
-  options: NormalizedCollectionReadOptions
-): boolean {
-  if (!isRecord(item)) return false;
-
-  if (options.query && !collectionSearchText(kind, item).toLowerCase().includes(options.query.toLowerCase())) {
-    return false;
-  }
-
-  if (kind === "task") return matchesTaskCollectionItem(item, options);
-  if (kind === "reference") return matchesReferenceCollectionItem(item, options);
-  return matchesBacklinkCollectionItem(item, options);
-}
-
-function matchesTaskCollectionItem(
-  item: Record<string, unknown>,
-  options: NormalizedCollectionReadOptions
-): boolean {
-  if (options.checkbox !== undefined && readRecordString(item, "checkbox") !== options.checkbox) return false;
-  if (options.priority && readRecordString(item, "priority") !== options.priority) return false;
-  if (options.dueBefore && !dateOnOrBefore(readRecordString(item, "due"), options.dueBefore)) return false;
-  if (options.dueAfter && !dateOnOrAfter(readRecordString(item, "due"), options.dueAfter)) return false;
-  return true;
-}
-
-function matchesReferenceCollectionItem(
-  item: Record<string, unknown>,
-  options: NormalizedCollectionReadOptions
-): boolean {
-  if (options.refKind && readRecordString(item, "kind") !== options.refKind) return false;
-  return true;
-}
-
-function matchesBacklinkCollectionItem(
-  item: Record<string, unknown>,
-  options: NormalizedCollectionReadOptions
-): boolean {
-  if (options.type && readRecordString(item, "type") !== options.type) return false;
-  return true;
-}
-
-function collectionSearchText(kind: ReadCollectionKind, item: Record<string, unknown>): string {
-  let keys = ["title", "path"];
-  switch (kind) {
-    case "task":
-      keys = ["name", "checkbox", "priority", "due", "scheduled", "start", "created", "done", "cancelled"];
-      break;
-    case "reference":
-      keys = ["link", "kind", "description", "target", "path"];
-      break;
-    case "backlink":
-      break;
-  }
-  return keys.map((key) => readRecordString(item, key) ?? "").join("\n");
-}
-
-function normalizeCheckboxFilter(value: string | undefined): string | undefined {
-  if (value === undefined) return undefined;
-  const trimmed = value.trim();
-  if (!trimmed || trimmed === "space" || trimmed === "blank" || trimmed === "todo" || trimmed === "open") return " ";
-  return trimmed;
-}
-
-function normalizeIsoDateFilter(value: string | undefined, key: string): string | undefined {
-  const trimmed = trimOptional(value);
-  if (!trimmed) return undefined;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) throw new Error(`${key} must be YYYY-MM-DD`);
-  return trimmed;
-}
-
-function trimOptional(value: string | undefined): string | undefined {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : undefined;
-}
-
-function readRecordString(record: Record<string, unknown>, key: string): string | undefined {
-  const value = record[key];
-  return typeof value === "string" ? value : undefined;
-}
-
-function dateOnOrBefore(value: string | undefined, limit: string): boolean {
-  const date = readIsoDate(value);
-  return !!date && date <= limit;
-}
-
-function dateOnOrAfter(value: string | undefined, limit: string): boolean {
-  const date = readIsoDate(value);
-  return !!date && date >= limit;
-}
-
-function readIsoDate(value: string | undefined): string | undefined {
-  return value?.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
 }
 
 type WritableSurfaceTarget =
@@ -3011,14 +2448,6 @@ function enumerateBacklinkSources(
   return count;
 }
 
-function readReferenceWritableField(value: string, originalKey: string): ReferenceWritableField {
-  if (value === "link" || value === "description") return value;
-  if (value === "kind" || value === "path" || value === "target") {
-    throw new Error(`reference field is read-only for update key: ${originalKey}`);
-  }
-  throw new Error(`unknown reference field for update key: ${originalKey}`);
-}
-
 function parseReferenceIndex(value: string, originalKey: string): number {
   if (!/^\d+$/.test(value)) throw new Error(`reference index must be a non-negative integer for update key: ${originalKey}`);
   return Number(value);
@@ -3142,10 +2571,6 @@ function isCanonicalFolderNote(file: TFile, rootFolder: string): boolean {
   const directPath = joinVaultPath(rootFolder, `${file.basename}.md`);
   const folderStylePath = joinVaultPath(rootFolder, file.basename, `${file.basename}.md`);
   return file.path === directPath || file.path === folderStylePath;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 type TagDomain = "project" | "area" | "resource" | "knowledge";

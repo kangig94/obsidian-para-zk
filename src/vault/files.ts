@@ -1,5 +1,5 @@
 import { TFolder, type App, type TFile } from "obsidian";
-import { normalizeVaultPath } from "../vault/paths";
+import { normalizeVaultPath } from "./paths";
 
 export async function ensureFolder(app: App, folder: string): Promise<void> {
   const normalized = normalizeVaultPath(folder);

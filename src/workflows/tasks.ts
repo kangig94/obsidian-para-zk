@@ -1,6 +1,5 @@
 import type { App, TFile } from "obsidian";
-import type { ParaZkSettings } from "../types";
-import { joinVaultPath, normalizeVaultPath, sanitizeFileName } from "../vault/paths";
+import { hasOwn, isRecord } from "../infra/records";
 import {
   findSectionContentRangeByHeading,
   isMarkdownScaffold,
@@ -10,9 +9,11 @@ import {
   spliceTextRange,
   trimTextRange,
   type TextRange
-} from "./markdown-sections";
-import { fileFrontmatter, readType, type Frontmatter } from "./note-frontmatter";
-import { ensureFolder, isInFolder, parentFolder } from "./vault-files";
+} from "../markdown/sections";
+import type { ParaZkSettings } from "../types";
+import { ensureFolder, isInFolder, parentFolder } from "../vault/files";
+import { fileFrontmatter, readType, type Frontmatter } from "../vault/note-frontmatter";
+import { joinVaultPath, normalizeVaultPath, sanitizeFileName } from "../vault/paths";
 
 export const ROOT_ID_FRONTMATTER_KEY = "id";
 
@@ -803,12 +804,4 @@ function normalizeCheckboxFilter(value: string | undefined): string | undefined 
 
 function isArchivedFile(ctx: TaskContext, file: TFile): boolean {
   return isInFolder(file, ctx.settings.paths.archivesFolder);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function hasOwn(value: object, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(value, key);
 }
