@@ -1,0 +1,205 @@
+import { describe, expect, it } from "vitest";
+import { buildUpdateArgs } from "../../src/mcp/server";
+
+describe("MCP update arg builder", () => {
+  it("builds shell-safe replace args for optsidian ZK notes", () => {
+    const oldString = "line one\n\"quoted\" $HOME `tick`";
+    const newString = "line two\n'quoted' $PATH `next`";
+
+    expect(buildUpdateArgs({
+      cli: "optsidian",
+      tool: "replace",
+      params: {
+        type: "zk_fleeting",
+        title: "My Note",
+        key: "body",
+        old_string: oldString,
+        new_string: newString
+      }
+    })).toEqual([
+      "raw",
+      "para-zk:update-zk",
+      "kind=fleeting",
+      "title=My Note",
+      "key=body",
+      "op=replace",
+      `match=${oldString}`,
+      `with=${newString}`,
+      "format=json"
+    ]);
+  });
+
+  it("maps replace_all to all=true and uses the obsidian command shape", () => {
+    expect(buildUpdateArgs({
+      cli: "obsidian",
+      tool: "replace",
+      params: {
+        type: "project",
+        title: "Launch",
+        key: "body",
+        old_string: "old",
+        new_string: "new",
+        replace_all: true
+      }
+    })).toEqual([
+      "para-zk:update-project",
+      "title=Launch",
+      "key=body",
+      "op=replace",
+      "match=old",
+      "with=new",
+      "all=true",
+      "format=json"
+    ]);
+  });
+
+  it("builds set args with path selectors and raw multi-line content", () => {
+    const content = "first line\nsecond line with $ and `backticks`";
+
+    expect(buildUpdateArgs({
+      cli: "optsidian",
+      tool: "set",
+      params: {
+        type: "area",
+        path: "Areas/Health.md",
+        key: "children/Habits/body",
+        content
+      }
+    })).toEqual([
+      "raw",
+      "para-zk:update-area",
+      "path=Areas/Health.md",
+      "key=children/Habits/body",
+      "op=set",
+      `value=${content}`,
+      "format=json"
+    ]);
+  });
+
+  it("builds add args for append and prepend positions", () => {
+    expect(buildUpdateArgs({
+      cli: "obsidian",
+      tool: "add",
+      params: {
+        type: "resource",
+        title: "Reading Queue",
+        key: "body",
+        content: "- Default append"
+      }
+    })).toEqual([
+      "para-zk:update-resource",
+      "title=Reading Queue",
+      "key=body",
+      "op=append",
+      "value=- Default append",
+      "format=json"
+    ]);
+
+    expect(buildUpdateArgs({
+      cli: "obsidian",
+      tool: "add",
+      params: {
+        type: "resource",
+        title: "Reading Queue",
+        key: "body",
+        content: "- Prepend",
+        position: "start"
+      }
+    })).toEqual([
+      "para-zk:update-resource",
+      "title=Reading Queue",
+      "key=body",
+      "op=prepend",
+      "value=- Prepend",
+      "format=json"
+    ]);
+  });
+
+  it("maps journal date selectors and retro date pass-through", () => {
+    expect(buildUpdateArgs({
+      cli: "optsidian",
+      tool: "set",
+      params: {
+        type: "journal",
+        date: "2026-06-04",
+        key: "body",
+        content: "Today"
+      }
+    })).toEqual([
+      "raw",
+      "para-zk:update-journal",
+      "date=2026-06-04",
+      "key=body",
+      "op=set",
+      "value=Today",
+      "format=json"
+    ]);
+
+    expect(buildUpdateArgs({
+      cli: "optsidian",
+      tool: "add",
+      params: {
+        type: "retro",
+        title: "Week 23",
+        date: "2026-06-04",
+        key: "body",
+        content: "Reflection"
+      }
+    })).toEqual([
+      "raw",
+      "para-zk:update-retro",
+      "title=Week 23",
+      "date=2026-06-04",
+      "key=body",
+      "op=append",
+      "value=Reflection",
+      "format=json"
+    ]);
+  });
+
+  it("validates missing required mutation fields before spawning", () => {
+    expect(() => buildUpdateArgs({
+      cli: "optsidian",
+      tool: "replace",
+      params: { type: "project", title: "Launch", old_string: "old", new_string: "new" }
+    })).toThrow(/key is required/);
+
+    expect(() => buildUpdateArgs({
+      cli: "optsidian",
+      tool: "replace",
+      params: { type: "project", title: "Launch", key: "body", new_string: "new" }
+    })).toThrow(/old_string is required/);
+
+    expect(() => buildUpdateArgs({
+      cli: "optsidian",
+      tool: "set",
+      params: { type: "project", title: "Launch", key: "body" }
+    })).toThrow(/content is required/);
+
+    expect(() => buildUpdateArgs({
+      cli: "optsidian",
+      tool: "add",
+      params: { type: "project", key: "body", content: "text" }
+    })).toThrow(/requires a title or path selector/);
+
+    expect(() => buildUpdateArgs({
+      cli: "optsidian",
+      tool: "set",
+      params: { title: "Launch", key: "body", content: "text" }
+    })).toThrow(/type is required/);
+  });
+
+  it("rejects unknown and empty mutation types", () => {
+    expect(() => buildUpdateArgs({
+      cli: "optsidian",
+      tool: "set",
+      params: { type: "task", title: "Launch", key: "body", content: "text" }
+    })).toThrow(/unknown type: task/);
+
+    expect(() => buildUpdateArgs({
+      cli: "optsidian",
+      tool: "set",
+      params: { type: "", title: "Launch", key: "body", content: "text" }
+    })).toThrow(/type is required/);
+  });
+});

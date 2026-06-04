@@ -5,6 +5,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult, type ListToolsResult } from "@modelcontextprotocol/sdk/types.js";
 
 export type ParaZkCli = "optsidian" | "obsidian";
+export type UpdateTool = "replace" | "set" | "add";
 
 type DescribePayload = {
   ok: true;
@@ -15,8 +16,8 @@ type CliEnv = {
   PARA_ZK_CLI?: string;
 };
 
-const TOOL_DESCRIPTION = "PARA-ZK — read & write the user's Obsidian vault (PARA + Zettelkasten: projects, areas, resources, journal, Zettelkasten notes). Call this FIRST whenever a task involves the user's personal notes or knowledge base. Returns how to drive the vault via its `para-zk:*` CLI: invocation, surface types, and where to fetch per-type keys.";
-const HOWTO_BASE = "Locale-neutral codes only. Collections (tasks/references/backlinks) page via offset/limit, key/<i> for one item; backlinks read-only. Use `schema` for a type's read/write keys and filters, `commands` for the full command list.";
+const TOOL_DESCRIPTION = "PARA-ZK — read/write the user's Obsidian vault (PARA + Zettelkasten). Call FIRST for any task touching the user's notes; returns how to drive the vault via its `para-zk:*` CLI (invocation, surface types, schema drill-down).";
+const HOWTO_BASE = "Locale-neutral codes. Collections (tasks/references/backlinks) page via offset/limit, key/<i> for one item; backlinks read-only. `schema`=per-type keys/filters; `commands`=full command list. Section content edits: `replace`/`set`/`add` (shell-safe; CLI mangles content). Frontmatter/tasks: CLI.";
 const OPTSIDIAN_NOTE = " `optsidian` is an Obsidian-based optimized CLI; run the `invoke`/`schema`/`commands` strings exactly as given and do not substitute `obsidian`.";
 const FALLBACK_HOWTO = "PARA-ZK CLI detected but no running Obsidian vault was reachable (or no optsidian/obsidian CLI on PATH). Open the vault in Obsidian and ensure the CLI is on PATH, then call this tool again for the live schema.";
 const DESCRIBE_INPUT_SCHEMA = {
@@ -24,6 +25,107 @@ const DESCRIBE_INPUT_SCHEMA = {
   properties: {},
   additionalProperties: false
 } satisfies ListToolsResult["tools"][number]["inputSchema"];
+const UPDATE_TYPE_VALUES = [
+  "project",
+  "area",
+  "resource",
+  "retro",
+  "journal",
+  "zk_fleeting",
+  "zk_literature",
+  "zk_permanent"
+] as const;
+const UPDATE_TOOL_NAMES = ["replace", "set", "add"] as const;
+const UPDATE_TYPES: Record<UpdateType, { command: string; kind?: string }> = {
+  project: { command: "update-project" },
+  area: { command: "update-area" },
+  resource: { command: "update-resource" },
+  retro: { command: "update-retro" },
+  journal: { command: "update-journal" },
+  zk_fleeting: { command: "update-zk", kind: "fleeting" },
+  zk_literature: { command: "update-zk", kind: "literature" },
+  zk_permanent: { command: "update-zk", kind: "permanent" }
+};
+const BASE_MUTATION_PROPERTIES = {
+  type: {
+    type: "string",
+    enum: UPDATE_TYPE_VALUES,
+    description: "Note type."
+  },
+  title: {
+    type: "string",
+    description: "Title selector (most types)."
+  },
+  path: {
+    type: "string",
+    description: "Exact vault path selector."
+  },
+  date: {
+    type: "string",
+    description: "YYYY-MM-DD selector (journal; optional for retro)."
+  },
+  key: {
+    type: "string",
+    description: "Section key, e.g. body or children/<title>/body."
+  }
+} as const;
+const REPLACE_INPUT_SCHEMA = {
+  type: "object",
+  properties: {
+    ...BASE_MUTATION_PROPERTIES,
+    old_string: {
+      type: "string",
+      description: "Literal text to replace."
+    },
+    new_string: {
+      type: "string",
+      description: "Replacement text."
+    },
+    replace_all: {
+      type: "boolean",
+      description: "Replace all matches (default: exactly one)."
+    }
+  },
+  required: ["type", "key", "old_string", "new_string"],
+  additionalProperties: false
+} satisfies ListToolsResult["tools"][number]["inputSchema"];
+const SET_INPUT_SCHEMA = {
+  type: "object",
+  properties: {
+    ...BASE_MUTATION_PROPERTIES,
+    content: {
+      type: "string",
+      description: "New full section content."
+    }
+  },
+  required: ["type", "key", "content"],
+  additionalProperties: false
+} satisfies ListToolsResult["tools"][number]["inputSchema"];
+const ADD_INPUT_SCHEMA = {
+  type: "object",
+  properties: {
+    ...BASE_MUTATION_PROPERTIES,
+    content: {
+      type: "string",
+      description: "Content to add."
+    },
+    position: {
+      type: "string",
+      enum: ["end", "start"],
+      description: "end=append (default), start=prepend."
+    }
+  },
+  required: ["type", "key", "content"],
+  additionalProperties: false
+} satisfies ListToolsResult["tools"][number]["inputSchema"];
+
+type UpdateType = typeof UPDATE_TYPE_VALUES[number];
+type UpdateParams = Record<string, unknown>;
+type ExecFileTextResult = {
+  stdout: string;
+  stderr: string;
+  error?: string;
+};
 
 export function resolveCliOrder(env: CliEnv): ParaZkCli[] {
   const override = env.PARA_ZK_CLI?.trim();
@@ -48,6 +150,43 @@ export function schemaCommand(cli: ParaZkCli): string {
 
 export function howtoFor(cli: ParaZkCli): string {
   return cli === "optsidian" ? `${HOWTO_BASE}${OPTSIDIAN_NOTE}` : HOWTO_BASE;
+}
+
+export function buildUpdateArgs({ cli, tool, params }: { cli: ParaZkCli; tool: UpdateTool; params: unknown }): string[] {
+  const record = readParams(params);
+  const type = readUpdateType(record);
+  const config = UPDATE_TYPES[type];
+  const args = cli === "optsidian"
+    ? ["raw", `para-zk:${config.command}`]
+    : [`para-zk:${config.command}`];
+
+  if (config.kind) args.push(`kind=${config.kind}`);
+  args.push(...selectorArgs(type, record));
+  args.push(`key=${readRequiredString(record, "key")}`);
+
+  if (tool === "replace") {
+    args.push(
+      "op=replace",
+      `match=${readRequiredString(record, "old_string", { allowEmpty: true })}`,
+      `with=${readRequiredString(record, "new_string", { allowEmpty: true })}`
+    );
+    const replaceAll = readOptionalBoolean(record, "replace_all");
+    if (replaceAll) args.push("all=true");
+  } else if (tool === "set") {
+    args.push(
+      "op=set",
+      `value=${readRequiredString(record, "content", { allowEmpty: true })}`
+    );
+  } else {
+    const position = readOptionalPosition(record);
+    args.push(
+      position === "start" ? "op=prepend" : "op=append",
+      `value=${readRequiredString(record, "content", { allowEmpty: true })}`
+    );
+  }
+
+  args.push("format=json");
+  return args;
 }
 
 function surfaceTypes(describe: DescribePayload): string[] {
@@ -128,14 +267,25 @@ async function describeFromAvailableCli(env: CliEnv) {
 }
 
 function execFileText(file: string, args: string[], timeout: number): Promise<string> {
+  return execFileTextResult(file, args, timeout).then((result) => {
+    if (result.error) throw new Error(result.error);
+    return result.stdout;
+  });
+}
+
+function execFileTextResult(file: string, args: string[], timeout: number): Promise<ExecFileTextResult> {
   return new Promise((resolve, reject) => {
-    execFile(file, args, { timeout, windowsHide: true }, (error, stdout) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      resolve(stdout);
-    });
+    try {
+      execFile(file, args, { timeout, windowsHide: true }, (error, stdout, stderr) => {
+        resolve({
+          stdout: textFromExecOutput(stdout),
+          stderr: textFromExecOutput(stderr),
+          ...(error ? { error: errorMessage(error) } : {})
+        });
+      });
+    } catch (error) {
+      reject(error);
+    }
   });
 }
 
@@ -147,6 +297,145 @@ function isDescribePayload(value: unknown): value is DescribePayload {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function textFromExecOutput(value: string | Buffer): string {
+  return typeof value === "string" ? value : value.toString("utf8");
+}
+
+function readParams(params: unknown): UpdateParams {
+  if (!params || typeof params !== "object" || Array.isArray(params)) {
+    throw new Error("tool arguments must be an object");
+  }
+  return params as UpdateParams;
+}
+
+function readUpdateType(params: UpdateParams): UpdateType {
+  const type = readRequiredString(params, "type").trim();
+  if (isUpdateType(type)) return type;
+  throw new Error(`unknown type: ${type}`);
+}
+
+function isUpdateType(value: string): value is UpdateType {
+  return Object.prototype.hasOwnProperty.call(UPDATE_TYPES, value);
+}
+
+function isUpdateToolName(value: string): value is UpdateTool {
+  return (UPDATE_TOOL_NAMES as readonly string[]).includes(value);
+}
+
+function selectorArgs(type: UpdateType, params: UpdateParams): string[] {
+  const title = readOptionalString(params, "title");
+  const path = readOptionalString(params, "path");
+  const date = readOptionalString(params, "date");
+
+  if (type === "journal") {
+    if (!date && !path) throw new Error("journal requires a date or path selector");
+    return [
+      ...(date ? [`date=${date}`] : []),
+      ...(path ? [`path=${path}`] : [])
+    ];
+  }
+
+  if (!title && !path) throw new Error(`${type} requires a title or path selector`);
+  return [
+    ...(title ? [`title=${title}`] : []),
+    ...(path ? [`path=${path}`] : []),
+    ...(type === "retro" && date ? [`date=${date}`] : [])
+  ];
+}
+
+function readRequiredString(params: UpdateParams, key: string, options: { allowEmpty?: boolean } = {}): string {
+  if (!Object.prototype.hasOwnProperty.call(params, key)) throw new Error(`${key} is required`);
+  const value = params[key];
+  if (typeof value !== "string") throw new Error(`${key} must be a string`);
+  if (!options.allowEmpty && value.trim() === "") throw new Error(`${key} is required`);
+  return value;
+}
+
+function readOptionalString(params: UpdateParams, key: string): string | undefined {
+  if (!Object.prototype.hasOwnProperty.call(params, key)) return undefined;
+  const value = params[key];
+  if (typeof value !== "string") throw new Error(`${key} must be a string`);
+  return value.trim() === "" ? undefined : value;
+}
+
+function readOptionalBoolean(params: UpdateParams, key: string): boolean | undefined {
+  if (!Object.prototype.hasOwnProperty.call(params, key)) return undefined;
+  const value = params[key];
+  if (typeof value !== "boolean") throw new Error(`${key} must be a boolean`);
+  return value;
+}
+
+function readOptionalPosition(params: UpdateParams): "end" | "start" {
+  if (!Object.prototype.hasOwnProperty.call(params, "position")) return "end";
+  const value = params.position;
+  if (value === "end" || value === "start") return value;
+  throw new Error("position must be end or start");
+}
+
+function parseJsonObject(stdout: string, cli: ParaZkCli): { kind: "ok"; payload: Record<string, unknown> } | { kind: "unavailable"; error: string } {
+  const trimmed = stdout.trim();
+  if (!trimmed) return { kind: "unavailable", error: `${cli} returned no output` };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return { kind: "unavailable", error: `${cli} returned non-JSON output` };
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { kind: "unavailable", error: `${cli} returned a non-object JSON response` };
+  }
+  return { kind: "ok", payload: parsed as Record<string, unknown> };
+}
+
+function jsonToolResult(payload: Record<string, unknown>, isError = false): CallToolResult {
+  return {
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify(payload)
+      }
+    ],
+    ...(isError ? { isError: true } : {})
+  };
+}
+
+async function callUpdateTool(tool: UpdateTool, params: unknown, env: CliEnv): Promise<CallToolResult> {
+  try {
+    buildUpdateArgs({ cli: "optsidian", tool, params });
+  } catch (error) {
+    return jsonToolResult({ ok: false, error: errorMessage(error) }, true);
+  }
+
+  const order = resolveCliOrder(env);
+  const preferred = order[0] ?? "optsidian";
+  let reason = "no CLI attempted";
+
+  for (const cli of order) {
+    const args = buildUpdateArgs({ cli, tool, params });
+    const result = await execFileTextResult(cli, args, 15_000);
+    const parsed = parseJsonObject(result.stdout, cli);
+    if (parsed.kind === "ok") {
+      return jsonToolResult(parsed.payload, parsed.payload.ok === false);
+    }
+
+    reason = result.error ?? parsed.error;
+    console.error(`PARA-ZK MCP: ${cli} mutation unavailable: ${reason}`);
+  }
+
+  return jsonToolResult(buildFallback({ cli: preferred, reason }), true);
+}
+
+let toolCallChain: Promise<unknown> = Promise.resolve();
+
+// Serialize tool-call execution so pipelined/concurrent requests cannot race
+// when they mutate the same note. Conformant clients call serially; this guards
+// the pipelined edge without changing single-call behavior.
+function serializeToolCall<T>(run: () => Promise<T>): Promise<T> {
+  const result = toolCallChain.then(run, run);
+  toolCallChain = result.then(() => undefined, () => undefined);
+  return result;
 }
 
 function createServer(): Server {
@@ -165,11 +454,30 @@ function createServer(): Server {
         name: "describe",
         description: TOOL_DESCRIPTION,
         inputSchema: DESCRIBE_INPUT_SCHEMA
+      },
+      {
+        name: "replace",
+        description: "Replace literal old_string→new_string in a note section. Use for section content (not the CLI): multi-line/quotes/$/backticks pass verbatim; the shell-routed CLI mangles them. Frontmatter/tasks: CLI.",
+        inputSchema: REPLACE_INPUT_SCHEMA
+      },
+      {
+        name: "set",
+        description: "Overwrite a note section's content. Shell-safe (CLI mangles raw content).",
+        inputSchema: SET_INPUT_SCHEMA
+      },
+      {
+        name: "add",
+        description: "Append/prepend content to a note section. Shell-safe (CLI mangles raw content).",
+        inputSchema: ADD_INPUT_SCHEMA
       }
     ]
   }));
 
-  server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToolResult> => {
+  server.setRequestHandler(CallToolRequestSchema, (request): Promise<CallToolResult> => serializeToolCall(async (): Promise<CallToolResult> => {
+    if (isUpdateToolName(request.params.name)) {
+      return callUpdateTool(request.params.name, request.params.arguments ?? {}, process.env);
+    }
+
     if (request.params.name !== "describe") {
       return {
         content: [
@@ -204,7 +512,7 @@ function createServer(): Server {
         ]
       };
     }
-  });
+  }));
 
   return server;
 }
