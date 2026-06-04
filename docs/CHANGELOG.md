@@ -74,7 +74,7 @@ Notable changes for PARA-ZK are tracked here.
   returns that surface's stable read/write keys and filters.
 - Added a thin MCP server (`para-zk`) packaged as both a Claude Code plugin and a
   Codex plugin — they share `clients/` (`.claude-plugin/` and `.codex-plugin/`
-  manifests over one bundled `para-zk-mcp.mjs`, each declaring the server inline) —
+  manifests over one bundled `para-zk-mcp.mjs` and one shared `.mcp.json`) —
   so any MCP client can discover the vault and drive it through the native CLI.
   Install in Claude with `/plugin marketplace add kangig94/obsidian-para-zk` then
   `/plugin install para-zk@kangig94`, or in Codex with
