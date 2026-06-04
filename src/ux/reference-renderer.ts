@@ -291,7 +291,7 @@ function renderReferenceRow(
           new Notice(registryErrorMessage(error));
         });
       });
-      const description = referenceDescription(item.reference);
+      const description = item.reference.description;
       if (description) {
         body.createDiv({
           cls: "para-zk-reference-description",
@@ -893,10 +893,6 @@ function referenceTitle(reference: ReferenceRead): string {
   const target = reference.path ?? reference.target ?? parseWikiLink(reference.link)?.target ?? reference.link;
   const base = splitObsidianSubpath(target).base;
   return pathBasenameWithoutExtension(base) || target;
-}
-
-function referenceDescription(reference: ReferenceRead): string | undefined {
-  return reference.description;
 }
 
 function normalizeReferenceAnchor(anchor: string): string {

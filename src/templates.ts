@@ -433,15 +433,6 @@ function noteContextHint(locale: Locale): string {
   return locale === "ko" ? "(나의 생각/맥락)" : "(my thought/context)";
 }
 
-function dataviewProjectChildDocs(t: ReturnType<typeof localePack>, sourcePath?: string): string[] {
-  return fenced("dataview", [
-    `TABLE WITHOUT ID file.link AS "${t.labels.filename}", file.mtime AS "${t.labels.updated}"`,
-    "FROM \"\"",
-    `WHERE parent = ${dataviewCurrentFileLink(sourcePath)} AND type = "doc"`,
-    "SORT file.name ASC"
-  ]);
-}
-
 function dataviewProjectRetros(t: ReturnType<typeof localePack>, settings: ParaZkSettings, sourcePath?: string): string[] {
   return fenced("dataview", [
     `TABLE WITHOUT ID link(file.path, replace(week_iso, "-", "_")) AS "${t.labels.retros}", file.mtime AS "${t.labels.updated}"`,
@@ -526,7 +517,7 @@ export type DataviewViewKey = typeof DATAVIEW_VIEW_KEYS[number];
 export function dataviewViewBlock(key: string, settings: ParaZkSettings, sourcePath?: string): string | undefined {
   const t = localePack(settings.locale);
   switch (key) {
-    case "project-subnotes": return dataviewProjectChildDocs(t, sourcePath).join("\n");
+    case "project-subnotes": return dataviewChildDocs(t, sourcePath).join("\n");
     case "project-retros": return dataviewProjectRetros(t, settings, sourcePath).join("\n");
     case "area-projects": return dataviewAreaProjects(t, settings, sourcePath).join("\n");
     case "area-subareas": return dataviewChildAreas(t, settings, sourcePath).join("\n");
@@ -625,7 +616,7 @@ function renderDashboardBody(
         ...fenced("para-zk-dashboard-actions", []),
         "",
         `## ${t.labels.summary}`,
-        ...dashboardHomeSummary(t),
+        ...dashboardSummaryBlock("home"),
         "",
         "---",
         `## ${t.labels.dueSoon7}`,
@@ -657,7 +648,7 @@ function renderDashboardBody(
     case "projects":
       return [
         `## ${t.labels.summary}`,
-        ...dashboardProjectsSummary(t),
+        ...dashboardSummaryBlock("projects"),
         "",
         "---",
         `## ${t.labels.dueSoon7}`,
@@ -678,7 +669,7 @@ function renderDashboardBody(
     case "areas":
       return [
         `## ${t.labels.summary}`,
-        ...dashboardAreasSummary(t),
+        ...dashboardSummaryBlock("areas"),
         "",
         "---",
         `## ${t.labels.dashboardProjects}`,
@@ -691,7 +682,7 @@ function renderDashboardBody(
     case "resources":
       return [
         `## ${t.labels.summary}`,
-        ...dashboardResourcesSummary(t),
+        ...dashboardSummaryBlock("resources"),
         "",
         "---",
         `## ${t.labels.active}`,
@@ -712,7 +703,7 @@ function renderDashboardBody(
     case "zk":
       return [
         `## ${t.labels.summary}`,
-        ...dashboardZkSummary(t),
+        ...dashboardSummaryBlock("zk"),
         "",
         "---",
         `## ${t.labels.staleFleeting}`,
@@ -746,7 +737,7 @@ function renderDashboardBody(
     case "review":
       return [
         `## ${t.labels.summary}`,
-        ...dashboardReviewSummary(t),
+        ...dashboardSummaryBlock("review"),
         "",
         "---",
         `## ${t.labels.createdThisWeek}: ${t.labels.references}`,
@@ -806,7 +797,7 @@ function minimalFolders(paths: string[]): string[] {
   const result: string[] = [];
   for (const folder of paths.map(normalizedFolder).filter(Boolean)) {
     if (result.includes(folder)) continue;
-    if (result.some((parent) => folder === parent || folder.startsWith(`${parent}/`))) continue;
+    if (result.some((parent) => folder.startsWith(`${parent}/`))) continue;
     for (let index = result.length - 1; index >= 0; index -= 1) {
       if (result[index].startsWith(`${folder}/`)) result.splice(index, 1);
     }
@@ -826,9 +817,8 @@ function zkSourceFolders(settings: ParaZkSettings): string[] {
 
 function pathStartsWithAnyExpression(pathExpression: string, folders: string[]): string {
   const prefixes = minimalFolders(folders).map(folderPrefix).filter(Boolean);
-  return prefixes.length > 0
-    ? prefixes.map((prefix) => `${pathExpression}.startsWith(${jsString(prefix)})`).join(" || ")
-    : "false";
+  if (prefixes.length === 0) return "false";
+  return prefixes.map((prefix) => `${pathExpression}.startsWith(${jsString(prefix)})`).join(" || ");
 }
 
 function dataviewJs(lines: string[]): string[] {
@@ -840,30 +830,6 @@ function dataviewJs(lines: string[]): string[] {
     "const dayOf = (value) => { const d = new Date(timeOf(value)); d.setHours(0,0,0,0); return d.getTime(); };",
     ...lines
   ]);
-}
-
-function dashboardHomeSummary(_t: ReturnType<typeof localePack>): string[] {
-  return dashboardSummaryBlock("home");
-}
-
-function dashboardProjectsSummary(_t: ReturnType<typeof localePack>): string[] {
-  return dashboardSummaryBlock("projects");
-}
-
-function dashboardAreasSummary(_t: ReturnType<typeof localePack>): string[] {
-  return dashboardSummaryBlock("areas");
-}
-
-function dashboardResourcesSummary(_t: ReturnType<typeof localePack>): string[] {
-  return dashboardSummaryBlock("resources");
-}
-
-function dashboardZkSummary(_t: ReturnType<typeof localePack>): string[] {
-  return dashboardSummaryBlock("zk");
-}
-
-function dashboardReviewSummary(_t: ReturnType<typeof localePack>): string[] {
-  return dashboardSummaryBlock("review");
 }
 
 function dashboardSummaryBlock(type: "home" | "projects" | "areas" | "resources" | "zk" | "review"): string[] {

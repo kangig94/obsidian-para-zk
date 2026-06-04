@@ -23,8 +23,7 @@ export const customSortDependencyConfiguration: DependencyConfiguration = {
 async function isCustomSortConfigured(
   services: DependencyConfigurationServices,
   app: App,
-  manager: PluginManager,
-  settings: ParaZkSettings
+  manager: PluginManager
 ): Promise<boolean> {
   const currentSettings = await services.readSettingsFile(app, CUSTOM_SORT_SETTINGS_PATH);
   const nextSettings = mergeCustomSortSettings(currentSettings);
@@ -162,7 +161,10 @@ function bookmarkFile(path: string, nextCtime: () => number): BookmarkItem {
 
 function bookmarkCtimeGenerator(): () => number {
   let ctime = Date.now();
-  return () => ctime += 1;
+  return () => {
+    ctime += 1;
+    return ctime;
+  };
 }
 
 function isBookmarkItem(value: unknown): value is BookmarkItem {

@@ -272,16 +272,15 @@ function renderDateInput(
   const input = new TextComponent(container);
   input.inputEl.type = type;
   input.inputEl.addClass("para-zk-props-input");
+  const currentValue = valueText(readFieldValue(field, frontmatter));
+  const inputValue = type === "datetime-local" ? toDateTimeInputValue(currentValue) : currentValue;
   input
-    .setValue(type === "datetime-local"
-      ? toDateTimeInputValue(valueText(readFieldValue(field, frontmatter)))
-      : valueText(readFieldValue(field, frontmatter)))
+    .setValue(inputValue)
     .setDisabled(!field.key || !sourcePath);
   input.inputEl.addEventListener("change", () => {
     if (!field.key) return;
-    const value = type === "datetime-local"
-      ? fromDateTimeInputValue(input.getValue())
-      : input.getValue();
+    let value = input.getValue();
+    if (type === "datetime-local") value = fromDateTimeInputValue(value);
     void writeFrontmatterValue(plugin, sourcePath, field.key, value);
   });
 }
@@ -297,13 +296,14 @@ function renderSelectInput(
   select.selectEl.addClass("para-zk-props-select");
   select.setDisabled(!field.key || !sourcePath);
   select.addOption("", "");
+  const options = field.options ?? [];
 
-  for (const option of field.options ?? []) {
+  for (const option of options) {
     select.addOption(option.value, option.label);
   }
 
   const rawValue = valueText(readFieldValue(field, frontmatter));
-  const selected = selectValue(rawValue, field.options ?? []);
+  const selected = selectValue(rawValue, options);
   if (rawValue && selected === undefined) {
     select.addOption(rawValue, rawValue);
   }

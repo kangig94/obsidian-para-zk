@@ -246,7 +246,7 @@ function renderTaskToolbar(
 }
 
 async function currentRootTasks(plugin: ParaZkPluginContext, rootFile: TFile): Promise<RenderableTask[]> {
-  const taskMap = await readRootTaskMap({ app: plugin.app, settings: plugin.settings }, rootFile);
+  const taskMap = await readRootTaskMap(taskContext(plugin), rootFile);
   return Object.entries(taskMap).map(([id, task]) => ({
     rootFile,
     rootTitle: rootFile.basename,
@@ -256,7 +256,7 @@ async function currentRootTasks(plugin: ParaZkPluginContext, rootFile: TFile): P
 }
 
 async function allRootTasks(plugin: ParaZkPluginContext): Promise<RenderableTask[]> {
-  const items = await readAllTaskItems({ app: plugin.app, settings: plugin.settings });
+  const items = await readAllTaskItems(taskContext(plugin));
   return items.flatMap((item) => {
     const rootFile = plugin.app.vault.getFileByPath(item.rootPath);
     if (!(rootFile instanceof TFile)) return [];
@@ -775,16 +775,12 @@ function taskPriorityOptions(labels: Record<string, string>): Array<{ value: Tas
 }
 
 function taskMeta(task: TaskRead): TaskMetaChip[] {
-  return [
-    task.priority ? { kind: "priority", label: task.priority } : undefined,
-    task.due ? { kind: "due", label: `due ${task.due}` } : undefined,
-    task.scheduled ? { kind: "scheduled", label: `scheduled ${task.scheduled}` } : undefined,
-    task.start ? { kind: "start", label: `start ${task.start}` } : undefined
-  ].filter(isTaskMetaChip);
-}
-
-function isTaskMetaChip(value: TaskMetaChip | undefined): value is TaskMetaChip {
-  return value !== undefined;
+  const chips: TaskMetaChip[] = [];
+  if (task.priority) chips.push({ kind: "priority", label: task.priority });
+  if (task.due) chips.push({ kind: "due", label: `due ${task.due}` });
+  if (task.scheduled) chips.push({ kind: "scheduled", label: `scheduled ${task.scheduled}` });
+  if (task.start) chips.push({ kind: "start", label: `start ${task.start}` });
+  return chips;
 }
 
 function taskCheckboxClass(value: string): string {
@@ -796,8 +792,7 @@ function taskCheckboxClass(value: string): string {
 }
 
 function taskCheckboxText(value: string): string {
-  const normalized = value.trim();
-  return normalized || "";
+  return value.trim();
 }
 
 function parseTaskBlockArgs(source: string): TaskBlockArgs {
@@ -808,12 +803,14 @@ function parseTaskBlockArgs(source: string): TaskBlockArgs {
   if (limit !== undefined && (!Number.isInteger(limit) || limit < 1)) {
     new Notice("PARA-ZK task block limit must be a positive integer.");
   }
+  const validLimit = limit !== undefined && Number.isInteger(limit) && limit > 0;
+  const defaultLimit = root === "all" ? 50 : undefined;
   return {
     root,
     title: raw.title?.trim() || undefined,
     checkbox: raw.checkbox,
     due: parseDueFilter(raw.due),
-    limit: limit !== undefined && Number.isInteger(limit) && limit > 0 ? limit : root === "all" ? 50 : undefined,
+    limit: validLimit ? limit : defaultLimit,
     order: parseTaskOrder(raw.order)
   };
 }

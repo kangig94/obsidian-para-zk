@@ -44,7 +44,8 @@ export function isoWeekInfo(date = new Date()): {
   const thursday = new Date(current);
   thursday.setDate(current.getDate() + 4 - day);
   const yearStart = new Date(thursday.getFullYear(), 0, 1);
-  const week = Math.ceil((((thursday.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  const daysSinceYearStart = (thursday.getTime() - yearStart.getTime()) / 86400000;
+  const week = Math.ceil((daysSinceYearStart + 1) / 7);
 
   const start = new Date(current);
   start.setDate(current.getDate() - day + 1);

@@ -36,9 +36,35 @@ export function promptSetupOptions(
   });
 }
 
-class TextPromptModal extends Modal {
+class ResolvingModal<T> extends Modal {
   private done = false;
 
+  constructor(
+    app: App,
+    private readonly resolve: (value: T | null) => void
+  ) {
+    super(app);
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+    this.resolveOnce(null);
+  }
+
+  protected resolveAndClose(value: T | null): void {
+    if (!this.resolveOnce(value)) return;
+    this.close();
+  }
+
+  private resolveOnce(value: T | null): boolean {
+    if (this.done) return false;
+    this.done = true;
+    this.resolve(value);
+    return true;
+  }
+}
+
+class TextPromptModal extends ResolvingModal<string> {
   constructor(
     app: App,
     private readonly titleText: string,
@@ -46,9 +72,9 @@ class TextPromptModal extends Modal {
     private readonly initialValue: string,
     private readonly confirmLabel: string,
     private readonly cancelLabel: string,
-    private readonly resolve: (value: string | null) => void
+    resolve: (value: string | null) => void
   ) {
-    super(app);
+    super(app, resolve);
   }
 
   onOpen(): void {
@@ -86,39 +112,24 @@ class TextPromptModal extends Modal {
       });
   }
 
-  onClose(): void {
-    this.contentEl.empty();
-    if (!this.done) {
-      this.done = true;
-      this.resolve(null);
-    }
-  }
-
   private submit(value: string): void {
-    if (this.done) return;
-    this.done = true;
-    this.resolve(value.trim() || null);
-    this.close();
+    this.resolveAndClose(value.trim() || null);
   }
 
   private cancel(): void {
-    if (this.done) return;
-    this.done = true;
-    this.resolve(null);
-    this.close();
+    this.resolveAndClose(null);
   }
 }
 
-class SetupOptionsModal extends Modal {
-  private done = false;
+class SetupOptionsModal extends ResolvingModal<SetupPromptOptions> {
   private value: SetupPromptOptions;
 
   constructor(
     app: App,
     initial: SetupPromptOptions,
-    private readonly resolve: (value: SetupPromptOptions | null) => void
+    resolve: (value: SetupPromptOptions | null) => void
   ) {
-    super(app);
+    super(app, resolve);
     this.value = { ...initial };
   }
 
@@ -182,39 +193,23 @@ class SetupOptionsModal extends Modal {
       });
   }
 
-  onClose(): void {
-    this.contentEl.empty();
-    if (!this.done) {
-      this.done = true;
-      this.resolve(null);
-    }
-  }
-
   private submit(): void {
-    if (this.done) return;
-    this.done = true;
-    this.resolve({ ...this.value });
-    this.close();
+    this.resolveAndClose({ ...this.value });
   }
 
   private cancel(): void {
-    if (this.done) return;
-    this.done = true;
-    this.resolve(null);
-    this.close();
+    this.resolveAndClose(null);
   }
 }
 
-class ChoiceModal extends Modal {
-  private done = false;
-
+class ChoiceModal extends ResolvingModal<string> {
   constructor(
     app: App,
     private readonly titleText: string,
     private readonly choices: Array<{ label: string; value: string }>,
-    private readonly resolve: (value: string | null) => void
+    resolve: (value: string | null) => void
   ) {
-    super(app);
+    super(app, resolve);
   }
 
   onOpen(): void {
@@ -232,25 +227,7 @@ class ChoiceModal extends Modal {
     }
   }
 
-  onClose(): void {
-    this.contentEl.empty();
-    if (!this.done) {
-      this.done = true;
-      this.resolve(null);
-    }
-  }
-
   private submit(value: string): void {
-    if (this.done) return;
-    this.done = true;
-    this.resolve(value);
-    this.close();
-  }
-
-  private cancel(): void {
-    if (this.done) return;
-    this.done = true;
-    this.resolve(null);
-    this.close();
+    this.resolveAndClose(value);
   }
 }

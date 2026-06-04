@@ -914,7 +914,6 @@ export function registerNativeCliHandlers(plugin: ParaZkPluginContext): void {
       command.description,
       command.options,
       async (args = {}) => withCliErrors(
-        plugin,
         args,
         command.command,
         () => command.run(plugin, args),
@@ -925,7 +924,6 @@ export function registerNativeCliHandlers(plugin: ParaZkPluginContext): void {
 }
 
 async function withCliErrors(
-  plugin: ParaZkPluginContext,
   args: CliArgs,
   command: string,
   fn: () => Promise<Record<string, unknown>>,
@@ -1071,9 +1069,10 @@ function normalizeAttachmentFolder(value: string | undefined): string {
 function attachmentFileName(sourcePath: string, requestedName: string | undefined): string {
   const sourceName = localFileName(sourcePath);
   const sourceExtension = fileExtension(sourceName);
-  let filename = sanitizeFileName(requestedName?.trim() || sourceName);
+  const trimmedRequestedName = requestedName?.trim();
+  let filename = sanitizeFileName(trimmedRequestedName || sourceName);
   if (!filename) throw new Error("attachment filename is required");
-  if (requestedName?.trim() && !fileExtension(filename) && sourceExtension) {
+  if (trimmedRequestedName && !fileExtension(filename) && sourceExtension) {
     filename = `${filename}${sourceExtension}`;
   }
   assertVaultPathSafe(filename, "name");
@@ -1216,9 +1215,8 @@ function renderCli(args: CliArgs, payload: Record<string, unknown>, text: string
   const warnings = Array.isArray(payload.warnings)
     ? payload.warnings.filter((warning): warning is string => typeof warning === "string")
     : [];
-  return warnings.length > 0
-    ? [text, ...warnings.map((warning) => `warning: ${warning}`)].join("\n")
-    : text;
+  if (warnings.length === 0) return text;
+  return [text, ...warnings.map((warning) => `warning: ${warning}`)].join("\n");
 }
 
 function readCliString(args: CliArgs, key: string): string | undefined {
@@ -1282,11 +1280,13 @@ function readCliRenameKind(args: CliArgs): string | undefined {
 }
 
 function readCliPath(args: CliArgs): string | undefined {
-  for (const key of ["file_path", "filePath", "source", "sourcePath", "file"]) {
-    if (Object.prototype.hasOwnProperty.call(args, key)) {
-      throw new Error(`Use path instead of ${key}`);
-    }
-  }
+  rejectCliAliases(args, {
+    file_path: "path",
+    filePath: "path",
+    source: "path",
+    sourcePath: "path",
+    file: "path"
+  });
   return readCliString(args, "path");
 }
 
@@ -1392,9 +1392,8 @@ function readDecodedCliString(args: CliArgs, key: string): string | undefined {
 }
 
 function readCliReplacement(args: CliArgs): { present: boolean; value?: string } {
-  return Object.prototype.hasOwnProperty.call(args, "with")
-    ? { present: true, value: decodeCliEscapes(readCliString(args, "with") ?? "") }
-    : { present: false };
+  if (!Object.prototype.hasOwnProperty.call(args, "with")) return { present: false };
+  return { present: true, value: decodeCliEscapes(readCliString(args, "with") ?? "") };
 }
 
 function rejectCliAliases(args: CliArgs, aliases: Record<string, string>): void {

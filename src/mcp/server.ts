@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult, type ListToolsResult } from "@modelcontextprotocol/sdk/types.js";
+import { isRecord } from "../records";
 
 export type ParaZkCli = "optsidian" | "obsidian";
 export type UpdateTool = "replace" | "set" | "add";
@@ -123,7 +124,6 @@ type UpdateType = typeof UPDATE_TYPE_VALUES[number];
 type UpdateParams = Record<string, unknown>;
 type ExecFileTextResult = {
   stdout: string;
-  stderr: string;
   error?: string;
 };
 
@@ -276,10 +276,9 @@ function execFileText(file: string, args: string[], timeout: number): Promise<st
 function execFileTextResult(file: string, args: string[], timeout: number): Promise<ExecFileTextResult> {
   return new Promise((resolve, reject) => {
     try {
-      execFile(file, args, { timeout, windowsHide: true }, (error, stdout, stderr) => {
+      execFile(file, args, { timeout, windowsHide: true }, (error, stdout) => {
         resolve({
           stdout: textFromExecOutput(stdout),
-          stderr: textFromExecOutput(stderr),
           ...(error ? { error: errorMessage(error) } : {})
         });
       });
@@ -290,9 +289,7 @@ function execFileTextResult(file: string, args: string[], timeout: number): Prom
 }
 
 function isDescribePayload(value: unknown): value is DescribePayload {
-  if (!value || typeof value !== "object") return false;
-  const record = value as Record<string, unknown>;
-  return record.ok === true;
+  return isRecord(value) && value.ok === true;
 }
 
 function errorMessage(error: unknown): string {
@@ -304,10 +301,10 @@ function textFromExecOutput(value: string | Buffer): string {
 }
 
 function readParams(params: unknown): UpdateParams {
-  if (!params || typeof params !== "object" || Array.isArray(params)) {
+  if (!isRecord(params)) {
     throw new Error("tool arguments must be an object");
   }
-  return params as UpdateParams;
+  return params;
 }
 
 function readUpdateType(params: UpdateParams): UpdateType {
@@ -331,18 +328,18 @@ function selectorArgs(type: UpdateType, params: UpdateParams): string[] {
 
   if (type === "journal") {
     if (!date && !path) throw new Error("journal requires a date or path selector");
-    return [
-      ...(date ? [`date=${date}`] : []),
-      ...(path ? [`path=${path}`] : [])
-    ];
+    const args: string[] = [];
+    if (date) args.push(`date=${date}`);
+    if (path) args.push(`path=${path}`);
+    return args;
   }
 
   if (!title && !path) throw new Error(`${type} requires a title or path selector`);
-  return [
-    ...(title ? [`title=${title}`] : []),
-    ...(path ? [`path=${path}`] : []),
-    ...(type === "retro" && date ? [`date=${date}`] : [])
-  ];
+  const args: string[] = [];
+  if (title) args.push(`title=${title}`);
+  if (path) args.push(`path=${path}`);
+  if (type === "retro" && date) args.push(`date=${date}`);
+  return args;
 }
 
 function readRequiredString(params: UpdateParams, key: string, options: { allowEmpty?: boolean } = {}): string {
@@ -383,10 +380,10 @@ function parseJsonObject(stdout: string, cli: ParaZkCli): { kind: "ok"; payload:
   } catch {
     return { kind: "unavailable", error: `${cli} returned non-JSON output` };
   }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+  if (!isRecord(parsed)) {
     return { kind: "unavailable", error: `${cli} returned a non-object JSON response` };
   }
-  return { kind: "ok", payload: parsed as Record<string, unknown> };
+  return { kind: "ok", payload: parsed };
 }
 
 function jsonToolResult(payload: Record<string, unknown>, isError = false): CallToolResult {
@@ -492,25 +489,11 @@ function createServer(): Server {
 
     try {
       const envelope = await describeFromAvailableCli(process.env);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(envelope)
-          }
-        ]
-      };
+      return jsonToolResult(envelope);
     } catch (error) {
       const preferred = resolveCliOrder(process.env)[0] ?? "optsidian";
       console.error(`PARA-ZK MCP: unexpected describe failure: ${errorMessage(error)}`);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(buildFallback({ cli: preferred, reason: errorMessage(error) }))
-          }
-        ]
-      };
+      return jsonToolResult(buildFallback({ cli: preferred, reason: errorMessage(error) }));
     }
   }));
 

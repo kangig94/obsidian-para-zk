@@ -752,11 +752,19 @@ export async function createRetro(ctx: WorkflowContext, options: CreateRetroOpti
   const labels = localePack(ctx.settings.locale).labels;
   const sourceLink = source ? linkToFile(source) : "";
   const project = sourceType === "project" ? sourceLink : "";
-  const areas = sourceType === "area"
-    ? [sourceLink]
-    : sourceType === "project"
-      ? frontmatterLinks(sourceFm.areas)
-      : [];
+  let areas: string[] = [];
+  let defaultName = labels.retroNameGeneral;
+  if (source) {
+    let sourceNamePrefix = labels.retroNameNotePrefix;
+    if (sourceType === "area") {
+      areas = [sourceLink];
+      sourceNamePrefix = labels.retroNameAreaPrefix;
+    } else if (sourceType === "project") {
+      areas = frontmatterLinks(sourceFm.areas);
+      sourceNamePrefix = labels.retroNameProjectPrefix;
+    }
+    defaultName = `${sourceNamePrefix}-${source.basename}`;
+  }
   const existingSourceRetro = source && !options.title
     ? await findExistingSourceRetroForWeek(ctx, source, sourceType, weekSegment)
     : undefined;
@@ -769,9 +777,6 @@ export async function createRetro(ctx: WorkflowContext, options: CreateRetroOpti
     };
   }
 
-  const defaultName = source
-    ? `${sourceType === "area" ? labels.retroNameAreaPrefix : sourceType === "project" ? labels.retroNameProjectPrefix : labels.retroNameNotePrefix}-${source.basename}`
-    : labels.retroNameGeneral;
   const name = sanitizeFileName(options.title || defaultName) || "General";
   const folder = joinVaultPath(ctx.settings.paths.retrosFolder, weekSegment);
   await ensureFolder(ctx.app, folder);
@@ -924,11 +929,12 @@ async function createZkFile(
   options: { maturityCode?: MaturityCode } = {}
 ): Promise<TFile> {
   const createdAt = localDateTimeSpace();
-  const templateName: TemplateName = kind === "Fleeting"
-    ? "zk_fleeting"
-    : kind === "Literature"
-      ? "zk_literature"
-      : "zk_permanent";
+  let templateName: TemplateName = "zk_permanent";
+  if (kind === "Fleeting") {
+    templateName = "zk_fleeting";
+  } else if (kind === "Literature") {
+    templateName = "zk_literature";
+  }
   const maturity = options.maturityCode ?? "draft";
   const file = await createMarkdownFile(ctx, templateName, path, {
     created: createdAt,
@@ -1376,11 +1382,14 @@ function normalizeReferenceOptionalField(value: unknown, key: "description"): st
 function deriveReferenceRead(ctx: WorkflowContext, file: TFile, item: NormalizedReferenceItem): ReferenceRead {
   const link = item.link;
   const wiki = parseWikiLink(link);
-  const derived = wiki
-    ? deriveWikiReferenceRead(ctx, file, link, wiki.target)
-    : isExternalReference(link)
-      ? { link, kind: "url" as const, target: link }
-      : { link, kind: "text" as const };
+  let derived: ReferenceRead;
+  if (wiki) {
+    derived = deriveWikiReferenceRead(ctx, file, link, wiki.target);
+  } else if (isExternalReference(link)) {
+    derived = { link, kind: "url", target: link };
+  } else {
+    derived = { link, kind: "text" };
+  }
 
   return {
     ...derived,
@@ -1936,7 +1945,7 @@ async function readSurfaceKey(
     return readSurfaceMapKey(surface, spec, parts, key, collectionOptions);
   }
 
-  if (!Object.prototype.hasOwnProperty.call(surface, "children")) {
+  if (!hasOwn(surface, "children")) {
     throw unknownReadKeyError(spec, key);
   }
   if (parts.length === 1) return surface.children;
@@ -2131,11 +2140,17 @@ function matchesBacklinkCollectionItem(
 }
 
 function collectionSearchText(kind: ReadCollectionKind, item: Record<string, unknown>): string {
-  const keys = kind === "task"
-    ? ["name", "checkbox", "priority", "due", "scheduled", "start", "created", "done", "cancelled"]
-    : kind === "reference"
-      ? ["link", "kind", "description", "target", "path"]
-      : ["title", "path"];
+  let keys = ["title", "path"];
+  switch (kind) {
+    case "task":
+      keys = ["name", "checkbox", "priority", "due", "scheduled", "start", "created", "done", "cancelled"];
+      break;
+    case "reference":
+      keys = ["link", "kind", "description", "target", "path"];
+      break;
+    case "backlink":
+      break;
+  }
   return keys.map((key) => readRecordString(item, key) ?? "").join("\n");
 }
 
@@ -2236,17 +2251,29 @@ async function updateSurface(
   const key = requireUpdateKey(options.key);
   const operation = parseUpdateOperation(options.operation);
   const target = await resolveWritableSurfaceTarget(ctx, file, spec, key, key);
-  const result = target.kind === "frontmatter"
-    ? await updateFrontmatterSurface(ctx, target, operation, options)
-    : target.kind === "text"
-      ? await updateTextSurface(ctx, target, operation, options)
-      : target.kind === "taskCollection"
-        ? await updateTaskCollectionSurface(ctx, target, operation, options)
-        : target.kind === "referenceItem"
-          ? await updateReferenceItemSurface(ctx, target, operation, options)
-          : target.kind === "referenceCollection"
-            ? await updateReferenceCollectionSurface(ctx, target, operation, options)
-            : await updateTaskItemSurface(ctx, target, operation, options);
+  let result: TextUpdateResult;
+  switch (target.kind) {
+    case "frontmatter":
+      result = await updateFrontmatterSurface(ctx, target, operation, options);
+      break;
+    case "text":
+      result = await updateTextSurface(ctx, target, operation, options);
+      break;
+    case "taskCollection":
+      result = await updateTaskCollectionSurface(ctx, target, operation, options);
+      break;
+    case "taskItem":
+      result = await updateTaskItemSurface(ctx, target, operation, options);
+      break;
+    case "referenceCollection":
+      result = await updateReferenceCollectionSurface(ctx, target, operation, options);
+      break;
+    case "referenceItem":
+      result = await updateReferenceItemSurface(ctx, target, operation, options);
+      break;
+    default:
+      throw new Error("unknown update target");
+  }
   const resultFile = result.file ?? target.file;
 
   return {
@@ -2785,7 +2812,7 @@ function parseUpdateOperation(value: string | undefined): UpdateOperation {
 }
 
 function requireUpdateValue(options: UpdatePayloadOptions): unknown {
-  if (!Object.prototype.hasOwnProperty.call(options, "value")) throw new Error("value is required");
+  if (!hasOwn(options, "value")) throw new Error("value is required");
   return options.value;
 }
 
@@ -2804,7 +2831,7 @@ function requireReplaceMatch(options: UpdatePayloadOptions): string {
 }
 
 function requireReplacementText(options: UpdatePayloadOptions): string {
-  if (!Object.prototype.hasOwnProperty.call(options, "replacement")) {
+  if (!hasOwn(options, "replacement")) {
     throw new Error("with is required for op=replace");
   }
   const replacement = options.replacement;
@@ -3173,7 +3200,7 @@ function describeSurfaceSpec(type: SurfaceType, spec: ReadSurfaceSpec): SurfaceD
 function readMapPath(map: ReadMap, parts: string[], originalKey: string): unknown {
   let current: unknown = map;
   for (const part of parts) {
-    if (!isRecord(current) || !Object.prototype.hasOwnProperty.call(current, part)) {
+    if (!isRecord(current) || !hasOwn(current, part)) {
       throw new Error(`unknown read key: ${originalKey}`);
     }
     current = current[part];
@@ -3262,7 +3289,7 @@ function enumerateBacklinkSources(
   const sourcePaths = Object.entries(ctx.app.metadataCache.resolvedLinks)
     .filter(([sourcePath, targets]) => sourcePath !== targetFile.path
       && isRecord(targets)
-      && Object.prototype.hasOwnProperty.call(targets, targetFile.path))
+      && hasOwn(targets, targetFile.path))
     .map(([sourcePath]) => sourcePath)
     .sort((left, right) => left.localeCompare(right));
 
@@ -3534,14 +3561,6 @@ function randomBytes(length: number): Uint8Array {
   return bytes;
 }
 
-function frontmatterText(lines: string[]): string {
-  return [
-    "---",
-    ...lines,
-    "---"
-  ].join("\n");
-}
-
 async function readTasks(_content: string, context: SectionTransformContext): Promise<Record<string, TaskRead>> {
   return readRootTaskMap(context.ctx, context.file);
 }
@@ -3556,19 +3575,17 @@ export async function readRootTaskMap(ctx: WorkflowContext, rootFile: TFile): Pr
   if (!range) return items;
 
   let cursor = range.start;
-  let line = lineNumberAt(content, range.start);
   while (cursor < range.end) {
     const span = readLineSpan(content, cursor, range.end);
     if (!span) break;
 
-    const task = readTaskLine(shardFile.path, line, span.text);
+    const task = readTaskLine(span.text);
     if (task) {
       const id = uniqueReadId(task.id, items);
       items[id] = task.task;
     }
 
     cursor = span.next;
-    line += 1;
   }
 
   return items;
@@ -3597,12 +3614,11 @@ export async function readAllTaskItems(ctx: WorkflowContext): Promise<Array<{
     const range = taskShardTaskRange(content);
     if (!range) continue;
     let cursor = range.start;
-    let line = lineNumberAt(content, range.start);
     const seen: Record<string, true> = {};
     while (cursor < range.end) {
       const span = readLineSpan(content, cursor, range.end);
       if (!span) break;
-      const task = readTaskLine(file.path, line, span.text);
+      const task = readTaskLine(span.text);
       if (task) {
         const id = uniqueReadId(task.id, seen);
         seen[id] = true;
@@ -3615,7 +3631,6 @@ export async function readAllTaskItems(ctx: WorkflowContext): Promise<Array<{
         });
       }
       cursor = span.next;
-      line += 1;
     }
   }
   return results;
@@ -3721,7 +3736,7 @@ export function cycleTaskCheckbox(checkbox: string): string {
   return cycle[index === -1 || index === cycle.length - 1 ? 0 : index + 1];
 }
 
-function readTaskLine(path: string, line: number, text: string): TaskLineRead | undefined {
+function readTaskLine(text: string): TaskLineRead | undefined {
   const match = text.match(/^\s*(?:[-*+]|\d+[.)])\s+\[([^\]\r\n]?)\]\s*(.*)$/);
   if (!match) return undefined;
 
@@ -3866,12 +3881,12 @@ function normalizeTaskWriteValue(value: unknown): TaskWrite {
 
   const name = normalizeTaskNameValue(value.name);
   const task: TaskRead = {
-    checkbox: Object.prototype.hasOwnProperty.call(value, "checkbox") ? normalizeTaskCheckboxValue(value.checkbox) : " ",
+    checkbox: hasOwn(value, "checkbox") ? normalizeTaskCheckboxValue(value.checkbox) : " ",
     name
   };
 
   for (const field of TASK_METADATA_WRITE_FIELDS) {
-    if (!Object.prototype.hasOwnProperty.call(value, field)) continue;
+    if (!hasOwn(value, field)) continue;
     const normalized = normalizeTaskMetadataWriteValue(field, value[field]);
     if (normalized !== undefined) task[field] = normalized;
   }
@@ -4035,9 +4050,9 @@ function normalizeTaskMetadataValue(key: keyof TaskMetadata, value: string): str
 }
 
 function uniqueReadId(id: string, items: Record<string, unknown>): string {
-  if (!Object.prototype.hasOwnProperty.call(items, id)) return id;
+  if (!hasOwn(items, id)) return id;
   let index = 2;
-  while (Object.prototype.hasOwnProperty.call(items, `${id}-${index}`)) index += 1;
+  while (hasOwn(items, `${id}-${index}`)) index += 1;
   return `${id}-${index}`;
 }
 
@@ -4724,7 +4739,7 @@ async function cleanupFrontmatterReferences(
     if (!keys.some((key) => frontmatterNeedsTargetCleanup(ctx, file.path, frontmatter[key], targets))) continue;
     await ctx.app.fileManager.processFrontMatter(file, (fm) => {
       for (const key of keys) {
-        if (!Object.prototype.hasOwnProperty.call(fm, key)) continue;
+        if (!hasOwn(fm, key)) continue;
         const next = removeTargetFrontmatterLinks(ctx, file.path, fm[key], targets);
         if (!next.changed) continue;
         changedKeys += 1;
@@ -5385,30 +5400,19 @@ async function resolveProjectAreas(ctx: WorkflowContext, areaTitles: string[] | 
 }
 
 function findAreaByTitle(ctx: WorkflowContext, title: string): TFile | undefined {
-  const canonicalPaths = [
-    joinVaultPath(ctx.settings.paths.areasFolder, title, `${title}.md`),
-    joinVaultPath(ctx.settings.paths.areasFolder, `${title}.md`)
-  ];
+  const canonicalPaths = folderStyleCanonicalPaths(ctx.settings.paths.areasFolder, title);
 
   for (const path of canonicalPaths) {
     const file = ctx.app.vault.getFileByPath(path);
     if (file) return file;
   }
 
-  const areaFiles = ctx.app.vault.getMarkdownFiles().filter((file) => {
-    const frontmatter = ctx.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
-    return frontmatter.type === "area" && isInFolder(file, ctx.settings.paths.areasFolder);
+  return findUniqueNoteByTitle(ctx, {
+    title,
+    folders: [ctx.settings.paths.areasFolder],
+    type: "area",
+    label: "area"
   });
-  const exactMatches = areaFiles.filter((file) => file.basename === title);
-  if (exactMatches.length === 1) return exactMatches[0];
-  if (exactMatches.length > 1) throw new Error(`area title is ambiguous: ${title}`);
-
-  const foldedTitle = title.toLocaleLowerCase();
-  const foldedMatches = areaFiles.filter((file) => file.basename.toLocaleLowerCase() === foldedTitle);
-  if (foldedMatches.length === 1) return foldedMatches[0];
-  if (foldedMatches.length > 1) throw new Error(`area title is ambiguous: ${title}`);
-
-  return undefined;
 }
 
 function areaResult(file: TFile, created: boolean): ProjectAreaResult {

@@ -163,15 +163,13 @@ function dataviewViewToolbar(plugin: ParaZkPluginContext, key: DataviewViewKey):
   const labels = localePack(plugin.settings.locale).labels;
   switch (key) {
     case "project-subnotes":
+    case "area-subnotes":
       return actionToolbar("create-subnote", labels.createSubnote, "file-plus");
     case "project-retros":
+    case "area-retros":
       return actionToolbar("create-retro", labels.createRetro, "calendar-plus");
     case "area-subareas":
       return actionToolbar("create-subarea", labels.createSubarea, "folder-plus");
-    case "area-subnotes":
-      return actionToolbar("create-subnote", labels.createSubnote, "file-plus");
-    case "area-retros":
-      return actionToolbar("create-retro", labels.createRetro, "calendar-plus");
     case "resource-zk-links":
       return actionToolbar("promote-resource", labels.promoteToZk, "arrow-up-right");
     case "fleeting-promotion":

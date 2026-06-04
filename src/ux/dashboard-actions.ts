@@ -5,7 +5,6 @@ import { createWorkflowButton } from "./workflow-buttons";
 
 type DashboardAction = {
   kind: "command" | "link";
-  id: string;
   label: string;
   target: string;
 };
@@ -71,41 +70,39 @@ function dashboardActionGroups(plugin: ParaZkPluginContext): DashboardActionGrou
       title: `✨ ${t.labels.createNew}`,
       tone: "primary",
       actions: [
-        commandAction("new-project", t.labels.homeNewProject, "create-project"),
-        commandAction("new-area", t.labels.homeNewArea, "create-area"),
-        commandAction("new-resource", t.labels.homeNewResource, "create-resource"),
-        commandAction("new-zk", t.labels.homeNewZk, "create-zk"),
-        commandAction("journal-capture", t.labels.captureJournalCommandName, "capture-journal")
+        commandAction(t.labels.homeNewProject, "create-project"),
+        commandAction(t.labels.homeNewArea, "create-area"),
+        commandAction(t.labels.homeNewResource, "create-resource"),
+        commandAction(t.labels.homeNewZk, "create-zk"),
+        commandAction(t.labels.captureJournalCommandName, "capture-journal")
       ]
     },
     {
       title: `📄 ${t.labels.openDashboards}`,
       tone: "secondary",
       actions: [
-        linkAction("projects", t.labels.homeProjects, "Projects.md"),
-        linkAction("areas", t.labels.homeAreas, "Areas.md"),
-        linkAction("resources", t.labels.homeResources, "Resources.md"),
-        linkAction("zk", "ZK", "ZK.md"),
-        linkAction("review", t.labels.dashboardReview, "Review.md"),
-        linkAction("tasks", t.labels.homeTasks, "Tasks.md")
+        linkAction(t.labels.homeProjects, "Projects.md"),
+        linkAction(t.labels.homeAreas, "Areas.md"),
+        linkAction(t.labels.homeResources, "Resources.md"),
+        linkAction("ZK", "ZK.md"),
+        linkAction(t.labels.dashboardReview, "Review.md"),
+        linkAction(t.labels.homeTasks, "Tasks.md")
       ]
     }
   ];
 }
 
-function commandAction(id: string, label: string, command: string): DashboardAction {
+function commandAction(label: string, command: string): DashboardAction {
   return {
     kind: "command",
-    id,
     label,
     target: command
   };
 }
 
-function linkAction(id: string, label: string, path: string): DashboardAction {
+function linkAction(label: string, path: string): DashboardAction {
   return {
     kind: "link",
-    id,
     label,
     target: path
   };
