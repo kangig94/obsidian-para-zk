@@ -12,8 +12,8 @@ structured options and needs token-efficient JSON results.
 Use Obsidian's native CLI directly or through Optsidian passthrough:
 
 ```bash
-obsidian para-zk:ping format=json
-optsidian raw para-zk:ping format=json
+obsidian para-zk:describe format=json
+optsidian raw para-zk:describe format=json
 ```
 
 Use `format=json` for automation. Text output is for humans and may omit fields
@@ -111,18 +111,22 @@ missing file and retry.
 
 ## Commands
 
-### `para-zk:ping`
+### `para-zk:describe`
 
-Checks that the plugin and native CLI handler are loaded.
+Describes the live PARA-ZK CLI surface. This is also the preferred readiness
+check: if it returns JSON with `ok: true`, Obsidian is running, PARA-ZK is loaded,
+and the native CLI handler is registered.
 
 ```bash
-optsidian raw para-zk:ping format=json
+optsidian raw para-zk:describe format=json
+optsidian raw para-zk:describe type=project format=json
 ```
 
 Important fields:
 
-- `pluginId`
-- `settings`
+- `surfaceTypes`
+- `collectionFilters`
+- `surfaces` when `type` is provided
 
 ### `para-zk:setup`
 
