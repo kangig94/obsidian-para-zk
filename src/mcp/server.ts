@@ -20,7 +20,8 @@ type CliEnv = {
 const TOOL_DESCRIPTION = "PARA-ZK — read/write the user's Obsidian vault (PARA + Zettelkasten). Call FIRST for any task touching the user's notes; returns how to drive the vault via its `para-zk:*` CLI (invocation, surface types, schema drill-down).";
 const HOWTO_BASE = "Locale-neutral codes. Collections (tasks/references/backlinks) page via offset/limit, key/<i> for one item; backlinks read-only. `schema`=per-type keys/filters; `commands`=full command list. Section content edits: `replace`/`set`/`add` (shell-safe; CLI mangles content). Frontmatter/tasks: CLI.";
 const OPTSIDIAN_NOTE = " `optsidian` is an Obsidian-based optimized CLI; run the `invoke`/`schema`/`commands` strings exactly as given and do not substitute `obsidian`.";
-const FALLBACK_HOWTO = "PARA-ZK CLI detected but no running Obsidian vault was reachable (or no optsidian/obsidian CLI on PATH). Open the vault in Obsidian and ensure the CLI is on PATH, then call this tool again for the live schema.";
+const FALLBACK_HOWTO_OBSIDIAN = "PARA-ZK CLI detected but no running Obsidian vault was reachable (or no obsidian CLI on PATH). Open the vault in Obsidian and ensure the CLI is on PATH, then call this tool again for the live schema.";
+const FALLBACK_HOWTO_OPTSIDIAN = "PARA-ZK CLI detected but no running Obsidian vault was reachable. Launch Obsidian with `optsidian open-gui` (it opens your last-opened vault and waits until the vault is ready), then call this tool again for the live schema. If optsidian is not found, ensure it is on PATH.";
 const DESCRIBE_INPUT_SCHEMA = {
   type: "object",
   properties: {},
@@ -152,6 +153,10 @@ export function howtoFor(cli: ParaZkCli): string {
   return cli === "optsidian" ? `${HOWTO_BASE}${OPTSIDIAN_NOTE}` : HOWTO_BASE;
 }
 
+function fallbackHowto(cli: ParaZkCli): string {
+  return cli === "optsidian" ? FALLBACK_HOWTO_OPTSIDIAN : FALLBACK_HOWTO_OBSIDIAN;
+}
+
 export function buildUpdateArgs({ cli, tool, params }: { cli: ParaZkCli; tool: UpdateTool; params: unknown }): string[] {
   const record = readParams(params);
   const type = readUpdateType(record);
@@ -219,7 +224,7 @@ export function buildFallback({ cli, reason }: { cli: ParaZkCli; reason?: string
     cli,
     invoke: invokePattern(cli),
     commands: helpCommand(cli),
-    howto: FALLBACK_HOWTO,
+    howto: fallbackHowto(cli),
     ...(reason ? { reason } : {})
   };
 }

@@ -36,6 +36,11 @@ describe("MCP server pure helpers", () => {
     expect(buildFallback({ cli: "optsidian" })).not.toHaveProperty("reason");
   });
 
+  it("guides optsidian users to launch via open-gui in the fallback howto", () => {
+    expect(buildFallback({ cli: "optsidian" }).howto).toContain("optsidian open-gui");
+    expect(buildFallback({ cli: "obsidian" }).howto).not.toContain("open-gui");
+  });
+
   it("explains optsidian only when it is the chosen CLI", () => {
     expect(howtoFor("optsidian")).toContain("Obsidian-based optimized CLI");
     expect(howtoFor("optsidian")).toContain("do not substitute `obsidian`");
