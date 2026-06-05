@@ -1,11 +1,13 @@
 import { TFile } from "obsidian";
 import { hasOwn, isRecord } from "../records";
 import {
-  findSectionContentRangeByHeading,
+  findSectionContentTargetByHeading,
+  findSectionSplitHazard,
   markdownBodyRange,
   skipProjectSummaryManagedBlock,
   spliceTextRange,
   trimTextRange,
+  type SectionContentRange,
   trailingManagedBlockStart,
   type TextRange
 } from "../vault/sections";
@@ -120,6 +122,8 @@ type WritableSurfaceTarget =
     kind: "text";
     file: TFile;
     range: TextRange;
+    sectionKey: string;
+    headingLevel?: number;
   }
   | {
     kind: "taskCollection";
@@ -249,12 +253,15 @@ async function resolveWritableSurfaceTarget(
     return {
       kind: "text",
       file,
-      range: writableBodyRange(content)
+      range: writableBodyRange(content),
+      sectionKey: "body"
     };
   }
 
   const section = spec.sections?.find((item) => item.key === parts[0]);
-  if (!section) throw unknownUpdateKeyError(spec, originalKey);
+  if (!section) {
+    throw unknownUpdateKeyError(spec, originalKey);
+  }
 
   if (section.collection) {
     return resolveWritableCollectionTarget(ctx, file, section, parts, originalKey);
@@ -263,10 +270,13 @@ async function resolveWritableSurfaceTarget(
   if (parts.length !== 1) throw new Error(`unknown update key: ${originalKey}`);
 
   const content = await ctx.host.read(file);
+  const range = writableSectionRange(content, section, originalKey);
   return {
     kind: "text",
     file,
-    range: writableSectionRange(content, section, originalKey)
+    range,
+    sectionKey: section.key,
+    headingLevel: range.headingLevel
   };
 }
 
@@ -371,7 +381,10 @@ async function updateTextSurface(
   if (operation === "delete") throw new Error("op=delete only supports structured item keys");
   const before = await ctx.host.read(target.file);
   const current = before.slice(target.range.start, target.range.end);
-  const update = applyTextOperation(current, operation, options);
+  const update = applyTextOperation(current, operation, options, {
+    headingLevel: target.headingLevel,
+    sectionKey: target.sectionKey
+  });
   if (!update.changed) return update;
 
   const after = spliceTextRange(before, target.range, update.value);
@@ -460,11 +473,16 @@ async function updateReferenceItemSurface(
 function applyTextOperation(
   current: string,
   operation: UpdateOperation,
-  options: UpdatePayloadOptions
+  options: UpdatePayloadOptions,
+  splitGuard: {
+    headingLevel?: number;
+    sectionKey: string;
+  }
 ): TextUpdateResult & { value: string } {
   switch (operation) {
     case "set": {
       const value = requireUpdateText(options, { allowEmpty: true });
+      assertTextUpdateDoesNotSplitSection(value, splitGuard);
       return {
         changed: current !== value,
         value
@@ -474,6 +492,7 @@ function applyTextOperation(
       throw new Error("op=insert only supports task collection keys");
     case "append": {
       const value = requireUpdateText(options, { allowEmpty: false });
+      assertTextUpdateDoesNotSplitSection(value, splitGuard);
       const next = current.trim() ? `${current}${current.endsWith("\n") ? "" : "\n"}${value}` : value;
       return {
         changed: current !== next,
@@ -482,6 +501,7 @@ function applyTextOperation(
     }
     case "prepend": {
       const value = requireUpdateText(options, { allowEmpty: false });
+      assertTextUpdateDoesNotSplitSection(value, splitGuard);
       const next = current.trim() ? `${value}${value.endsWith("\n") ? "" : "\n"}${current}` : value;
       return {
         changed: current !== next,
@@ -491,6 +511,7 @@ function applyTextOperation(
     case "replace": {
       const match = requireReplaceMatch(options);
       const replacement = requireReplacementText(options);
+      assertTextUpdateDoesNotSplitSection(replacement, splitGuard);
       const matches = literalOccurrences(current, match);
       if (matches === 0) throw new Error("replace text was not found");
       if (matches > 1 && !options.all) {
@@ -510,35 +531,71 @@ function applyTextOperation(
   }
 }
 
-function writableSectionRange(content: string, section: ReadSectionSpec, originalKey: string): TextRange {
+function assertTextUpdateDoesNotSplitSection(
+  value: string,
+  splitGuard: {
+    headingLevel?: number;
+    sectionKey: string;
+  }
+): void {
+  if (splitGuard.headingLevel === undefined) return;
+  const hazard = findSectionSplitHazard(value, splitGuard.headingLevel);
+  if (!hazard) return;
+
+  const subject = hazard.kind === "heading"
+    ? `a level-${hazard.level} heading`
+    : `a '${hazard.marker}' line`;
+  throw new Error(
+    `value contains ${subject} that would split the "${splitGuard.sectionKey}" section. ` +
+    `Use a deeper heading${deeperHeadingHint(splitGuard.headingLevel)} or write a separate section, then retry.`
+  );
+}
+
+function deeperHeadingHint(sectionHeadingLevel: number): string {
+  if (sectionHeadingLevel >= 6) return "";
+  return ` (more '#', e.g. '${"#".repeat(sectionHeadingLevel + 1)}')`;
+}
+
+function writableSectionRange(content: string, section: ReadSectionSpec, originalKey: string): SectionContentRange {
   const range = findSectionContentRange(content, section);
   if (!range) throw new Error(`section not found for update key: ${originalKey}`);
   const editableStart = section.skipManagedPrelude
     ? skipProjectSummaryManagedBlock(content, range.start, range.end)
     : range.start;
   const editableEnd = trailingManagedBlockStart(content, editableStart, range.end) ?? range.end;
-  return trimTextRange(content, editableStart, editableEnd);
+  return trimSectionContentRange(content, {
+    start: editableStart,
+    end: editableEnd,
+    headingLevel: range.headingLevel
+  });
 }
 
 function writableBodyRange(content: string): TextRange {
   const body = markdownBodyRange(content);
   const prelude = content.slice(body.start, body.end).match(/^\s*```para-zk-props\r?\n[\s\S]*?\r?\n```\s*/);
   const start = body.start + (prelude?.[0].length ?? 0);
-  return trimTextRange(content, start, body.end);
+  const end = trailingManagedBlockStart(content, start, body.end) ?? body.end;
+  return trimTextRange(content, start, end);
 }
 
-function findSectionContentRange(content: string, section: ReadSectionSpec): TextRange | undefined {
+function findSectionContentRange(content: string, section: ReadSectionSpec): SectionContentRange | undefined {
   const body = markdownBodyRange(content);
   const markdown = content.slice(body.start, body.end);
 
   for (const label of sectionHeadingCandidates(section)) {
-    const range = findSectionContentRangeByHeading(markdown, label, {
-      includeSubsections: section.includeSubsections ?? false,
+    const range = findSectionContentTargetByHeading(markdown, label, {
       offset: body.start
     });
     if (range) return range;
   }
   return undefined;
+}
+
+function trimSectionContentRange(content: string, range: SectionContentRange): SectionContentRange {
+  return {
+    ...trimTextRange(content, range.start, range.end),
+    headingLevel: range.headingLevel
+  };
 }
 
 function requireUpdateKey(value: string | undefined): string {

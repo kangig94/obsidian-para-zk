@@ -312,7 +312,6 @@ function taskRegistryFolder(ctx: WorkflowContext): string {
 
 function taskShardTaskRange(content: string): TextRange | undefined {
   const range = findSectionContentRangeByHeading(content, "Tasks", {
-    includeSubsections: false,
     offset: 0
   });
   return range ? trimTextRange(content, range.start, range.end) : undefined;

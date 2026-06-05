@@ -49,13 +49,20 @@ with a direct error rather than accepting multiple spellings. CLI option values 
 locale-neutral codes (`status: in_progress`, `priority: high`, `maturity: draft`);
 localized labels are rendered in the GUI and generated Markdown.
 
-Read and update commands expose PARA-ZK editable surfaces, not raw Markdown. Their
-`key` arguments are stable map paths (`frontmatter/status`, `summary`, `children`,
-`children/<title>/body`) that must not depend on localized headings, and only
-writable leaves are mutable. Raw file reads, arbitrary patches, and generic vault
-search are Optsidian's responsibility, not PARA-ZK's. Structural changes stay
-domain-specific (`rename-*`, status-driven archive/restore, core-trash deletes)
-rather than generic move/edit commands.
+Read and update commands expose PARA-ZK editable surfaces, not raw Markdown.
+Structured types (`project`, `area`, `journal`, `retro`) use load-bearing
+template sections as stable keys such as `summary` or `quick_memo`; section reads
+include lower-level subheadings inside that section, such as a Decision-1
+subsection, and section writes use a split guard so an inserted heading cannot
+accidentally create a sibling section.
+Free-form types (`resource`, child `doc`, fallback `note`, and `zk_*`) expose
+prose as one `body` key for the whole editable Markdown body before the managed
+tail. Literal `set`, `append`, `prepend`, and `replace` edits target that body;
+H1 headings are allowed there, and there are no enforced prose-section keys.
+Raw file reads, arbitrary patches, and generic vault search are Optsidian's
+responsibility, not PARA-ZK's. Structural changes stay domain-specific
+(`rename-*`, status-driven archive/restore, core-trash deletes) rather than
+generic move/edit commands.
 
 The exact key semantics, compact-read payload shape, task/reference structural
 rules, and per-type `key=` roots are specified in [CLI.md](CLI.md) and surfaced live
@@ -115,7 +122,8 @@ can discover them.
 
 Promotion preserves traceability:
 
-- Promoting a resource creates a ZK note linked back to the resource.
+- Promoting a resource creates a ZK note linked back to the resource and appends
+  the promoted-note link to the source resource body before the managed tail.
 - Promoting a fleeting note creates a Literature or Permanent note, keeps the source
   fleeting note in place marked `processed: true`, and links it to the promoted note.
 - Fleeting notes have no archive folder; completed work is `processed: true`.

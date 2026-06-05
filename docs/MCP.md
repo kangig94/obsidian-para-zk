@@ -1,6 +1,6 @@
 # PARA-ZK MCP
 
-PARA-ZK ships a thin MCP server for discovery plus shell-safe section edits. It exposes `describe` for the live PARA-ZK surface index, and `replace`, `set`, and `add` for section body mutations. Frontmatter and task mutations stay CLI-only. The same server is packaged as both a Claude Code plugin and a Codex plugin that share `clients/` (`.claude-plugin/` + `.codex-plugin/` manifests and one bundled `para-zk-mcp.mjs`), or it can be registered as a plain MCP server in any client. The two platforms resolve plugin MCP paths differently, so each manifest declares its own config: Claude inlines `mcpServers` directly in `.claude-plugin/plugin.json` (`${CLAUDE_PLUGIN_ROOT}/para-zk-mcp.mjs`), while Codex points at `clients/.mcp.codex.json` (relative `para-zk-mcp.mjs` plus `cwd: "."`, which Codex rebases to the plugin root, since Codex neither expands `${CLAUDE_PLUGIN_ROOT}` in `args` nor accepts an inline `mcpServers` object).
+PARA-ZK ships a thin MCP server for discovery plus shell-safe body/section edits. It exposes `describe` for the live PARA-ZK surface index, and `replace`, `set`, and `add` for body/section mutations. Frontmatter and task mutations stay CLI-only. The same server is packaged as both a Claude Code plugin and a Codex plugin that share `clients/` (`.claude-plugin/` + `.codex-plugin/` manifests and one bundled `para-zk-mcp.mjs`), or it can be registered as a plain MCP server in any client. The two platforms resolve plugin MCP paths differently, so each manifest declares its own config: Claude inlines `mcpServers` directly in `.claude-plugin/plugin.json` (`${CLAUDE_PLUGIN_ROOT}/para-zk-mcp.mjs`), while Codex points at `clients/.mcp.codex.json` (relative `para-zk-mcp.mjs` plus `cwd: "."`, which Codex rebases to the plugin root, since Codex neither expands `${CLAUDE_PLUGIN_ROOT}` in `args` nor accepts an inline `mcpServers` object).
 
 ## Prerequisites
 
@@ -70,7 +70,7 @@ The `install` field is present in both states (the active vault running PARA-ZK 
 
 ### `replace`
 
-Claude-style edit for literal section replacement. It wraps `para-zk:update-*` with `execFile(file, argsArray)`, never a shell, so multi-line strings, quotes, `$`, and backticks are passed as one argv element.
+Claude-style edit for literal body/section replacement. It wraps `para-zk:update-*` with `execFile(file, argsArray)`, never a shell, so multi-line strings, quotes, `$`, and backticks are passed as one argv element.
 
 Params:
 
@@ -91,7 +91,7 @@ Required: `type`, `key`, `old_string`, `new_string`, and a valid selector for th
 
 ### `set`
 
-Claude-style write for replacing the entire selected section.
+Claude-style write for replacing the entire selected body or section.
 
 Params:
 
@@ -110,7 +110,7 @@ Required: `type`, `key`, `content`, and a valid selector for the type.
 
 ### `add`
 
-Append or prepend content to the selected section.
+Append or prepend content to the selected body or section.
 
 Params:
 
@@ -141,10 +141,16 @@ Required: `type`, `key`, `content`, and a valid selector for the type. `position
 | `zk_literature` | `update-zk` | `title` or `path` | `kind=literature` |
 | `zk_permanent` | `update-zk` | `title` or `path` | `kind=permanent` |
 
-Child doc/note sections are edited through their parent note by passing the child key, for example `children/<Child Title>/body`.
+Child doc/note bodies are edited through their parent note by passing the child key, for example `children/<Child Title>/body`.
+
+Structured types (`project`, `area`, `journal`, `retro`) use template section
+keys. Free-form types (`resource`, `zk_fleeting`, `zk_literature`,
+`zk_permanent`, child `doc`, and fallback `note`) use `key=body` for prose;
+their Markdown headings are content, not enforced keys. `describe` remains the
+source of truth for each type's read/write keys and collections.
 
 ## Shell Safety
 
 The mutation tools receive JSON params and invoke `optsidian` or `obsidian` with `execFile(file, argsArray)`. Content is passed as single argv elements such as `value=<raw content>` or `with=<raw content>`, not interpolated into a shell command.
 
-Only section edits are exposed through MCP mutation tools. Frontmatter updates, task insertion/deletion, and other mutation commands remain available through the CLI returned by `describe`.
+Only body/section edits are exposed through MCP mutation tools. Frontmatter updates, task insertion/deletion, and other mutation commands remain available through the CLI returned by `describe`.

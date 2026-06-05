@@ -1,4 +1,4 @@
-import type { Locale, ParaZkSettings } from "./types";
+import type { ParaZkSettings } from "./types";
 import { localePack } from "./i18n";
 import type { PropsViewType } from "./props/schema";
 
@@ -142,12 +142,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "updated:"
         ]),
         paraZkPropsBlock("resource"),
-        `# ${t.labels.overview}`,
-        "",
         "{{cursor}}",
-        "",
-        "---",
-        `# ${t.labels.body}`,
         "",
         paraZkManagedBlock(),
         ""
@@ -237,13 +232,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "processed: false"
         ]),
         paraZkPropsBlock("zk_fleeting"),
-        `# ${t.labels.thoughtSummary}`,
-        "",
         "{{cursor}}",
-        "",
-        `# ${t.labels.memo}`,
-        "",
-        "- ",
         "",
         paraZkManagedBlock(),
         ""
@@ -262,23 +251,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "updated:"
         ]),
         paraZkPropsBlock("zk_literature"),
-        `## ${t.labels.highlightBlock}`,
-        `> [!quote] ${quoteExampleTitle(t.locale)}`,
-        `> ${t.labels.quotePlaceholder}`,
-        "> ",
-        `> - ${t.labels.source}: `,
-        `> - ${t.labels.pageTimestamp}: `,
-        `> - ${t.labels.note}: ${noteContextHint(t.locale)}`,
-        "",
-        `# ${t.labels.summary}`,
-        "",
         "{{cursor}}",
-        "",
-        `# ${t.labels.insight}`,
-        "",
-        `# ${t.labels.evidence}`,
-        "",
-        "> ",
         "",
         paraZkManagedBlock(),
         ""
@@ -295,17 +268,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "updated:"
         ]),
         paraZkPropsBlock("zk_permanent"),
-        `# ${t.labels.oneSentenceSummary}`,
-        "",
         "{{cursor}}",
-        "",
-        `# ${t.labels.body}`,
-        "",
-        `## ${t.labels.limitations}`,
-        "- ",
-        "",
-        `## ${t.labels.relatedQuestions}`,
-        "- ",
         "",
         paraZkManagedBlock(),
         ""
@@ -423,14 +386,6 @@ function joinManagedUiBlocks(blocks: Array<string | string[]>): string {
     lines.push(...managedUiLines(block));
   }
   return [...lines, ""].join("\n");
-}
-
-function quoteExampleTitle(locale: Locale): string {
-  return locale === "ko" ? "하이라이트 예시" : "Highlight example";
-}
-
-function noteContextHint(locale: Locale): string {
-  return locale === "ko" ? "(나의 생각/맥락)" : "(my thought/context)";
 }
 
 function dataviewProjectRetros(t: ReturnType<typeof localePack>, settings: ParaZkSettings, sourcePath?: string): string[] {

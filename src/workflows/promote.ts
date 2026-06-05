@@ -10,6 +10,7 @@ import type { CaptureResult, PromotionResult } from "../types";
 import { ensureFolder } from "../vault/files";
 import type { WorkflowHost } from "../vault/host";
 import { joinVaultPath, wikiLink } from "../vault/paths";
+import { trailingManagedBlockStart } from "../vault/sections";
 import {
   ENERGY_CODE_HELP,
   MATURITY_CODE_HELP,
@@ -82,6 +83,7 @@ export async function promoteResource(ctx: WorkflowContext, options: PromoteReso
   const file = await createZkFile(ctx, kind, path, title, { maturityCode });
 
   await insertReferenceItem(ctx, file, { link: wikiLink(source.path) });
+  await appendPromotionLinkToBody(ctx.host, source, `- ${localePack(ctx.settings.locale).labels.promoteToZk}: ${linkToFile(file)}`, file.path);
   await openIfRequested(ctx, file, options.open);
 
   return {
@@ -114,6 +116,30 @@ export async function promoteFleeting(ctx: WorkflowContext, options: PromoteFlee
     sourcePath: source.path,
     kind
   };
+}
+
+async function appendPromotionLinkToBody(
+  host: Pick<WorkflowHost, "modify" | "read">,
+  file: TFile,
+  line: string,
+  dedupeTargetPath: string
+): Promise<boolean> {
+  const content = await host.read(file);
+  const linkTargetRe = new RegExp(`\\[\\[${escapeRegExp(dedupeTargetPath)}(?:\\|[^\\]]*)?\\]\\]`, "i");
+  if (linkTargetRe.test(content)) return false;
+
+  const tailStart = trailingManagedBlockStart(content, 0, content.length) ?? content.length;
+  const beforeTail = content.slice(0, tailStart).replace(/\s*$/, "");
+  const tail = content.slice(tailStart).replace(/^\s*/, "");
+  const updated = [
+    beforeTail,
+    line,
+    ...(tail ? [tail] : [])
+  ].filter(Boolean).join("\n\n") + (tail ? "" : "\n");
+
+  if (updated === content) return false;
+  await host.modify(file, updated);
+  return true;
 }
 
 async function appendLineUnderHeader(

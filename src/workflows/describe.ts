@@ -21,7 +21,6 @@ export type ReadSectionSpec = {
   key: string;
   labelKey?: string;
   labels?: string[];
-  includeSubsections?: boolean;
   skipManagedPrelude?: boolean;
   collection?: ReadCollectionKind;
   transform?: (content: string, context: SectionTransformContext) => unknown | Promise<unknown>;
@@ -82,11 +81,10 @@ export const AREA_READ_SPEC: ReadSurfaceSpec = {
 export const RESOURCE_READ_SPEC: ReadSurfaceSpec = {
   frontmatter: [],
   sections: [
-    { key: "overview", labelKey: "overview" },
-    { key: "body", labelKey: "body" },
     { key: "references", labelKey: "references", transform: readReferences, collection: "reference" },
     BACKLINK_READ_SECTION
-  ]
+  ],
+  body: true
 };
 
 export const JOURNAL_READ_SPEC: ReadSurfaceSpec = {
@@ -125,36 +123,28 @@ const DOC_READ_SPEC: ReadSurfaceSpec = {
 const ZK_FLEETING_READ_SPEC: ReadSurfaceSpec = {
   frontmatter: ["processed"],
   sections: [
-    { key: "thought_summary", labelKey: "thoughtSummary" },
-    { key: "memo", labelKey: "memo" },
-    { key: "tasks", labelKey: "tasks", transform: readTasks, collection: "task" },
     { key: "references", labelKey: "references", transform: readReferences, collection: "reference" },
     BACKLINK_READ_SECTION
-  ]
+  ],
+  body: true
 };
 
 const ZK_LITERATURE_READ_SPEC: ReadSurfaceSpec = {
   frontmatter: ["sourceTitle", "authors", "published", "url"],
   sections: [
-    { key: "highlight_block", labelKey: "highlightBlock" },
-    { key: "summary", labelKey: "summary" },
-    { key: "insight", labelKey: "insight" },
-    { key: "evidence", labelKey: "evidence" },
     { key: "references", labelKey: "references", transform: readReferences, collection: "reference" },
     BACKLINK_READ_SECTION
-  ]
+  ],
+  body: true
 };
 
 const ZK_PERMANENT_READ_SPEC: ReadSurfaceSpec = {
   frontmatter: ["maturity", "aliases"],
   sections: [
-    { key: "one_sentence_summary", labelKey: "oneSentenceSummary" },
-    { key: "body", labelKey: "body" },
-    { key: "limitations", labelKey: "limitations" },
-    { key: "related_questions", labelKey: "relatedQuestions" },
     { key: "references", labelKey: "references", transform: readReferences, collection: "reference" },
     BACKLINK_READ_SECTION
-  ]
+  ],
+  body: true
 };
 
 const NOTE_READ_SPEC: ReadSurfaceSpec = {

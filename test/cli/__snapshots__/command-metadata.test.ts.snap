@@ -711,7 +711,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Optional stable read key. Valid: overview, body, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}.",
+        "description": "Optional stable read key. Valid: references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body.",
         "value": "<map-path>",
       },
       "limit": {
@@ -835,7 +835,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Stable read key; depends on ZK kind. fleeting: frontmatter, frontmatter/{processed}, thought_summary, memo, tasks, tasks/<id>, tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}; literature: frontmatter, frontmatter/{sourceTitle|authors|published|url}, highlight_block, summary, insight, evidence, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}; permanent: frontmatter, frontmatter/{maturity|aliases}, one_sentence_summary, body, limitations, related_questions, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}.",
+        "description": "Stable read key; depends on ZK kind. fleeting: frontmatter, frontmatter/{processed}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body; literature: frontmatter, frontmatter/{sourceTitle|authors|published|url}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body; permanent: frontmatter, frontmatter/{maturity|aliases}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body.",
         "value": "<map-path>",
       },
       "kind": {
@@ -1169,7 +1169,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Stable writable key. Valid: overview=set|append|prepend|replace, body=set|append|prepend|replace, references=insert, references/<i>=delete, references/<i>/{link|description}=set.",
+        "description": "Stable writable key. Valid: references=insert, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace.",
         "value": "<map-path>",
       },
       "match": {
@@ -1269,7 +1269,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Stable write key; depends on ZK kind. fleeting: frontmatter/{processed}=set, thought_summary=set|append|prepend|replace, memo=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set; literature: frontmatter/{sourceTitle|authors|published|url}=set, highlight_block=set|append|prepend|replace, summary=set|append|prepend|replace, insight=set|append|prepend|replace, evidence=set|append|prepend|replace, references=insert, references/<i>=delete, references/<i>/{link|description}=set; permanent: frontmatter/{maturity|aliases}=set, one_sentence_summary=set|append|prepend|replace, body=set|append|prepend|replace, limitations=set|append|prepend|replace, related_questions=set|append|prepend|replace, references=insert, references/<i>=delete, references/<i>/{link|description}=set.",
+        "description": "Stable write key; depends on ZK kind. fleeting: frontmatter/{processed}=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace; literature: frontmatter/{sourceTitle|authors|published|url}=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace; permanent: frontmatter/{maturity|aliases}=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace.",
         "value": "<map-path>",
       },
       "kind": {

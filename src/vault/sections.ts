@@ -3,6 +3,20 @@ export type TextRange = {
   end: number;
 };
 
+export type SectionContentRange = TextRange & {
+  headingLevel: number;
+};
+
+export type SectionSplitHazard =
+  | {
+    kind: "heading";
+    level: number;
+  }
+  | {
+    kind: "thematicBreak";
+    marker: string;
+  };
+
 export function yamlFrontmatterRange(content: string): TextRange | undefined {
   const openStart = content.startsWith("\uFEFF") ? 1 : 0;
   if (!content.startsWith("---\n", openStart) && !content.startsWith("---\r\n", openStart)) {
@@ -50,24 +64,40 @@ export function findSectionContentRangeByHeading(
   content: string,
   heading: string,
   options: {
-    includeSubsections: boolean;
     offset: number;
   }
 ): TextRange | undefined {
-  const headingPattern = escapeRegExp(heading).replace(/\s+/g, "\\s+");
-  const headerRe = new RegExp(`^\\s*(?<hashes>#{1,6})\\s+${headingPattern}(?=\\s|$).*?$`, "im");
-  const match = content.match(headerRe);
+  const target = findSectionContentTargetByHeading(content, heading, options);
+  return target
+    ? {
+      start: target.start,
+      end: target.end
+    }
+    : undefined;
+}
+
+export function findSectionContentTargetByHeading(
+  content: string,
+  heading: string,
+  options: {
+    offset: number;
+    level?: number;
+    exact?: boolean;
+  }
+): SectionContentRange | undefined {
+  const match = findHeadingMatch(content, heading, options.level, options.exact ?? false);
   if (!match) return undefined;
 
   const level = match.groups?.hashes.length ?? 6;
   const headerEnd = (match.index ?? 0) + match[0].length;
   const sectionStart = headerEnd + lineBreakLengthAt(content, headerEnd);
   const after = content.slice(sectionStart);
-  const nextBoundaryRel = nextSectionBoundary(after, options.includeSubsections ? level : undefined);
+  const nextBoundaryRel = nextSectionBoundary(after, level);
   const sectionEnd = nextBoundaryRel === -1 ? content.length : sectionStart + nextBoundaryRel;
   return {
     start: options.offset + sectionStart,
-    end: options.offset + sectionEnd
+    end: options.offset + sectionEnd,
+    headingLevel: level
   };
 }
 
@@ -125,14 +155,10 @@ export function trimTextRange(content: string, start: number, end: number): Text
   };
 }
 
-export function readSection(
-  content: string,
-  labels: string[],
-  options: { includeSubsections?: boolean } = {}
-): string {
+export function readSection(content: string, labels: string[]): string {
   const body = stripYamlFrontmatter(content);
   for (const label of labels) {
-    const section = readSectionByHeading(body, label, options);
+    const section = readSectionByHeading(body, label);
     if (section !== undefined) return section;
   }
   return "";
@@ -160,7 +186,9 @@ export function stripProjectSummaryManagedBlock(content: string): string {
 }
 
 export function stripManagedPrelude(content: string): string {
-  return trimMarkdownBlock(stripYamlFrontmatter(content).replace(/^\s*```para-zk-props\n[\s\S]*?\n```\s*/, ""));
+  return trimMarkdownBlock(
+    stripTrailingManagedBlock(stripYamlFrontmatter(content).replace(/^\s*```para-zk-props\n[\s\S]*?\n```\s*/, ""))
+  );
 }
 
 function stripYamlFrontmatter(content: string): string {
@@ -212,6 +240,36 @@ export function isMarkdownScaffold(value: string): boolean {
   return /^>\s*#{1,6}\s+\(.+\)\s*$/.test(text);
 }
 
+export function findSectionSplitHazard(
+  value: string,
+  sectionHeadingLevel: number
+): SectionSplitHazard | undefined {
+  let cursor = 0;
+  while (cursor < value.length) {
+    const line = readLineSpan(value, cursor, value.length);
+    if (!line) break;
+
+    const heading = line.text.match(/^\s*(#{1,6})\s+/);
+    if (heading && heading[1].length <= sectionHeadingLevel) {
+      return {
+        kind: "heading",
+        level: heading[1].length
+      };
+    }
+
+    const thematicBreak = line.text.match(/^\s*(-{3,}|\*{3,}|_{3,})\s*$/);
+    if (thematicBreak) {
+      return {
+        kind: "thematicBreak",
+        marker: thematicBreak[1].slice(0, 3)
+      };
+    }
+
+    cursor = line.next;
+  }
+  return undefined;
+}
+
 function startsWithMarkdownBoundary(content: string): boolean {
   return /^(?:#{1,6}\s+|```|(?:-{3,}|\*{3,}|_{3,})\s*(?:\r?\n|$))/.test(content);
 }
@@ -245,20 +303,35 @@ function skipLeadingFencedBlockRange(content: string, start: number, end: number
 function readSectionByHeading(
   content: string,
   heading: string,
-  options: { includeSubsections?: boolean } = {}
+  level?: number
 ): string | undefined {
-  const headingPattern = escapeRegExp(heading).replace(/\s+/g, "\\s+");
-  const headerRe = new RegExp(`^\\s*(?<hashes>#{1,6})\\s+${headingPattern}(?=\\s|$).*?$`, "im");
-  const match = content.match(headerRe);
+  const match = findHeadingMatch(content, heading, level, false);
+  return readSectionByMatch(content, match);
+}
+
+function readSectionByMatch(content: string, match: RegExpMatchArray | null): string | undefined {
   if (!match) return undefined;
 
-  const level = match.groups?.hashes.length ?? 6;
+  const headingLevel = match.groups?.hashes.length ?? 6;
   const headerEnd = (match.index ?? 0) + match[0].length;
   const sectionStart = content.charAt(headerEnd) === "\n" ? headerEnd + 1 : headerEnd;
   const after = content.slice(sectionStart);
-  const nextBoundaryRel = nextSectionBoundary(after, options.includeSubsections ? level : undefined);
+  const nextBoundaryRel = nextSectionBoundary(after, headingLevel);
   const sectionEnd = nextBoundaryRel === -1 ? content.length : sectionStart + nextBoundaryRel;
   return trimMarkdownBlock(stripTrailingManagedBlock(content.slice(sectionStart, sectionEnd)));
+}
+
+function findHeadingMatch(
+  content: string,
+  heading: string,
+  level?: number,
+  exact = false
+): RegExpMatchArray | null {
+  const headingPattern = escapeRegExp(heading).replace(/\s+/g, "\\s+");
+  const hashesPattern = level === undefined ? "#{1,6}" : `#{${level}}`;
+  const tailPattern = exact ? "\\s*(?:#+\\s*)?$" : "(?=\\s|$).*?$";
+  const headerRe = new RegExp(`^\\s*(?<hashes>${hashesPattern})\\s+${headingPattern}${tailPattern}`, "im");
+  return content.match(headerRe);
 }
 
 function nextSectionBoundary(content: string, maxHeadingLevel: number | undefined): number {

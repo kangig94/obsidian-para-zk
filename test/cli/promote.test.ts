@@ -27,6 +27,10 @@ describe("promote-resource", () => {
     const content = cli.app.readPath(String(promoted.path)) ?? "";
     expect(content).toContain("type: zk_literature");
     expect(content).toContain(`[[${resource.path}]]`);
+
+    const sourceContent = cli.app.readPath(String(resource.path)) ?? "";
+    expect(sourceContent).toContain(`[[${promoted.path}|Promoted source]]`);
+    expect(sourceContent).toContain("```para-zk-managed");
   });
 });
 

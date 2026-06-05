@@ -384,21 +384,34 @@ When selecting by `title`, `read-project`, `read-area`, `read-resource`, and
 `read-retro` accept `archived=true` to select the matching note under
 `PARA/Archives`.
 
+Surface types fall into two groups. `project`, `area`, `journal`, and `retro`
+are structured: their load-bearing template sections are stable keys. `resource`,
+child `doc`/fallback `note`, and `zk_*` notes are free-form: prose is exposed as
+one `body` key for the whole editable Markdown body before the managed tail.
+Free-form bodies may contain H1 headings; those headings are content, not extra
+stable keys.
+
 | Command | Selector | Top-level keys |
 | --- | --- | --- |
 | `para-zk:read-area` | `title` or `path` | `frontmatter`, `overview`, `tasks`, `references`, `backlinks`, `children` |
-| `para-zk:read-resource` | `title` or `path` | `frontmatter`, `overview`, `body`, `references`, `backlinks` |
-| `para-zk:read-zk` | `title` plus optional `kind`, or `path` | depends on ZK type |
+| `para-zk:read-resource` | `title` or `path` | `frontmatter`, `body`, `references`, `backlinks` |
+| `para-zk:read-zk` | `title` plus optional `kind`, or `path` | `frontmatter`, `body`, `references`, `backlinks` |
 | `para-zk:read-journal` | `date` or `path` | `frontmatter`, `focus`, `quick_memo`, `timeline`, `tasks`, `short_review`, `references`, `backlinks` |
 | `para-zk:read-retro` | `title` plus optional `date`, or `path` | `frontmatter`, `week_progress`, `good`, `improve`, `risks`, `tasks`, `retro_summary`, `references`, `backlinks` |
 
-ZK top-level keys:
+Free-form top-level keys:
 
 ```text
-zk_fleeting: frontmatter | thought_summary | memo | tasks | references | backlinks
-zk_literature: frontmatter | highlight_block | summary | insight | evidence | references | backlinks
-zk_permanent: frontmatter | one_sentence_summary | body | limitations | related_questions | references | backlinks
+resource: frontmatter | body | references | backlinks
+zk_fleeting: frontmatter | body | references | backlinks
+zk_literature: frontmatter | body | references | backlinks
+zk_permanent: frontmatter | body | references | backlinks
 ```
+
+ZK templates still start with example headings such as Summary or Key insights,
+but those headings live inside `body`; read and edit them with `key=body`.
+Type-specific `frontmatter/<key>` reads and writes remain available where
+`para-zk:describe` lists frontmatter keys.
 
 Examples:
 
@@ -407,6 +420,7 @@ optsidian raw para-zk:read-area title="AI" key=children format=json
 optsidian raw para-zk:read-area title="AI" key=backlinks type=project format=json
 optsidian raw para-zk:read-project title="Finished Project" archived=true key=summary format=json
 optsidian raw para-zk:read-resource title="Source Paper" key=body format=json
+optsidian raw para-zk:read-zk title="Stable Interface Contracts" kind=permanent key=body format=json
 optsidian raw para-zk:read-zk title="Stable Interface Contracts" kind=permanent key=frontmatter/maturity format=json
 optsidian raw para-zk:read-journal date=2026-05-30 key=quick_memo format=json
 optsidian raw para-zk:read-retro path="PARA/Retros/2026_W22/Retro-General-2026_W22.md" key=retro_summary format=json
@@ -436,6 +450,9 @@ Options:
 Writable keys are a subset of read keys. `frontmatter/<key>` supports `op=set`
 only and uses Obsidian frontmatter mutation. Section/body keys support
 `set`, `append`, `prepend`, and exact literal `replace`.
+For free-form resource, child doc/note, and ZK prose, use `key=body`; old starter
+headings such as `summary`, `memo`, `insight`, or `limitations` are not writable
+map keys.
 Task collections are structured and do not accept raw Markdown task lines.
 Insert one task with `key=tasks op=insert value_json='{...}'`, update one field
 with `key=tasks/<id>/<field> op=set value=...`, and delete one task with
@@ -523,8 +540,8 @@ The same update algorithm is used by the other domain update commands:
 | Command | Selector | Notes |
 | --- | --- | --- |
 | `para-zk:update-area` | `title` or `path` | Supports area surface keys and `children/<title>/...`. |
-| `para-zk:update-resource` | `title` or `path` | Supports resource surface keys such as `overview` and `body`. |
-| `para-zk:update-zk` | `title` plus optional `kind`, or `path` | Supports the selected ZK type's surface keys. |
+| `para-zk:update-resource` | `title` or `path` | Uses free-form `body`, `references`, and frontmatter keys. |
+| `para-zk:update-zk` | `title` plus optional `kind`, or `path` | Uses free-form `body`, `references`, and type-specific frontmatter keys. |
 | `para-zk:update-journal` | `date` or `path` | Supports journal surface keys such as `quick_memo` and `tasks`. |
 | `para-zk:update-retro` | `title` plus optional `date`, or `path` | Supports retro surface keys such as `tasks`. |
 
@@ -663,7 +680,7 @@ Side effects:
 ### `para-zk:create-resource`
 
 Creates a resource note and optionally appends a frontmatter reference to it on
-the source note. Use this when the reference needs its own note, summary,
+the source note. Use this when the reference needs its own note, body text,
 metadata, or future reuse. For an existing file, note, or URL, use
 `para-zk:add-reference`.
 
@@ -888,7 +905,8 @@ Important fields:
 ### `para-zk:promote-resource`
 
 Promotes a resource note into a ZK note and writes a frontmatter reference on
-the new ZK note back to the resource.
+the new ZK note back to the resource. It also appends a link to the promoted ZK
+note into the source resource's free-form `body`, before the managed tail.
 
 Options:
 

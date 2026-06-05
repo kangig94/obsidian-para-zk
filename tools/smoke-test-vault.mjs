@@ -165,6 +165,8 @@ function runLiveScenario() {
   // references, tasks, archive, rename, delete) is covered by the vitest unit
   // suite (npm test) and is no longer re-checked here.
   assertGeneratedTemplateShapes();
+  assertFreeFormReadWriteScenario();
+  assertPromoteResourceBodyPlacementScenario();
   assertReferenceSubpathScenario();
   assertObjectReferenceDeleteCleanup();
   assertObjectReferenceRenameSurvival();
@@ -373,7 +375,203 @@ function assertGeneratedNoteTemplateShape(path, type, options = {}) {
     } else if (type === "retro") {
       assert(text.includes("# Retro summary (required)\n"), `${path} retro summary heading is missing`);
     }
+
+    if (type === "resource") {
+      assertResourceFreeFormTemplateShape(path, text);
+    } else if (type.startsWith("zk_")) {
+      assertZkStarterTemplateShape(path, type, text);
+    }
   });
+}
+
+function assertResourceFreeFormTemplateShape(path, text) {
+  const body = editableBodyBeforeManagedTail(path, text);
+  assert(body.trim() === "", `${path} resource template body must be blank before the managed tail`);
+  assert(!text.includes("# Overview\n"), `${path} resource template must not include old Overview heading`);
+  assert(!text.includes("# Body\n"), `${path} resource template must not include old Body heading`);
+}
+
+function assertZkStarterTemplateShape(path, type, text) {
+  const body = editableBodyBeforeManagedTail(path, text);
+  assert(body.trim() === "", `${path} ${type} template body must be blank before the managed tail`);
+  for (const heading of oldZkStarterHeadings(type)) {
+    assert(!text.includes(`${heading}\n`), `${path} ZK template must not include old starter heading: ${heading}`);
+  }
+}
+
+function oldZkStarterHeadings(type) {
+  switch (type) {
+    case "zk_fleeting":
+      return ["# One-line thought summary", "# Memo"];
+    case "zk_literature":
+      return ["## Highlights (quotes/evidence)", "# Summary", "# Key insights", "# Important quotes/evidence"];
+    case "zk_permanent":
+      return ["# One-sentence summary", "# Body", "## Limitations", "## Related questions"];
+    default:
+      return [];
+  }
+}
+
+function editableBodyBeforeManagedTail(path, text) {
+  const props = text.match(/```para-zk-props\r?\n[\s\S]*?\r?\n```\s*/);
+  assert(props?.index !== undefined, `${path} is missing para-zk props block`);
+  const tail = text.match(/\s*```para-zk-managed\r?\n```\s*$/);
+  assert(tail?.index !== undefined, `${path} is missing trailing para-zk managed block`);
+  return text.slice(props.index + props[0].length, tail.index);
+}
+
+function assertFreeFormReadWriteScenario() {
+  const resource = cliJson("para-zk:create-resource", [
+    `title=Smoke Free Body Resource ${stamp}`,
+    "link=false",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(resource, "free-form resource");
+  const resourceBody = `# Smoke Resource Body ${stamp}\n\nH1 headings are valid inside a free-form resource body.`;
+  assertFreeFormBodyReadWrite({
+    label: "resource",
+    updateCommand: "para-zk:update-resource",
+    readCommand: "para-zk:read-resource",
+    selectorArgs: [`path=${resource.path}`],
+    body: resourceBody,
+    droppedKeys: [
+      "overview",
+      "body-section",
+      "summary",
+      "insight",
+      "evidence",
+      "highlight_block",
+      "one_sentence_summary",
+      "limitations",
+      "related_questions",
+      "thought_summary",
+      "memo",
+      "tasks",
+      "untracked"
+    ]
+  });
+
+  for (const { kind, type, droppedKeys } of [
+    {
+      kind: "fleeting",
+      type: "zk_fleeting",
+      droppedKeys: ["thought_summary", "memo", "tasks", "untracked"]
+    },
+    {
+      kind: "literature",
+      type: "zk_literature",
+      droppedKeys: ["highlight_block", "summary", "insight", "evidence", "untracked"]
+    },
+    {
+      kind: "permanent",
+      type: "zk_permanent",
+      droppedKeys: ["one_sentence_summary", "limitations", "related_questions", "tasks", "untracked"]
+    }
+  ]) {
+    const note = cliJson("para-zk:create-zk", [
+      `title=Smoke Free Body ${kind} ${stamp}`,
+      `kind=${kind}`,
+      "open=false",
+      "format=json"
+    ]);
+    assertCreated(note, `free-form ${kind}`);
+    assertGeneratedNoteTemplateShape(note.path, type);
+
+    const body = `# Smoke ${kind} Body ${stamp}\n\n## Nested Heading\n\nFree-form ZK body text.`;
+    assertFreeFormBodyReadWrite({
+      label: type,
+      updateCommand: "para-zk:update-zk",
+      readCommand: "para-zk:read-zk",
+      selectorArgs: [`path=${note.path}`],
+      body,
+      droppedKeys
+    });
+  }
+}
+
+function assertFreeFormBodyReadWrite({ label, updateCommand, readCommand, selectorArgs, body, droppedKeys }) {
+  const update = cliJson(updateCommand, [
+    ...selectorArgs,
+    "key=body",
+    "op=set",
+    `value=${body}`,
+    "format=json"
+  ]);
+  assert(update.ok === true && update.changed === true, `${label} key=body update failed: ${JSON.stringify(update)}`);
+
+  const exact = cliJson(readCommand, [
+    ...selectorArgs,
+    "key=body",
+    "format=json"
+  ]);
+  assert(exact.mode === "exact", `${label} key=body read did not return exact mode`);
+  assert(exact.value === body, `${label} key=body read returned unexpected body: ${JSON.stringify(exact.value)}`);
+
+  const full = cliJson(readCommand, [
+    ...selectorArgs,
+    "format=json"
+  ]);
+  assert(full.mode === "compact", `${label} full read did not return compact mode`);
+  assert(full.body?.chars === body.length, `${label} full read did not summarize body chars: ${JSON.stringify(full)}`);
+  for (const key of droppedKeys) {
+    assert(!hasOwnKey(full, key), `${label} full read exposed dropped prose key: ${key}`);
+  }
+}
+
+function assertPromoteResourceBodyPlacementScenario() {
+  const resource = cliJson("para-zk:create-resource", [
+    `title=Smoke Promote Source ${stamp}`,
+    "link=false",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(resource, "promote resource source");
+  const sourceBody = `# Promotion Source Body ${stamp}\n\nSource notes stay above the managed tail.`;
+  const setup = cliJson("para-zk:update-resource", [
+    `path=${resource.path}`,
+    "key=body",
+    "op=set",
+    `value=${sourceBody}`,
+    "format=json"
+  ]);
+  assert(setup.ok === true, "promote resource source body setup failed");
+
+  const promoted = cliJson("para-zk:promote-resource", [
+    `path=${resource.path}`,
+    `title=Smoke Promoted Literature ${stamp}`,
+    "kind=literature",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(promoted, "promote resource target");
+  assert(promoted.sourcePath === resource.path, "promote-resource result lost sourcePath");
+  assertGeneratedNoteTemplateShape(promoted.path, "zk_literature");
+
+  const promotedLink = `[[${promoted.path}|${promoted.title}]]`;
+  const bodyRead = cliJson("para-zk:read-resource", [
+    `path=${resource.path}`,
+    "key=body",
+    "format=json"
+  ]);
+  assert(bodyRead.value.includes(promotedLink), "promote-resource did not append target link to source resource body");
+  assert(bodyRead.value.includes(sourceBody), "promote-resource source body lost existing body text");
+
+  const sourceText = readVaultText(resource.path);
+  const linkIndex = sourceText.indexOf(promotedLink);
+  const tailIndex = sourceText.lastIndexOf("```para-zk-managed");
+  assert(linkIndex >= 0, "promote-resource target link is missing from source resource file");
+  assert(tailIndex >= 0, "promote-resource source resource lost managed tail");
+  assert(linkIndex < tailIndex, "promote-resource target link must appear before the managed tail");
+
+  const references = cliJson("para-zk:read-zk", [
+    `path=${promoted.path}`,
+    "key=references",
+    "limit=all",
+    "format=json"
+  ]);
+  const items = Object.values(references.value?.items ?? {});
+  assert(items.some((item) => item.path === resource.path), "promoted ZK note does not reference source resource");
 }
 
 function assertProjectSummaryShape(path, summaryText = "") {
@@ -1674,6 +1872,10 @@ function assertFileNotContains(path, needles) {
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+function hasOwnKey(value, key) {
+  return Object.prototype.hasOwnProperty.call(value, key);
 }
 
 function assertNearlyEqual(actual, expected, tolerance, message) {

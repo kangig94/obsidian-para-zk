@@ -22,6 +22,22 @@ describe("managed templates", () => {
     expect(project).not.toContain("dataviewjs");
     expect(project).not.toContain("sameLink");
     expect(project).toContain("# Summary\n```para-zk-latest-retro-summary\n```\n{{cursor}}");
+    expect(resource).toContain("```para-zk-props\ntype: resource\n```\n{{cursor}}\n\n```para-zk-managed");
+    expect(resource).not.toContain("# Overview");
+    expect(resource).not.toContain("# Body");
+    expect(fleeting).toContain("```para-zk-props\ntype: zk_fleeting\n```\n{{cursor}}\n\n```para-zk-managed");
+    expect(fleeting).not.toContain("# One-line thought summary");
+    expect(fleeting).not.toContain("# Memo");
+    expect(literature).toContain("```para-zk-props\ntype: zk_literature\n```\n{{cursor}}\n\n```para-zk-managed");
+    expect(literature).not.toContain("## Highlights (quotes/evidence)");
+    expect(literature).not.toContain("# Summary");
+    expect(literature).not.toContain("# Key insights");
+    expect(literature).not.toContain("# Important quotes/evidence");
+    expect(permanent).toContain("```para-zk-props\ntype: zk_permanent\n```\n{{cursor}}\n\n```para-zk-managed");
+    expect(permanent).not.toContain("# One-sentence summary");
+    expect(permanent).not.toContain("# Body");
+    expect(permanent).not.toContain("## Limitations");
+    expect(permanent).not.toContain("## Related questions");
     expect(subnote).not.toContain("para-zk-managed");
     expect(retro).not.toContain("para-zk-managed");
 

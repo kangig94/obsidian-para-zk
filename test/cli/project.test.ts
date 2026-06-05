@@ -114,6 +114,33 @@ describe("read-project", () => {
     expect(exact.value).toBe(summary);
   });
 
+  it("keeps deeper sub-headings inside their section", async () => {
+    const summary = [
+      "Lead summary.",
+      "## Detail",
+      "Nested detail.",
+      "### Evidence",
+      "Nested evidence."
+    ].join("\n");
+    await cli.app.vault.create("PARA/Projects/Nested.md", [
+      "---",
+      "type: project",
+      "---",
+      "# Summary",
+      summary,
+      "# Goals",
+      "Goal text.",
+      ""
+    ].join("\n"));
+
+    const exact = await cli.run("para-zk:read-project", { path: "PARA/Projects/Nested.md", key: "summary" });
+    expect(exact.value).toBe(summary);
+
+    const compact = await cli.run("para-zk:read-project", { path: "PARA/Projects/Nested.md" });
+    expect(compact.summary).toEqual({ chars: summary.length });
+    expect(compact.goals).toEqual({ chars: "Goal text.".length });
+  });
+
   it("reads scalar keys in exact mode", async () => {
     await createBaseProject();
     const status = await cli.run("para-zk:read-project", {

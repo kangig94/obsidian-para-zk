@@ -259,7 +259,8 @@ describe("managed UI preservation", () => {
     });
     expect(resourceUpdate.changed).toBe(true);
     const resourceContent = cli.app.readPath("PARA/Resources/Source.md") ?? "";
-    expect(resourceContent).toContain("# Body\nResource body\n\n```para-zk-managed\n```");
+    expect(resourceContent).toContain("Resource body\n\n```para-zk-managed\n```");
+    expect(resourceContent).not.toContain("# Body");
     expect(resourceContent.match(/```para-zk-managed/g)).toHaveLength(1);
 
     await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
@@ -284,15 +285,67 @@ describe("managed UI preservation", () => {
 });
 
 describe("resource body updates", () => {
-  it("sets, replaces all matches, and rejects ambiguous replace", async () => {
+  it("reads arbitrary heading-shaped Markdown as one free-form body", async () => {
+    const body = [
+      "# Free section",
+      "Loose notes.",
+      "## Detail",
+      "Nested loose note.",
+      "# Another section",
+      "More prose."
+    ].join("\n");
+    await cli.app.vault.create("PARA/Resources/Free Resource.md", [
+      "---",
+      "type: resource",
+      "---",
+      "```para-zk-props",
+      "type: resource",
+      "```",
+      body,
+      "",
+      "```para-zk-managed",
+      "```",
+      ""
+    ].join("\n"));
+
+    const exact = await cli.run("para-zk:read-resource", {
+      path: "PARA/Resources/Free Resource.md",
+      key: "body"
+    });
+    expect(exact.value).toBe(body);
+
+    const compact = await cli.run("para-zk:read-resource", { path: "PARA/Resources/Free Resource.md" });
+    expect(compact.body).toEqual({ chars: body.length });
+    expect(compact).not.toHaveProperty("overview");
+    expect(compact).not.toHaveProperty("untracked");
+  });
+
+  it("sets, appends, and replaces body text with top-level headings", async () => {
     await cli.run("para-zk:create-resource", { title: "Source", open: "false" });
+    const initial = [
+      "# First",
+      "repeat",
+      "repeat"
+    ].join("\n");
     const set = await cli.run("para-zk:update-resource", {
       title: "Source",
       key: "body",
       op: "set",
-      value: "repeat\\nrepeat"
+      value: initial
     });
     expect(set.changed).toBe(true);
+
+    const appendValue = [
+      "# Second",
+      "tail"
+    ].join("\n");
+    const append = await cli.run("para-zk:update-resource", {
+      title: "Source",
+      key: "body",
+      op: "append",
+      value: appendValue
+    });
+    expect(append.changed).toBe(true);
 
     const ambiguous = await cli.run("para-zk:update-resource", {
       title: "Source",
@@ -313,6 +366,130 @@ describe("resource body updates", () => {
       all: "true"
     });
     expect(all.matches).toBe(2);
+
+    const replace = await cli.run("para-zk:update-resource", {
+      title: "Source",
+      key: "body",
+      op: "replace",
+      match: "tail",
+      with: "# Tail\nmore"
+    });
+    expect(replace.matches).toBe(1);
+
+    const read = await cli.run("para-zk:read-resource", { title: "Source", key: "body" });
+    expect(read.value).toBe([
+      "# First",
+      "done",
+      "done",
+      "# Second",
+      "# Tail",
+      "more"
+    ].join("\n"));
+  });
+
+  it("keeps body reads and writes working after ZK template headings are removed", async () => {
+    const created = await cli.run("para-zk:create-zk", {
+      title: "Template Destroyed",
+      kind: "literature",
+      open: "false"
+    });
+    const path = String(created.path);
+    const file = cli.app.vault.getFileByPath(path);
+    expect(file).toBeTruthy();
+
+    const body = [
+      "# Arbitrary",
+      "No enforced summary shape.",
+      "# Notes",
+      "Still prose."
+    ].join("\n");
+    await cli.app.vault.modify(file!, [
+      "---",
+      "type: zk_literature",
+      "sourceTitle:",
+      "authors:",
+      "published:",
+      "url:",
+      "---",
+      "```para-zk-props",
+      "type: zk_literature",
+      "```",
+      body,
+      "",
+      "```para-zk-managed",
+      "```",
+      ""
+    ].join("\n"));
+
+    const read = await cli.run("para-zk:read-zk", {
+      path,
+      kind: "literature",
+      key: "body"
+    });
+    expect(read.value).toBe(body);
+
+    const append = await cli.run("para-zk:update-zk", {
+      path,
+      kind: "literature",
+      key: "body",
+      op: "append",
+      value: "# Replacement\nWorks"
+    });
+    expect(append.changed).toBe(true);
+
+    const roundTrip = await cli.run("para-zk:read-zk", {
+      path,
+      kind: "literature",
+      key: "body"
+    });
+    expect(roundTrip.value).toBe(`${body}\n# Replacement\nWorks`);
+  });
+});
+
+describe("structured section split guard", () => {
+  it("rejects section updates that would split the section", async () => {
+    await cli.run("para-zk:create-area", { title: "Split Guard", open: "false" });
+
+    const h1Value = "Intro\n# Split";
+    const rejectedSet = await cli.run("para-zk:update-area", {
+      title: "Split Guard",
+      key: "overview",
+      op: "set",
+      value: h1Value
+    });
+    expect(rejectedSet.ok).toBe(false);
+    expect(String(rejectedSet.error)).toContain("value contains a level-1 heading");
+    expect(String(rejectedSet.error)).toContain("would split the \"overview\" section");
+    expect(String(rejectedSet.error)).toContain("e.g. '##'");
+
+    const rejectedAppend = await cli.run("para-zk:update-area", {
+      title: "Split Guard",
+      key: "overview",
+      op: "append",
+      value: h1Value
+    });
+    expect(rejectedAppend.ok).toBe(false);
+    expect(String(rejectedAppend.error)).toContain("value contains a level-1 heading");
+
+    const deeperValue = "Intro\n## Split";
+    const allowed = await cli.run("para-zk:update-area", {
+      title: "Split Guard",
+      key: "overview",
+      op: "set",
+      value: deeperValue
+    });
+    expect(allowed.changed).toBe(true);
+    const read = await cli.run("para-zk:read-area", { title: "Split Guard", key: "overview" });
+    expect(read.value).toBe(deeperValue);
+
+    const thematicBreak = await cli.run("para-zk:update-area", {
+      title: "Split Guard",
+      key: "overview",
+      op: "set",
+      value: "Intro\n---\nRest"
+    });
+    expect(thematicBreak.ok).toBe(false);
+    expect(String(thematicBreak.error)).toContain("value contains a '---' line");
   });
 });
 

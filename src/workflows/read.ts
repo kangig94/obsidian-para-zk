@@ -118,9 +118,7 @@ async function readSurfaceMap(ctx: WorkflowContext, file: TFile, spec: ReadSurfa
       });
       continue;
     }
-    const value = readSection(content, sectionHeadingCandidates(section), {
-      includeSubsections: section.includeSubsections ?? false
-    });
+    const value = readSection(content, sectionHeadingCandidates(section));
     surface[section.key] = section.transform
       ? await section.transform(value, {
         ctx,
@@ -144,6 +142,7 @@ function compactReadEnvelope(
   spec: ReadSurfaceSpec
 ): Record<string, unknown> {
   const compact = compactReadMap(surface, spec);
+
   if (specHasBacklinkSection(spec)) {
     const backlinkCount = countBacklinks(ctx, file);
     if (backlinkCount > 0) compact.backlinks = { count: backlinkCount };
@@ -245,20 +244,24 @@ async function readSurfaceKey(
   surface: ReadMap,
   spec: ReadSurfaceSpec,
   key: string,
-  collectionOptions?: CollectionReadOptions
+  collectionOptions?: CollectionReadOptions,
+  originalKey = key
 ): Promise<unknown> {
   const parts = keyParts(key);
   if (parts.length === 0) throw new Error("key is required");
 
   if (parts[0] !== "children") {
     if (parts[0] === "backlinks") {
-      return readBacklinkSurfaceKey(ctx, source, spec, parts, key, collectionOptions);
+      return readBacklinkSurfaceKey(ctx, source, spec, parts, originalKey, collectionOptions);
     }
-    return readSurfaceMapKey(surface, spec, parts, key, collectionOptions);
+    if (readSurfaceTopLevelKeys(spec).includes(parts[0])) {
+      return readSurfaceMapKey(surface, spec, parts, originalKey, collectionOptions);
+    }
+    throw unknownReadKeyError(spec, originalKey);
   }
 
   if (!hasOwn(surface, "children")) {
-    throw unknownReadKeyError(spec, key);
+    throw unknownReadKeyError(spec, originalKey);
   }
   if (parts.length === 1) return surface.children;
 
@@ -271,7 +274,7 @@ async function readSurfaceKey(
   if (parts.length > 2) {
     const childParts = parts.slice(2);
     if (childParts[0] === "backlinks") {
-      return readBacklinkSurfaceKey(ctx, child, childSpec, childParts, key, collectionOptions);
+      return readBacklinkSurfaceKey(ctx, child, childSpec, childParts, originalKey, collectionOptions);
     }
   }
 
@@ -279,7 +282,7 @@ async function readSurfaceKey(
   if (parts.length === 2) {
     return compactReadEnvelope(ctx, child, childType, childSurface, childSpec);
   }
-  return readSurfaceMapKey(childSurface, childSpec, parts.slice(2), key, collectionOptions);
+  return readSurfaceKey(ctx, child, childSurface, childSpec, parts.slice(2).join("/"), collectionOptions, originalKey);
 }
 
 function readBacklinkSurfaceKey(
@@ -372,7 +375,6 @@ function findSectionContentRange(content: string, section: ReadSectionSpec): Tex
 
   for (const label of sectionHeadingCandidates(section)) {
     const range = findSectionContentRangeByHeading(markdown, label, {
-      includeSubsections: section.includeSubsections ?? false,
       offset: body.start
     });
     if (range) return range;
