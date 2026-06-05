@@ -37,11 +37,11 @@ describe("create-from-resource", () => {
   });
 });
 
-describe("create-permanent", () => {
+describe("create-from-source", () => {
   it("creates a permanent note that references the preserved source", async () => {
     const source = await cli.run("para-zk:create-zk", { title: "Book note", kind: "source", open: "false" });
 
-    const created = await cli.run("para-zk:create-permanent", {
+    const created = await cli.run("para-zk:create-from-source", {
       path: String(source.path),
       title: "Evergreen book note",
       maturity: "refined",

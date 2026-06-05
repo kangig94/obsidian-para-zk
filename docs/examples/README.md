@@ -25,7 +25,7 @@ Two operations move notes here:
 
 - **Distill** — `distill-spark` consumes a spark into a permanent note (the spark is then marked
   `processed: true` and discarded manually). A spark may yield several permanents.
-- **Create** — `create-permanent` (from a source) and `create-from-resource` make a new note that
+- **Create** — `create-from-source` (from a source) and `create-from-resource` make a new note that
   **references** the durable origin. The origin is preserved; no reverse link is written back into it —
   the new note surfaces in the origin's *Cited by* view via Obsidian backlinks (single-direction linking).
 

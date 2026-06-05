@@ -48,7 +48,7 @@ describe("managed templates", () => {
       expect(content).not.toContain("area-subareas");
       expect(content).not.toContain("resource-cited-by");
       expect(content).not.toContain("spark-distill");
-      expect(content).not.toContain("source-create-permanent");
+      expect(content).not.toContain("source-cited-by");
     }
   });
 
@@ -78,7 +78,7 @@ describe("managed templates", () => {
     expect(journal).toContain("para-zk-tasks");
     expect(managedUiBlockForType("retro", DEFAULT_SETTINGS)).toBeUndefined();
     expect(spark).toContain("spark-distill");
-    expect(source).toContain("source-create-permanent");
+    expect(source).toContain("source-cited-by");
     expect(source).toContain("para-zk-references");
     expect(permanent).toContain("permanent-cited-by");
     expect(permanent).toContain("title: Cited by");
@@ -88,7 +88,7 @@ describe("managed templates", () => {
   it("renders Dataview tables for managed ZK views (cited-by and distilled-into)", () => {
     expect(dataviewViewBlock("permanent-cited-by", DEFAULT_SETTINGS)).toContain("contains(file.outlinks");
     expect(dataviewViewBlock("resource-cited-by", DEFAULT_SETTINGS)).toContain("contains(file.outlinks");
-    expect(dataviewViewBlock("source-create-permanent", DEFAULT_SETTINGS)).toContain("contains(file.outlinks");
+    expect(dataviewViewBlock("source-cited-by", DEFAULT_SETTINGS)).toContain("contains(file.outlinks");
     expect(dataviewViewBlock("spark-distill", DEFAULT_SETTINGS)).toContain("distilled_to");
   });
 

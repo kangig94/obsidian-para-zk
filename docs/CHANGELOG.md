@@ -95,7 +95,7 @@ Notable changes for PARA-ZK are tracked here.
   (`zk_permanent`, your atomic connected idea — the common, primary output).
   Split the old single "promote" path into two operations: **distill**
   (`distill-spark`, spark → permanent, consuming) and **create**
-  (`create-permanent` from a source, `create-from-resource` for source/permanent).
+  (`create-from-source` from a source, `create-from-resource` for source/permanent).
   ZK creation now uses single-direction links (the new note references its origin;
   the origin surfaces it via a derived *Cited by* backlink view on permanent and
   resource notes) and no longer writes reverse body links or `promoted_to`

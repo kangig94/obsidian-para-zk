@@ -17,6 +17,15 @@ const vaultPath = resolve(args.vault ?? inferVaultPath());
 const pluginDir = resolve(args.pluginDir ?? join(vaultPath, ".obsidian/plugins/para-zk"));
 const installDeps = args.installDeps !== false;
 const stamp = args.stamp ?? timestamp();
+const runLocale = resolveRunLocale(args.locale);
+// Locale-dependent headings/titles the live assertions check. Ribbon/command
+// labels are covered separately by guiLocaleExpectations; these mirror the
+// template section headings and managed-toolbar titles that differ by locale.
+const LOCALIZED = {
+  en: { summary: "Summary", goals: "Goals", retroSummary: "Retro summary (required)", references: "References", subnotes: "Subnotes", createRetro: "Create retro", updated: "Updated" },
+  ko: { summary: "요약", goals: "목표", retroSummary: "회고 요약 (필수)", references: "참고 자료", subnotes: "서브노트", createRetro: "새 회고 만들기", updated: "수정" }
+};
+const L = LOCALIZED[runLocale];
 const requiredDependencyIds = [
   "dataview",
   "obsidian-tasks-plugin",
@@ -35,7 +44,7 @@ const guiLocaleExpectations = {
     emptyTrashLabel: "Empty trash"
   },
   ko: {
-    ribbonLabels: ["새 프로젝트", "새 영역", "새 ZK", "새 자료", "일일노트", "빠른 메모"],
+    ribbonLabels: ["새 프로젝트", "새 영역", "새 ZK", "새 리소스", "일일노트", "빠른 메모"],
     createProjectCommandName: "PARA-ZK: 새 프로젝트 만들기",
     emptyTrashLabel: "휴지통 비우기"
   }
@@ -43,16 +52,10 @@ const guiLocaleExpectations = {
 
 prepareVault();
 
-const setupResult = setupVaultCli([], "setup");
+const setupResult = setupVaultCli([`locale=${runLocale}`], "setup");
 assertSetupEnvironment(setupResult);
 ensureDataviewIndexReady();
-assertGuiLocale("en");
-
-setupVaultCli(["locale=ko", "force=true"], "ko locale init");
-assertGuiLocale("ko");
-
-setupVaultCli(["locale=en", "force=true"], "en locale init");
-assertGuiLocale("en");
+assertGuiLocale(runLocale);
 assertManagedTemplateFiles();
 
 const today = todayIso();
@@ -276,13 +279,13 @@ function assertManagedTemplateFiles() {
 
   const project = readVaultText("Templates/para-zk/template_project.md");
   assert(
-    project.includes("# Summary\n```para-zk-latest-retro-summary\n```\n{{cursor}}\n\n# Goals"),
+    project.includes(`# ${L.summary}\n\`\`\`para-zk-latest-retro-summary\n\`\`\`\n{{cursor}}\n\n# ${L.goals}`),
     "template_project.md summary must keep latest-retro block directly under Summary"
   );
 
   const retro = readVaultText("Templates/para-zk/template_retro.md");
   assert(retro.includes("areas: {{areas_frontmatter}}"), "template_retro.md must keep YAML-safe areas placeholder spacing");
-  assert(retro.includes("# Retro summary (required)\n"), "template_retro.md must keep required Retro summary heading");
+  assert(retro.includes(`# ${L.retroSummary}\n`), "template_retro.md must keep required Retro summary heading");
   assert(!retro.includes("```para-zk-managed"), "template_retro.md must not include managed UI");
   assertFileNotContains("Templates/para-zk/template_retro.md", [
     "다음 주에 바로 도움이 될 핵심 한 줄",
@@ -377,9 +380,9 @@ function assertGeneratedNoteTemplateShape(path, type, options = {}) {
     if (type === "project") {
       assertProjectSummaryText(path, text);
     } else if (type === "retro" && options.allowRetroSummaryText) {
-      assert(text.includes("# Retro summary (required)"), `${path} retro summary heading is missing`);
+      assert(text.includes(`# ${L.retroSummary}`), `${path} retro summary heading is missing`);
     } else if (type === "retro") {
-      assert(text.includes("# Retro summary (required)\n"), `${path} retro summary heading is missing`);
+      assert(text.includes(`# ${L.retroSummary}\n`), `${path} retro summary heading is missing`);
     }
 
     if (type === "resource") {
@@ -580,10 +583,10 @@ function assertProjectSummaryShape(path, summaryText = "") {
 
 function assertProjectSummaryText(path, text, summaryText = "") {
   const expected = summaryText
-    ? `# Summary\n\`\`\`para-zk-latest-retro-summary\n\`\`\`\n${summaryText}\n\n# Goals`
-    : "# Summary\n```para-zk-latest-retro-summary\n```\n\n# Goals";
+    ? `# ${L.summary}\n\`\`\`para-zk-latest-retro-summary\n\`\`\`\n${summaryText}\n\n# ${L.goals}`
+    : `# ${L.summary}\n\`\`\`para-zk-latest-retro-summary\n\`\`\`\n\n# ${L.goals}`;
   assert(text.includes(expected), `${path} project summary shape drifted`);
-  assert(!text.includes("```\n\n\n# Goals"), `${path} has extra blank lines before Goals`);
+  assert(!text.includes(`\`\`\`\n\n\n# ${L.goals}`), `${path} has extra blank lines before Goals`);
   assert(!text.includes("para-zk-latest-retro-summary\n```\n\n\n"), `${path} has extra blank lines after latest-retro block`);
 }
 
@@ -671,8 +674,8 @@ function assertDataviewToolbarLayout(path) {
   assert(snapshot.taskToolbar && snapshot.referenceToolbar && snapshot.viewToolbar, `toolbar layout snapshot incomplete: ${JSON.stringify(snapshot)}`);
   assert(snapshot.viewButton, `Dataview toolbar button missing: ${JSON.stringify(snapshot)}`);
   assert(snapshot.taskTitle === "Tasks", `task toolbar title missing: ${JSON.stringify(snapshot)}`);
-  assert(snapshot.referenceTitle === "References", `reference toolbar title missing: ${JSON.stringify(snapshot)}`);
-  assert(snapshot.viewTitle === "Subnotes", `Dataview toolbar title missing: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.referenceTitle === L.references, `reference toolbar title missing: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.viewTitle === L.subnotes, `Dataview toolbar title missing: ${JSON.stringify(snapshot)}`);
   assertNearlyEqual(snapshot.viewButton.right, snapshot.viewToolbar.right, 1, `Dataview button right edge differs from toolbar: ${JSON.stringify(snapshot)}`);
   assertNearlyEqual(snapshot.viewButton.right, snapshot.viewRoot.right, 1, `Dataview button right edge differs from view root: ${JSON.stringify(snapshot)}`);
   assertNearlyEqual(snapshot.viewToolbar.right, snapshot.taskToolbar.right, 1, `Dataview toolbar right edge differs from task toolbar: ${JSON.stringify(snapshot)}`);
@@ -1167,7 +1170,7 @@ function assertCreateRetroButtonProjectLink() {
     }));
   })()`);
 
-  assert(created.buttonText === "Create retro", `Create retro button text mismatch: ${created.buttonText}`);
+  assert(created.buttonText === L.createRetro, `Create retro button text mismatch: ${created.buttonText}`);
   assert(typeof created.retroPath === "string" && created.retroPath.length > 0, "Create retro button did not create a retro");
 
   let frontmatter = {};
@@ -1224,7 +1227,7 @@ function assertCreateRetroButtonProjectLink() {
       hasComponent = Boolean(root.querySelector(".para-zk-latest-retro-summary"));
       retrosText = root.querySelector(".para-zk-view-project-retros")?.textContent?.trim() ?? "";
       hasUpdatedColumn = Array.from(root.querySelectorAll(".para-zk-view-project-retros th, .para-zk-view-project-retros .table-view-th"))
-        .some((el) => el.textContent?.trim() === "Updated") || retrosText.includes("Updated");
+        .some((el) => el.textContent?.trim() === ${JSON.stringify(L.updated)}) || retrosText.includes(${JSON.stringify(L.updated)});
       hasRetroInView = retrosText.includes(retroWeekLabel) && !retrosText.includes(retroTitle);
       if (hasComponent && hasRetroInView && hasUpdatedColumn) break;
       await sleep(100);
@@ -1274,7 +1277,7 @@ function assertCreateRetroButtonProjectLink() {
       body = component?.querySelector(".para-zk-latest-retro-summary-body")?.textContent?.trim() ?? "";
       retrosText = retrosView?.textContent?.trim() ?? "";
       hasUpdatedColumn = Array.from(root.querySelectorAll(".para-zk-view-project-retros th, .para-zk-view-project-retros .table-view-th"))
-        .some((el) => el.textContent?.trim() === "Updated") || retrosText.includes("Updated");
+        .some((el) => el.textContent?.trim() === ${JSON.stringify(L.updated)}) || retrosText.includes(${JSON.stringify(L.updated)});
       hasRetroInView = retrosText.includes(retroWeekLabel) && !retrosText.includes(retroTitle);
       codeBlocks = Array.from(root.querySelectorAll("code"))
         .filter((code) => code.textContent?.includes("para-zk-latest-retro-summary")).length;
@@ -1430,6 +1433,10 @@ function parseArgs(rawArgs) {
       parsed.stamp = arg.slice("--stamp=".length);
     } else if (arg === "--stamp") {
       parsed.stamp = takeNext(rawArgs, arg);
+    } else if (arg.startsWith("--locale=")) {
+      parsed.locale = arg.slice("--locale=".length);
+    } else if (arg === "--locale") {
+      parsed.locale = takeNext(rawArgs, arg);
     } else if (arg === "--help" || arg === "-h") {
       printHelp();
       process.exit(0);
@@ -1443,6 +1450,14 @@ function takeNext(rawArgs, flag) {
   const index = rawArgs.indexOf(flag);
   const value = rawArgs[index + 1];
   if (!value || value.startsWith("--")) throw new Error(`${flag} requires a value`);
+  return value;
+}
+
+function resolveRunLocale(value) {
+  if (value === undefined) return "en";
+  if (value !== "en" && value !== "ko") {
+    throw new Error(`--locale must be 'en' or 'ko' (got '${value}')`);
+  }
   return value;
 }
 
@@ -1466,6 +1481,8 @@ Options:
   --no-build           Skip npm run build and plugin sync.
   --no-install-deps    Run para-zk:setup without installing required dependencies.
   --stamp <value>      Stable suffix for generated smoke-test notes.
+  --locale <en|ko>     Locale the live scenarios run in (default en). The en<->ko
+                       switch is always exercised; this picks the settled locale.
 `);
 }
 

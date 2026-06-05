@@ -196,8 +196,8 @@ function dataviewViewToolbar(plugin: ParaZkPluginContext, key: DataviewViewKey):
           { command: "distill-spark", label: labels.distillButton, icon: "arrow-up-right" }
         ]
       };
-    case "source-create-permanent":
-      return actionToolbar("create-permanent", labels.createPermanentButton, "arrow-up-right");
+    case "source-cited-by":
+      return actionToolbar("create-from-source", labels.createPermanentButton, "arrow-up-right");
     case "permanent-cited-by":
     case "area-projects":
       return undefined;

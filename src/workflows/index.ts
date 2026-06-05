@@ -33,7 +33,7 @@ export {
 } from "./update";
 export { renameArea, renameProject, renameResource, renameZk } from "./rename";
 export { deleteArea, deleteJournal, deleteProject, deleteResource, deleteRetro, deleteZk } from "./delete";
-export { captureJournal, openJournal, distillSpark, createPermanentFromSource, createFromResource } from "./promote";
+export { captureJournal, openJournal, distillSpark, createFromSource, createFromResource } from "./promote";
 export {
   addReference,
   deleteReferenceItem,

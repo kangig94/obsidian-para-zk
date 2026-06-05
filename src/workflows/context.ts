@@ -98,7 +98,7 @@ export type CreateFromResourceOptions = {
   open?: boolean;
 };
 
-export type CreatePermanentFromSourceOptions = {
+export type CreateFromSourceOptions = {
   sourcePath?: string;
   title?: string;
   maturity?: string;

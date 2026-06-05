@@ -361,12 +361,12 @@ export function managedUiBlockForType(type: string, settings: ParaZkSettings): s
       ]);
     case "zk_spark":
       return joinManagedUiBlocks([
-        paraZkViewBlock("spark-distill", t.labels.distilledInto),
+        paraZkViewBlock("spark-distill", t.labels.createdFromThis),
         paraZkReferencesBlock("current", t.labels.references)
       ]);
     case "zk_source":
       return joinManagedUiBlocks([
-        paraZkViewBlock("source-create-permanent", t.labels.createdFromThis),
+        paraZkViewBlock("source-cited-by", t.labels.createdFromThis),
         paraZkReferencesBlock("current", t.labels.references)
       ]);
     case "zk_permanent":
@@ -456,7 +456,7 @@ function dataviewCitedBy(t: ReturnType<typeof localePack>, settings: ParaZkSetti
 // discarded — no dangling links are left in the permanents.
 function dataviewDistilledInto(t: ReturnType<typeof localePack>): string[] {
   return fenced("dataview", [
-    `TABLE WITHOUT ID distilled_to AS "${t.labels.distilledInto}"`,
+    `TABLE WITHOUT ID distilled_to AS "${t.labels.filename}"`,
     "WHERE file.path = this.file.path AND distilled_to"
   ]);
 }
@@ -471,7 +471,7 @@ export const DATAVIEW_VIEW_KEYS = [
   "resource-cited-by",
   "permanent-cited-by",
   "spark-distill",
-  "source-create-permanent"
+  "source-cited-by"
 ] as const;
 
 export type DataviewViewKey = typeof DATAVIEW_VIEW_KEYS[number];
@@ -492,7 +492,7 @@ export function dataviewViewBlock(key: string, settings: ParaZkSettings, sourceP
     case "area-retros": return dataviewAreaRetros(t, settings, sourcePath).join("\n");
     case "resource-cited-by":
     case "permanent-cited-by":
-    case "source-create-permanent":
+    case "source-cited-by":
       return dataviewCitedBy(t, settings, sourcePath).join("\n");
     case "spark-distill": return dataviewDistilledInto(t).join("\n");
     default: return undefined;

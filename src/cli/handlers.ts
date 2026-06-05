@@ -136,7 +136,7 @@ type WorkflowFunctionName =
   | "deleteRetro"
   | "deleteZk"
   | "distillSpark"
-  | "createPermanentFromSource"
+  | "createFromSource"
   | "createFromResource"
   | "readArea"
   | "readJournal"
@@ -881,7 +881,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     }))
   },
   {
-    command: "para-zk:create-permanent",
+    command: "para-zk:create-from-source",
     description: "Create a Permanent note from a source note (source preserved)",
     options: {
       path: { value: "<path>", description: "Source note path." },
@@ -891,7 +891,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "permanent created",
-    run: workflowRun("createPermanentFromSource", (args) => ({
+    run: workflowRun("createFromSource", (args) => ({
       sourcePath: readCliPath(args),
       title: readCliTitle(args),
       maturity: readCliString(args, "maturity"),

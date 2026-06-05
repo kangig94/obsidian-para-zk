@@ -936,7 +936,7 @@ Important fields:
 - `sourcePath`
 - `kind`
 
-### `para-zk:create-permanent`
+### `para-zk:create-from-source`
 
 Creates a Permanent note from a source note and writes a frontmatter reference on
 the new permanent note back to the source. The source is preserved.
@@ -953,7 +953,7 @@ Options:
 Example:
 
 ```bash
-optsidian raw para-zk:create-permanent \
+optsidian raw para-zk:create-from-source \
   path="ZK/Source/Paper Digest.md" \
   title="Compounding learning" \
   maturity=refined \

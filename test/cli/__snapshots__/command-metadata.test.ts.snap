@@ -141,7 +141,7 @@ exports[`native CLI command metadata is stable 1`] = `
     },
   },
   {
-    "command": "para-zk:create-permanent",
+    "command": "para-zk:create-from-source",
     "description": "Create a Permanent note from a source note (source preserved)",
     "options": {
       "format": {

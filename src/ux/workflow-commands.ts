@@ -142,13 +142,13 @@ async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: 
         { label: "Permanent", value: "permanent" }
       ]);
       if (!kind) return undefined;
-      const title = await prompt(plugin, labels.createFromResourceCommandName, labels.promptZkTitle, sourceFile?.basename ?? "");
+      const title = await prompt(plugin, labels.createZkButton, labels.promptZkTitle, sourceFile?.basename ?? "");
       return title ? workflows.createFromResource(ctx, { sourcePath: activePath, title, kind, open: true }) : undefined;
     }
     case "distill-spark": {
       const result = await promptDistill(
         plugin.app,
-        labels.distillSparkCommandName,
+        labels.distillButton,
         labels.promptZkTitle,
         sourceFile?.basename ?? "",
         labels.distillDiscardToggle,
@@ -168,9 +168,9 @@ async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: 
       );
       return confirmed ? workflows.deleteZk(ctx, { path: activePath }) : undefined;
     }
-    case "create-permanent": {
-      const title = await prompt(plugin, labels.createPermanentCommandName, labels.promptZkTitle, sourceFile?.basename ?? "");
-      return title ? workflows.createPermanentFromSource(ctx, { sourcePath: activePath, title, open: true }) : undefined;
+    case "create-from-source": {
+      const title = await prompt(plugin, labels.createPermanentButton, labels.promptZkTitle, sourceFile?.basename ?? "");
+      return title ? workflows.createFromSource(ctx, { sourcePath: activePath, title, open: true }) : undefined;
     }
     default:
       throw new Error(`${localePack(plugin.settings.locale).messages.unknownCommand}: ${command}`);

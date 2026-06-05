@@ -33,7 +33,7 @@ import type {
   OpenJournalOptions,
   OpenJournalResult,
   DistillSparkOptions,
-  CreatePermanentFromSourceOptions,
+  CreateFromSourceOptions,
   CreateFromResourceOptions,
   WorkflowContext
 } from "./context";
@@ -75,7 +75,7 @@ export async function openJournal(ctx: WorkflowContext, options: OpenJournalOpti
 }
 
 // Shared scaffold: resolve a typed origin note and create a new ZK note of
-// `kind` from it. Behind createFromResource / createPermanentFromSource /
+// `kind` from it. Behind createFromResource / createFromSource /
 // distillSpark — each adds only its distinct post-create step.
 async function createZkFromOrigin(
   ctx: WorkflowContext,
@@ -108,7 +108,7 @@ export async function createFromResource(ctx: WorkflowContext, options: CreateFr
   return { ...noteResult(file, true, options.open), sourcePath: source.path, kind };
 }
 
-export async function createPermanentFromSource(ctx: WorkflowContext, options: CreatePermanentFromSourceOptions = {}): Promise<PromotionResult> {
+export async function createFromSource(ctx: WorkflowContext, options: CreateFromSourceOptions = {}): Promise<PromotionResult> {
   const { source, file } = await createZkFromOrigin(ctx, options, { label: "source note", expectedType: "zk_source" }, "Permanent");
   await insertReferenceItem(ctx, file, { link: wikiLink(source.path) });
   await openIfRequested(ctx, file, options.open);

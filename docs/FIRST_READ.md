@@ -125,7 +125,7 @@ origin surfaces it via backlinks / its *Cited by* view — no reverse link is st
 
 - **Create from resource** (`create-from-resource`) makes a Source or Permanent note
   that references the resource; the resource is preserved and left unchanged.
-- **Create permanent from source** (`create-permanent`) makes a Permanent note that
+- **Create permanent from source** (`create-from-source`) makes a Permanent note that
   references the source; the source is preserved.
 - **Distill spark** (`distill-spark`) moves a spark's idea into a new Permanent note,
   marks the spark `processed: true`, and leaves it for manual discard (a spark may yield
