@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { slugify } from "../../src/text/slug";
+import { slugify } from "../../src/text";
 
 describe("slugify", () => {
   it("lowercases and joins words with underscores", () => {

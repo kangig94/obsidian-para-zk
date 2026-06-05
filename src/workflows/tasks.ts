@@ -1,5 +1,5 @@
-import type { App, TFile } from "obsidian";
-import { hasOwn, isRecord } from "../infra/records";
+import type { TFile } from "obsidian";
+import { hasOwn, isRecord } from "../records";
 import {
   findSectionContentRangeByHeading,
   isMarkdownScaffold,
@@ -9,40 +9,14 @@ import {
   spliceTextRange,
   trimTextRange,
   type TextRange
-} from "../markdown/sections";
-import type { ParaZkSettings } from "../types";
+} from "../vault/sections";
 import { ensureFolder, isInFolder, parentFolder } from "../vault/files";
-import { fileFrontmatter, readType, type Frontmatter } from "../vault/note-frontmatter";
+import { fileFrontmatter, readType, type Frontmatter } from "../vault/frontmatter";
 import { joinVaultPath, normalizeVaultPath, sanitizeFileName } from "../vault/paths";
+import type { RootTaskItem, TaskRead, TaskWritableField, WorkflowContext } from "./context";
 
 export const ROOT_ID_FRONTMATTER_KEY = "id";
 
-export type TaskContext = {
-  app: App;
-  settings: ParaZkSettings;
-};
-
-export type TaskRead = {
-  checkbox: string;
-  name: string;
-  due?: string;
-  scheduled?: string;
-  start?: string;
-  created?: string;
-  done?: string;
-  cancelled?: string;
-  priority?: string;
-};
-
-export type TaskWritableField = keyof TaskRead;
-
-export type RootTaskItem = {
-  rootPath: string;
-  rootTitle: string;
-  rootType: string;
-  id: string;
-  task: TaskRead;
-};
 
 type TaskLineRead = {
   id: string;
@@ -105,7 +79,7 @@ const TASK_PRIORITY_FIELD_SYMBOLS: Record<string, string> = {
   lowest: "\u{23EC}"
 };
 
-export async function ensureTaskShard(ctx: TaskContext, rootFile: TFile): Promise<TFile> {
+export async function ensureTaskShard(ctx: WorkflowContext, rootFile: TFile): Promise<TFile> {
   const rootId = await ensureRootId(ctx, rootFile);
   const path = taskShardPath(ctx, rootId, isArchivedFile(ctx, rootFile));
   await ensureFolder(ctx.app, parentFolder(path));
@@ -117,11 +91,11 @@ export async function ensureTaskShard(ctx: TaskContext, rootFile: TFile): Promis
   return shardFile;
 }
 
-export function readTaskShardFile(ctx: TaskContext, rootFile: TFile): TFile | undefined {
+export function readTaskShardFile(ctx: WorkflowContext, rootFile: TFile): TFile | undefined {
   return taskShardFile(ctx, rootFile);
 }
 
-export function taskShardPath(ctx: TaskContext, rootId: string, archived: boolean): string {
+export function taskShardPath(ctx: WorkflowContext, rootId: string, archived: boolean): string {
   return joinVaultPath(taskShardFolder(ctx, archived), `${sanitizeFileName(rootId)}.md`);
 }
 
@@ -134,7 +108,7 @@ export function newRootId(): string {
   return newId();
 }
 
-export async function assertRootTaskExists(ctx: TaskContext, rootFile: TFile, taskId: string): Promise<void> {
+export async function assertRootTaskExists(ctx: WorkflowContext, rootFile: TFile, taskId: string): Promise<void> {
   const shardFile = readTaskShardFile(ctx, rootFile);
   if (!shardFile) throw new Error(`task not found: ${taskId}`);
   const content = await ctx.app.vault.read(shardFile);
@@ -143,7 +117,7 @@ export async function assertRootTaskExists(ctx: TaskContext, rootFile: TFile, ta
   if (!line) throw new Error(`task not found: ${taskId}`);
 }
 
-export async function readRootTaskMap(ctx: TaskContext, rootFile: TFile): Promise<Record<string, TaskRead>> {
+export async function readRootTaskMap(ctx: WorkflowContext, rootFile: TFile): Promise<Record<string, TaskRead>> {
   const items: Record<string, TaskRead> = {};
   const shardFile = readTaskShardFile(ctx, rootFile);
   if (!shardFile) return items;
@@ -169,7 +143,7 @@ export async function readRootTaskMap(ctx: TaskContext, rootFile: TFile): Promis
   return items;
 }
 
-export async function readAllTaskItems(ctx: TaskContext): Promise<RootTaskItem[]> {
+export async function readAllTaskItems(ctx: WorkflowContext): Promise<RootTaskItem[]> {
   const rootFiles = rootFilesById(ctx);
   const results: RootTaskItem[] = [];
   for (const file of ctx.app.vault.getMarkdownFiles()) {
@@ -202,7 +176,7 @@ export async function readAllTaskItems(ctx: TaskContext): Promise<RootTaskItem[]
   return results;
 }
 
-export async function insertRootTask(ctx: TaskContext, rootFile: TFile, value: unknown): Promise<string> {
+export async function insertRootTask(ctx: WorkflowContext, rootFile: TFile, value: unknown): Promise<string> {
   const write = normalizeTaskWriteValue(value);
   const taskId = await newTaskId(ctx);
   const line = serializeNewTaskLine(write.task, taskId);
@@ -218,7 +192,7 @@ export async function insertRootTask(ctx: TaskContext, rootFile: TFile, value: u
 }
 
 export async function setRootTaskField(
-  ctx: TaskContext,
+  ctx: WorkflowContext,
   rootFile: TFile,
   taskId: string,
   field: TaskWritableField,
@@ -239,7 +213,7 @@ export async function setRootTaskField(
   return true;
 }
 
-export async function reorderRootTasks(ctx: TaskContext, rootFile: TFile, taskIds: string[]): Promise<boolean> {
+export async function reorderRootTasks(ctx: WorkflowContext, rootFile: TFile, taskIds: string[]): Promise<boolean> {
   const shardFile = readTaskShardFile(ctx, rootFile);
   if (!shardFile) throw new Error("task list not found");
   const before = await ctx.app.vault.read(shardFile);
@@ -273,7 +247,7 @@ export async function reorderRootTasks(ctx: TaskContext, rootFile: TFile, taskId
   return true;
 }
 
-export async function deleteRootTask(ctx: TaskContext, rootFile: TFile, taskId: string): Promise<boolean> {
+export async function deleteRootTask(ctx: WorkflowContext, rootFile: TFile, taskId: string): Promise<boolean> {
   const shardFile = readTaskShardFile(ctx, rootFile);
   if (!shardFile) throw new Error(`task not found: ${taskId}`);
   const before = await ctx.app.vault.read(shardFile);
@@ -297,7 +271,7 @@ export function readTaskWritableField(value: string, originalKey: string): TaskW
   throw new Error(`unknown task field for update key: ${originalKey}`);
 }
 
-async function ensureRootId(ctx: TaskContext, file: TFile): Promise<string> {
+async function ensureRootId(ctx: WorkflowContext, file: TFile): Promise<string> {
   const existing = rootIdFromFrontmatter(fileFrontmatter(ctx, file));
   if (existing) return existing;
 
@@ -315,24 +289,24 @@ async function ensureRootId(ctx: TaskContext, file: TFile): Promise<string> {
   return resolved;
 }
 
-function taskShardFile(ctx: TaskContext, rootFile: TFile): TFile | undefined {
+function taskShardFile(ctx: WorkflowContext, rootFile: TFile): TFile | undefined {
   const rootId = rootIdFromFrontmatter(fileFrontmatter(ctx, rootFile));
   return rootId ? ctx.app.vault.getFileByPath(taskShardPath(ctx, rootId, isArchivedFile(ctx, rootFile))) ?? undefined : undefined;
 }
 
-function taskShardFolder(ctx: TaskContext, archived: boolean): string {
+function taskShardFolder(ctx: WorkflowContext, archived: boolean): string {
   return archived ? taskArchivesFolder(ctx) : taskCurrentFolder(ctx);
 }
 
-function taskCurrentFolder(ctx: TaskContext): string {
+function taskCurrentFolder(ctx: WorkflowContext): string {
   return joinVaultPath(ctx.settings.paths.tasksFolder, "current");
 }
 
-function taskArchivesFolder(ctx: TaskContext): string {
+function taskArchivesFolder(ctx: WorkflowContext): string {
   return joinVaultPath(ctx.settings.paths.tasksFolder, "archives");
 }
 
-function taskRegistryFolder(ctx: TaskContext): string {
+function taskRegistryFolder(ctx: WorkflowContext): string {
   return normalizeVaultPath(ctx.settings.paths.tasksFolder);
 }
 
@@ -382,7 +356,7 @@ function editableTaskLineSpans(content: string): Array<TextRange & { endWithoutB
   return spans;
 }
 
-async function newTaskId(ctx: TaskContext): Promise<string> {
+async function newTaskId(ctx: WorkflowContext): Promise<string> {
   const existing = await existingTaskIds(ctx);
   for (let attempt = 0; attempt < 100; attempt += 1) {
     const id = randomAlphabetId(TASK_ID_LENGTH, TASK_ID_ALPHABET);
@@ -406,7 +380,7 @@ function fallbackUuid(): string {
   });
 }
 
-async function existingTaskIds(ctx: TaskContext): Promise<Set<string>> {
+async function existingTaskIds(ctx: WorkflowContext): Promise<Set<string>> {
   const ids = new Set<string>();
   const tasksFolder = taskRegistryFolder(ctx);
   for (const file of ctx.app.vault.getMarkdownFiles()) {
@@ -449,7 +423,7 @@ function randomBytes(length: number): Uint8Array {
   return bytes;
 }
 
-function rootFilesById(ctx: TaskContext): Map<string, TFile> {
+function rootFilesById(ctx: WorkflowContext): Map<string, TFile> {
   const roots = new Map<string, TFile>();
   for (const file of ctx.app.vault.getMarkdownFiles()) {
     if (isInFolder(file, taskRegistryFolder(ctx)) || isArchivedFile(ctx, file)) continue;
@@ -802,6 +776,6 @@ function normalizeCheckboxFilter(value: string | undefined): string | undefined 
   return trimmed;
 }
 
-function isArchivedFile(ctx: TaskContext, file: TFile): boolean {
+function isArchivedFile(ctx: WorkflowContext, file: TFile): boolean {
   return isInFolder(file, ctx.settings.paths.archivesFolder);
 }

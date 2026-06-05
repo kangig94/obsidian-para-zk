@@ -1,6 +1,6 @@
 import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
-import { isRecord } from "../infra/records";
+import { isRecord } from "../records";
 import { refreshExplorerActionLabels } from "./explorer-actions";
 
 type Labels = Record<string, string>;

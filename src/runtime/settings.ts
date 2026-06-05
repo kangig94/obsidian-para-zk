@@ -5,7 +5,7 @@ import {
   type ManagedFileState,
   type ParaZkSettings
 } from "../types";
-import { isRecord } from "../infra/records";
+import { isRecord } from "../records";
 import { joinVaultPath, normalizeVaultPath } from "../vault/paths";
 
 export async function loadSettings(plugin: Plugin): Promise<ParaZkSettings> {

@@ -6,7 +6,7 @@ import {
 } from "obsidian";
 import { localePack, type LocalePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
-import { isRecord } from "../infra/records";
+import { isRecord } from "../records";
 import { normalizeVaultPath } from "../vault/paths";
 
 type RetroSummary = {

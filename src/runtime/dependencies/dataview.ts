@@ -1,5 +1,5 @@
 import type { App } from "obsidian";
-import { isRecord } from "../../infra/records";
+import { isRecord } from "../../records";
 import type { DependencyConfiguration, DependencyConfigurationServices, PluginManager } from "./index";
 
 export const DATAVIEW_PLUGIN_ID = "dataview";

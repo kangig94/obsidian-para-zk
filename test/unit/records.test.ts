@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasOwn, isRecord } from "../../src/infra/records";
+import { hasOwn, isRecord } from "../../src/records";
 
 describe("isRecord", () => {
   it("accepts plain objects", () => {

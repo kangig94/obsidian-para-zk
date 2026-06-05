@@ -1,5 +1,5 @@
 import type { App } from "obsidian";
-import { isRecord } from "../infra/records";
+import { isRecord } from "../records";
 import type { SetupResult, ParaZkSettings } from "../types";
 import { normalizeVaultPath } from "../vault/paths";
 

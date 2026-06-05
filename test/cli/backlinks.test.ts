@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { backlinkReadInstrumentation } from "../../src/workflows/surfaces";
+import { backlinkReadInstrumentation } from "../../src/workflows";
 import { createCliHarness, type CliHarness } from "../harness/cli";
 
 let cli: CliHarness;

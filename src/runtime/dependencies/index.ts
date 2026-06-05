@@ -1,5 +1,5 @@
 import { App, requestUrl, type PluginManifest } from "obsidian";
-import { isRecord } from "../../infra/records";
+import { isRecord } from "../../records";
 import type { DependencyResult, ParaZkSettings } from "../../types";
 import {
   customSortDependencyConfiguration,

@@ -1,18 +1,5 @@
-import { isRecord } from "../infra/records";
-
-export type CollectionKind = "task" | "reference" | "backlink";
-
-export type CollectionReadOptions = {
-  offset?: number;
-  limit?: number | "all";
-  query?: string;
-  type?: string;
-  checkbox?: string;
-  priority?: string;
-  dueBefore?: string;
-  dueAfter?: string;
-  refKind?: string;
-};
+import { isRecord } from "../records";
+import type { CollectionKind, CollectionReadOptions } from "./context";
 
 type NormalizedCollectionReadOptions = {
   offset: number;

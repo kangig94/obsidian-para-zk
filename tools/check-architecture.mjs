@@ -92,7 +92,7 @@ function checkLayerBoundaries(sourceFiles) {
       if (source.startsWith("src/ux/") && targetPath.startsWith("src/cli/")) {
         violations.push(`${source} imports ${targetPath}; UX must not depend on CLI`);
       }
-      if ((source === "src/workflows.ts" || source === "src/templates.ts")
+      if ((source.startsWith("src/workflows/") || source === "src/templates.ts")
         && (targetPath.startsWith("src/cli/") || targetPath.startsWith("src/ux/") || targetPath.startsWith("src/runtime/"))) {
         violations.push(`${source} imports ${targetPath}; core workflow/template modules must stay UI/runtime independent`);
       }

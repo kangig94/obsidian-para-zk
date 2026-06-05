@@ -1,53 +1,96 @@
-import { TFile, type App } from "obsidian";
-import { hasOwn, isRecord } from "../infra/records";
+import { TFile } from "obsidian";
+import { hasOwn, isRecord } from "../records";
 import {
   fileFrontmatter,
   readFileFrontmatterFresh,
   type Frontmatter
-} from "../vault/note-frontmatter";
-import {
-  canonicalWikiLink,
-  isExternalReference,
-  normalizedReferenceTargetWithSubpath,
-  parseMarkdownLink,
-  parseWikiLink,
-  referenceTargetWithSubpath,
-  splitObsidianSubpath
-} from "./reference-targets";
+} from "../vault/frontmatter";
+import { normalizeVaultPath } from "../vault/paths";
+import type {
+  AddReferenceOptions,
+  AddReferenceResult,
+  ReferenceMutationResult,
+  ReferenceRead,
+  ReferenceStoredItem,
+  ReferenceWritableField,
+  ReferenceWriteInput,
+  WorkflowContext
+} from "./context";
+import { resolveRequiredFile } from "./locations";
 
-export type ReferenceContext = {
-  app: App;
-};
+export function pathBasenameWithoutExtension(path: string): string {
+  const last = path.split("/").filter(Boolean).pop() ?? path;
+  return last.replace(/\.md$/i, "");
+}
 
-type ReferenceKind = "url" | "note" | "file" | "wiki" | "text";
+export function parseWikiLink(value: string): { target: string; alias?: string } | undefined {
+  const match = value.trim().match(/^\[\[([^\]|]+)(?:\|([^\]]*))?\]\]$/);
+  const target = match?.[1]?.trim();
+  if (!target) return undefined;
+  return {
+    target,
+    ...(match?.[2] !== undefined ? { alias: match[2].trim() } : {})
+  };
+}
 
-export type ReferenceStoredItem = string | {
-  link: string;
-  description?: string;
-};
+export function parseMarkdownLink(value: string): { target: string } | undefined {
+  const match = value.trim().match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+  const text = match?.[1]?.trim();
+  const target = match?.[2]?.trim();
+  if (!text || !target) return undefined;
+  return { target };
+}
 
-export type ReferenceRead = {
-  link: string;
-  kind: ReferenceKind;
-  description?: string;
-  path?: string;
-  target?: string;
-};
+export function splitObsidianSubpath(value: string): { base: string; subpath: string } {
+  const normalizedSeparators = value.trim().replace(/\\/g, "/");
+  const hash = normalizedSeparators.indexOf("#");
+  if (hash === -1) {
+    return {
+      base: normalizeVaultPath(normalizedSeparators),
+      subpath: ""
+    };
+  }
+  return {
+    base: normalizeVaultPath(normalizedSeparators.slice(0, hash)),
+    subpath: normalizedSeparators.slice(hash).trim()
+  };
+}
 
-export type ReferenceWritableField = "link" | "description";
+export function normalizedReferenceTargetWithSubpath(value: string): string {
+  const split = splitObsidianSubpath(value);
+  return referenceTargetWithSubpath(split.base, split.subpath);
+}
 
-export type ReferenceWriteInput = {
-  link: unknown;
-  description?: unknown;
-  position?: unknown;
-};
+export function referenceTargetWithSubpath(base: string, subpath: string): string {
+  return `${base}${subpath}`;
+}
 
-export type ReferenceMutationResult = {
-  changed: boolean;
-  index: number;
-  link: string;
-  added?: boolean;
-};
+export function canonicalWikiLink(target: string): string {
+  return `[[${target}]]`;
+}
+
+export function isExternalReference(value: string): boolean {
+  const trimmed = value.trim();
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) || /^(mailto|tel):/i.test(trimmed);
+}
+
+
+export async function addReference(ctx: WorkflowContext, options: AddReferenceOptions): Promise<AddReferenceResult> {
+  const source = resolveRequiredFile(ctx, options.sourcePath, "source note");
+  const reference = await insertReferenceItem(ctx, source, {
+    link: options.target,
+    ...(options.description !== undefined ? { description: options.description } : {})
+  });
+  if (options.open) await ctx.app.workspace.getLeaf(true).openFile(source);
+  return {
+    path: source.path,
+    title: source.basename,
+    index: reference.index,
+    link: reference.link,
+    added: reference.added === true,
+    opened: options.open || undefined
+  };
+}
 
 type NormalizedReferenceItem = {
   link: string;
@@ -59,18 +102,18 @@ type ParsedReferenceTarget = {
   target: string;
 };
 
-export function readReferenceItems(ctx: ReferenceContext, file: TFile): ReferenceRead[] {
+export function readReferenceItems(ctx: WorkflowContext, file: TFile): ReferenceRead[] {
   return referenceItemsFromFrontmatter(fileFrontmatter(ctx, file))
     .map((item) => deriveReferenceRead(ctx, file, item));
 }
 
-export async function readReferenceItemsFresh(ctx: ReferenceContext, file: TFile): Promise<ReferenceRead[]> {
+export async function readReferenceItemsFresh(ctx: WorkflowContext, file: TFile): Promise<ReferenceRead[]> {
   return referenceItemsFromFrontmatter(await readFileFrontmatterFresh(ctx, file))
     .map((item) => deriveReferenceRead(ctx, file, item));
 }
 
 export async function insertReferenceItem(
-  ctx: ReferenceContext,
+  ctx: WorkflowContext,
   file: TFile,
   input: ReferenceWriteInput
 ): Promise<ReferenceMutationResult> {
@@ -107,7 +150,7 @@ export async function insertReferenceItem(
 }
 
 export async function updateReferenceItem(
-  ctx: ReferenceContext,
+  ctx: WorkflowContext,
   file: TFile,
   index: number,
   patch: {
@@ -160,7 +203,7 @@ export async function updateReferenceItem(
 }
 
 export async function setReferenceItemField(
-  ctx: ReferenceContext,
+  ctx: WorkflowContext,
   file: TFile,
   index: number,
   field: string,
@@ -171,7 +214,7 @@ export async function setReferenceItemField(
 }
 
 export async function deleteReferenceItem(
-  ctx: ReferenceContext,
+  ctx: WorkflowContext,
   file: TFile,
   index: number
 ): Promise<ReferenceMutationResult> {
@@ -187,7 +230,7 @@ export async function deleteReferenceItem(
 }
 
 export async function reorderReferenceItems(
-  ctx: ReferenceContext,
+  ctx: WorkflowContext,
   file: TFile,
   links: string[]
 ): Promise<{ changed: boolean; items: ReferenceRead[] }> {
@@ -260,7 +303,7 @@ function normalizeReferenceItem(value: {
 }
 
 async function writeReferenceItems(
-  ctx: ReferenceContext,
+  ctx: WorkflowContext,
   file: TFile,
   items: NormalizedReferenceItem[]
 ): Promise<void> {
@@ -314,7 +357,7 @@ function normalizeReferenceOptionalField(value: unknown, key: "description"): st
   return trimmed ? trimmed : undefined;
 }
 
-function deriveReferenceRead(ctx: ReferenceContext, file: TFile, item: NormalizedReferenceItem): ReferenceRead {
+function deriveReferenceRead(ctx: WorkflowContext, file: TFile, item: NormalizedReferenceItem): ReferenceRead {
   const link = item.link;
   const wiki = parseWikiLink(link);
   let derived: ReferenceRead;
@@ -332,7 +375,7 @@ function deriveReferenceRead(ctx: ReferenceContext, file: TFile, item: Normalize
   };
 }
 
-function deriveWikiReferenceRead(ctx: ReferenceContext, file: TFile, link: string, target: string): ReferenceRead {
+function deriveWikiReferenceRead(ctx: WorkflowContext, file: TFile, link: string, target: string): ReferenceRead {
   const resolved = resolveWikiReferenceFile(ctx, file, target);
   const normalized = normalizedReferenceTargetWithSubpath(target);
   if (resolved) {
@@ -351,7 +394,7 @@ function deriveWikiReferenceRead(ctx: ReferenceContext, file: TFile, link: strin
 
 // Dedupe identity for a stored reference link. Resolution-based so two textual forms of
 // the same vault target collide, while distinct Obsidian subpaths remain distinct.
-function referenceDedupeKey(ctx: ReferenceContext, source: TFile, link: string): string {
+function referenceDedupeKey(ctx: WorkflowContext, source: TFile, link: string): string {
   const wiki = parseWikiLink(link);
   if (wiki) {
     const resolved = resolveWikiReferenceFile(ctx, source, wiki.target);
@@ -363,7 +406,7 @@ function referenceDedupeKey(ctx: ReferenceContext, source: TFile, link: string):
 }
 
 function canonicalizeReferenceTarget(
-  ctx: ReferenceContext,
+  ctx: WorkflowContext,
   source: TFile,
   target: unknown
 ): {
@@ -447,7 +490,7 @@ function parseReferenceTargetInput(value: string): ParsedReferenceTarget {
 }
 
 function resolveWikiReferenceFile(
-  ctx: ReferenceContext,
+  ctx: WorkflowContext,
   source: TFile,
   target: string
 ): { file: TFile; subpath: string } | undefined {
@@ -471,7 +514,7 @@ function resolveWikiReferenceFile(
 }
 
 function resolveRawReferenceFile(
-  ctx: ReferenceContext,
+  ctx: WorkflowContext,
   source: TFile,
   target: string
 ): { file: TFile; subpath: string } | undefined {
@@ -488,4 +531,63 @@ function resolveRawReferenceFile(
     file,
     subpath: split.subpath
   };
+}
+
+
+export function stringReferencesAnyTarget(
+  ctx: WorkflowContext,
+  sourcePath: string,
+  value: string,
+  targets: TFile[]
+): boolean {
+  const wikiTarget = readWikiLinkPath(value);
+  if (wikiTarget) return linkReferencesAnyTarget(ctx, sourcePath, wikiTarget, targets);
+
+  const markdown = parseMarkdownLink(value);
+  if (markdown) {
+    const target = splitObsidianSubpath(markdown.target).base;
+    return target ? linkReferencesAnyTarget(ctx, sourcePath, target, targets) : false;
+  }
+
+  return bareStringReferencesAnyTarget(ctx, sourcePath, value, targets);
+}
+
+function linkReferencesAnyTarget(
+  ctx: WorkflowContext,
+  sourcePath: string,
+  linkPath: string,
+  targets: TFile[]
+): boolean {
+  const targetPaths = new Set(targets.map((target) => target.path));
+  const resolved = resolveLinkReference(ctx, sourcePath, linkPath);
+  if (resolved) return targetPaths.has(resolved.path);
+
+  const normalized = normalizeVaultPath(linkPath.split("#")[0]);
+  return targets.some((target) => normalized === target.path || normalized === target.basename);
+}
+
+function bareStringReferencesAnyTarget(
+  ctx: WorkflowContext,
+  sourcePath: string,
+  value: string,
+  targets: TFile[]
+): boolean {
+  const targetPaths = new Set(targets.map((target) => target.path));
+  if (targetPaths.has(normalizeVaultPath(value))) return true;
+
+  const resolved = resolveLinkReference(ctx, sourcePath, value);
+  return resolved ? targetPaths.has(resolved.path) : false;
+}
+
+function resolveLinkReference(ctx: WorkflowContext, sourcePath: string, linkPath: string): TFile | null {
+  if (!linkPath.trim()) return null;
+  const split = splitObsidianSubpath(linkPath);
+  const withSubpath = referenceTargetWithSubpath(split.base, split.subpath);
+  return ctx.app.metadataCache.getFirstLinkpathDest(withSubpath, sourcePath)
+    ?? (split.base ? ctx.app.metadataCache.getFirstLinkpathDest(split.base, sourcePath) : null);
+}
+
+function readWikiLinkPath(value: string): string | undefined {
+  const match = value.trim().match(/^\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]$/);
+  return match?.[1]?.trim();
 }

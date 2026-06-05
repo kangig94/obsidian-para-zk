@@ -26,3 +26,14 @@ export function parentFolder(path: string): string {
   const index = normalized.lastIndexOf("/");
   return index === -1 ? "" : normalized.slice(0, index);
 }
+
+export function uniqueFiles(files: TFile[]): TFile[] {
+  const seen = new Set<string>();
+  const result: TFile[] = [];
+  for (const file of files) {
+    if (seen.has(file.path)) continue;
+    seen.add(file.path);
+    result.push(file);
+  }
+  return result;
+}
