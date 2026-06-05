@@ -62,7 +62,7 @@ import { ROOT_ID_FRONTMATTER_KEY, insertRootTask, newRootId, rootIdFromFrontmatt
 export async function createProject(ctx: WorkflowContext, options: CreateProjectOptions): Promise<CreateProjectResult> {
   const title = requireTitle(options.title, "project title");
   const target = uniqueFolderStyleMarkdownPath(ctx, ctx.settings.paths.projectsFolder, title);
-  await ensureFolder(ctx.app, target.folder);
+  await ensureFolder(ctx.host, target.folder);
 
   const createdAt = localDateTimeSpace();
   const statusCode = readOptionalCode(options.status, parseProjectStatusCode, "status", PROJECT_STATUS_CODE_HELP);
@@ -84,7 +84,7 @@ export async function createProject(ctx: WorkflowContext, options: CreateProject
   });
 
   const tags = localePack(ctx.settings.locale).tags;
-  await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+  await ctx.host.processFrontMatter(file, (fm) => {
     fm.type = "project";
     if (areaLinks.length > 0) fm.areas = areaLinks;
     fm.status = fm.status ?? status;
@@ -103,7 +103,7 @@ export async function createProject(ctx: WorkflowContext, options: CreateProject
 export async function createArea(ctx: WorkflowContext, options: CreateAreaOptions): Promise<NoteResult> {
   const title = requireTitle(options.title, "area title");
   const target = uniqueFolderStyleMarkdownPath(ctx, ctx.settings.paths.areasFolder, title);
-  await ensureFolder(ctx.app, target.folder);
+  await ensureFolder(ctx.host, target.folder);
 
   const createdAt = localDateTimeSpace();
   const parent = resolveOptionalFile(ctx, options.parentPath);
@@ -114,7 +114,7 @@ export async function createArea(ctx: WorkflowContext, options: CreateAreaOption
   });
 
   const tags = localePack(ctx.settings.locale).tags;
-  await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+  await ctx.host.processFrontMatter(file, (fm) => {
     fm.type = "area";
     fm.tags = [`${tags.area}/${slugify(target.title)}`];
     if (parent) fm.parent = linkToFile(parent);
@@ -129,7 +129,7 @@ export async function createResource(ctx: WorkflowContext, options: CreateResour
   const title = requireTitle(options.title, "resource title");
   const source = resolveOptionalFile(ctx, options.sourcePath);
   const createdAt = localDateTimeSpace();
-  const path = await uniqueMarkdownPath(ctx.app, joinVaultPath(ctx.settings.paths.resourcesFolder, `${title}.md`));
+  const path = await uniqueMarkdownPath(ctx.host, joinVaultPath(ctx.settings.paths.resourcesFolder, `${title}.md`));
   const file = await createMarkdownFile(ctx, "resource", path, {
     created: createdAt,
     slug: slugify(title),
@@ -137,7 +137,7 @@ export async function createResource(ctx: WorkflowContext, options: CreateResour
   });
 
   const tags = localePack(ctx.settings.locale).tags;
-  await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+  await ctx.host.processFrontMatter(file, (fm) => {
     fm.type = "resource";
     fm.tags = [`${tags.resource}/${slugify(title)}`];
     applyCreatedUpdatedDefaults(fm, createdAt);
@@ -164,7 +164,7 @@ export async function createSubnote(ctx: WorkflowContext, options: CreateSubnote
   const subnoteType = subnoteTypeCode ?? "free";
   const path = joinVaultPath(parent.childFolder, `${title}.md`);
   let created = true;
-  let file = ctx.app.vault.getFileByPath(path);
+  let file = ctx.host.getFile(path);
 
   if (!file) {
     file = await createMarkdownFile(ctx, "subnote", path, {
@@ -172,7 +172,7 @@ export async function createSubnote(ctx: WorkflowContext, options: CreateSubnote
       subnote_type: subnoteType,
       cursor: ""
     });
-    await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+    await ctx.host.processFrontMatter(file, (fm) => {
       fm.type = fm.type || "doc";
       fm.parent = linkToFile(parent.file);
       fm.subnote_type = fm.subnote_type ?? subnoteType;
@@ -193,12 +193,12 @@ export async function createSubarea(ctx: WorkflowContext, options: CreateSubarea
   const title = requireTitle(options.title, "subarea title");
   const parent = await ensureFolderStyleParent(ctx, resolveRequiredFile(ctx, options.sourcePath, "source area"));
   const subareaFolder = joinVaultPath(parent.childFolder, title);
-  await ensureFolder(ctx.app, subareaFolder);
+  await ensureFolder(ctx.host, subareaFolder);
 
   const createdAt = localDateTimeSpace();
   const path = joinVaultPath(subareaFolder, `${title}.md`);
   let created = true;
-  let file = ctx.app.vault.getFileByPath(path);
+  let file = ctx.host.getFile(path);
   if (!file) {
     file = await createMarkdownFile(ctx, "area", path, {
       created: createdAt,
@@ -210,11 +210,11 @@ export async function createSubarea(ctx: WorkflowContext, options: CreateSubarea
   }
 
   const tags = localePack(ctx.settings.locale).tags;
-  const parentFrontmatter = parseFrontmatterFromContent(await ctx.app.vault.read(parent.file));
+  const parentFrontmatter = parseFrontmatterFromContent(await ctx.host.read(parent.file));
   const parentTags = frontmatterLinks(parentFrontmatter.tags);
   const parentNamespace = parentTags.find((tag) => tag.startsWith(`${tags.area}/`)) ?? `${tags.area}/${slugify(parent.file.basename)}`;
   const childNamespace = `${parentNamespace}/${slugify(title)}`;
-  await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+  await ctx.host.processFrontMatter(file, (fm) => {
     fm.type = "area";
     fm.parent = linkToFile(parent.file);
     fm.tags = options.inheritParentTag === false
@@ -269,11 +269,11 @@ export async function createRetro(ctx: WorkflowContext, options: CreateRetroOpti
 
   const name = sanitizeFileName(options.title || defaultName) || "General";
   const folder = joinVaultPath(ctx.settings.paths.retrosFolder, weekSegment);
-  await ensureFolder(ctx.app, folder);
+  await ensureFolder(ctx.host, folder);
 
   const path = joinVaultPath(folder, `${sanitizeFileName(`Retro-${name}-${weekSegment}`)}.md`);
   let created = true;
-  let file = ctx.app.vault.getFileByPath(path);
+  let file = ctx.host.getFile(path);
   if (!file) {
     file = await createMarkdownFile(ctx, "retro", path, {
       created: createdAt,
@@ -292,7 +292,7 @@ export async function createRetro(ctx: WorkflowContext, options: CreateRetroOpti
   }
 
   const tags = localePack(ctx.settings.locale).tags;
-  await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+  await ctx.host.processFrontMatter(file, (fm) => {
     fm.type = "retro";
     if (project) fm.project = project;
     if (areas.length > 0) fm.areas = areas;
@@ -317,8 +317,8 @@ export async function createZk(ctx: WorkflowContext, options: CreateZkOptions): 
   const kind = readOptionalCode(options.kind, parseZkKind, "kind", ZK_KIND_CODE_HELP) ?? "Fleeting";
   const maturityCode = readOptionalCode(options.maturity, parseMaturityCode, "maturity", MATURITY_CODE_HELP);
   const folder = folderForZkKind(ctx.settings, kind);
-  await ensureFolder(ctx.app, folder);
-  const path = await uniqueMarkdownPath(ctx.app, joinVaultPath(folder, `${title}.md`));
+  await ensureFolder(ctx.host, folder);
+  const path = await uniqueMarkdownPath(ctx.host, joinVaultPath(folder, `${title}.md`));
   const file = await createZkFile(ctx, kind, path, title, { maturityCode });
 
   await openIfRequested(ctx, file, options.open);
@@ -351,7 +351,7 @@ export async function createZkFile(
   });
 
   const tags = localePack(ctx.settings.locale).tags;
-  await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+  await ctx.host.processFrontMatter(file, (fm) => {
     fm.type = `zk_${kind.toLowerCase()}`;
     fm.tags = [`${tags.knowledge}/${slugify(title)}`];
     applyCreatedUpdatedDefaults(fm, createdAt);
@@ -372,16 +372,16 @@ export async function createMarkdownFile(
   path: string,
   variables: TemplateVariables
 ): Promise<TFile> {
-  await ensureFolder(ctx.app, parentFolder(path));
+  await ensureFolder(ctx.host, parentFolder(path));
   const template = await readTemplate(ctx, templateName);
   const content = applyTemplateVariables(template, variables);
-  return ctx.app.vault.create(path, content);
+  return ctx.host.create(path, content);
 }
 
 async function readTemplate(ctx: WorkflowContext, templateName: TemplateName): Promise<string> {
   const templatePath = joinVaultPath(ctx.settings.paths.managedTemplatesFolder, `template_${templateName}.md`);
-  const templateFile = ctx.app.vault.getFileByPath(templatePath);
-  if (templateFile) return ctx.app.vault.read(templateFile);
+  const templateFile = ctx.host.getFile(templatePath);
+  if (templateFile) return ctx.host.read(templateFile);
   return renderTemplate(templateName, ctx.settings);
 }
 
@@ -437,7 +437,7 @@ async function resolveProjectAreas(ctx: WorkflowContext, areaTitles: string[] | 
     }
 
     const created = await createArea(ctx, { title, open: false });
-    const file = ctx.app.vault.getFileByPath(created.path);
+    const file = ctx.host.getFile(created.path);
     if (!file) throw new Error(`created area file not found: ${created.path}`);
     results.push(areaResult(file, true));
   }
@@ -456,7 +456,7 @@ function areaResult(file: TFile, created: boolean): ProjectAreaResult {
 
 export async function openIfRequested(ctx: WorkflowContext, file: TFile, open?: boolean): Promise<void> {
   if (!open) return;
-  await ctx.app.workspace.getLeaf(true).openFile(file);
+  await ctx.host.openFile(file);
 }
 
 function frontmatterListBlock(values: string[] | undefined): string {

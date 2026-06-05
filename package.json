@@ -13,7 +13,8 @@
     "smoke:vault": "node tools/smoke-test-vault.mjs",
     "typecheck": "tsc --noEmit",
     "lint:architecture": "node tools/check-architecture.mjs",
-    "lint": "npm run lint:architecture && npm run typecheck"
+    "lint:deadcode": "knip",
+    "lint": "npm run lint:architecture && npm run lint:deadcode && npm run typecheck"
   },
   "keywords": [
     "obsidian",
@@ -26,6 +27,7 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/node": "^25.9.1",
     "esbuild": "^0.28.0",
+    "knip": "^6.15.0",
     "obsidian": "^1.12.3",
     "typescript": "^6.0.3",
     "vitest": "^4.1.8",

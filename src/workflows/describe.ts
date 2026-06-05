@@ -7,10 +7,9 @@ import { readReferenceItems } from "./references";
 import { readRootTaskMap } from "./tasks";
 import { uniqueStrings } from "../text";
 
-type ReadMap = Record<string, unknown>;
 type ReadCollectionKind = CollectionKind;
 
-export type SectionTransformContext = {
+type SectionTransformContext = {
   ctx: WorkflowContext;
   file: TFile;
   content: string;
@@ -35,7 +34,7 @@ export type ReadSurfaceSpec = {
   children?: boolean;
 };
 
-export const BACKLINK_READ_SECTION: ReadSectionSpec = {
+const BACKLINK_READ_SECTION: ReadSectionSpec = {
   key: "backlinks",
   labelKey: "backlinks",
   transform: readBacklinks,
@@ -115,7 +114,7 @@ export const RETRO_READ_SPEC: ReadSurfaceSpec = {
   ]
 };
 
-export const DOC_READ_SPEC: ReadSurfaceSpec = {
+const DOC_READ_SPEC: ReadSurfaceSpec = {
   frontmatter: ["subnote_type"],
   sections: [
     BACKLINK_READ_SECTION
@@ -123,7 +122,7 @@ export const DOC_READ_SPEC: ReadSurfaceSpec = {
   body: true
 };
 
-export const ZK_FLEETING_READ_SPEC: ReadSurfaceSpec = {
+const ZK_FLEETING_READ_SPEC: ReadSurfaceSpec = {
   frontmatter: ["processed"],
   sections: [
     { key: "thought_summary", labelKey: "thoughtSummary" },
@@ -134,7 +133,7 @@ export const ZK_FLEETING_READ_SPEC: ReadSurfaceSpec = {
   ]
 };
 
-export const ZK_LITERATURE_READ_SPEC: ReadSurfaceSpec = {
+const ZK_LITERATURE_READ_SPEC: ReadSurfaceSpec = {
   frontmatter: ["sourceTitle", "authors", "published", "url"],
   sections: [
     { key: "highlight_block", labelKey: "highlightBlock" },
@@ -146,7 +145,7 @@ export const ZK_LITERATURE_READ_SPEC: ReadSurfaceSpec = {
   ]
 };
 
-export const ZK_PERMANENT_READ_SPEC: ReadSurfaceSpec = {
+const ZK_PERMANENT_READ_SPEC: ReadSurfaceSpec = {
   frontmatter: ["maturity", "aliases"],
   sections: [
     { key: "one_sentence_summary", labelKey: "oneSentenceSummary" },
@@ -158,7 +157,7 @@ export const ZK_PERMANENT_READ_SPEC: ReadSurfaceSpec = {
   ]
 };
 
-export const NOTE_READ_SPEC: ReadSurfaceSpec = {
+const NOTE_READ_SPEC: ReadSurfaceSpec = {
   frontmatter: [],
   sections: [
     BACKLINK_READ_SECTION
@@ -187,7 +186,7 @@ export function readSurfaceTopLevelKeys(spec: ReadSurfaceSpec): string[] {
   return keys;
 }
 
-export function readKeyHints(spec: ReadSurfaceSpec): string[] {
+function readKeyHints(spec: ReadSurfaceSpec): string[] {
   const keys: string[] = [];
   if (spec.frontmatter.length > 0) keys.push("frontmatter", `frontmatter/{${spec.frontmatter.join("|")}}`);
   for (const section of spec.sections ?? []) {
@@ -235,7 +234,7 @@ function collectionMap(spec: ReadSurfaceSpec): Record<string, ReadCollectionKind
   return collections;
 }
 
-export function writeKeyHints(spec: ReadSurfaceSpec): string[] {
+function writeKeyHints(spec: ReadSurfaceSpec): string[] {
   const keys: string[] = [];
   if (spec.frontmatter.length > 0) keys.push(`frontmatter/{${spec.frontmatter.join("|")}}=set`);
   for (const section of spec.sections ?? []) {

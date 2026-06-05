@@ -83,18 +83,18 @@ async function renameFolderStyleNote(
     const targetFolder = joinVaultPath(parentFolder(folder.path), newTitle);
     toPath = joinVaultPath(targetFolder, `${newTitle}.md`);
     assertVacantPath(ctx, targetFolder);
-    const conflictingFile = ctx.app.vault.getAbstractFileByPath(joinVaultPath(folder.path, `${newTitle}.md`));
+    const conflictingFile = ctx.host.getAbstractFile(joinVaultPath(folder.path, `${newTitle}.md`));
     if (conflictingFile && conflictingFile !== file) {
       throw new Error(`target already exists: ${joinVaultPath(folder.path, `${newTitle}.md`)}`);
     }
-    await ctx.app.fileManager.renameFile(folder, targetFolder);
+    await ctx.host.renameFile(folder, targetFolder);
 
-    renamed = ctx.app.vault.getFileByPath(toPath) ?? await renameMovedFolderStyleMain(ctx, targetFolder, file.name, toPath);
+    renamed = ctx.host.getFile(toPath) ?? await renameMovedFolderStyleMain(ctx, targetFolder, file.name, toPath);
   } else {
     toPath = joinVaultPath(parentFolder(file.path), `${newTitle}.md`);
     assertVacantPath(ctx, toPath);
-    await ctx.app.fileManager.renameFile(file, toPath);
-    renamed = ctx.app.vault.getFileByPath(toPath) ?? file;
+    await ctx.host.renameFile(file, toPath);
+    renamed = ctx.host.getFile(toPath) ?? file;
   }
 
   const tagUpdate = await updateTitleDerivedTag(ctx, renamed, tagDomain, fromTitle, newTitle);
@@ -129,7 +129,7 @@ async function dependentRetroRenamePlans(
 
   const plans: DependentRetroRenamePlan[] = [];
   const seenTargets = new Set<string>();
-  for (const file of ctx.app.vault.getMarkdownFiles()) {
+  for (const file of ctx.host.getMarkdownFiles()) {
     const frontmatter = fileFrontmatter(ctx, file);
     if (readType(frontmatter) !== "retro") continue;
     if (!isSourceScopedRetro(ctx, file, frontmatter, source, domain)) continue;
@@ -143,7 +143,7 @@ async function dependentRetroRenamePlans(
     if (seenTargets.has(toPath)) throw new Error(`duplicate dependent retro target: ${toPath}`);
     seenTargets.add(toPath);
 
-    const existing = ctx.app.vault.getAbstractFileByPath(toPath);
+    const existing = ctx.host.getAbstractFile(toPath);
     if (existing && existing !== file) throw new Error(`target already exists: ${toPath}`);
     plans.push({
       fromPath: file.path,
@@ -216,11 +216,11 @@ async function renameDependentRetros(
 ): Promise<Array<{ fromPath: string; toPath: string }>> {
   const renamed: Array<{ fromPath: string; toPath: string }> = [];
   for (const plan of plans) {
-    const file = ctx.app.vault.getFileByPath(plan.fromPath);
+    const file = ctx.host.getFile(plan.fromPath);
     if (!file) continue;
-    await ensureFolder(ctx.app, parentFolder(plan.toPath));
-    await ctx.app.fileManager.renameFile(file, plan.toPath);
-    const moved = ctx.app.vault.getFileByPath(plan.toPath);
+    await ensureFolder(ctx.host, parentFolder(plan.toPath));
+    await ctx.host.renameFile(file, plan.toPath);
+    const moved = ctx.host.getFile(plan.toPath);
     if (!moved) throw new Error(`failed to rename dependent retro ${plan.fromPath} to ${plan.toPath}`);
     renamed.push({
       fromPath: plan.fromPath,
@@ -237,12 +237,12 @@ async function renameMovedFolderStyleMain(
   toPath: string
 ): Promise<TFile> {
   const movedPath = joinVaultPath(targetFolder, oldFileName);
-  const movedMain = ctx.app.vault.getFileByPath(movedPath);
+  const movedMain = ctx.host.getFile(movedPath);
   if (!movedMain) throw new Error(`failed to find moved note at ${movedPath}`);
 
   assertVacantPath(ctx, toPath);
-  await ctx.app.fileManager.renameFile(movedMain, toPath);
-  return ctx.app.vault.getFileByPath(toPath) ?? movedMain;
+  await ctx.host.renameFile(movedMain, toPath);
+  return ctx.host.getFile(toPath) ?? movedMain;
 }
 
 async function renameFlatNote(
@@ -267,8 +267,8 @@ async function renameFlatNote(
 
   const toPath = joinVaultPath(parentFolder(file.path), `${newTitle}.md`);
   assertVacantPath(ctx, toPath);
-  await ctx.app.fileManager.renameFile(file, toPath);
-  const renamed = ctx.app.vault.getFileByPath(toPath) ?? file;
+  await ctx.host.renameFile(file, toPath);
+  const renamed = ctx.host.getFile(toPath) ?? file;
   await updateTitleDerivedTag(ctx, renamed, tagDomain, fromTitle, newTitle);
   return {
     path: toPath,
@@ -297,7 +297,7 @@ async function updateTitleDerivedTag(
   const nextTag = `${activeTagPrefix}/${slugify(title)}`;
   const namespaceMoves: TagNamespaceMove[] = [];
 
-  await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+  await ctx.host.processFrontMatter(file, (fm) => {
     const existing = frontmatterLinks(fm.tags);
     let replaced = false;
     const next = existing.map((tag) => {
@@ -375,14 +375,14 @@ async function updateAreaDescendantTagPrefixes(
   if (namespaceMoves.length === 0) return;
 
   const folder = parentFolder(renamedAreaPath);
-  const descendants = ctx.app.vault.getMarkdownFiles().filter((file) => {
+  const descendants = ctx.host.getMarkdownFiles().filter((file) => {
     return file.path !== renamedAreaPath
       && isInFolder(file, folder)
       && readType(fileFrontmatter(ctx, file)) === "area";
   });
 
   for (const descendant of descendants) {
-    await ctx.app.fileManager.processFrontMatter(descendant, (fm) => {
+    await ctx.host.processFrontMatter(descendant, (fm) => {
       const existing = frontmatterLinks(fm.tags);
       if (existing.length === 0) return;
       const next = existing.map((tag) => renameTagNamespace(tag, namespaceMoves));

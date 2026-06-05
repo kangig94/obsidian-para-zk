@@ -1,4 +1,5 @@
-import { parseYaml, type App, type TFile } from "obsidian";
+import { parseYaml, type TFile } from "obsidian";
+import type { WorkflowHost } from "./host";
 import { yamlFrontmatterRange } from "./sections";
 
 export function yamlScalar(value: string | undefined): string {
@@ -15,17 +16,17 @@ export function frontmatterLinks(value: unknown): string[] {
 export type Frontmatter = Record<string, unknown>;
 
 export type FrontmatterContext = {
-  app: App;
+  host: Pick<WorkflowHost, "getFileCache" | "read">;
 };
 
 export function fileFrontmatter(ctx: FrontmatterContext, file: TFile): Frontmatter {
-  return ctx.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+  return ctx.host.getFileCache(file)?.frontmatter ?? {};
 }
 
 // metadataCache.getFileCache() lags behind processFrontMatter writes (the cache updates
 // asynchronously), so mutation/render paths should parse current file content first.
 export async function readFileFrontmatterFresh(ctx: FrontmatterContext, file: TFile): Promise<Frontmatter> {
-  const content = await ctx.app.vault.read(file);
+  const content = await ctx.host.read(file);
   const fresh = parseFrontmatterFromContent(content);
   if (hasFrontmatterKeys(fresh)) return fresh;
 

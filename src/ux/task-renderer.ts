@@ -9,6 +9,7 @@ import {
 import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { localDate } from "../time";
+import { createObsidianHost } from "../vault/host";
 import { parseCodeBlockKeyValues } from "./code-block-args";
 import {
   cycleTaskCheckbox,
@@ -434,7 +435,7 @@ async function updateTaskFromEditor(plugin: ParaZkPluginContext, item: Renderabl
 
 function taskContext(plugin: ParaZkPluginContext): WorkflowContext {
   return {
-    app: plugin.app,
+    host: createObsidianHost(plugin.app),
     settings: plugin.settings
   };
 }

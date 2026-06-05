@@ -75,7 +75,7 @@ async function deleteDomainNote(
   const cleaned = await cleanupStructuredReferences(ctx, deletedFiles, deletedPathSet);
   const trashMethod = await trashAbstractFile(ctx, container);
   for (const shard of taskShards) {
-    if (ctx.app.vault.getAbstractFileByPath(shard.path)) await trashAbstractFile(ctx, shard);
+    if (ctx.host.getAbstractFile(shard.path)) await trashAbstractFile(ctx, shard);
   }
 
   return {
@@ -110,7 +110,7 @@ function collectAbstractPaths(file: TAbstractFile): string[] {
 
 function deletedMarkdownFiles(ctx: WorkflowContext, container: TAbstractFile): TFile[] {
   if (container instanceof TFile) return [container];
-  return ctx.app.vault.getMarkdownFiles().filter((file) => isInFolder(file, container.path));
+  return ctx.host.getMarkdownFiles().filter((file) => isInFolder(file, container.path));
 }
 
 async function taskShardsForDeletedFiles(ctx: WorkflowContext, files: TFile[]): Promise<TFile[]> {
@@ -123,15 +123,12 @@ async function taskShardsForDeletedFiles(ctx: WorkflowContext, files: TFile[]): 
 }
 
 async function trashAbstractFile(ctx: WorkflowContext, file: TAbstractFile): Promise<string> {
-  const fileManager = ctx.app.fileManager as typeof ctx.app.fileManager & {
-    trashFile?: (target: TAbstractFile) => Promise<void>;
-  };
-  if (typeof fileManager.trashFile === "function") {
-    await fileManager.trashFile(file);
+  if (typeof ctx.host.trashFile === "function") {
+    await ctx.host.trashFile(file);
     return "fileManager.trashFile";
   }
 
-  await ctx.app.vault.trash(file, false);
+  await ctx.host.trash(file, false);
   return "vault.trash.local";
 }
 
@@ -140,7 +137,7 @@ function incomingLinksForPaths(
   targetPaths: Set<string>,
   deletedPathSet: Set<string>
 ): IncomingLink[] {
-  const resolvedLinks = ctx.app.metadataCache.resolvedLinks;
+  const resolvedLinks = ctx.host.resolvedLinks();
   const incoming: IncomingLink[] = [];
   for (const [sourcePath, targets] of Object.entries(resolvedLinks)) {
     if (deletedPathSet.has(sourcePath)) continue;
@@ -175,11 +172,11 @@ async function cleanupFrontmatterReferences(
 ): Promise<number> {
   let changedKeys = 0;
   const keys = ["areas", "project", "parent", "promoted_to"];
-  for (const file of ctx.app.vault.getMarkdownFiles()) {
+  for (const file of ctx.host.getMarkdownFiles()) {
     if (deletedPathSet.has(file.path)) continue;
     const frontmatter = fileFrontmatter(ctx, file);
     if (!keys.some((key) => frontmatterNeedsTargetCleanup(ctx, file.path, frontmatter[key], targets))) continue;
-    await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+    await ctx.host.processFrontMatter(file, (fm) => {
       for (const key of keys) {
         if (!hasOwn(fm, key)) continue;
         const next = removeTargetFrontmatterLinks(ctx, file.path, fm[key], targets);
@@ -237,13 +234,13 @@ async function cleanupReferenceFrontmatterItems(
   deletedPathSet: Set<string>
 ): Promise<number> {
   let removed = 0;
-  for (const file of ctx.app.vault.getMarkdownFiles()) {
+  for (const file of ctx.host.getMarkdownFiles()) {
     if (deletedPathSet.has(file.path)) continue;
     const frontmatter = fileFrontmatter(ctx, file);
     if (!Array.isArray(frontmatter.references)) continue;
     if (!frontmatter.references.some((item) => referenceFrontmatterItemReferencesAnyTarget(ctx, file.path, item, targets))) continue;
 
-    await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+    await ctx.host.processFrontMatter(file, (fm) => {
       const current = Array.isArray(fm.references) ? fm.references : [];
       const next: unknown[] = [];
       for (const item of current) {

@@ -2,6 +2,7 @@ import { Notice } from "obsidian";
 import { localePack, normalizeLocale } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { isRecord } from "../records";
+import { createObsidianHost } from "../vault/host";
 import type { WorkflowContext } from "../workflows";
 import {
   statusCommandEntries,
@@ -162,7 +163,7 @@ async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: 
 
 function workflowContext(plugin: ParaZkPluginContext): WorkflowContext {
   return {
-    app: plugin.app,
+    host: createObsidianHost(plugin.app),
     settings: plugin.settings
   };
 }

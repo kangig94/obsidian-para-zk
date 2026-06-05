@@ -1,14 +1,12 @@
-import type { App } from "obsidian";
 import type {
-  CaptureResult,
   NoteResult,
   ParaZkSettings,
-  PromotionResult,
   ZkKind
 } from "../types";
+import type { WorkflowHost } from "../vault/host";
 
 export type WorkflowContext = {
-  app: App;
+  host: WorkflowHost;
   settings: ParaZkSettings;
 };
 
@@ -122,31 +120,31 @@ export type CollectionReadOptions = {
   refKind?: string;
 };
 
-export type ReadOptionsWithCollection = {
+type ReadOptionsWithCollection = {
   collection?: CollectionReadOptions;
 };
 
-export type ByTitleSelectorOptions = {
+type ByTitleSelectorOptions = {
   path?: string;
   title?: string;
   key?: string;
   archived?: boolean;
 };
 
-export type ZkSelectorOptions = {
+type ZkSelectorOptions = {
   path?: string;
   title?: string;
   key?: string;
   kind?: string;
 };
 
-export type JournalSelectorOptions = {
+type JournalSelectorOptions = {
   path?: string;
   date?: string;
   key?: string;
 };
 
-export type ReadByTitleOptions = ReadOptionsWithCollection & ByTitleSelectorOptions;
+type ReadByTitleOptions = ReadOptionsWithCollection & ByTitleSelectorOptions;
 export type ReadProjectOptions = ReadByTitleOptions;
 export type ReadAreaOptions = ReadByTitleOptions;
 export type ReadResourceOptions = ReadByTitleOptions;
@@ -171,7 +169,7 @@ export type UpdatePayloadOptions = {
   all?: boolean;
 };
 
-export type UpdateByTitleOptions = ByTitleSelectorOptions & UpdatePayloadOptions;
+type UpdateByTitleOptions = ByTitleSelectorOptions & UpdatePayloadOptions;
 export type UpdateProjectOptions = UpdateByTitleOptions;
 export type UpdateAreaOptions = UpdateByTitleOptions;
 export type UpdateResourceOptions = UpdateByTitleOptions;
@@ -295,7 +293,7 @@ export type RootTaskItem = {
   task: TaskRead;
 };
 
-export type ReferenceKind = "url" | "note" | "file" | "wiki" | "text";
+type ReferenceKind = "url" | "note" | "file" | "wiki" | "text";
 
 export type ReferenceStoredItem = string | {
   link: string;
@@ -355,4 +353,3 @@ export type AddReferenceResult = {
   added: boolean;
   opened?: boolean;
 };
-export type { CaptureResult, NoteResult, PromotionResult, ZkKind };

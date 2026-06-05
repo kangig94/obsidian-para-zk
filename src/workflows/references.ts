@@ -33,7 +33,7 @@ export function parseWikiLink(value: string): { target: string; alias?: string }
   };
 }
 
-export function parseMarkdownLink(value: string): { target: string } | undefined {
+function parseMarkdownLink(value: string): { target: string } | undefined {
   const match = value.trim().match(/^\[([^\]]+)\]\(([^)]+)\)$/);
   const text = match?.[1]?.trim();
   const target = match?.[2]?.trim();
@@ -56,16 +56,16 @@ export function splitObsidianSubpath(value: string): { base: string; subpath: st
   };
 }
 
-export function normalizedReferenceTargetWithSubpath(value: string): string {
+function normalizedReferenceTargetWithSubpath(value: string): string {
   const split = splitObsidianSubpath(value);
   return referenceTargetWithSubpath(split.base, split.subpath);
 }
 
-export function referenceTargetWithSubpath(base: string, subpath: string): string {
+function referenceTargetWithSubpath(base: string, subpath: string): string {
   return `${base}${subpath}`;
 }
 
-export function canonicalWikiLink(target: string): string {
+function canonicalWikiLink(target: string): string {
   return `[[${target}]]`;
 }
 
@@ -81,7 +81,7 @@ export async function addReference(ctx: WorkflowContext, options: AddReferenceOp
     link: options.target,
     ...(options.description !== undefined ? { description: options.description } : {})
   });
-  if (options.open) await ctx.app.workspace.getLeaf(true).openFile(source);
+  if (options.open) await ctx.host.openFile(source);
   return {
     path: source.path,
     title: source.basename,
@@ -308,7 +308,7 @@ async function writeReferenceItems(
   items: NormalizedReferenceItem[]
 ): Promise<void> {
   const stored = items.map(serializeReferenceStoredItem);
-  await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+  await ctx.host.processFrontMatter(file, (fm) => {
     if (stored.length === 0) {
       delete fm.references;
     } else {
@@ -496,8 +496,8 @@ function resolveWikiReferenceFile(
 ): { file: TFile; subpath: string } | undefined {
   const split = splitObsidianSubpath(target);
   const normalized = referenceTargetWithSubpath(split.base, split.subpath);
-  const resolved = ctx.app.metadataCache.getFirstLinkpathDest(normalized, source.path)
-    ?? (split.base ? ctx.app.metadataCache.getFirstLinkpathDest(split.base, source.path) : null);
+  const resolved = ctx.host.getFirstLinkpathDest(normalized, source.path)
+    ?? (split.base ? ctx.host.getFirstLinkpathDest(split.base, source.path) : null);
   if (resolved) {
     return {
       file: resolved,
@@ -525,7 +525,7 @@ function resolveRawReferenceFile(
       subpath: split.subpath
     };
   }
-  const file = ctx.app.vault.getAbstractFileByPath(split.base);
+  const file = ctx.host.getAbstractFile(split.base);
   if (!(file instanceof TFile)) return undefined;
   return {
     file,
@@ -583,8 +583,8 @@ function resolveLinkReference(ctx: WorkflowContext, sourcePath: string, linkPath
   if (!linkPath.trim()) return null;
   const split = splitObsidianSubpath(linkPath);
   const withSubpath = referenceTargetWithSubpath(split.base, split.subpath);
-  return ctx.app.metadataCache.getFirstLinkpathDest(withSubpath, sourcePath)
-    ?? (split.base ? ctx.app.metadataCache.getFirstLinkpathDest(split.base, sourcePath) : null);
+  return ctx.host.getFirstLinkpathDest(withSubpath, sourcePath)
+    ?? (split.base ? ctx.host.getFirstLinkpathDest(split.base, sourcePath) : null);
 }
 
 function readWikiLinkPath(value: string): string | undefined {

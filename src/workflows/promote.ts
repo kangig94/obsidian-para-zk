@@ -1,4 +1,4 @@
-import { type App, TFile } from "obsidian";
+import { TFile } from "obsidian";
 import { localePack } from "../i18n";
 import {
   dateFromCli,
@@ -6,17 +6,16 @@ import {
   localDateTimeSpace,
   localTime
 } from "../time";
-import type { CaptureResult, NoteResult, PromotionResult } from "../types";
-import { yamlScalar } from "../vault/frontmatter";
+import type { CaptureResult, PromotionResult } from "../types";
 import { ensureFolder } from "../vault/files";
+import type { WorkflowHost } from "../vault/host";
 import { joinVaultPath, wikiLink } from "../vault/paths";
 import {
   ENERGY_CODE_HELP,
   MATURITY_CODE_HELP,
   parseEnergyCode,
   parseMaturityCode,
-  type EnergyCode,
-  type MaturityCode
+  type EnergyCode
 } from "../vocabulary";
 import { PROMOTION_ZK_KIND_CODE_HELP, ZK_KIND_CODE_HELP, parsePromotionKind, parseZkKind } from "../zk/kinds";
 import { escapeRegExp } from "../text";
@@ -47,7 +46,7 @@ export async function captureJournal(ctx: WorkflowContext, options: CaptureJourn
   const journal = await ensureJournal(ctx, options);
 
   const t = localePack(ctx.settings.locale);
-  await appendLineUnderHeader(ctx.app, journal.file, t.labels.quickMemo, `- ${timeText} - ${content}`, {
+  await appendLineUnderHeader(ctx.host, journal.file, t.labels.quickMemo, `- ${timeText} - ${content}`, {
     createHeadingLevel: 1,
     ordered: false,
     dedupe: false
@@ -78,8 +77,8 @@ export async function promoteResource(ctx: WorkflowContext, options: PromoteReso
   const maturityCode = readOptionalCode(options.maturity, parseMaturityCode, "maturity", MATURITY_CODE_HELP);
   const title = requireTitle(options.title || source.basename, "ZK title");
   const folder = folderForZkKind(ctx.settings, kind);
-  await ensureFolder(ctx.app, folder);
-  const path = await uniqueMarkdownPath(ctx.app, joinVaultPath(folder, `${title}.md`));
+  await ensureFolder(ctx.host, folder);
+  const path = await uniqueMarkdownPath(ctx.host, joinVaultPath(folder, `${title}.md`));
   const file = await createZkFile(ctx, kind, path, title, { maturityCode });
 
   await insertReferenceItem(ctx, file, { link: wikiLink(source.path) });
@@ -98,12 +97,12 @@ export async function promoteFleeting(ctx: WorkflowContext, options: PromoteFlee
   const maturityCode = readOptionalCode(options.maturity, parseMaturityCode, "maturity", MATURITY_CODE_HELP);
   const title = requireTitle(options.title || source.basename, "ZK title");
   const folder = folderForZkKind(ctx.settings, kind);
-  await ensureFolder(ctx.app, folder);
-  const path = await uniqueMarkdownPath(ctx.app, joinVaultPath(folder, `${title}.md`));
+  await ensureFolder(ctx.host, folder);
+  const path = await uniqueMarkdownPath(ctx.host, joinVaultPath(folder, `${title}.md`));
   const file = await createZkFile(ctx, kind, path, title, { maturityCode });
 
   await insertReferenceItem(ctx, file, { link: wikiLink(source.path) });
-  await ctx.app.fileManager.processFrontMatter(source, (fm) => {
+  await ctx.host.processFrontMatter(source, (fm) => {
     fm.processed = true;
     fm.promoted_to = linkToFile(file);
   });
@@ -118,7 +117,7 @@ export async function promoteFleeting(ctx: WorkflowContext, options: PromoteFlee
 }
 
 async function appendLineUnderHeader(
-  app: App,
+  host: Pick<WorkflowHost, "modify" | "read">,
   file: TFile,
   headerName: string,
   line: string,
@@ -130,7 +129,7 @@ async function appendLineUnderHeader(
     dedupeText?: string;
   }
 ): Promise<boolean> {
-  const content = await app.vault.read(file);
+  const content = await host.read(file);
   const headerPattern = escapeRegExp(headerName).replace(/\s+/g, "\\s+");
   const headerRe = new RegExp(`^(?<quote>(?:>\\s*)*)\\s*(?<hashes>#{1,6})\\s*${headerPattern}(?=\\s|$).*?$`, "im");
   const match = content.match(headerRe);
@@ -138,7 +137,7 @@ async function appendLineUnderHeader(
   if (!match) {
     const prefix = "#".repeat(options.createHeadingLevel);
     const insertedLine = options.ordered ? `1. ${line}` : line;
-    await app.vault.modify(file, `${content.replace(/\s*$/, "")}\n\n${prefix} ${headerName}\n${insertedLine}\n`);
+    await host.modify(file, `${content.replace(/\s*$/, "")}\n\n${prefix} ${headerName}\n${insertedLine}\n`);
     return true;
   }
 
@@ -164,7 +163,7 @@ async function appendLineUnderHeader(
     : `${insertQuote}${line}`;
   const gap = section.length === 0 || section.endsWith("\n") ? "" : "\n";
   const updated = content.slice(0, sectionStart) + section + gap + newLine + "\n" + content.slice(sectionEnd);
-  await app.vault.modify(file, updated);
+  await host.modify(file, updated);
   return true;
 }
 
@@ -187,11 +186,11 @@ async function ensureJournal(ctx: WorkflowContext, options: OpenJournalOptions):
   const energyCode = readOptionalCode(options.energy, parseEnergyCode, "energy", ENERGY_CODE_HELP);
   const energy = energyCode ?? "normal";
   const folder = joinVaultPath(ctx.settings.paths.journalFolder, dateText.slice(0, 7));
-  await ensureFolder(ctx.app, folder);
+  await ensureFolder(ctx.host, folder);
   const path = joinVaultPath(folder, `${dateText}.md`);
 
   let created = false;
-  let file = ctx.app.vault.getFileByPath(path);
+  let file = ctx.host.getFile(path);
   if (!file) {
     created = true;
     file = await createMarkdownFile(ctx, "journal", path, {
@@ -203,7 +202,7 @@ async function ensureJournal(ctx: WorkflowContext, options: OpenJournalOptions):
   }
 
   const tags = localePack(ctx.settings.locale).tags;
-  await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+  await ctx.host.processFrontMatter(file, (fm) => {
     fm.type = "journal";
     fm.date = fm.date || dateText;
     fm.energy = fm.energy ?? energy;

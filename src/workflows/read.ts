@@ -19,13 +19,10 @@ import type {
   ReadResourceOptions,
   ReadRetroOptions,
   ReadZkOptions,
-  ReferenceRead,
-  TaskRead,
   WorkflowContext
 } from "./context";
 import { hasCollectionReadOptions, readCollectionPage } from "./collections";
 import {
-  BACKLINK_READ_SECTION,
   JOURNAL_READ_SPEC,
   PROJECT_READ_SPEC,
   AREA_READ_SPEC,
@@ -40,8 +37,7 @@ import {
 } from "./describe";
 import { countBacklinks, readBacklinks } from "./backlinks";
 import { childFiles, findChild, isArchivedFile, resolveRequiredArea, resolveRequiredJournal, resolveRequiredProject, resolveRequiredResource, resolveRequiredRetro, resolveRequiredZk } from "./locations";
-import { parseWikiLink, pathBasenameWithoutExtension, readReferenceItems, splitObsidianSubpath } from "./references";
-import { readRootTaskMap } from "./tasks";
+import { parseWikiLink, pathBasenameWithoutExtension, splitObsidianSubpath } from "./references";
 
 type ReadMap = Record<string, unknown>;
 type ReadCollectionKind = CollectionKind;
@@ -72,7 +68,7 @@ export async function readRetro(ctx: WorkflowContext, options: ReadRetroOptions)
   return readSurface(ctx, await resolveRequiredRetro(ctx, options), RETRO_READ_SPEC, options.key, options.collection);
 }
 
-export async function readSurface(
+async function readSurface(
   ctx: WorkflowContext,
   file: TFile,
   spec: ReadSurfaceSpec,
@@ -103,7 +99,7 @@ export async function readSurface(
 }
 
 async function readSurfaceMap(ctx: WorkflowContext, file: TFile, spec: ReadSurfaceSpec): Promise<ReadMap> {
-  const content = await ctx.app.vault.read(file);
+  const content = await ctx.host.read(file);
   const frontmatter = await readFileFrontmatterFresh(ctx, file);
   const surface: ReadMap = {
     frontmatter: pickFrontmatter(frontmatter, spec.frontmatter)
@@ -397,16 +393,6 @@ function readMapPath(map: ReadMap, parts: string[], originalKey: string): unknow
 
 function keyParts(key: string): string[] {
   return key.split("/").map((part) => part.trim()).filter(Boolean);
-}
-
-function readReferences(_content: string, context: { ctx: WorkflowContext; file: TFile }): Record<string, ReferenceRead> {
-  return Object.fromEntries(
-    readReferenceItems(context.ctx, context.file).map((item, index) => [String(index), item])
-  );
-}
-
-async function readTasks(_content: string, context: { ctx: WorkflowContext; file: TFile }): Promise<Record<string, TaskRead>> {
-  return readRootTaskMap(context.ctx, context.file);
 }
 
 function readWikiLinkLabel(value: string): string | undefined {

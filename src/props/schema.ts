@@ -18,7 +18,7 @@ import {
   type SubnoteTypeCode
 } from "../vocabulary";
 
-export const PROPS_VIEW_TYPES = [
+const PROPS_VIEW_TYPES = [
   "project",
   "area",
   "resource",
@@ -32,7 +32,7 @@ export const PROPS_VIEW_TYPES = [
 
 export type PropsViewType = typeof PROPS_VIEW_TYPES[number];
 
-export type PropsFieldControl =
+type PropsFieldControl =
   | "area-list"
   | "date"
   | "datetime"

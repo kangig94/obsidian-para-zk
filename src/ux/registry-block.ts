@@ -46,7 +46,7 @@ export function beginRegistryBlockRender<TArgs, TState extends RegistryDragState
   return state;
 }
 
-export function registryBlockState<TArgs, TState>(
+function registryBlockState<TArgs, TState>(
   states: WeakMap<HTMLElement, TState>,
   el: HTMLElement,
   args: TArgs,
@@ -225,7 +225,7 @@ export function createRegistryDragReorder<TItem>(
   };
 }
 
-export function reorderedRegistryItemKeys<TItem>(
+function reorderedRegistryItemKeys<TItem>(
   visible: TItem[],
   draggedKey: string,
   targetKey: string,

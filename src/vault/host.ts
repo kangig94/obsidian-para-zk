@@ -1,0 +1,49 @@
+import type { App, CachedMetadata, TAbstractFile, TFile } from "obsidian";
+
+export interface WorkflowHost {
+  getFile(path: string): TFile | null;
+  getAbstractFile(path: string): TAbstractFile | null;
+  getMarkdownFiles(): TFile[];
+  read(file: TFile): Promise<string>;
+  cachedRead(file: TFile): Promise<string>;
+  create(path: string, data: string): Promise<TFile>;
+  createFolder(path: string): Promise<void>;
+  modify(file: TFile, data: string): Promise<void>;
+  trash(file: TAbstractFile, system: boolean): Promise<void>;
+  trashFile?: (file: TAbstractFile) => Promise<void>;
+  processFrontMatter(file: TFile, fn: (frontmatter: Record<string, unknown>) => void): Promise<void>;
+  renameFile(file: TAbstractFile, newPath: string): Promise<void>;
+  getFirstLinkpathDest(linkpath: string, sourcePath: string): TFile | null;
+  getFileCache(file: TFile): CachedMetadata | null;
+  resolvedLinks(): Record<string, Record<string, number>>;
+  openFile(file: TFile): Promise<void>;
+  getActiveFile(): TFile | null;
+}
+
+export function createObsidianHost(app: App): WorkflowHost {
+  const fileManager = app.fileManager as typeof app.fileManager & {
+    trashFile?: (file: TAbstractFile) => Promise<void>;
+  };
+
+  return {
+    getFile: (path) => app.vault.getFileByPath(path),
+    getAbstractFile: (path) => app.vault.getAbstractFileByPath(path),
+    getMarkdownFiles: () => app.vault.getMarkdownFiles(),
+    read: (file) => app.vault.read(file),
+    cachedRead: (file) => app.vault.cachedRead(file),
+    create: (path, data) => app.vault.create(path, data),
+    createFolder: async (path) => { await app.vault.createFolder(path); },
+    modify: (file, data) => app.vault.modify(file, data),
+    trash: (file, system) => app.vault.trash(file, system),
+    trashFile: typeof fileManager.trashFile === "function"
+      ? (file) => fileManager.trashFile?.(file) ?? Promise.resolve()
+      : undefined,
+    processFrontMatter: (file, fn) => app.fileManager.processFrontMatter(file, fn),
+    renameFile: (file, newPath) => app.fileManager.renameFile(file, newPath),
+    getFirstLinkpathDest: (linkpath, sourcePath) => app.metadataCache.getFirstLinkpathDest(linkpath, sourcePath),
+    getFileCache: (file) => app.metadataCache.getFileCache(file),
+    resolvedLinks: () => app.metadataCache.resolvedLinks,
+    openFile: async (file) => { await app.workspace.getLeaf(true).openFile(file); },
+    getActiveFile: () => app.workspace.getActiveFile()
+  };
+}

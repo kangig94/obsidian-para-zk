@@ -37,7 +37,7 @@ function enumerateBacklinkSources(
   targetFile: TFile,
   visitor?: BacklinkSourceVisitor
 ): number {
-  const sourcePaths = Object.entries(ctx.app.metadataCache.resolvedLinks)
+  const sourcePaths = Object.entries(ctx.host.resolvedLinks())
     .filter(([sourcePath, targets]) => sourcePath !== targetFile.path
       && isRecord(targets)
       && hasOwn(targets, targetFile.path))
@@ -46,7 +46,7 @@ function enumerateBacklinkSources(
 
   let count = 0;
   for (const sourcePath of sourcePaths) {
-    const sourceFile = ctx.app.vault.getFileByPath(sourcePath);
+    const sourceFile = ctx.host.getFile(sourcePath);
     if (!sourceFile || sourceFile.path === targetFile.path) continue;
     visitor?.(sourceFile, count);
     count += 1;

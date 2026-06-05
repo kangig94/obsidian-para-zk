@@ -163,7 +163,7 @@ export function stripManagedPrelude(content: string): string {
   return trimMarkdownBlock(stripYamlFrontmatter(content).replace(/^\s*```para-zk-props\n[\s\S]*?\n```\s*/, ""));
 }
 
-export function stripYamlFrontmatter(content: string): string {
+function stripYamlFrontmatter(content: string): string {
   const frontmatter = yamlFrontmatterRange(content);
   return frontmatter ? content.slice(frontmatter.end) : content;
 }

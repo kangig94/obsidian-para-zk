@@ -11,6 +11,7 @@ import {
 } from "obsidian";
 import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
+import { createObsidianHost } from "../vault/host";
 import {
   createResource,
   deleteReferenceItem,
@@ -447,7 +448,7 @@ function assertSameReferenceLinkSet(left: string[], right: string[], goneMessage
 
 function referenceContext(plugin: ParaZkPluginContext): WorkflowContext {
   return {
-    app: plugin.app,
+    host: createObsidianHost(plugin.app),
     settings: plugin.settings
   };
 }

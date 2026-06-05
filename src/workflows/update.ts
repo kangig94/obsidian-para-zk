@@ -154,7 +154,7 @@ type TextUpdateResult = {
   toPath?: string;
 };
 
-export async function updateSurface(
+async function updateSurface(
   ctx: WorkflowContext,
   file: TFile,
   spec: ReadSurfaceSpec,
@@ -245,7 +245,7 @@ async function resolveWritableSurfaceTarget(
   }
 
   if (parts[0] === "body" && parts.length === 1 && spec.body) {
-    const content = await ctx.app.vault.read(file);
+    const content = await ctx.host.read(file);
     return {
       kind: "text",
       file,
@@ -262,7 +262,7 @@ async function resolveWritableSurfaceTarget(
 
   if (parts.length !== 1) throw new Error(`unknown update key: ${originalKey}`);
 
-  const content = await ctx.app.vault.read(file);
+  const content = await ctx.host.read(file);
   return {
     kind: "text",
     file,
@@ -346,7 +346,7 @@ async function updateFrontmatterSurface(
   const frontmatterChanged = !frontmatterValuesEqual(before, value);
 
   if (frontmatterChanged) {
-    await ctx.app.fileManager.processFrontMatter(target.file, (fm) => {
+    await ctx.host.processFrontMatter(target.file, (fm) => {
       fm[target.frontmatterKey] = value;
     });
   }
@@ -369,13 +369,13 @@ async function updateTextSurface(
   options: UpdatePayloadOptions
 ): Promise<TextUpdateResult> {
   if (operation === "delete") throw new Error("op=delete only supports structured item keys");
-  const before = await ctx.app.vault.read(target.file);
+  const before = await ctx.host.read(target.file);
   const current = before.slice(target.range.start, target.range.end);
   const update = applyTextOperation(current, operation, options);
   if (!update.changed) return update;
 
   const after = spliceTextRange(before, target.range, update.value);
-  if (before !== after) await ctx.app.vault.modify(target.file, after);
+  if (before !== after) await ctx.host.modify(target.file, after);
   return {
     changed: before !== after,
     matches: update.matches
@@ -672,9 +672,9 @@ async function moveNoteBetweenRoots(
     const relativeFolder = relativePathUnderRoot(folderStyleFolder.path, normalizedFromRoot);
     const targetFolder = joinVaultPath(normalizedToRoot, relativeFolder);
     const toPath = joinVaultPath(targetFolder, file.name);
-    await ensureFolder(ctx.app, parentFolder(targetFolder));
-    await ctx.app.fileManager.renameFile(folderStyleFolder, targetFolder);
-    const moved = ctx.app.vault.getFileByPath(toPath);
+    await ensureFolder(ctx.host, parentFolder(targetFolder));
+    await ctx.host.renameFile(folderStyleFolder, targetFolder);
+    const moved = ctx.host.getFile(toPath);
     if (!moved) throw new Error(`failed to move ${fromPath} to ${toPath}`);
     await moveTaskShardBetweenArchiveStates(ctx, rootId, normalizedFromRoot, normalizedToRoot);
     return { file: moved, fromPath, toPath };
@@ -682,9 +682,9 @@ async function moveNoteBetweenRoots(
 
   const relativeFile = relativePathUnderRoot(file.path, normalizedFromRoot);
   const toPath = joinVaultPath(normalizedToRoot, relativeFile);
-  await ensureFolder(ctx.app, parentFolder(toPath));
-  await ctx.app.fileManager.renameFile(file, toPath);
-  const moved = ctx.app.vault.getFileByPath(toPath);
+  await ensureFolder(ctx.host, parentFolder(toPath));
+  await ctx.host.renameFile(file, toPath);
+  const moved = ctx.host.getFile(toPath);
   if (!moved) throw new Error(`failed to move ${fromPath} to ${toPath}`);
   await moveTaskShardBetweenArchiveStates(ctx, rootId, normalizedFromRoot, normalizedToRoot);
   return { file: moved, fromPath, toPath };
@@ -703,11 +703,11 @@ function assertCanMoveTaskShardBetweenArchiveStates(
   const toArchived = isArchivedPath(ctx, toRoot);
   if (fromArchived === toArchived) return;
 
-  const source = ctx.app.vault.getFileByPath(taskShardPath(ctx, rootId, fromArchived));
+  const source = ctx.host.getFile(taskShardPath(ctx, rootId, fromArchived));
   if (!source) return;
 
   const targetPath = taskShardPath(ctx, rootId, toArchived);
-  const existing = ctx.app.vault.getAbstractFileByPath(targetPath);
+  const existing = ctx.host.getAbstractFile(targetPath);
   if (existing && existing !== source) throw new Error(`target already exists: ${targetPath}`);
 }
 
@@ -723,12 +723,12 @@ async function moveTaskShardBetweenArchiveStates(
   const toArchived = isArchivedPath(ctx, toRoot);
   if (fromArchived === toArchived) return;
 
-  const source = ctx.app.vault.getFileByPath(taskShardPath(ctx, rootId, fromArchived));
+  const source = ctx.host.getFile(taskShardPath(ctx, rootId, fromArchived));
   if (!source) return;
 
   const targetPath = taskShardPath(ctx, rootId, toArchived);
-  await ensureFolder(ctx.app, parentFolder(targetPath));
-  await ctx.app.fileManager.renameFile(source, targetPath);
+  await ensureFolder(ctx.host, parentFolder(targetPath));
+  await ctx.host.renameFile(source, targetPath);
 }
 
 function frontmatterValuesEqual(left: unknown, right: unknown): boolean {

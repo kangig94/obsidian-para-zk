@@ -1,7 +1,10 @@
-import { TFolder, type App, type TFile } from "obsidian";
+import { TFolder, type TFile } from "obsidian";
+import type { WorkflowHost } from "./host";
 import { normalizeVaultPath } from "./paths";
 
-export async function ensureFolder(app: App, folder: string): Promise<void> {
+type FolderHost = Pick<WorkflowHost, "createFolder" | "getAbstractFile">;
+
+export async function ensureFolder(host: FolderHost, folder: string): Promise<void> {
   const normalized = normalizeVaultPath(folder);
   if (!normalized) return;
 
@@ -9,10 +12,10 @@ export async function ensureFolder(app: App, folder: string): Promise<void> {
   let current = "";
   for (const part of parts) {
     current = current ? `${current}/${part}` : part;
-    const existing = app.vault.getAbstractFileByPath(current);
+    const existing = host.getAbstractFile(current);
     if (existing instanceof TFolder) continue;
     if (existing) throw new Error(`cannot create folder; a file exists at ${current}`);
-    await app.vault.createFolder(current);
+    await host.createFolder(current);
   }
 }
 

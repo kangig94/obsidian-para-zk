@@ -11,7 +11,7 @@ export type PromotionZkKind = "Literature" | "Permanent";
 
 export type Locale = "en" | "ko";
 
-export type ParaZkPaths = {
+type ParaZkPaths = {
   projectsFolder: string;
   areasFolder: string;
   resourcesFolder: string;
@@ -58,7 +58,7 @@ export type SetupOptions = {
   installDeps?: boolean;
 };
 
-export type DependencyAction =
+type DependencyAction =
   | "none"
   | "warn"
   | "would_install_and_enable"
@@ -99,7 +99,7 @@ export type CaptureResult = {
   created: boolean;
 };
 
-export const DEFAULT_PATHS: ParaZkPaths = {
+const DEFAULT_PATHS: ParaZkPaths = {
   projectsFolder: "PARA/Projects",
   areasFolder: "PARA/Areas",
   resourcesFolder: "PARA/Resources",
@@ -116,7 +116,7 @@ export const DEFAULT_PATHS: ParaZkPaths = {
   managedTemplatesFolder: "Templates/para-zk"
 };
 
-export const DEFAULT_LAYOUT_FOLDERS = [
+const DEFAULT_LAYOUT_FOLDERS = [
   "PARA",
   "PARA/Projects",
   "PARA/Areas",

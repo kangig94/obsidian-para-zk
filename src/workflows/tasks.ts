@@ -79,14 +79,14 @@ const TASK_PRIORITY_FIELD_SYMBOLS: Record<string, string> = {
   lowest: "\u{23EC}"
 };
 
-export async function ensureTaskShard(ctx: WorkflowContext, rootFile: TFile): Promise<TFile> {
+async function ensureTaskShard(ctx: WorkflowContext, rootFile: TFile): Promise<TFile> {
   const rootId = await ensureRootId(ctx, rootFile);
   const path = taskShardPath(ctx, rootId, isArchivedFile(ctx, rootFile));
-  await ensureFolder(ctx.app, parentFolder(path));
+  await ensureFolder(ctx.host, parentFolder(path));
 
-  let shardFile = ctx.app.vault.getFileByPath(path);
+  let shardFile = ctx.host.getFile(path);
   if (!shardFile) {
-    shardFile = await ctx.app.vault.create(path, "# Tasks\n");
+    shardFile = await ctx.host.create(path, "# Tasks\n");
   }
   return shardFile;
 }
@@ -111,7 +111,7 @@ export function newRootId(): string {
 export async function assertRootTaskExists(ctx: WorkflowContext, rootFile: TFile, taskId: string): Promise<void> {
   const shardFile = readTaskShardFile(ctx, rootFile);
   if (!shardFile) throw new Error(`task not found: ${taskId}`);
-  const content = await ctx.app.vault.read(shardFile);
+  const content = await ctx.host.read(shardFile);
   const range = taskShardTaskRange(content);
   const line = range ? findEditableTaskLine(shardFile.path, content, range, taskId) : undefined;
   if (!line) throw new Error(`task not found: ${taskId}`);
@@ -122,7 +122,7 @@ export async function readRootTaskMap(ctx: WorkflowContext, rootFile: TFile): Pr
   const shardFile = readTaskShardFile(ctx, rootFile);
   if (!shardFile) return items;
 
-  const content = await ctx.app.vault.read(shardFile);
+  const content = await ctx.host.read(shardFile);
   const range = taskShardTaskRange(content);
   if (!range) return items;
 
@@ -146,11 +146,11 @@ export async function readRootTaskMap(ctx: WorkflowContext, rootFile: TFile): Pr
 export async function readAllTaskItems(ctx: WorkflowContext): Promise<RootTaskItem[]> {
   const rootFiles = rootFilesById(ctx);
   const results: RootTaskItem[] = [];
-  for (const file of ctx.app.vault.getMarkdownFiles()) {
+  for (const file of ctx.host.getMarkdownFiles()) {
     if (!isInFolder(file, taskCurrentFolder(ctx))) continue;
     const rootFile = rootFiles.get(file.basename);
     if (!rootFile) continue;
-    const content = await ctx.app.vault.read(file);
+    const content = await ctx.host.read(file);
     const range = taskShardTaskRange(content);
     if (!range) continue;
     let cursor = range.start;
@@ -181,12 +181,12 @@ export async function insertRootTask(ctx: WorkflowContext, rootFile: TFile, valu
   const taskId = await newTaskId(ctx);
   const line = serializeNewTaskLine(write.task, taskId);
   const shardFile = await ensureTaskShard(ctx, rootFile);
-  const base = await ctx.app.vault.read(shardFile);
+  const base = await ctx.host.read(shardFile);
   const normalized = ensureTaskShardTaskSection(base);
   const current = normalized.content.slice(normalized.range.start, normalized.range.end);
   const next = insertTaskLine(current, line, write.position);
   if (current !== next || base !== normalized.content) {
-    await ctx.app.vault.modify(shardFile, spliceTextRange(normalized.content, normalized.range, next));
+    await ctx.host.modify(shardFile, spliceTextRange(normalized.content, normalized.range, next));
   }
   return taskId;
 }
@@ -200,7 +200,7 @@ export async function setRootTaskField(
 ): Promise<boolean> {
   const shardFile = readTaskShardFile(ctx, rootFile);
   if (!shardFile) throw new Error(`task not found: ${taskId}`);
-  const before = await ctx.app.vault.read(shardFile);
+  const before = await ctx.host.read(shardFile);
   const range = taskShardTaskRange(before);
   const line = range ? findEditableTaskLine(shardFile.path, before, range, taskId) : undefined;
   if (!line) throw new Error(`task not found: ${taskId}`);
@@ -209,14 +209,14 @@ export async function setRootTaskField(
   const nextLine = serializeEditableTaskLine(line, nextTask);
   const currentLine = before.slice(line.range.start, line.range.endWithoutBreak);
   if (currentLine === nextLine) return false;
-  await ctx.app.vault.modify(shardFile, spliceTextRange(before, line.range, nextLine));
+  await ctx.host.modify(shardFile, spliceTextRange(before, line.range, nextLine));
   return true;
 }
 
 export async function reorderRootTasks(ctx: WorkflowContext, rootFile: TFile, taskIds: string[]): Promise<boolean> {
   const shardFile = readTaskShardFile(ctx, rootFile);
   if (!shardFile) throw new Error("task list not found");
-  const before = await ctx.app.vault.read(shardFile);
+  const before = await ctx.host.read(shardFile);
   const range = taskShardTaskRange(before);
   if (!range) throw new Error("task list not found");
 
@@ -243,20 +243,20 @@ export async function reorderRootTasks(ctx: WorkflowContext, rootFile: TFile, ta
     .join("\n");
   if (section === nextSection) return false;
 
-  await ctx.app.vault.modify(shardFile, spliceTextRange(before, range, nextSection));
+  await ctx.host.modify(shardFile, spliceTextRange(before, range, nextSection));
   return true;
 }
 
 export async function deleteRootTask(ctx: WorkflowContext, rootFile: TFile, taskId: string): Promise<boolean> {
   const shardFile = readTaskShardFile(ctx, rootFile);
   if (!shardFile) throw new Error(`task not found: ${taskId}`);
-  const before = await ctx.app.vault.read(shardFile);
+  const before = await ctx.host.read(shardFile);
   const range = taskShardTaskRange(before);
   const line = range ? findEditableTaskLine(shardFile.path, before, range, taskId) : undefined;
   if (!line) throw new Error(`task not found: ${taskId}`);
   const after = removeTextRanges(before, [line.range]);
   if (before === after) return false;
-  await ctx.app.vault.modify(shardFile, after);
+  await ctx.host.modify(shardFile, after);
   return true;
 }
 
@@ -277,7 +277,7 @@ async function ensureRootId(ctx: WorkflowContext, file: TFile): Promise<string> 
 
   const id = newRootId();
   let resolved = id;
-  await ctx.app.fileManager.processFrontMatter(file, (fm) => {
+  await ctx.host.processFrontMatter(file, (fm) => {
     const current = rootIdFromFrontmatter(fm);
     if (current) {
       resolved = current;
@@ -291,7 +291,7 @@ async function ensureRootId(ctx: WorkflowContext, file: TFile): Promise<string> 
 
 function taskShardFile(ctx: WorkflowContext, rootFile: TFile): TFile | undefined {
   const rootId = rootIdFromFrontmatter(fileFrontmatter(ctx, rootFile));
-  return rootId ? ctx.app.vault.getFileByPath(taskShardPath(ctx, rootId, isArchivedFile(ctx, rootFile))) ?? undefined : undefined;
+  return rootId ? ctx.host.getFile(taskShardPath(ctx, rootId, isArchivedFile(ctx, rootFile))) ?? undefined : undefined;
 }
 
 function taskShardFolder(ctx: WorkflowContext, archived: boolean): string {
@@ -383,9 +383,9 @@ function fallbackUuid(): string {
 async function existingTaskIds(ctx: WorkflowContext): Promise<Set<string>> {
   const ids = new Set<string>();
   const tasksFolder = taskRegistryFolder(ctx);
-  for (const file of ctx.app.vault.getMarkdownFiles()) {
+  for (const file of ctx.host.getMarkdownFiles()) {
     if (tasksFolder && !isInFolder(file, tasksFolder)) continue;
-    const content = await ctx.app.vault.cachedRead(file);
+    const content = await ctx.host.cachedRead(file);
     collectTaskIds(content, ids);
   }
   return ids;
@@ -425,7 +425,7 @@ function randomBytes(length: number): Uint8Array {
 
 function rootFilesById(ctx: WorkflowContext): Map<string, TFile> {
   const roots = new Map<string, TFile>();
-  for (const file of ctx.app.vault.getMarkdownFiles()) {
+  for (const file of ctx.host.getMarkdownFiles()) {
     if (isInFolder(file, taskRegistryFolder(ctx)) || isArchivedFile(ctx, file)) continue;
     const rootId = rootIdFromFrontmatter(fileFrontmatter(ctx, file));
     if (rootId && !roots.has(rootId)) roots.set(rootId, file);

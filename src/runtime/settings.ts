@@ -16,7 +16,7 @@ export async function saveSettings(plugin: Plugin, settings: ParaZkSettings): Pr
   await plugin.saveData(settings);
 }
 
-export function mergeSettings(loaded: unknown): ParaZkSettings {
+function mergeSettings(loaded: unknown): ParaZkSettings {
   const data = isRecord(loaded) ? loaded : {};
   const paths = readPaths(data.paths);
   return {

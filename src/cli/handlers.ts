@@ -13,6 +13,7 @@ import {
 } from "../vocabulary";
 import { PROMOTION_ZK_KIND_CODE_HELP, ZK_KIND_CODE_HELP } from "../zk/kinds";
 import { parseList } from "./parse";
+import { createObsidianHost } from "../vault/host";
 import { joinVaultPath, normalizeVaultPath, sanitizeFileName, wikiLink } from "../vault/paths";
 import {
   describeSurface,
@@ -948,7 +949,7 @@ async function withCliErrors(
 
 function workflowContext(plugin: ParaZkPluginContext): WorkflowContext {
   return {
-    app: plugin.app,
+    host: createObsidianHost(plugin.app),
     settings: plugin.settings
   };
 }
