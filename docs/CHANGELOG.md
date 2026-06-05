@@ -97,9 +97,10 @@ Notable changes for PARA-ZK are tracked here.
   (`distill-spark`, spark → permanent, consuming) and **create**
   (`create-from-source` from a source, `create-from-resource` for source/permanent).
   ZK creation now uses single-direction links (the new note references its origin;
-  the origin surfaces it via a derived *Cited by* backlink view on permanent and
-  resource notes) and no longer writes reverse body links or `promoted_to`
-  frontmatter. Sparks no longer get auto-inserted task items.
+  the origin surfaces it via a derived backlink view — a "Created from this" list
+  on spark/source/resource, "Cited by" on permanent) and no longer writes reverse
+  body links or `promoted_to` frontmatter. Sparks no longer get auto-inserted task
+  items; a kept spark records what it became via `distilled_to`.
 - Full (no-key) reads now summarize prose sections as `{ chars: N }` (mirroring
   collections' `{ count: N }`) instead of inlining full section text, so a
   compact read stays bounded for long-form notes; full text is read with

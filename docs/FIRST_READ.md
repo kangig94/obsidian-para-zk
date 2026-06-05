@@ -153,7 +153,8 @@ npm run smoke:vault -- --vault "$PARA_ZK_TEST_VAULT"
 ```
 
 The representative CLI command checklist lives in [CLI.md](CLI.md#smoke-test). The
-default locale is English; pass `locale=ko` only when validating Korean output.
+smoke runs in one locale (English by default); pass `--locale ko` to validate
+Korean output: `npm run smoke:vault -- --locale ko`.
 Always run `npm run lint` and `npm run build` before considering a change complete.
 
 ## Development Rules

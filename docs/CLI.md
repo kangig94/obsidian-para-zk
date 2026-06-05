@@ -967,10 +967,12 @@ Important fields:
 
 ### `para-zk:distill-spark`
 
-Distills a spark into a new Permanent note and marks the spark `processed: true`.
-The spark is **kept** (discard is a separate, manual action — a spark may yield
-several permanents). The spark is ephemeral, so the permanent does **not**
-reference it.
+Distills a spark into a new Permanent note. By default the spark is **kept**,
+marked `processed: true`, with a `distilled_to` pointer to the new note (a spark
+may yield several permanents, so discard is left manual). Pass `discard=true` to
+move the spark to trash instead. The permanent never references the ephemeral
+spark — the `distilled_to` pointer lives on the spark, so discarding it (by any
+means) leaves no dangling link.
 
 Options:
 
@@ -979,6 +981,7 @@ Options:
 | `path` | path | Required for deterministic CLI use. Source spark note. |
 | `title` | string | Optional. Defaults to source basename. |
 | `maturity` | maturity code | Permanent-note maturity. |
+| `discard` | boolean | Move the spark to trash instead of keeping it processed. Default `false`. |
 | `open` | boolean | Default `false`. |
 
 Example:
@@ -999,7 +1002,9 @@ Important fields:
 Side effects:
 
 - Creates a Permanent note.
-- Sets `processed: true` on the source spark note (kept for manual discard).
+- Without `discard`: marks the spark `processed: true` and appends the new note
+  to the spark's `distilled_to`.
+- With `discard=true`: moves the spark to trash (recoverable).
 
 ## Smoke Test
 
