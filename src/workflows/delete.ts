@@ -171,7 +171,7 @@ async function cleanupFrontmatterReferences(
   deletedPathSet: Set<string>
 ): Promise<number> {
   let changedKeys = 0;
-  const keys = ["areas", "project", "parent", "promoted_to"];
+  const keys = ["areas", "project", "parent", "distilled_to"];
   for (const file of ctx.host.getMarkdownFiles()) {
     if (deletedPathSet.has(file.path)) continue;
     const frontmatter = fileFrontmatter(ctx, file);

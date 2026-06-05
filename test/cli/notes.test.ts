@@ -8,9 +8,9 @@ beforeEach(() => {
 });
 
 describe("zk notes", () => {
-  it("creates fleeting and permanent notes and reads/updates maturity", async () => {
-    const fleeting = await cli.run("para-zk:create-zk", { title: "Spark", kind: "fleeting", open: "false" });
-    expect(fleeting.created).toBe(true);
+  it("creates spark and permanent notes and reads/updates maturity", async () => {
+    const spark = await cli.run("para-zk:create-zk", { title: "Spark", kind: "spark", open: "false" });
+    expect(spark.created).toBe(true);
 
     const permanent = await cli.run("para-zk:create-zk", {
       title: "Evergreen",
@@ -390,7 +390,7 @@ describe("resource body updates", () => {
   it("keeps body reads and writes working after ZK template headings are removed", async () => {
     const created = await cli.run("para-zk:create-zk", {
       title: "Template Destroyed",
-      kind: "literature",
+      kind: "source",
       open: "false"
     });
     const path = String(created.path);
@@ -405,14 +405,14 @@ describe("resource body updates", () => {
     ].join("\n");
     await cli.app.vault.modify(file!, [
       "---",
-      "type: zk_literature",
+      "type: zk_source",
       "sourceTitle:",
       "authors:",
       "published:",
       "url:",
       "---",
       "```para-zk-props",
-      "type: zk_literature",
+      "type: zk_source",
       "```",
       body,
       "",
@@ -423,14 +423,14 @@ describe("resource body updates", () => {
 
     const read = await cli.run("para-zk:read-zk", {
       path,
-      kind: "literature",
+      kind: "source",
       key: "body"
     });
     expect(read.value).toBe(body);
 
     const append = await cli.run("para-zk:update-zk", {
       path,
-      kind: "literature",
+      kind: "source",
       key: "body",
       op: "append",
       value: "# Replacement\nWorks"
@@ -439,7 +439,7 @@ describe("resource body updates", () => {
 
     const roundTrip = await cli.run("para-zk:read-zk", {
       path,
-      kind: "literature",
+      kind: "source",
       key: "body"
     });
     expect(roundTrip.value).toBe(`${body}\n# Replacement\nWorks`);

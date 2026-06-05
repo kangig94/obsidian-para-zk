@@ -45,13 +45,13 @@ low | medium | high
 ZK kind:
 
 ```text
-fleeting | literature | permanent
+spark | source | permanent
 ```
 
-Promotion target kind:
+Resource-create target kind:
 
 ```text
-literature | permanent
+source | permanent
 ```
 
 Maturity:
@@ -403,8 +403,8 @@ Free-form top-level keys:
 
 ```text
 resource: frontmatter | body | references | backlinks
-zk_fleeting: frontmatter | body | references | backlinks
-zk_literature: frontmatter | body | references | backlinks
+zk_spark: frontmatter | body | references | backlinks
+zk_source: frontmatter | body | references | backlinks
 zk_permanent: frontmatter | body | references | backlinks
 ```
 
@@ -599,8 +599,7 @@ Body backlinks are intentionally preserved. The JSON result reports incoming
 links observed before deletion so an LLM can decide whether follow-up edits are
 needed. PARA-ZK only cleans relationships it owns directly:
 
-- frontmatter links in keys such as `areas`, `project`, `parent`, and
-  `promoted_to`
+- frontmatter links in keys such as `areas`, `project`, and `parent`
 - frontmatter `references` items that point at the deleted note
 
 | Command | Selector | Notes |
@@ -629,7 +628,7 @@ Examples:
 optsidian raw para-zk:delete-resource title="Source Paper" format=json
 optsidian raw para-zk:delete-area title="Unused Area" format=json
 optsidian raw para-zk:delete-project title="Prototype" force=true format=json
-optsidian raw para-zk:delete-zk title="Draft idea" kind=fleeting format=json
+optsidian raw para-zk:delete-zk title="Draft idea" kind=spark format=json
 optsidian raw para-zk:delete-journal date=2026-05-30 format=json
 ```
 
@@ -852,7 +851,7 @@ Options:
 | Option | Values | Notes |
 | --- | --- | --- |
 | `title` | string | Required. |
-| `kind` | ZK kind code | Defaults to `fleeting`. |
+| `kind` | ZK kind code | Defaults to `spark`. |
 | `maturity` | maturity code | Used for permanent notes. Defaults to `draft`. |
 | `open` | boolean | Default `false`. |
 
@@ -902,11 +901,15 @@ Important fields:
 - `date`
 - `created`
 
-### `para-zk:promote-resource`
+ZK notes are created with **single-direction links**: the new note references its
+origin; the origin is preserved and gets no reverse link written into it — the new
+note surfaces in the origin's *Cited by* view via Obsidian backlinks.
 
-Promotes a resource note into a ZK note and writes a frontmatter reference on
-the new ZK note back to the resource. It also appends a link to the promoted ZK
-note into the source resource's free-form `body`, before the managed tail.
+### `para-zk:create-from-resource`
+
+Creates a Source or Permanent ZK note from a resource and writes a frontmatter
+reference on the new ZK note back to the resource. The resource is preserved and
+left unchanged.
 
 Options:
 
@@ -914,17 +917,17 @@ Options:
 | --- | --- | --- |
 | `path` | path | Required for deterministic CLI use. Source resource note. |
 | `title` | string | Optional. Defaults to source basename. |
-| `kind` | ZK kind code | Defaults to `permanent`. |
+| `kind` | `source` \| `permanent` | Defaults to `permanent`. |
 | `maturity` | maturity code | Used for permanent notes. |
 | `open` | boolean | Default `false`. |
 
 Example:
 
 ```bash
-optsidian raw para-zk:promote-resource \
+optsidian raw para-zk:create-from-resource \
   path="PARA/Resources/Source Paper.md" \
   title="Paper Insight" \
-  kind=literature \
+  kind=source \
   format=json
 ```
 
@@ -933,29 +936,57 @@ Important fields:
 - `sourcePath`
 - `kind`
 
-### `para-zk:promote-fleeting`
+### `para-zk:create-permanent`
 
-Promotes a fleeting note into Literature or Permanent, writes a frontmatter
-reference on the new ZK note back to the source, and marks the source as
-processed in place.
+Creates a Permanent note from a source note and writes a frontmatter reference on
+the new permanent note back to the source. The source is preserved.
 
 Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `path` | path | Required for deterministic CLI use. Source fleeting note. |
+| `path` | path | Required for deterministic CLI use. Source note. |
 | `title` | string | Optional. Defaults to source basename. |
-| `kind` | promotion target kind code | Defaults to `permanent`. |
-| `maturity` | maturity code | Used for permanent notes. |
+| `maturity` | maturity code | Permanent-note maturity. |
 | `open` | boolean | Default `false`. |
 
 Example:
 
 ```bash
-optsidian raw para-zk:promote-fleeting \
-  path="ZK/Fleeting/Raw Thought.md" \
+optsidian raw para-zk:create-permanent \
+  path="ZK/Source/Paper Digest.md" \
+  title="Compounding learning" \
+  maturity=refined \
+  format=json
+```
+
+Important fields:
+
+- `sourcePath`
+- `kind` (always `Permanent`)
+
+### `para-zk:distill-spark`
+
+Distills a spark into a new Permanent note and marks the spark `processed: true`.
+The spark is **kept** (discard is a separate, manual action — a spark may yield
+several permanents). The spark is ephemeral, so the permanent does **not**
+reference it.
+
+Options:
+
+| Option | Values | Notes |
+| --- | --- | --- |
+| `path` | path | Required for deterministic CLI use. Source spark note. |
+| `title` | string | Optional. Defaults to source basename. |
+| `maturity` | maturity code | Permanent-note maturity. |
+| `open` | boolean | Default `false`. |
+
+Example:
+
+```bash
+optsidian raw para-zk:distill-spark \
+  path="ZK/Spark/Raw Thought.md" \
   title="Durable Thought" \
-  kind=permanent \
   maturity=evergreen \
   format=json
 ```
@@ -963,14 +994,12 @@ optsidian raw para-zk:promote-fleeting \
 Important fields:
 
 - `sourcePath`
-- `kind`
+- `kind` (always `Permanent`)
 
 Side effects:
 
-- Creates a target ZK note.
-- Stores a frontmatter reference from the target note back to the source
-  fleeting note.
-- Sets `processed: true` and `promoted_to` on the source fleeting note.
+- Creates a Permanent note.
+- Sets `processed: true` on the source spark note (kept for manual discard).
 
 ## Smoke Test
 

@@ -89,6 +89,17 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Changed
 
+- Reworked the ZK model around its original Zettelkasten intent. Renamed the
+  three kinds to **spark** (`zk_spark`, transient capture), **source**
+  (`zk_source`, your own-words digest of an external source), and **permanent**
+  (`zk_permanent`, your atomic connected idea — the common, primary output).
+  Split the old single "promote" path into two operations: **distill**
+  (`distill-spark`, spark → permanent, consuming) and **create**
+  (`create-permanent` from a source, `create-from-resource` for source/permanent).
+  ZK creation now uses single-direction links (the new note references its origin;
+  the origin surfaces it via a derived *Cited by* backlink view on permanent and
+  resource notes) and no longer writes reverse body links or `promoted_to`
+  frontmatter. Sparks no longer get auto-inserted task items.
 - Full (no-key) reads now summarize prose sections as `{ chars: N }` (mirroring
   collections' `{ count: N }`) instead of inlining full section text, so a
   compact read stays bounded for long-form notes; full text is read with
@@ -148,8 +159,6 @@ Notable changes for PARA-ZK are tracked here.
   with `offset`, `limit`, `returned`, and `has_more`.
 - Journal and retro task collections now use the same stable `tasks` key as
   project and area task collections.
-- Fleeting ZK checklist items are now under the same generated `Tasks` heading
-  and `tasks` read key instead of a separate next-actions surface.
 - Journal and retro references now use the same stable `references` key and
   generated heading as project, area, resource, and ZK notes.
 - CLI compatibility aliases such as `name`, `type`, `areaTitles`,
@@ -173,9 +182,9 @@ Notable changes for PARA-ZK are tracked here.
   after a clean init.
 - The disposable-vault smoke test now validates GUI command labels, ribbon
   labels, and ribbon ordering across English and Korean locale changes.
-- Promoting a fleeting note now keeps the source note in `ZK/Fleeting`, marks it
-  `processed: true`, and records `promoted_to` instead of moving it to an
-  archive folder.
+- Distilling a spark creates a Permanent note and marks the source spark
+  `processed: true`, keeping it in `ZK/Spark` for manual discard (a spark may
+  yield several permanents). The permanent does not link back to the spark.
 - Updating a project's `frontmatter/status` to `archived` now moves the project
   into `PARA/Archives/Projects`; updating the archived copy to a non-archived
   status restores it to the active Projects folder.
@@ -216,7 +225,7 @@ Notable changes for PARA-ZK are tracked here.
 - Reference free text is now a single optional `description` field. Input
   wikilink aliases and markdown link text are dropped during canonicalization;
   the rendered title is always the target filename or URL.
-- Creating resources and promoting resource/fleeting notes now writes
+- Creating resources and creating ZK notes from resources/sources now write
   frontmatter reference registry entries instead of body reference lines.
 
 ### Removed
@@ -224,7 +233,7 @@ Notable changes for PARA-ZK are tracked here.
 - Removed the need for Meta Bind in generated PARA-ZK templates and dashboards.
 - Removed DataviewJS-only card rendering for dashboard summary sections.
 - Removed the separate `sync-managed-files` GUI command.
-- Removed the `ZK/Fleeting/Archives` layout folder because fleeting notes are
+- Removed the `ZK/Spark/Archives` layout folder because sparks are
   completed by `processed: true`, not by archive movement.
 - Removed body `## References` section-line storage, `ref-*` reference ids, and
   References-section link cleanup. `ref_kind=markdown` is no longer accepted

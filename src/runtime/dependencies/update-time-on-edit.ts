@@ -1,5 +1,6 @@
 import type { App } from "obsidian";
 import type { ParaZkSettings } from "../../types";
+import { appendUniqueStrings } from "../../text";
 import { normalizeVaultPath } from "../../vault/paths";
 import type { DependencyConfiguration, DependencyConfigurationServices, PluginManager } from "./index";
 
@@ -61,31 +62,19 @@ function mergeUpdateTimeOnEditSettings(
     headerUpdated: "updated",
     headerCreated: "created",
     minMinutesBetweenSaves: 1,
-    ignoreGlobalFolder: mergeStringList(current.ignoreGlobalFolder, [
+    ignoreGlobalFolder: appendUniqueStrings(current.ignoreGlobalFolder, [
       settings.paths.templatesFolder,
       settings.paths.dashboardFolder,
       settings.paths.tasksFolder,
       ATTACHMENT_FOLDER,
       "README"
-    ]),
-    ignoreCreatedFolder: mergeStringList(current.ignoreCreatedFolder, [
+    ].map(normalizeVaultPath)),
+    ignoreCreatedFolder: appendUniqueStrings(current.ignoreCreatedFolder, [
       settings.paths.templatesFolder,
       settings.paths.dashboardFolder,
       settings.paths.tasksFolder,
       "README"
-    ]),
+    ].map(normalizeVaultPath)),
     enableExperimentalHash: true
   };
-}
-
-function mergeStringList(current: unknown, desired: string[]): string[] {
-  const merged = Array.isArray(current)
-    ? current.filter((item): item is string => typeof item === "string")
-    : [];
-
-  for (const item of desired.map(normalizeVaultPath).filter(Boolean)) {
-    if (!merged.includes(item)) merged.push(item);
-  }
-
-  return merged;
 }

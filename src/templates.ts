@@ -14,8 +14,8 @@ export const TEMPLATE_NAMES = [
   "journal",
   "retro",
   "subnote",
-  "zk_fleeting",
-  "zk_literature",
+  "zk_spark",
+  "zk_source",
   "zk_permanent"
 ] as const;
 
@@ -221,26 +221,26 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         "{{cursor}}",
         ""
       ].join("\n");
-    case "zk_fleeting":
+    case "zk_spark":
       return [
         frontmatter([
-          "type: zk_fleeting",
+          "type: zk_spark",
           "tags:",
           `  - ${tags.knowledge}/${slugPlaceholder}`,
           `created: ${nowPlaceholder}`,
           "updated:",
           "processed: false"
         ]),
-        paraZkPropsBlock("zk_fleeting"),
+        paraZkPropsBlock("zk_spark"),
         "{{cursor}}",
         "",
         paraZkManagedBlock(),
         ""
       ].join("\n");
-    case "zk_literature":
+    case "zk_source":
       return [
         frontmatter([
-          "type: zk_literature",
+          "type: zk_source",
           "tags:",
           `  - ${tags.knowledge}/${slugPlaceholder}`,
           "sourceTitle:",
@@ -250,7 +250,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           `created: ${nowPlaceholder}`,
           "updated:"
         ]),
-        paraZkPropsBlock("zk_literature"),
+        paraZkPropsBlock("zk_source"),
         "{{cursor}}",
         "",
         paraZkManagedBlock(),
@@ -351,7 +351,7 @@ export function managedUiBlockForType(type: string, settings: ParaZkSettings): s
       ]);
     case "resource":
       return joinManagedUiBlocks([
-        paraZkViewBlock("resource-zk-links", t.labels.promoteToZk),
+        paraZkViewBlock("resource-cited-by", t.labels.createdFromThis),
         paraZkReferencesBlock("current", t.labels.references)
       ]);
     case "journal":
@@ -359,19 +359,19 @@ export function managedUiBlockForType(type: string, settings: ParaZkSettings): s
         paraZkTasksBlock("current", [], t.labels.tasks),
         paraZkReferencesBlock("current", t.labels.references)
       ]);
-    case "zk_fleeting":
+    case "zk_spark":
       return joinManagedUiBlocks([
-        paraZkViewBlock("fleeting-promotion", t.labels.promote),
-        paraZkTasksBlock("current", [], t.labels.tasks),
+        paraZkViewBlock("spark-distill", t.labels.distilledInto),
         paraZkReferencesBlock("current", t.labels.references)
       ]);
-    case "zk_literature":
+    case "zk_source":
       return joinManagedUiBlocks([
-        paraZkViewBlock("literature-promotion", t.labels.createPermanent),
+        paraZkViewBlock("source-create-permanent", t.labels.createdFromThis),
         paraZkReferencesBlock("current", t.labels.references)
       ]);
     case "zk_permanent":
       return joinManagedUiBlocks([
+        paraZkViewBlock("permanent-cited-by", t.labels.citedBy),
         paraZkReferencesBlock("current", t.labels.references)
       ]);
     default:
@@ -439,7 +439,10 @@ function dataviewAreaRetros(t: ReturnType<typeof localePack>, settings: ParaZkSe
   ]);
 }
 
-function dataviewResourceZkLinks(t: ReturnType<typeof localePack>, settings: ParaZkSettings, sourcePath?: string): string[] {
+// Notes (in ZK folders) that reference the current file. Read-only derived view
+// over Obsidian's link graph — the single-direction reference made on the citing
+// side surfaces here without any reverse link being stored (see ZK redesign).
+function dataviewCitedBy(t: ReturnType<typeof localePack>, settings: ParaZkSettings, sourcePath?: string): string[] {
   return fenced("dataview", [
     `TABLE WITHOUT ID file.link AS "${t.labels.filename}", file.mtime AS "${t.labels.updated}"`,
     `FROM ${dataviewSources(zkSourceFolders(settings))}`,
@@ -448,17 +451,13 @@ function dataviewResourceZkLinks(t: ReturnType<typeof localePack>, settings: Par
   ]);
 }
 
-function dataviewFleetingPromotion(t: ReturnType<typeof localePack>): string[] {
+// The permanents a spark has been distilled into. The `distilled_to` pointer lives
+// on the spark itself, so this list (and any link) disappears when the spark is
+// discarded — no dangling links are left in the permanents.
+function dataviewDistilledInto(t: ReturnType<typeof localePack>): string[] {
   return fenced("dataview", [
-    `TABLE WITHOUT ID promoted_to AS "${t.labels.promoteToZk}"`,
-    "WHERE file.path = this.file.path AND promoted_to"
-  ]);
-}
-
-function dataviewLiteraturePromotion(t: ReturnType<typeof localePack>): string[] {
-  return fenced("dataview", [
-    `TABLE WITHOUT ID promoted_to AS "${t.labels.createPermanent}"`,
-    "WHERE file.path = this.file.path AND promoted_to"
+    `TABLE WITHOUT ID distilled_to AS "${t.labels.distilledInto}"`,
+    "WHERE file.path = this.file.path AND distilled_to"
   ]);
 }
 
@@ -469,9 +468,10 @@ export const DATAVIEW_VIEW_KEYS = [
   "area-subareas",
   "area-subnotes",
   "area-retros",
-  "resource-zk-links",
-  "fleeting-promotion",
-  "literature-promotion"
+  "resource-cited-by",
+  "permanent-cited-by",
+  "spark-distill",
+  "source-create-permanent"
 ] as const;
 
 export type DataviewViewKey = typeof DATAVIEW_VIEW_KEYS[number];
@@ -490,9 +490,11 @@ export function dataviewViewBlock(key: string, settings: ParaZkSettings, sourceP
     case "area-subareas": return dataviewChildAreas(t, settings, sourcePath).join("\n");
     case "area-subnotes": return dataviewChildDocs(t, sourcePath).join("\n");
     case "area-retros": return dataviewAreaRetros(t, settings, sourcePath).join("\n");
-    case "resource-zk-links": return dataviewResourceZkLinks(t, settings, sourcePath).join("\n");
-    case "fleeting-promotion": return dataviewFleetingPromotion(t).join("\n");
-    case "literature-promotion": return dataviewLiteraturePromotion(t).join("\n");
+    case "resource-cited-by":
+    case "permanent-cited-by":
+    case "source-create-permanent":
+      return dataviewCitedBy(t, settings, sourcePath).join("\n");
+    case "spark-distill": return dataviewDistilledInto(t).join("\n");
     default: return undefined;
   }
 }
@@ -515,8 +517,8 @@ function renderGuide(settings: ParaZkSettings): string {
     `- ${settings.paths.resourcesFolder}: ${t.labels.folderResources}`,
     `- ${settings.paths.retrosFolder}: ${t.labels.folderRetros}`,
     `- ${settings.paths.archivesFolder}: ${t.labels.folderArchives}`,
-    `- ${settings.paths.fleetingFolder}: ${t.labels.folderFleeting}`,
-    `- ${settings.paths.literatureFolder}: ${t.labels.folderLiterature}`,
+    `- ${settings.paths.sparkFolder}: ${t.labels.folderSpark}`,
+    `- ${settings.paths.sourceFolder}: ${t.labels.folderSource}`,
     `- ${settings.paths.permanentFolder}: ${t.labels.folderPermanent}`,
     `- ${settings.paths.journalFolder}: ${t.labels.folderJournal}`,
     `- ${settings.paths.dashboardFolder}: ${t.labels.folderDashboard}`,
@@ -607,8 +609,8 @@ function renderDashboardBody(
         ...dashboardOrphanResources(t, settings, 10),
         "",
         "---",
-        `## ${t.labels.staleFleeting}`,
-        ...dashboardStaleFleeting(t, settings, 10),
+        `## ${t.labels.staleSpark}`,
+        ...dashboardStaleSpark(t, settings, 10),
         "",
         `## ${t.labels.draftCandidates}`,
         ...dashboardDraftPermanent(t, settings, 10)
@@ -674,8 +676,8 @@ function renderDashboardBody(
         ...dashboardSummaryBlock("zk"),
         "",
         "---",
-        `## ${t.labels.staleFleeting}`,
-        ...dashboardStaleFleeting(t, settings, 50),
+        `## ${t.labels.staleSpark}`,
+        ...dashboardStaleSpark(t, settings, 50),
         "",
         "---",
         `## ${t.labels.draftCandidates}`,
@@ -683,7 +685,7 @@ function renderDashboardBody(
         "",
         "---",
         `## ${t.labels.recentlyCreated}`,
-        ...dashboardRecentLiterature(t, settings)
+        ...dashboardRecentSource(t, settings)
       ];
     case "tasks":
       return [
@@ -712,8 +714,8 @@ function renderDashboardBody(
         ...dashboardThisWeekResources(t, settings),
         "",
         "---",
-        `## ${t.labels.createdThisWeek}: Fleeting`,
-        ...dashboardThisWeekFleeting(t, settings),
+        `## ${t.labels.createdThisWeek}: Spark`,
+        ...dashboardThisWeekSpark(t, settings),
         "",
         "---",
         `## ${t.labels.draftCandidates}`,
@@ -777,8 +779,8 @@ function minimalFolders(paths: string[]): string[] {
 function zkSourceFolders(settings: ParaZkSettings): string[] {
   return minimalFolders([
     settings.paths.zkFolder,
-    settings.paths.fleetingFolder,
-    settings.paths.literatureFolder,
+    settings.paths.sparkFolder,
+    settings.paths.sourceFolder,
     settings.paths.permanentFolder
   ]);
 }
@@ -932,17 +934,17 @@ function resourceBacklinkTable(
   ]);
 }
 
-function dashboardStaleFleeting(t: ReturnType<typeof localePack>, settings: ParaZkSettings, limit: number): string[] {
+function dashboardStaleSpark(t: ReturnType<typeof localePack>, settings: ParaZkSettings, limit: number): string[] {
   return dataviewJs([
     "const days = (n) => 1000 * 60 * 60 * 24 * n;",
     "const now = Date.now();",
-    `const rows = pages(${dataviewJsSource(settings.paths.fleetingFolder)})`,
+    `const rows = pages(${dataviewJsSource(settings.paths.sparkFolder)})`,
     "  .filter(f => f.processed !== true)",
     "  .filter(f => now - timeOf(f.file.ctime) >= days(7))",
     "  .sort((a,b) => timeOf(a.file.ctime) - timeOf(b.file.ctime))",
     `  .slice(0, ${limit})`,
     "  .map(f => [f.file.link, f.file.ctime]);",
-    `dv.table(['Fleeting', ${jsString(t.labels.created)}], rows);`
+    `dv.table(['Spark', ${jsString(t.labels.created)}], rows);`
   ]);
 }
 
@@ -959,10 +961,10 @@ function dashboardDraftPermanent(t: ReturnType<typeof localePack>, settings: Par
   ]);
 }
 
-function dashboardRecentLiterature(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
+function dashboardRecentSource(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
   return fenced("dataview", [
-    `TABLE WITHOUT ID file.link AS "Literature", file.ctime AS "${t.labels.created}", file.mtime AS "${t.labels.updated}"`,
-    `FROM ${dataviewSource(settings.paths.literatureFolder)}`,
+    `TABLE WITHOUT ID file.link AS "Source", file.ctime AS "${t.labels.created}", file.mtime AS "${t.labels.updated}"`,
+    `FROM ${dataviewSource(settings.paths.sourceFolder)}`,
     "SORT file.ctime DESC",
     "LIMIT 10"
   ]);
@@ -979,14 +981,14 @@ function dashboardThisWeekResources(t: ReturnType<typeof localePack>, settings: 
   ]);
 }
 
-function dashboardThisWeekFleeting(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
+function dashboardThisWeekSpark(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
   return dataviewJs([
     "const startOfWeek = (() => { const d = new Date(); const day = (d.getDay() + 6) % 7; d.setHours(0,0,0,0); d.setDate(d.getDate() - day); return d; })();",
-    `const rows = pages(${dataviewJsSource(settings.paths.fleetingFolder)})`,
+    `const rows = pages(${dataviewJsSource(settings.paths.sparkFolder)})`,
     "  .filter(p => p.processed !== true)",
     "  .filter(p => timeOf(p.file.ctime) >= startOfWeek.getTime())",
     "  .sort((a,b) => timeOf(b.file.ctime) - timeOf(a.file.ctime))",
     "  .map(p => [p.file.link, p.file.ctime]);",
-    `dv.table(['Fleeting', ${jsString(t.labels.created)}], rows);`
+    `dv.table(['Spark', ${jsString(t.labels.created)}], rows);`
   ]);
 }

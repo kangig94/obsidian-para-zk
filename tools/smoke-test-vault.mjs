@@ -78,6 +78,12 @@ function prepareVault() {
     });
   }
 
+  // ensureGuiVault opens the vault if Obsidian is not already on it. On a fresh
+  // vault (empty/deleted .obsidian) Obsidian MUST be launched here AFTER the build
+  // above wrote the plugin, because Obsidian only scans .obsidian/plugins at startup
+  // — an instance already running on the empty vault won't see the just-built plugin
+  // and plugin:enable below would no-op (→ "para-zk:setup not found"). Re-runs that
+  // reuse a loaded plugin are unaffected (cleanVault keeps .obsidian).
   ensureGuiVault(vaultPath);
   run("optsidian", ["raw", "plugin:enable", "id=para-zk"], { allowFailure: true });
   run("optsidian", ["raw", "plugin:reload", "id=para-zk"]);
@@ -166,7 +172,7 @@ function runLiveScenario() {
   // suite (npm test) and is no longer re-checked here.
   assertGeneratedTemplateShapes();
   assertFreeFormReadWriteScenario();
-  assertPromoteResourceBodyPlacementScenario();
+  assertCreateFromResourceScenario();
   assertReferenceSubpathScenario();
   assertObjectReferenceDeleteCleanup();
   assertObjectReferenceRenameSurvival();
@@ -250,8 +256,8 @@ function assertManagedTemplateFiles() {
     "journal",
     "retro",
     "subnote",
-    "zk_fleeting",
-    "zk_literature",
+    "zk_spark",
+    "zk_source",
     "zk_permanent"
   ];
 
@@ -328,23 +334,23 @@ function assertGeneratedTemplateShapes() {
   assertCreated(retro, "template-shape retro");
   assertGeneratedNoteTemplateShape(retro.path, "retro");
 
-  const fleeting = cliJson("para-zk:create-zk", [
-    `title=Smoke Template Fleeting ${stamp}`,
-    "kind=fleeting",
+  const spark = cliJson("para-zk:create-zk", [
+    `title=Smoke Template Spark ${stamp}`,
+    "kind=spark",
     "open=false",
     "format=json"
   ]);
-  assertCreated(fleeting, "template-shape fleeting");
-  assertGeneratedNoteTemplateShape(fleeting.path, "zk_fleeting");
+  assertCreated(spark, "template-shape spark");
+  assertGeneratedNoteTemplateShape(spark.path, "zk_spark");
 
-  const literature = cliJson("para-zk:create-zk", [
-    `title=Smoke Template Literature ${stamp}`,
-    "kind=literature",
+  const source = cliJson("para-zk:create-zk", [
+    `title=Smoke Template Source ${stamp}`,
+    "kind=source",
     "open=false",
     "format=json"
   ]);
-  assertCreated(literature, "template-shape literature");
-  assertGeneratedNoteTemplateShape(literature.path, "zk_literature");
+  assertCreated(source, "template-shape source");
+  assertGeneratedNoteTemplateShape(source.path, "zk_source");
 
   const permanent = cliJson("para-zk:create-zk", [
     `title=Smoke Template Permanent ${stamp}`,
@@ -401,9 +407,9 @@ function assertZkStarterTemplateShape(path, type, text) {
 
 function oldZkStarterHeadings(type) {
   switch (type) {
-    case "zk_fleeting":
+    case "zk_spark":
       return ["# One-line thought summary", "# Memo"];
-    case "zk_literature":
+    case "zk_source":
       return ["## Highlights (quotes/evidence)", "# Summary", "# Key insights", "# Important quotes/evidence"];
     case "zk_permanent":
       return ["# One-sentence summary", "# Body", "## Limitations", "## Related questions"];
@@ -454,13 +460,13 @@ function assertFreeFormReadWriteScenario() {
 
   for (const { kind, type, droppedKeys } of [
     {
-      kind: "fleeting",
-      type: "zk_fleeting",
+      kind: "spark",
+      type: "zk_spark",
       droppedKeys: ["thought_summary", "memo", "tasks", "untracked"]
     },
     {
-      kind: "literature",
-      type: "zk_literature",
+      kind: "source",
+      type: "zk_source",
       droppedKeys: ["highlight_block", "summary", "insight", "evidence", "untracked"]
     },
     {
@@ -519,7 +525,7 @@ function assertFreeFormBodyReadWrite({ label, updateCommand, readCommand, select
   }
 }
 
-function assertPromoteResourceBodyPlacementScenario() {
+function assertCreateFromResourceScenario() {
   const resource = cliJson("para-zk:create-resource", [
     `title=Smoke Promote Source ${stamp}`,
     "link=false",
@@ -537,41 +543,35 @@ function assertPromoteResourceBodyPlacementScenario() {
   ]);
   assert(setup.ok === true, "promote resource source body setup failed");
 
-  const promoted = cliJson("para-zk:promote-resource", [
+  const created = cliJson("para-zk:create-from-resource", [
     `path=${resource.path}`,
-    `title=Smoke Promoted Literature ${stamp}`,
-    "kind=literature",
+    `title=Smoke Created Source ${stamp}`,
+    "kind=source",
     "open=false",
     "format=json"
   ]);
-  assertCreated(promoted, "promote resource target");
-  assert(promoted.sourcePath === resource.path, "promote-resource result lost sourcePath");
-  assertGeneratedNoteTemplateShape(promoted.path, "zk_literature");
+  assertCreated(created, "create-from-resource target");
+  assert(created.sourcePath === resource.path, "create-from-resource result lost sourcePath");
+  assertGeneratedNoteTemplateShape(created.path, "zk_source");
 
-  const promotedLink = `[[${promoted.path}|${promoted.title}]]`;
+  // Single-direction reference: the resource is preserved and unchanged; no
+  // reverse link is written back into it (the new note surfaces via backlinks).
   const bodyRead = cliJson("para-zk:read-resource", [
     `path=${resource.path}`,
     "key=body",
     "format=json"
   ]);
-  assert(bodyRead.value.includes(promotedLink), "promote-resource did not append target link to source resource body");
-  assert(bodyRead.value.includes(sourceBody), "promote-resource source body lost existing body text");
-
-  const sourceText = readVaultText(resource.path);
-  const linkIndex = sourceText.indexOf(promotedLink);
-  const tailIndex = sourceText.lastIndexOf("```para-zk-managed");
-  assert(linkIndex >= 0, "promote-resource target link is missing from source resource file");
-  assert(tailIndex >= 0, "promote-resource source resource lost managed tail");
-  assert(linkIndex < tailIndex, "promote-resource target link must appear before the managed tail");
+  assert(bodyRead.value.includes(sourceBody), "create-from-resource resource body lost existing text");
+  assert(!bodyRead.value.includes(`[[${created.path}`), "create-from-resource must not write a reverse link into the resource");
 
   const references = cliJson("para-zk:read-zk", [
-    `path=${promoted.path}`,
+    `path=${created.path}`,
     "key=references",
     "limit=all",
     "format=json"
   ]);
   const items = Object.values(references.value?.items ?? {});
-  assert(items.some((item) => item.path === resource.path), "promoted ZK note does not reference source resource");
+  assert(items.some((item) => item.path === resource.path), "created ZK note does not reference source resource");
 }
 
 function assertProjectSummaryShape(path, summaryText = "") {
@@ -1449,9 +1449,17 @@ function takeNext(rawArgs, flag) {
 function printHelp() {
   console.log(`Usage: npm run smoke:vault -- [--vault <path>] [--no-build] [--no-install-deps]
 
-The vault contents are ALWAYS wiped and fully re-initialized before the run,
-so verification always starts from a clean state. This is intentionally
-non-optional: pass only a disposable test vault.
+The vault CONTENTS are ALWAYS wiped and fully re-initialized before the run
+(the .obsidian config dir is preserved), so verification always starts from a
+clean state. This is intentionally non-optional: pass only a disposable test vault.
+
+You do NOT need to restart Obsidian between runs: re-running this script while
+Obsidian stays open is fine, because the wipe keeps .obsidian and the para-zk
+plugin stays loaded. Restarting only matters on a truly fresh vault (an empty or
+deleted .obsidian): Obsidian scans plugins at startup, so a plugin built into
+.obsidian/plugins AFTER Obsidian opened that vault is not picked up until Obsidian
+(re)launches — which is why a brand-new vault must be opened fresh, not reused from
+an instance that was already running on the empty vault.
 
 Options:
   --vault <path>       Disposable test vault path. Defaults to PARA_ZK_TEST_VAULT or a local para-zk vault.

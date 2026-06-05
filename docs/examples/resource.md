@@ -24,4 +24,4 @@ A brand-new SSD finishes in under a second with a quick format. Mounting was con
 
 # Notes
 
-When part of the material becomes an idea worth refining for ZK → capture it as a fleeting note, then promote.
+When part of the material becomes an idea worth keeping → create a Source or Permanent ZK note from this resource (Create ZK from resource); the new note references this resource and it stays put.

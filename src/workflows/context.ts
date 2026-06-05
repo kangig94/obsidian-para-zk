@@ -90,7 +90,7 @@ export type OpenJournalOptions = {
   open?: boolean;
 };
 
-export type PromoteResourceOptions = {
+export type CreateFromResourceOptions = {
   sourcePath?: string;
   title?: string;
   kind?: string;
@@ -98,18 +98,18 @@ export type PromoteResourceOptions = {
   open?: boolean;
 };
 
-export type PromoteLiteratureOptions = {
+export type CreatePermanentFromSourceOptions = {
   sourcePath?: string;
   title?: string;
   maturity?: string;
   open?: boolean;
 };
 
-export type PromoteFleetingOptions = {
+export type DistillSparkOptions = {
   sourcePath?: string;
   title?: string;
-  kind?: string;
   maturity?: string;
+  discard?: boolean;
   open?: boolean;
 };
 

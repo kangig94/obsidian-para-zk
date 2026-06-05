@@ -6,12 +6,11 @@ import {
   localDateTimeSpace,
   localTime
 } from "../time";
-import type { CaptureResult, PromotionResult } from "../types";
+import type { CaptureResult, PromotionResult, ZkKind } from "../types";
 import { readFileFrontmatterFresh, readFileTypeFresh } from "../vault/frontmatter";
 import { ensureFolder } from "../vault/files";
 import type { WorkflowHost } from "../vault/host";
 import { joinVaultPath, wikiLink } from "../vault/paths";
-import { trailingManagedBlockStart } from "../vault/sections";
 import {
   ENERGY_CODE_HELP,
   MATURITY_CODE_HELP,
@@ -19,8 +18,8 @@ import {
   parseMaturityCode,
   type EnergyCode
 } from "../vocabulary";
-import { PROMOTION_ZK_KIND_CODE_HELP, ZK_KIND_CODE_HELP, parsePromotionKind, parseZkKind } from "../zk/kinds";
-import { escapeRegExp } from "../text";
+import { RESOURCE_CREATE_KIND_CODE_HELP, parseResourceCreateKind } from "../zk/kinds";
+import { appendUniqueStrings, escapeRegExp } from "../text";
 import { readOptionalCode } from "./code-options";
 import {
   applyCreatedUpdatedDefaults,
@@ -33,13 +32,14 @@ import type {
   CaptureJournalOptions,
   OpenJournalOptions,
   OpenJournalResult,
-  PromoteFleetingOptions,
-  PromoteLiteratureOptions,
-  PromoteResourceOptions,
+  DistillSparkOptions,
+  CreatePermanentFromSourceOptions,
+  CreateFromResourceOptions,
   WorkflowContext
 } from "./context";
-import { folderForZkKind, linkToFile, requireTitle, resolveRequiredFile, uniqueMarkdownPath } from "./locations";
+import { folderForZkKind, requireTitle, resolveRequiredFile, uniqueMarkdownPath } from "./locations";
 import { insertReferenceItem } from "./references";
+import { deleteZk } from "./delete";
 
 export async function captureJournal(ctx: WorkflowContext, options: CaptureJournalOptions): Promise<CaptureResult> {
   const content = options.content?.trim();
@@ -74,42 +74,66 @@ export async function openJournal(ctx: WorkflowContext, options: OpenJournalOpti
   };
 }
 
-export async function promoteResource(ctx: WorkflowContext, options: PromoteResourceOptions = {}): Promise<PromotionResult> {
-  const source = resolveRequiredFile(ctx, options.sourcePath, "source resource");
+// Shared scaffold: resolve a typed origin note and create a new ZK note of
+// `kind` from it. Behind createFromResource / createPermanentFromSource /
+// distillSpark — each adds only its distinct post-create step.
+async function createZkFromOrigin(
+  ctx: WorkflowContext,
+  options: { sourcePath?: string; title?: string; maturity?: string },
+  origin: { label: string; expectedType: string },
+  kind: ZkKind
+): Promise<{ source: TFile; file: TFile }> {
+  const source = resolveRequiredFile(ctx, options.sourcePath, origin.label);
   const sourceType = await readFileTypeFresh(ctx, source);
-  if (sourceType !== "resource") throw new Error(`file is not a resource note: ${source.path}`);
-  const kind = readOptionalCode(options.kind, parseZkKind, "kind", ZK_KIND_CODE_HELP) ?? "Permanent";
+  if (sourceType !== origin.expectedType) {
+    throw new Error(`file is not a ${origin.expectedType} note: ${source.path}`);
+  }
   const maturityCode = readOptionalCode(options.maturity, parseMaturityCode, "maturity", MATURITY_CODE_HELP);
   const title = requireTitle(options.title || source.basename, "ZK title");
   const folder = folderForZkKind(ctx.settings, kind);
   await ensureFolder(ctx.host, folder);
   const path = await uniqueMarkdownPath(ctx.host, joinVaultPath(folder, `${title}.md`));
   const file = await createZkFile(ctx, kind, path, title, { maturityCode });
-
-  await insertReferenceItem(ctx, file, { link: wikiLink(source.path) });
-  await appendPromotionLinkToBody(ctx.host, source, `- ${localePack(ctx.settings.locale).labels.promoteToZk}: ${linkToFile(file)}`, file.path);
-  await openIfRequested(ctx, file, options.open);
-
-  return {
-    ...noteResult(file, true, options.open),
-    sourcePath: source.path,
-    kind
-  };
+  return { source, file };
 }
 
-export async function promoteLiterature(ctx: WorkflowContext, options: PromoteLiteratureOptions = {}): Promise<PromotionResult> {
-  const source = resolveRequiredFile(ctx, options.sourcePath, "source literature note");
-  const sourceType = await readFileTypeFresh(ctx, source);
-  if (sourceType !== "zk_literature") throw new Error("file is not a literature ZK note: " + source.path);
-  const maturityCode = readOptionalCode(options.maturity, parseMaturityCode, "maturity", MATURITY_CODE_HELP);
-  const title = requireTitle(options.title || source.basename, "ZK title");
-  const folder = folderForZkKind(ctx.settings, "Permanent");
-  await ensureFolder(ctx.host, folder);
-  const path = await uniqueMarkdownPath(ctx.host, joinVaultPath(folder, `${title}.md`));
-  const file = await createZkFile(ctx, "Permanent", path, title, { maturityCode });
-
+// Create from a durable source. The new note references its origin (one
+// direction); the origin surfaces it via Obsidian backlinks. No reverse link is
+// written back into the origin (see ZK redesign: single-direction + derived backlinks).
+export async function createFromResource(ctx: WorkflowContext, options: CreateFromResourceOptions = {}): Promise<PromotionResult> {
+  const kind = readOptionalCode(options.kind, parseResourceCreateKind, "kind", RESOURCE_CREATE_KIND_CODE_HELP) ?? "Permanent";
+  const { source, file } = await createZkFromOrigin(ctx, options, { label: "source resource", expectedType: "resource" }, kind);
   await insertReferenceItem(ctx, file, { link: wikiLink(source.path) });
-  await appendPromotionLinkToBody(ctx.host, source, `- ${localePack(ctx.settings.locale).labels.createPermanent}: ${linkToFile(file)}`, file.path);
+  await openIfRequested(ctx, file, options.open);
+  return { ...noteResult(file, true, options.open), sourcePath: source.path, kind };
+}
+
+export async function createPermanentFromSource(ctx: WorkflowContext, options: CreatePermanentFromSourceOptions = {}): Promise<PromotionResult> {
+  const { source, file } = await createZkFromOrigin(ctx, options, { label: "source note", expectedType: "zk_source" }, "Permanent");
+  await insertReferenceItem(ctx, file, { link: wikiLink(source.path) });
+  await openIfRequested(ctx, file, options.open);
+  return { ...noteResult(file, true, options.open), sourcePath: source.path, kind: "Permanent" as const };
+}
+
+// Distill consumes a spark: its idea moves into a new permanent note. The spark
+// is ephemeral, so the permanent does not reference it; the spark is only marked
+// processed (discard is a separate, manual action — a spark may yield several
+// permanents before there is nothing left to extract).
+export async function distillSpark(ctx: WorkflowContext, options: DistillSparkOptions = {}): Promise<PromotionResult> {
+  const { source, file } = await createZkFromOrigin(ctx, options, { label: "source spark note", expectedType: "zk_spark" }, "Permanent");
+
+  if (options.discard) {
+    // The whole point of the spark is fulfilled — drop it (to trash, recoverable).
+    await deleteZk(ctx, { path: source.path });
+  } else {
+    // Keep the spark for now; record what it became. The pointer lives on the
+    // disposable spark (not the permanent), so discarding it later — by any means —
+    // never leaves a dangling link in the permanent.
+    await ctx.host.processFrontMatter(source, (fm) => {
+      fm.processed = true;
+      fm.distilled_to = appendUniqueStrings(fm.distilled_to, [wikiLink(file.path)]);
+    });
+  }
   await openIfRequested(ctx, file, options.open);
 
   return {
@@ -117,57 +141,6 @@ export async function promoteLiterature(ctx: WorkflowContext, options: PromoteLi
     sourcePath: source.path,
     kind: "Permanent" as const
   };
-}
-
-export async function promoteFleeting(ctx: WorkflowContext, options: PromoteFleetingOptions = {}): Promise<PromotionResult> {
-  const source = resolveRequiredFile(ctx, options.sourcePath, "source fleeting note");
-  const sourceType = await readFileTypeFresh(ctx, source);
-  if (sourceType !== "zk_fleeting") throw new Error(`file is not a fleeting ZK note: ${source.path}`);
-  const kind = readOptionalCode(options.kind, parsePromotionKind, "kind", PROMOTION_ZK_KIND_CODE_HELP) ?? "Permanent";
-  const maturityCode = readOptionalCode(options.maturity, parseMaturityCode, "maturity", MATURITY_CODE_HELP);
-  const title = requireTitle(options.title || source.basename, "ZK title");
-  const folder = folderForZkKind(ctx.settings, kind);
-  await ensureFolder(ctx.host, folder);
-  const path = await uniqueMarkdownPath(ctx.host, joinVaultPath(folder, `${title}.md`));
-  const file = await createZkFile(ctx, kind, path, title, { maturityCode });
-
-  await insertReferenceItem(ctx, file, { link: wikiLink(source.path) });
-  await ctx.host.processFrontMatter(source, (fm) => {
-    fm.processed = true;
-    fm.promoted_to = linkToFile(file);
-  });
-
-  await openIfRequested(ctx, file, options.open);
-
-  return {
-    ...noteResult(file, true, options.open),
-    sourcePath: source.path,
-    kind
-  };
-}
-
-async function appendPromotionLinkToBody(
-  host: Pick<WorkflowHost, "modify" | "read">,
-  file: TFile,
-  line: string,
-  dedupeTargetPath: string
-): Promise<boolean> {
-  const content = await host.read(file);
-  const linkTargetRe = new RegExp(`\\[\\[${escapeRegExp(dedupeTargetPath)}(?:\\|[^\\]]*)?\\]\\]`, "i");
-  if (linkTargetRe.test(content)) return false;
-
-  const tailStart = trailingManagedBlockStart(content, 0, content.length) ?? content.length;
-  const beforeTail = content.slice(0, tailStart).replace(/\s*$/, "");
-  const tail = content.slice(tailStart).replace(/^\s*/, "");
-  const updated = [
-    beforeTail,
-    line,
-    ...(tail ? [tail] : [])
-  ].filter(Boolean).join("\n\n") + (tail ? "" : "\n");
-
-  if (updated === content) return false;
-  await host.modify(file, updated);
-  return true;
 }
 
 async function appendLineUnderHeader(

@@ -187,12 +187,18 @@ function dataviewViewToolbar(plugin: ParaZkPluginContext, key: DataviewViewKey):
       return actionToolbar("create-retro", labels.createRetro, "calendar-plus");
     case "area-subareas":
       return actionToolbar("create-subarea", labels.createSubarea, "folder-plus");
-    case "resource-zk-links":
-      return actionToolbar("promote-resource", labels.promoteToZk, "arrow-up-right");
-    case "fleeting-promotion":
-      return actionToolbar("promote-fleeting", labels.promote, "arrow-up-right");
-    case "literature-promotion":
-      return actionToolbar("promote-literature", labels.createPermanent, "arrow-up-right");
+    case "resource-cited-by":
+      return actionToolbar("create-from-resource", labels.createZkButton, "arrow-up-right");
+    case "spark-distill":
+      return {
+        actions: [
+          { command: "discard-spark", label: labels.discardButton, icon: "trash-2" },
+          { command: "distill-spark", label: labels.distillButton, icon: "arrow-up-right" }
+        ]
+      };
+    case "source-create-permanent":
+      return actionToolbar("create-permanent", labels.createPermanentButton, "arrow-up-right");
+    case "permanent-cited-by":
     case "area-projects":
       return undefined;
   }

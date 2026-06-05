@@ -15,8 +15,8 @@ controls, dependency configuration, and the native CLI surface.
 The goal is not only a nicer Obsidian for a person. It is to let an LLM create and
 maintain knowledge-work structures in the vault — create a project, attach it to
 areas, add child notes, create resources, capture journal memos, create ZK notes,
-promote resources into ZK, promote fleeting notes — and keep the resulting
-frontmatter and backlinks coherent.
+create ZK notes from resources/sources, distill sparks into permanents — and keep the
+resulting frontmatter and backlinks coherent.
 
 ## Test Vaults
 
@@ -120,13 +120,17 @@ Folder-style notes are part of the workflow: projects and areas are folders
 containing their main note, and children link back through frontmatter so Dataview
 can discover them.
 
-Promotion preserves traceability:
+ZK creation uses single-direction links (the new note references its origin; the
+origin surfaces it via backlinks / its *Cited by* view — no reverse link is stored):
 
-- Promoting a resource creates a ZK note linked back to the resource and appends
-  the promoted-note link to the source resource body before the managed tail.
-- Promoting a fleeting note creates a Literature or Permanent note, keeps the source
-  fleeting note in place marked `processed: true`, and links it to the promoted note.
-- Fleeting notes have no archive folder; completed work is `processed: true`.
+- **Create from resource** (`create-from-resource`) makes a Source or Permanent note
+  that references the resource; the resource is preserved and left unchanged.
+- **Create permanent from source** (`create-permanent`) makes a Permanent note that
+  references the source; the source is preserved.
+- **Distill spark** (`distill-spark`) moves a spark's idea into a new Permanent note,
+  marks the spark `processed: true`, and leaves it for manual discard (a spark may yield
+  several permanents). The permanent does not link back to the ephemeral spark.
+- Sparks have no archive folder; completed work is `processed: true`.
 
 ## Verification
 

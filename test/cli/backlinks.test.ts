@@ -387,8 +387,8 @@ describe("backlink read collection", () => {
     expect(Object.values(value.items)[0]?.path).toBe(projectPath);
   });
 
-  it("exposes backlinks on fleeting and literature ZK reads", async () => {
-    for (const kind of ["fleeting", "literature"]) {
+  it("exposes backlinks on spark and source ZK reads", async () => {
+    for (const kind of ["spark", "source"]) {
       const title = `Backlinked ${kind}`;
       const targetPath = await createZk(title, kind);
       const sourcePath = await createProject(`${kind} ZK Source`);

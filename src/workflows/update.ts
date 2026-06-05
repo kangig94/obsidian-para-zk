@@ -659,7 +659,7 @@ function normalizeFrontmatterUpdateValue(type: string, key: string, value: unkno
   if (type === "zk_permanent" && key === "maturity") {
     return readOptionalCode(String(value), parseMaturityCode, "maturity", MATURITY_CODE_HELP);
   }
-  if (type === "zk_fleeting" && key === "processed") {
+  if (type === "zk_spark" && key === "processed") {
     if (typeof value === "boolean") return value;
     const normalized = String(value).trim().toLowerCase();
     if (["true", "1", "yes", "on"].includes(normalized)) return true;

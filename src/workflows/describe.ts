@@ -47,8 +47,8 @@ const SURFACE_TYPES = [
   "journal",
   "retro",
   "doc",
-  "zk_fleeting",
-  "zk_literature",
+  "zk_spark",
+  "zk_source",
   "zk_permanent",
   "note"
 ] as const;
@@ -120,7 +120,7 @@ const DOC_READ_SPEC: ReadSurfaceSpec = {
   body: true
 };
 
-const ZK_FLEETING_READ_SPEC: ReadSurfaceSpec = {
+const ZK_SPARK_READ_SPEC: ReadSurfaceSpec = {
   frontmatter: ["processed"],
   sections: [
     { key: "references", labelKey: "references", transform: readReferences, collection: "reference" },
@@ -129,7 +129,7 @@ const ZK_FLEETING_READ_SPEC: ReadSurfaceSpec = {
   body: true
 };
 
-const ZK_LITERATURE_READ_SPEC: ReadSurfaceSpec = {
+const ZK_SOURCE_READ_SPEC: ReadSurfaceSpec = {
   frontmatter: ["sourceTitle", "authors", "published", "url"],
   sections: [
     { key: "references", labelKey: "references", transform: readReferences, collection: "reference" },
@@ -162,8 +162,8 @@ export function specForType(type: string): ReadSurfaceSpec {
   if (type === "journal") return JOURNAL_READ_SPEC;
   if (type === "retro") return RETRO_READ_SPEC;
   if (type === "doc") return DOC_READ_SPEC;
-  if (type === "zk_fleeting") return ZK_FLEETING_READ_SPEC;
-  if (type === "zk_literature") return ZK_LITERATURE_READ_SPEC;
+  if (type === "zk_spark") return ZK_SPARK_READ_SPEC;
+  if (type === "zk_source") return ZK_SOURCE_READ_SPEC;
   if (type === "zk_permanent") return ZK_PERMANENT_READ_SPEC;
   return NOTE_READ_SPEC;
 }
@@ -274,8 +274,8 @@ export function describeSurfaces(): SurfaceDescription[] {
 
 function normalizeSurfaceType(type: string): SurfaceType {
   const normalized = type.trim().toLocaleLowerCase();
-  if (normalized === "fleeting") return "zk_fleeting";
-  if (normalized === "literature") return "zk_literature";
+  if (normalized === "spark") return "zk_spark";
+  if (normalized === "source") return "zk_source";
   if (normalized === "permanent") return "zk_permanent";
   if ((SURFACE_TYPES as readonly string[]).includes(normalized)) return normalized as SurfaceType;
   throw new Error(`unknown surface type: ${type} (valid: ${SURFACE_TYPES.join(", ")})`);

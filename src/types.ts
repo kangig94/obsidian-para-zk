@@ -5,9 +5,9 @@ export type CliOptionSpec = {
   description: string;
 };
 
-export type ZkKind = "Fleeting" | "Literature" | "Permanent";
+export type ZkKind = "Spark" | "Source" | "Permanent";
 
-export type PromotionZkKind = "Literature" | "Permanent";
+export type ResourceCreateKind = "Source" | "Permanent";
 
 export type Locale = "en" | "ko";
 
@@ -18,8 +18,8 @@ type ParaZkPaths = {
   retrosFolder: string;
   archivesFolder: string;
   zkFolder: string;
-  fleetingFolder: string;
-  literatureFolder: string;
+  sparkFolder: string;
+  sourceFolder: string;
   permanentFolder: string;
   journalFolder: string;
   dashboardFolder: string;
@@ -106,8 +106,8 @@ const DEFAULT_PATHS: ParaZkPaths = {
   retrosFolder: "PARA/Retros",
   archivesFolder: "PARA/Archives",
   zkFolder: "ZK",
-  fleetingFolder: "ZK/Fleeting",
-  literatureFolder: "ZK/Literature",
+  sparkFolder: "ZK/Spark",
+  sourceFolder: "ZK/Source",
   permanentFolder: "ZK/Permanent",
   journalFolder: "Journal",
   dashboardFolder: "Dashboard",
@@ -124,8 +124,8 @@ const DEFAULT_LAYOUT_FOLDERS = [
   "PARA/Retros",
   "PARA/Archives",
   "ZK",
-  "ZK/Fleeting",
-  "ZK/Literature",
+  "ZK/Spark",
+  "ZK/Source",
   "ZK/Permanent",
   "Journal",
   "Dashboard",

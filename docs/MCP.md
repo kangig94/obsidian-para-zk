@@ -137,14 +137,14 @@ Required: `type`, `key`, `content`, and a valid selector for the type. `position
 | `resource` | `update-resource` | `title` or `path` | |
 | `retro` | `update-retro` | `title` or `path` | optional `date` passes through |
 | `journal` | `update-journal` | `date` or `path` | no title selector |
-| `zk_fleeting` | `update-zk` | `title` or `path` | `kind=fleeting` |
-| `zk_literature` | `update-zk` | `title` or `path` | `kind=literature` |
+| `zk_spark` | `update-zk` | `title` or `path` | `kind=spark` |
+| `zk_source` | `update-zk` | `title` or `path` | `kind=source` |
 | `zk_permanent` | `update-zk` | `title` or `path` | `kind=permanent` |
 
 Child doc/note bodies are edited through their parent note by passing the child key, for example `children/<Child Title>/body`.
 
 Structured types (`project`, `area`, `journal`, `retro`) use template section
-keys. Free-form types (`resource`, `zk_fleeting`, `zk_literature`,
+keys. Free-form types (`resource`, `zk_spark`, `zk_source`,
 `zk_permanent`, child `doc`, and fallback `note`) use `key=body` for prose;
 their Markdown headings are content, not enforced keys. `describe` remains the
 source of truth for each type's read/write keys and collections.

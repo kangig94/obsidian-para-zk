@@ -80,9 +80,9 @@ export function workflowCommandEntries(labels: Labels): Array<readonly [string, 
     ["create-zk", labels.createZkCommandName],
     ["open-journal", labels.openJournalCommandName],
     ["capture-journal", labels.captureJournalCommandName],
-    ["promote-resource", labels.promoteResourceCommandName],
-    ["promote-fleeting", labels.promoteFleetingCommandName],
-    ["promote-literature", labels.promoteLiteratureCommandName]
+    ["create-from-resource", labels.createFromResourceCommandName],
+    ["distill-spark", labels.distillSparkCommandName],
+    ["create-permanent", labels.createPermanentCommandName]
   ];
 }
 

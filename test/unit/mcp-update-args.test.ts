@@ -10,7 +10,7 @@ describe("MCP update arg builder", () => {
       cli: "optsidian",
       tool: "replace",
       params: {
-        type: "zk_fleeting",
+        type: "zk_spark",
         title: "My Note",
         key: "body",
         old_string: oldString,
@@ -19,7 +19,7 @@ describe("MCP update arg builder", () => {
     })).toEqual([
       "raw",
       "para-zk:update-zk",
-      "kind=fleeting",
+      "kind=spark",
       "title=My Note",
       "key=body",
       "op=replace",

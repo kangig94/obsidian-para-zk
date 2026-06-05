@@ -7,7 +7,7 @@ import {
   statusCommandEntries,
   workflowCommandEntries
 } from "./locale-labels";
-import { chooseValue, promptSetupOptions, promptText } from "./prompts";
+import { chooseValue, confirmAction, promptDistill, promptSetupOptions, promptText } from "./prompts";
 
 export function registerStatusAndInitCommands(plugin: ParaZkPluginContext): void {
   const labels = localePack(plugin.settings.locale).labels;
@@ -121,9 +121,9 @@ async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: 
     case "create-retro":
       return workflows.createRetro(ctx, { sourcePath: activePath, open: true });
     case "create-zk": {
-      const kind = await chooseValue(plugin.app, labels.promptPromoteKind, [
-        { label: "Fleeting", value: "fleeting" },
-        { label: "Literature", value: "literature" },
+      const kind = await chooseValue(plugin.app, labels.promptCreateKind, [
+        { label: "Spark", value: "spark" },
+        { label: "Source", value: "source" },
         { label: "Permanent", value: "permanent" }
       ]);
       if (!kind) return undefined;
@@ -136,28 +136,41 @@ async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: 
       const content = await prompt(plugin, labels.captureJournalCommandName, labels.promptCaptureContent);
       return content ? workflows.captureJournal(ctx, { content, open: true }) : undefined;
     }
-    case "promote-resource": {
-      const kind = await chooseValue(plugin.app, labels.promptPromoteKind, [
-        { label: "Fleeting", value: "fleeting" },
-        { label: "Literature", value: "literature" },
+    case "create-from-resource": {
+      const kind = await chooseValue(plugin.app, labels.promptCreateKind, [
+        { label: "Source", value: "source" },
         { label: "Permanent", value: "permanent" }
       ]);
       if (!kind) return undefined;
-      const title = await prompt(plugin, labels.promoteResourceCommandName, labels.promptZkTitle, sourceFile?.basename ?? "");
-      return title ? workflows.promoteResource(ctx, { sourcePath: activePath, title, kind, open: true }) : undefined;
+      const title = await prompt(plugin, labels.createFromResourceCommandName, labels.promptZkTitle, sourceFile?.basename ?? "");
+      return title ? workflows.createFromResource(ctx, { sourcePath: activePath, title, kind, open: true }) : undefined;
     }
-    case "promote-fleeting": {
-      const kind = await chooseValue(plugin.app, labels.promptPromoteKind, [
-        { label: "Literature", value: "literature" },
-        { label: "Permanent", value: "permanent" }
-      ]);
-      if (!kind) return undefined;
-      const title = await prompt(plugin, labels.promoteFleetingCommandName, labels.promptZkTitle, sourceFile?.basename ?? "");
-      return title ? workflows.promoteFleeting(ctx, { sourcePath: activePath, title, kind, open: true }) : undefined;
+    case "distill-spark": {
+      const result = await promptDistill(
+        plugin.app,
+        labels.distillSparkCommandName,
+        labels.promptZkTitle,
+        sourceFile?.basename ?? "",
+        labels.distillDiscardToggle,
+        labels.confirm,
+        labels.cancel
+      );
+      return result ? workflows.distillSpark(ctx, { sourcePath: activePath, title: result.title, discard: result.discard, open: true }) : undefined;
     }
-    case "promote-literature": {
-      const title = await prompt(plugin, labels.promoteLiteratureCommandName, labels.promptZkTitle, sourceFile?.basename ?? "");
-      return title ? workflows.promoteLiterature(ctx, { sourcePath: activePath, title, open: true }) : undefined;
+    case "discard-spark": {
+      if (!activePath) return undefined;
+      const confirmed = await confirmAction(
+        plugin.app,
+        labels.discardSparkConfirmTitle,
+        labels.discardSparkConfirmMessage,
+        labels.discardButton,
+        labels.cancel
+      );
+      return confirmed ? workflows.deleteZk(ctx, { path: activePath }) : undefined;
+    }
+    case "create-permanent": {
+      const title = await prompt(plugin, labels.createPermanentCommandName, labels.promptZkTitle, sourceFile?.basename ?? "");
+      return title ? workflows.createPermanentFromSource(ctx, { sourcePath: activePath, title, open: true }) : undefined;
     }
     default:
       throw new Error(`${localePack(plugin.settings.locale).messages.unknownCommand}: ${command}`);

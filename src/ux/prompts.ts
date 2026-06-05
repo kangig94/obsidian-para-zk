@@ -27,6 +27,34 @@ export function chooseValue(app: App, title: string, choices: Array<{ label: str
   });
 }
 
+export type DistillPromptResult = { title: string; discard: boolean };
+
+export function promptDistill(
+  app: App,
+  title: string,
+  placeholder: string,
+  initialValue: string,
+  discardToggleLabel: string,
+  confirmLabel: string,
+  cancelLabel: string
+): Promise<DistillPromptResult | null> {
+  return new Promise((resolve) => {
+    new DistillPromptModal(app, title, placeholder, initialValue, discardToggleLabel, confirmLabel, cancelLabel, resolve).open();
+  });
+}
+
+export function confirmAction(
+  app: App,
+  title: string,
+  message: string,
+  confirmLabel: string,
+  cancelLabel: string
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    new ConfirmModal(app, title, message, confirmLabel, cancelLabel, (value) => resolve(value === true)).open();
+  });
+}
+
 export function promptSetupOptions(
   app: App,
   initial: SetupPromptOptions
@@ -199,6 +227,91 @@ class SetupOptionsModal extends ResolvingModal<SetupPromptOptions> {
 
   private cancel(): void {
     this.resolveAndClose(null);
+  }
+}
+
+class DistillPromptModal extends ResolvingModal<DistillPromptResult> {
+  private discard = false;
+
+  constructor(
+    app: App,
+    private readonly titleText: string,
+    private readonly placeholder: string,
+    private readonly initialValue: string,
+    private readonly discardToggleLabel: string,
+    private readonly confirmLabel: string,
+    private readonly cancelLabel: string,
+    resolve: (value: DistillPromptResult | null) => void
+  ) {
+    super(app, resolve);
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: this.titleText });
+
+    const input = new TextComponent(contentEl);
+    input.inputEl.type = "text";
+    input.inputEl.addClass("para-zk-prompt-input");
+    input.setValue(this.initialValue).setPlaceholder(this.placeholder);
+    input.inputEl.addEventListener("keydown", (event: KeyboardEvent) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        this.submit(input.getValue());
+      }
+    });
+    input.inputEl.focus();
+    input.inputEl.select();
+
+    new Setting(contentEl)
+      .setName(this.discardToggleLabel)
+      .addToggle((toggle) => {
+        toggle.setValue(this.discard).onChange((value) => {
+          this.discard = value;
+        });
+      });
+
+    new Setting(contentEl)
+      .addButton((button) => {
+        button.setButtonText(this.confirmLabel).setCta().onClick(() => this.submit(input.getValue()));
+      })
+      .addButton((button) => {
+        button.setButtonText(this.cancelLabel).onClick(() => this.resolveAndClose(null));
+      });
+  }
+
+  private submit(value: string): void {
+    const title = value.trim();
+    this.resolveAndClose(title ? { title, discard: this.discard } : null);
+  }
+}
+
+class ConfirmModal extends ResolvingModal<boolean> {
+  constructor(
+    app: App,
+    private readonly titleText: string,
+    private readonly message: string,
+    private readonly confirmLabel: string,
+    private readonly cancelLabel: string,
+    resolve: (value: boolean | null) => void
+  ) {
+    super(app, resolve);
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: this.titleText });
+    contentEl.createEl("p", { text: this.message });
+
+    new Setting(contentEl)
+      .addButton((button) => {
+        button.setButtonText(this.confirmLabel).setWarning().onClick(() => this.resolveAndClose(true));
+      })
+      .addButton((button) => {
+        button.setButtonText(this.cancelLabel).onClick(() => this.resolveAndClose(false));
+      });
   }
 }
 

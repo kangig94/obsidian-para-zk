@@ -1,5 +1,6 @@
 import type { App } from "obsidian";
 import { isRecord } from "../records";
+import { appendUniqueStrings } from "../text";
 import type { SetupResult, ParaZkSettings } from "../types";
 import { normalizeVaultPath } from "../vault/paths";
 
@@ -84,12 +85,12 @@ function mergeAppConfig(current: Record<string, unknown>, settings: ParaZkSettin
     alwaysUpdateLinks: true,
     attachmentFolderPath: ATTACHMENT_FOLDER,
     trashOption: "local",
-    userIgnoreFilters: mergeStringList(current.userIgnoreFilters, [
+    userIgnoreFilters: appendUniqueStrings(current.userIgnoreFilters, [
       ignoreFilterFolder(settings.paths.templatesFolder),
       ignoreFilterFolder(settings.paths.dashboardFolder),
       ignoreFilterFolder(settings.paths.tasksFolder),
       "README"
-    ]),
+    ].map(cleanIgnoreFilter)),
     propertiesInDocument: "hidden"
   };
 }
@@ -99,18 +100,6 @@ function mergeTemplatesConfig(current: Record<string, unknown>, settings: ParaZk
     ...current,
     folder: normalizeVaultPath(settings.paths.templatesFolder)
   };
-}
-
-function mergeStringList(current: unknown, desired: string[]): string[] {
-  const merged = Array.isArray(current)
-    ? current.filter((item): item is string => typeof item === "string")
-    : [];
-
-  for (const item of desired.map(cleanIgnoreFilter).filter(Boolean)) {
-    if (!merged.includes(item)) merged.push(item);
-  }
-
-  return merged;
 }
 
 function ignoreFilterFolder(folder: string): string {

@@ -57,7 +57,7 @@ import {
   uniqueMarkdownPath
 } from "./locations";
 import { insertReferenceItem } from "./references";
-import { ROOT_ID_FRONTMATTER_KEY, insertRootTask, newRootId, rootIdFromFrontmatter } from "./tasks";
+import { ROOT_ID_FRONTMATTER_KEY, newRootId, rootIdFromFrontmatter } from "./tasks";
 
 export async function createProject(ctx: WorkflowContext, options: CreateProjectOptions): Promise<CreateProjectResult> {
   const title = requireTitle(options.title, "project title");
@@ -321,7 +321,7 @@ export async function createRetro(ctx: WorkflowContext, options: CreateRetroOpti
 
 export async function createZk(ctx: WorkflowContext, options: CreateZkOptions): Promise<CreateZkResult> {
   const title = requireTitle(options.title, "ZK title");
-  const kind = readOptionalCode(options.kind, parseZkKind, "kind", ZK_KIND_CODE_HELP) ?? "Fleeting";
+  const kind = readOptionalCode(options.kind, parseZkKind, "kind", ZK_KIND_CODE_HELP) ?? "Spark";
   const maturityCode = readOptionalCode(options.maturity, parseMaturityCode, "maturity", MATURITY_CODE_HELP);
   const folder = folderForZkKind(ctx.settings, kind);
   await ensureFolder(ctx.host, folder);
@@ -344,10 +344,10 @@ export async function createZkFile(
 ): Promise<TFile> {
   const createdAt = localDateTimeSpace();
   let templateName: TemplateName = "zk_permanent";
-  if (kind === "Fleeting") {
-    templateName = "zk_fleeting";
-  } else if (kind === "Literature") {
-    templateName = "zk_literature";
+  if (kind === "Spark") {
+    templateName = "zk_spark";
+  } else if (kind === "Source") {
+    templateName = "zk_source";
   }
   const maturity = options.maturityCode ?? "draft";
   const file = await createMarkdownFile(ctx, templateName, path, {
@@ -362,14 +362,9 @@ export async function createZkFile(
     fm.type = `zk_${kind.toLowerCase()}`;
     fm.tags = [`${tags.knowledge}/${slugify(title)}`];
     applyCreatedUpdatedDefaults(fm, createdAt);
-    if (kind === "Fleeting" && fm.processed === undefined) fm.processed = false;
+    if (kind === "Spark" && fm.processed === undefined) fm.processed = false;
     if (kind === "Permanent") fm.maturity = fm.maturity ?? maturity;
   });
-  if (kind === "Fleeting") {
-    const labels = localePack(ctx.settings.locale).labels;
-    await insertRootTask(ctx, file, { name: labels.refineFleetingAction });
-    await insertRootTask(ctx, file, { name: labels.connectReferencesAction });
-  }
   return file;
 }
 

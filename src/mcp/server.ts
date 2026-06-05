@@ -36,8 +36,8 @@ const UPDATE_TYPE_VALUES = [
   "resource",
   "retro",
   "journal",
-  "zk_fleeting",
-  "zk_literature",
+  "zk_spark",
+  "zk_source",
   "zk_permanent"
 ] as const;
 const UPDATE_TOOL_NAMES = ["replace", "set", "add"] as const;
@@ -47,8 +47,8 @@ const UPDATE_TYPES: Record<UpdateType, { command: string; kind?: string }> = {
   resource: { command: "update-resource" },
   retro: { command: "update-retro" },
   journal: { command: "update-journal" },
-  zk_fleeting: { command: "update-zk", kind: "fleeting" },
-  zk_literature: { command: "update-zk", kind: "literature" },
+  zk_spark: { command: "update-zk", kind: "spark" },
+  zk_source: { command: "update-zk", kind: "source" },
   zk_permanent: { command: "update-zk", kind: "permanent" }
 };
 const BASE_MUTATION_PROPERTIES = {

@@ -10,10 +10,10 @@ describe("managed templates", () => {
     const journal = renderTemplate("journal", DEFAULT_SETTINGS);
     const retro = renderTemplate("retro", DEFAULT_SETTINGS);
     const subnote = renderTemplate("subnote", DEFAULT_SETTINGS);
-    const fleeting = renderTemplate("zk_fleeting", DEFAULT_SETTINGS);
-    const literature = renderTemplate("zk_literature", DEFAULT_SETTINGS);
+    const spark = renderTemplate("zk_spark", DEFAULT_SETTINGS);
+    const source = renderTemplate("zk_source", DEFAULT_SETTINGS);
     const permanent = renderTemplate("zk_permanent", DEFAULT_SETTINGS);
-    const templates = [project, area, resource, journal, retro, subnote, fleeting, literature, permanent];
+    const templates = [project, area, resource, journal, retro, subnote, spark, source, permanent];
 
     for (const content of templates) {
       expect(content).not.toContain("PZK[");
@@ -25,14 +25,14 @@ describe("managed templates", () => {
     expect(resource).toContain("```para-zk-props\ntype: resource\n```\n{{cursor}}\n\n```para-zk-managed");
     expect(resource).not.toContain("# Overview");
     expect(resource).not.toContain("# Body");
-    expect(fleeting).toContain("```para-zk-props\ntype: zk_fleeting\n```\n{{cursor}}\n\n```para-zk-managed");
-    expect(fleeting).not.toContain("# One-line thought summary");
-    expect(fleeting).not.toContain("# Memo");
-    expect(literature).toContain("```para-zk-props\ntype: zk_literature\n```\n{{cursor}}\n\n```para-zk-managed");
-    expect(literature).not.toContain("## Highlights (quotes/evidence)");
-    expect(literature).not.toContain("# Summary");
-    expect(literature).not.toContain("# Key insights");
-    expect(literature).not.toContain("# Important quotes/evidence");
+    expect(spark).toContain("```para-zk-props\ntype: zk_spark\n```\n{{cursor}}\n\n```para-zk-managed");
+    expect(spark).not.toContain("# One-line thought summary");
+    expect(spark).not.toContain("# Memo");
+    expect(source).toContain("```para-zk-props\ntype: zk_source\n```\n{{cursor}}\n\n```para-zk-managed");
+    expect(source).not.toContain("## Highlights (quotes/evidence)");
+    expect(source).not.toContain("# Summary");
+    expect(source).not.toContain("# Key insights");
+    expect(source).not.toContain("# Important quotes/evidence");
     expect(permanent).toContain("```para-zk-props\ntype: zk_permanent\n```\n{{cursor}}\n\n```para-zk-managed");
     expect(permanent).not.toContain("# One-sentence summary");
     expect(permanent).not.toContain("# Body");
@@ -41,14 +41,14 @@ describe("managed templates", () => {
     expect(subnote).not.toContain("para-zk-managed");
     expect(retro).not.toContain("para-zk-managed");
 
-    for (const content of [project, area, resource, journal, fleeting, literature, permanent]) {
+    for (const content of [project, area, resource, journal, spark, source, permanent]) {
       expect(content.match(/```para-zk-managed/g)).toHaveLength(1);
       expect(content).not.toContain("---\n```para-zk-managed");
       expect(content).not.toContain("project-subnotes");
       expect(content).not.toContain("area-subareas");
-      expect(content).not.toContain("resource-zk-links");
-      expect(content).not.toContain("fleeting-promotion");
-      expect(content).not.toContain("literature-promotion");
+      expect(content).not.toContain("resource-cited-by");
+      expect(content).not.toContain("spark-distill");
+      expect(content).not.toContain("source-create-permanent");
     }
   });
 
@@ -57,8 +57,9 @@ describe("managed templates", () => {
     const area = managedUiBlockForType("area", DEFAULT_SETTINGS) ?? "";
     const resource = managedUiBlockForType("resource", DEFAULT_SETTINGS) ?? "";
     const journal = managedUiBlockForType("journal", DEFAULT_SETTINGS) ?? "";
-    const fleeting = managedUiBlockForType("zk_fleeting", DEFAULT_SETTINGS) ?? "";
-    const literature = managedUiBlockForType("zk_literature", DEFAULT_SETTINGS) ?? "";
+    const spark = managedUiBlockForType("zk_spark", DEFAULT_SETTINGS) ?? "";
+    const source = managedUiBlockForType("zk_source", DEFAULT_SETTINGS) ?? "";
+    const permanent = managedUiBlockForType("zk_permanent", DEFAULT_SETTINGS) ?? "";
 
     expect(project).not.toContain("para-zk-latest-retro-summary");
     expect(project).toMatch(/^\n---\n```para-zk-tasks/);
@@ -72,20 +73,23 @@ describe("managed templates", () => {
     expect(area).toContain("area-subareas");
     expect(area).toContain("area-subnotes");
     expect(area).toContain("area-retros");
-    expect(resource).toContain("resource-zk-links");
-    expect(resource).toContain("title: Create ZK");
+    expect(resource).toContain("resource-cited-by");
+    expect(resource).toContain("title: Created from this");
     expect(journal).toContain("para-zk-tasks");
     expect(managedUiBlockForType("retro", DEFAULT_SETTINGS)).toBeUndefined();
-    expect(fleeting).toContain("fleeting-promotion");
-    expect(literature).toContain("literature-promotion");
-    expect(literature).toContain("title: Create permanent");
-    expect(literature).toContain("para-zk-references");
+    expect(spark).toContain("spark-distill");
+    expect(source).toContain("source-create-permanent");
+    expect(source).toContain("para-zk-references");
+    expect(permanent).toContain("permanent-cited-by");
+    expect(permanent).toContain("title: Cited by");
     expect(managedUiBlockForType("doc", DEFAULT_SETTINGS)).toBeUndefined();
   });
 
-  it("renders Dataview blocks for promotion state", () => {
-    expect(dataviewViewBlock("fleeting-promotion", DEFAULT_SETTINGS)).toContain("promoted_to");
-    expect(dataviewViewBlock("literature-promotion", DEFAULT_SETTINGS)).toContain("promoted_to AS \"Create permanent\"");
+  it("renders Dataview tables for managed ZK views (cited-by and distilled-into)", () => {
+    expect(dataviewViewBlock("permanent-cited-by", DEFAULT_SETTINGS)).toContain("contains(file.outlinks");
+    expect(dataviewViewBlock("resource-cited-by", DEFAULT_SETTINGS)).toContain("contains(file.outlinks");
+    expect(dataviewViewBlock("source-create-permanent", DEFAULT_SETTINGS)).toContain("contains(file.outlinks");
+    expect(dataviewViewBlock("spark-distill", DEFAULT_SETTINGS)).toContain("distilled_to");
   });
 
   it("matches Dataview relationship views against the source note link", () => {
@@ -104,8 +108,8 @@ describe("managed templates", () => {
     expect(dataviewViewBlock("project-subnotes", DEFAULT_SETTINGS, sourcePath)).toContain(`parent = ${sourceLink}`);
     expect(dataviewViewBlock("project-subnotes", DEFAULT_SETTINGS, sourcePath)).toContain("file.link AS \"Filename\", file.mtime AS \"Updated\"");
     expect(dataviewViewBlock("area-subnotes", DEFAULT_SETTINGS, sourcePath)).toContain("file.link AS \"Filename\", file.mtime AS \"Updated\"");
-    expect(dataviewViewBlock("resource-zk-links", DEFAULT_SETTINGS, sourcePath)).toContain(`contains(file.outlinks, ${sourceLink})`);
-    expect(dataviewViewBlock("resource-zk-links", DEFAULT_SETTINGS, sourcePath)).toContain("file.link AS \"Filename\", file.mtime AS \"Updated\"");
+    expect(dataviewViewBlock("resource-cited-by", DEFAULT_SETTINGS, sourcePath)).toContain(`contains(file.outlinks, ${sourceLink})`);
+    expect(dataviewViewBlock("resource-cited-by", DEFAULT_SETTINGS, sourcePath)).toContain("file.link AS \"Filename\", file.mtime AS \"Updated\"");
   });
 
   it("keeps the retro areas placeholder valid YAML", () => {

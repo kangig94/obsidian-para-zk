@@ -61,8 +61,8 @@ function summaryCards(plugin: ParaZkPluginContext, type: DashboardSummaryType): 
         card("📦", t.labels.project, groups.projects.length),
         card("🧱", t.labels.area, groups.areas.length),
         card("📚", t.labels.references, groups.resources.length),
-        card("🌟", "Fleeting", groups.fleeting.length),
-        card("📚", "Literature", groups.literature.length),
+        card("🌟", "Spark", groups.spark.length),
+        card("📚", "Source", groups.source.length),
         card("🧠", "Permanent", groups.permanent.length)
       ];
     case "projects": {
@@ -112,10 +112,10 @@ function summaryCards(plugin: ParaZkPluginContext, type: DashboardSummaryType): 
       ];
     }
     case "zk": {
-      const stale = groups.fleeting.filter((record) => record.file.stat.ctime <= Date.now() - days(7));
+      const stale = groups.spark.filter((record) => record.file.stat.ctime <= Date.now() - days(7));
       return [
-        card("🌟", "Fleeting", groups.fleeting.length, `${t.labels.staleFleeting} ${stale.length}`),
-        card("📚", "Literature", groups.literature.length),
+        card("🌟", "Spark", groups.spark.length, `${t.labels.staleSpark} ${stale.length}`),
+        card("📚", "Source", groups.source.length),
         card("🧠", "Permanent", groups.permanent.length),
         card("📝", t.maturity.draft, groups.permanent.filter((record) => record.frontmatter.maturity === "draft").length),
         card("✨", t.maturity.refined, groups.permanent.filter((record) => record.frontmatter.maturity === "refined").length),
@@ -127,8 +127,8 @@ function summaryCards(plugin: ParaZkPluginContext, type: DashboardSummaryType): 
       return [
         card("📄", t.labels.createdThisWeek, groups.resources.filter((record) => record.file.stat.ctime >= weekStart).length),
         card("✏️", t.labels.updatedThisWeek, groups.resources.filter((record) => record.file.stat.mtime >= weekStart).length),
-        card("🌟", "Fleeting", groups.fleeting.filter((record) => record.file.stat.ctime >= weekStart).length),
-        card("📚", "Literature", groups.literature.filter((record) => record.file.stat.ctime >= weekStart).length),
+        card("🌟", "Spark", groups.spark.filter((record) => record.file.stat.ctime >= weekStart).length),
+        card("📚", "Source", groups.source.filter((record) => record.file.stat.ctime >= weekStart).length),
         card("🧠", "Permanent", groups.permanent.filter((record) => record.file.stat.ctime >= weekStart).length)
       ];
     }
@@ -139,16 +139,16 @@ function dashboardRecordGroups(records: FileRecord[], settings: ParaZkSettings):
   projects: FileRecord[];
   areas: FileRecord[];
   resources: FileRecord[];
-  fleeting: FileRecord[];
-  literature: FileRecord[];
+  spark: FileRecord[];
+  source: FileRecord[];
   permanent: FileRecord[];
 } {
   return {
     projects: records.filter((record) => record.frontmatter.type === "project" && isInFolder(record.file, settings.paths.projectsFolder)),
     areas: records.filter((record) => record.frontmatter.type === "area" && isInFolder(record.file, settings.paths.areasFolder)),
     resources: records.filter((record) => record.frontmatter.type === "resource" && isInFolder(record.file, settings.paths.resourcesFolder)),
-    fleeting: records.filter((record) => isInFolder(record.file, settings.paths.fleetingFolder) && record.frontmatter.processed !== true),
-    literature: records.filter((record) => isInFolder(record.file, settings.paths.literatureFolder)),
+    spark: records.filter((record) => isInFolder(record.file, settings.paths.sparkFolder) && record.frontmatter.processed !== true),
+    source: records.filter((record) => isInFolder(record.file, settings.paths.sourceFolder)),
     permanent: records.filter((record) => isInFolder(record.file, settings.paths.permanentFolder))
   };
 }

@@ -11,7 +11,7 @@ import {
   PROJECT_STATUS_CODE_HELP,
   SUBNOTE_TYPE_CODE_HELP
 } from "../vocabulary";
-import { PROMOTION_ZK_KIND_CODE_HELP, ZK_KIND_CODE_HELP } from "../zk/kinds";
+import { RESOURCE_CREATE_KIND_CODE_HELP, ZK_KIND_CODE_HELP } from "../zk/kinds";
 import { parseList } from "./parse";
 import { workflowContext } from "../vault/host";
 import { joinVaultPath, normalizeVaultPath, sanitizeFileName, wikiLink } from "../vault/paths";
@@ -42,7 +42,7 @@ type NativeCliCommand = {
   run: (plugin: ParaZkPluginContext, args: CliArgs) => Promise<Record<string, unknown>>;
 };
 
-const ZK_KEY_TYPES = ["zk_fleeting", "zk_literature", "zk_permanent"];
+const ZK_KEY_TYPES = ["zk_spark", "zk_source", "zk_permanent"];
 
 function readKeyOption(type: string): CliOptionSpec {
   return { value: "<map-path>", description: `Optional stable read key. Valid: ${surfaceReadKeys(type).join(", ")}.` };
@@ -135,9 +135,9 @@ type WorkflowFunctionName =
   | "deleteResource"
   | "deleteRetro"
   | "deleteZk"
-  | "promoteFleeting"
-  | "promoteLiterature"
-  | "promoteResource"
+  | "distillSpark"
+  | "createPermanentFromSource"
+  | "createFromResource"
   | "readArea"
   | "readJournal"
   | "readProject"
@@ -841,18 +841,18 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     }))
   },
   {
-    command: "para-zk:promote-resource",
-    description: "Create a ZK note from a resource (source preserved)",
+    command: "para-zk:create-from-resource",
+    description: "Create a Source or Permanent ZK note from a resource (resource preserved)",
     options: {
       path: { value: "<path>", description: "Source resource path." },
       title: { value: "<title>", description: "New ZK note title." },
-      kind: { value: `<${ZK_KIND_CODE_HELP}>`, description: "Locale-neutral target ZK kind." },
+      kind: { value: `<${RESOURCE_CREATE_KIND_CODE_HELP}>`, description: "Locale-neutral target ZK kind (source|permanent)." },
       maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
-    text: "resource promoted",
-    run: workflowRun("promoteResource", (args) => ({
+    text: "ZK note created from resource",
+    run: workflowRun("createFromResource", (args) => ({
       sourcePath: readCliPath(args),
       title: readCliTitle(args),
       kind: readCliKind(args),
@@ -861,37 +861,37 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     }))
   },
   {
-    command: "para-zk:promote-fleeting",
-    description: "Promote a fleeting note to Literature or Permanent and mark the source processed",
+    command: "para-zk:distill-spark",
+    description: "Distill a spark into a permanent note; record it on the spark, or discard the spark",
     options: {
-      path: { value: "<path>", description: "Source fleeting note path." },
-      title: { value: "<title>", description: "New ZK note title." },
-      kind: { value: `<${PROMOTION_ZK_KIND_CODE_HELP}>`, description: "Locale-neutral target ZK kind." },
+      path: { value: "<path>", description: "Source spark note path." },
+      title: { value: "<title>", description: "New permanent note title." },
       maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
+      discard: { value: "<true|false>", description: "Discard the spark (move to trash) instead of keeping it marked processed. Default false." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
-    text: "fleeting promoted",
-    run: workflowRun("promoteFleeting", (args) => ({
+    text: "spark distilled",
+    run: workflowRun("distillSpark", (args) => ({
       sourcePath: readCliPath(args),
       title: readCliTitle(args),
-      kind: readCliKind(args),
       maturity: readCliString(args, "maturity"),
+      discard: readCliBoolean(args, "discard") ?? false,
       open: readCliBoolean(args, "open") ?? false
     }))
   },
   {
-    command: "para-zk:promote-literature",
-    description: "Create a Permanent note from a literature note (source preserved)",
+    command: "para-zk:create-permanent",
+    description: "Create a Permanent note from a source note (source preserved)",
     options: {
-      path: { value: "<path>", description: "Source literature note path." },
+      path: { value: "<path>", description: "Source note path." },
       title: { value: "<title>", description: "New permanent note title." },
       maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "permanent created",
-    run: workflowRun("promoteLiterature", (args) => ({
+    run: workflowRun("createPermanentFromSource", (args) => ({
       sourcePath: readCliPath(args),
       title: readCliTitle(args),
       maturity: readCliString(args, "maturity"),

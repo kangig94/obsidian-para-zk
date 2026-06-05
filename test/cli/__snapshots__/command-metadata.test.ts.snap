@@ -111,6 +111,62 @@ exports[`native CLI command metadata is stable 1`] = `
     },
   },
   {
+    "command": "para-zk:create-from-resource",
+    "description": "Create a Source or Permanent ZK note from a resource (resource preserved)",
+    "options": {
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "kind": {
+        "description": "Locale-neutral target ZK kind (source|permanent).",
+        "value": "<source|permanent>",
+      },
+      "maturity": {
+        "description": "Permanent-note maturity code.",
+        "value": "<draft|refined|evergreen>",
+      },
+      "open": {
+        "description": "Open the created note in Obsidian.",
+        "value": "<true|false>",
+      },
+      "path": {
+        "description": "Source resource path.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "New ZK note title.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:create-permanent",
+    "description": "Create a Permanent note from a source note (source preserved)",
+    "options": {
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "maturity": {
+        "description": "Permanent-note maturity code.",
+        "value": "<draft|refined|evergreen>",
+      },
+      "open": {
+        "description": "Open the created note in Obsidian.",
+        "value": "<true|false>",
+      },
+      "path": {
+        "description": "Source note path.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "New permanent note title.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
     "command": "para-zk:create-project",
     "description": "Create a PARA project note",
     "options": {
@@ -258,7 +314,7 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "kind": {
         "description": "Locale-neutral ZK note kind.",
-        "value": "<fleeting|literature|permanent>",
+        "value": "<spark|source|permanent>",
       },
       "maturity": {
         "description": "Permanent-note maturity code.",
@@ -418,7 +474,7 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "kind": {
         "description": "Optional ZK kind filter.",
-        "value": "<fleeting|literature|permanent>",
+        "value": "<spark|source|permanent>",
       },
       "path": {
         "description": "Exact note path.",
@@ -440,44 +496,18 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "type": {
         "description": "Optional surface type. Omit to describe all supported surfaces.",
-        "value": "<project|area|resource|journal|retro|doc|zk_fleeting|zk_literature|zk_permanent|note>",
+        "value": "<project|area|resource|journal|retro|doc|zk_spark|zk_source|zk_permanent|note>",
       },
     },
   },
   {
-    "command": "para-zk:promote-fleeting",
-    "description": "Promote a fleeting note to Literature or Permanent and mark the source processed",
+    "command": "para-zk:distill-spark",
+    "description": "Distill a spark into a permanent note; record it on the spark, or discard the spark",
     "options": {
-      "format": {
-        "description": "Output format (default: text).",
-        "value": "<text|json>",
-      },
-      "kind": {
-        "description": "Locale-neutral target ZK kind.",
-        "value": "<literature|permanent>",
-      },
-      "maturity": {
-        "description": "Permanent-note maturity code.",
-        "value": "<draft|refined|evergreen>",
-      },
-      "open": {
-        "description": "Open the created note in Obsidian.",
+      "discard": {
+        "description": "Discard the spark (move to trash) instead of keeping it marked processed. Default false.",
         "value": "<true|false>",
       },
-      "path": {
-        "description": "Source fleeting note path.",
-        "value": "<path>",
-      },
-      "title": {
-        "description": "New ZK note title.",
-        "value": "<title>",
-      },
-    },
-  },
-  {
-    "command": "para-zk:promote-literature",
-    "description": "Create a Permanent note from a literature note (source preserved)",
-    "options": {
       "format": {
         "description": "Output format (default: text).",
         "value": "<text|json>",
@@ -491,41 +521,11 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<true|false>",
       },
       "path": {
-        "description": "Source literature note path.",
+        "description": "Source spark note path.",
         "value": "<path>",
       },
       "title": {
         "description": "New permanent note title.",
-        "value": "<title>",
-      },
-    },
-  },
-  {
-    "command": "para-zk:promote-resource",
-    "description": "Create a ZK note from a resource (source preserved)",
-    "options": {
-      "format": {
-        "description": "Output format (default: text).",
-        "value": "<text|json>",
-      },
-      "kind": {
-        "description": "Locale-neutral target ZK kind.",
-        "value": "<fleeting|literature|permanent>",
-      },
-      "maturity": {
-        "description": "Permanent-note maturity code.",
-        "value": "<draft|refined|evergreen>",
-      },
-      "open": {
-        "description": "Open the created note in Obsidian.",
-        "value": "<true|false>",
-      },
-      "path": {
-        "description": "Source resource path.",
-        "value": "<path>",
-      },
-      "title": {
-        "description": "New ZK note title.",
         "value": "<title>",
       },
     },
@@ -861,12 +861,12 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Stable read key; depends on ZK kind. fleeting: frontmatter, frontmatter/{processed}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body; literature: frontmatter, frontmatter/{sourceTitle|authors|published|url}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body; permanent: frontmatter, frontmatter/{maturity|aliases}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body.",
+        "description": "Stable read key; depends on ZK kind. spark: frontmatter, frontmatter/{processed}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body; source: frontmatter, frontmatter/{sourceTitle|authors|published|url}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body; permanent: frontmatter, frontmatter/{maturity|aliases}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body.",
         "value": "<map-path>",
       },
       "kind": {
         "description": "Optional ZK kind filter.",
-        "value": "<fleeting|literature|permanent>",
+        "value": "<spark|source|permanent>",
       },
       "limit": {
         "description": "Collection key reads only: maximum items to return (default: 50).",
@@ -990,7 +990,7 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "kind": {
         "description": "Optional ZK kind filter.",
-        "value": "<fleeting|literature|permanent>",
+        "value": "<spark|source|permanent>",
       },
       "new_title": {
         "description": "New note title.",
@@ -1295,12 +1295,12 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Stable write key; depends on ZK kind. fleeting: frontmatter/{processed}=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace; literature: frontmatter/{sourceTitle|authors|published|url}=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace; permanent: frontmatter/{maturity|aliases}=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace.",
+        "description": "Stable write key; depends on ZK kind. spark: frontmatter/{processed}=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace; source: frontmatter/{sourceTitle|authors|published|url}=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace; permanent: frontmatter/{maturity|aliases}=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace.",
         "value": "<map-path>",
       },
       "kind": {
         "description": "Optional ZK kind filter.",
-        "value": "<fleeting|literature|permanent>",
+        "value": "<spark|source|permanent>",
       },
       "match": {
         "description": "Exact text to match inside the selected key for op=replace.",

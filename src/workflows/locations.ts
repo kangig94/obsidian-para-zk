@@ -2,7 +2,7 @@ import { TFolder, type TFile } from "obsidian";
 import { localePack } from "../i18n";
 import { frontmatterLinks, fileFrontmatter, readFileFrontmatterFresh, readFileTypeFresh, readType, type Frontmatter } from "../vault/frontmatter";
 import { dateFromCli, isoWeekInfo, localDate } from "../time";
-import type { ParaZkSettings, PromotionZkKind, ZkKind } from "../types";
+import type { ParaZkSettings, ZkKind } from "../types";
 import { ensureFolder, isInFolder, parentFolder } from "../vault/files";
 import type { WorkflowHost } from "../vault/host";
 import { joinVaultPath, normalizeVaultPath, sanitizeFileName, wikiLink } from "../vault/paths";
@@ -103,10 +103,10 @@ export function uniqueFolderStyleMarkdownPath(
   }
 }
 
-export function folderForZkKind(settings: ParaZkSettings, kind: ZkKind | PromotionZkKind): string {
-  if (kind === "Literature") return settings.paths.literatureFolder;
+export function folderForZkKind(settings: ParaZkSettings, kind: ZkKind): string {
+  if (kind === "Source") return settings.paths.sourceFolder;
   if (kind === "Permanent") return settings.paths.permanentFolder;
-  return settings.paths.fleetingFolder;
+  return settings.paths.sparkFolder;
 }
 
 function archiveAwareFolders(
@@ -493,7 +493,7 @@ function typeForZkKind(kind: ZkKind): string {
 function zkSearchFolders(ctx: WorkflowContext, kind: ZkKind | undefined): string[] {
   return kind
     ? [folderForZkKind(ctx.settings, kind)]
-    : [ctx.settings.paths.fleetingFolder, ctx.settings.paths.literatureFolder, ctx.settings.paths.permanentFolder];
+    : [ctx.settings.paths.sparkFolder, ctx.settings.paths.sourceFolder, ctx.settings.paths.permanentFolder];
 }
 
 export function requireTitle(value: string | undefined, label: string): string {

@@ -71,7 +71,7 @@ describe("describe", () => {
     expect(String(bad.error)).toContain("unknown surface type");
   });
 
-  it("describes resource and ZK literature as free-form body surfaces", async () => {
+  it("describes resource and ZK source as free-form body surfaces", async () => {
     const resourceResult = await cli.run("para-zk:describe", { type: "resource" });
     const resource = (resourceResult.surfaces as Array<Record<string, unknown>>)[0];
     expect(resource.readKeys).toEqual(["references", "backlinks", "body"]);
@@ -82,16 +82,16 @@ describe("describe", () => {
     });
     expect(resource.readKeys).not.toEqual(expect.arrayContaining(["overview"]));
 
-    const literatureResult = await cli.run("para-zk:describe", { type: "zk_literature" });
-    const literature = (literatureResult.surfaces as Array<Record<string, unknown>>)[0];
-    expect(literature.frontmatterKeys).toEqual(["sourceTitle", "authors", "published", "url"]);
-    expect(literature.readKeys).toEqual(["frontmatter", "references", "backlinks", "body"]);
-    expect(literature.writeKeys).toEqual(["frontmatter", "references", "body"]);
-    expect(literature.collections).toEqual({
+    const sourceResult = await cli.run("para-zk:describe", { type: "zk_source" });
+    const source = (sourceResult.surfaces as Array<Record<string, unknown>>)[0];
+    expect(source.frontmatterKeys).toEqual(["sourceTitle", "authors", "published", "url"]);
+    expect(source.readKeys).toEqual(["frontmatter", "references", "backlinks", "body"]);
+    expect(source.writeKeys).toEqual(["frontmatter", "references", "body"]);
+    expect(source.collections).toEqual({
       references: "reference",
       backlinks: "backlink"
     });
-    expect(literature.readKeys).not.toEqual(expect.arrayContaining([
+    expect(source.readKeys).not.toEqual(expect.arrayContaining([
       "highlight_block",
       "summary",
       "insight",
