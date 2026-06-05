@@ -39,6 +39,7 @@ export function registerDataviewViewRenderers(plugin: ParaZkPluginContext): void
 
 class DataviewViewRenderChild extends MarkdownRenderChild {
   private readonly renderTimers = new Set<number>();
+  private renderGeneration = 0;
   private unloaded = true;
 
   constructor(
@@ -62,6 +63,7 @@ class DataviewViewRenderChild extends MarkdownRenderChild {
 
   onunload(): void {
     this.unloaded = true;
+    this.renderGeneration += 1;
     for (const timer of this.renderTimers) window.clearTimeout(timer);
     this.renderTimers.clear();
   }
@@ -81,20 +83,34 @@ class DataviewViewRenderChild extends MarkdownRenderChild {
 
   private renderNow(): void {
     if (this.unloaded) return;
-    void renderDataviewView(this.plugin, this.args, this.containerEl, this.sourcePath, this)
+    const generation = ++this.renderGeneration;
+    void renderDataviewView(
+      this.plugin,
+      this.args,
+      this.containerEl,
+      this.sourcePath,
+      this,
+      () => this.isCurrentRender(generation)
+    )
       .catch((error: unknown) => {
-        if (!this.unloaded) renderDataviewViewError(this.containerEl, error);
+        if (this.isCurrentRender(generation)) renderDataviewViewError(this.containerEl, error);
       });
+  }
+
+  private isCurrentRender(generation: number): boolean {
+    return !this.unloaded && this.renderGeneration === generation;
   }
 }
 
-function renderDataviewView(
+async function renderDataviewView(
   plugin: ParaZkPluginContext,
   args: DataviewViewArgs,
   el: HTMLElement,
   sourcePath: MarkdownPostProcessorContext["sourcePath"],
-  child: MarkdownRenderChild
+  child: MarkdownRenderChild,
+  isCurrent: () => boolean
 ): Promise<void> {
+  if (!isCurrent()) return;
   const key = args.key;
   const block = dataviewViewBlock(key, plugin.settings, sourcePath);
 
@@ -110,7 +126,8 @@ function renderDataviewView(
   if (viewKey || args.title) renderDataviewViewToolbar(plugin, el, viewKey, sourcePath, args.title);
 
   const body = el.createDiv({ cls: "para-zk-view-body" });
-  return MarkdownRenderer.render(plugin.app, block, body, sourcePath, child);
+  await MarkdownRenderer.render(plugin.app, block, body, sourcePath, child);
+  if (!isCurrent()) return;
 }
 
 function readViewArgs(source: string): DataviewViewArgs {

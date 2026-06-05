@@ -299,7 +299,7 @@ export async function resolveRequiredZk(ctx: WorkflowContext, options: ReadZkOpt
   const kind = readOptionalCode(options.kind, parseZkKind, "kind", ZK_KIND_CODE_HELP);
   const file = options.path
     ? resolveRequiredFile(ctx, options.path, "ZK note")
-    : findZkByTitle(ctx, requireTitle(options.title, "ZK title"), kind);
+    : await findZkByTitle(ctx, requireTitle(options.title, "ZK title"), kind);
   if (!file) throw new Error(`ZK note not found: ${options.title}`);
 
   const type = await readFileTypeFresh(ctx, file);
@@ -394,12 +394,18 @@ function findResourceByTitle(ctx: WorkflowContext, title: string, archived: bool
   });
 }
 
-function findZkByTitle(
+async function findZkByTitle(
   ctx: WorkflowContext,
   title: string,
   kind: ZkKind | undefined
-): TFile | undefined {
+): Promise<TFile | undefined> {
   const folders = zkSearchFolders(ctx, kind);
+
+  if (!kind) {
+    const matches = await findZkTitleMatches(ctx, title, folders);
+    if (matches.length === 1) return matches[0];
+    if (matches.length > 1) throw new Error(`ZK note title is ambiguous: ${title}`);
+  }
 
   for (const folder of folders) {
     const file = ctx.host.getFile(joinVaultPath(folder, `${title}.md`));
@@ -414,6 +420,20 @@ function findZkByTitle(
     typePrefix: expectedType ? undefined : "zk_",
     label: "ZK note"
   });
+}
+
+async function findZkTitleMatches(ctx: WorkflowContext, title: string, folders: string[]): Promise<TFile[]> {
+  const matchesByPath = new Map<string, TFile>();
+  for (const folder of folders) {
+    const file = ctx.host.getFile(joinVaultPath(folder, `${title}.md`));
+    if (file) matchesByPath.set(file.path, file);
+  }
+  for (const file of ctx.host.getMarkdownFiles()) {
+    if (file.basename !== title || !folders.some((folder) => isInFolder(file, folder))) continue;
+    const type = await readFileTypeFresh(ctx, file);
+    if (type.startsWith("zk_")) matchesByPath.set(file.path, file);
+  }
+  return Array.from(matchesByPath.values());
 }
 
 function findRetroByTitle(
@@ -505,18 +525,59 @@ export function findAreaByTitle(ctx: WorkflowContext, title: string): TFile | un
 
 export function childFiles(ctx: WorkflowContext, parent: TFile): TFile[] {
   const directFolder = folderStyleChildFolder(parent);
-  const parentLink = linkToFile(parent);
   const byPath = new Map<string, TFile>();
 
   for (const file of ctx.host.getMarkdownFiles()) {
     if (file.path === parent.path) continue;
     const frontmatter = fileFrontmatter(ctx, file);
-    if ((directFolder && file.parent?.path === directFolder) || frontmatter.parent === parentLink) {
+    if ((directFolder && file.parent?.path === directFolder) || parentFrontmatterReferencesFile(ctx, file, frontmatter.parent, parent)) {
       byPath.set(file.path, file);
     }
   }
 
   return Array.from(byPath.values()).sort((left, right) => left.path.localeCompare(right.path));
+}
+
+function parentFrontmatterReferencesFile(ctx: WorkflowContext, source: TFile, value: unknown, target: TFile): boolean {
+  return frontmatterLinks(value).some((link) => linkResolvesToFile(ctx, source.path, link, target));
+}
+
+function linkResolvesToFile(ctx: WorkflowContext, sourcePath: string, value: string, target: TFile): boolean {
+  const linkPath = wikiLinkTarget(value) ?? markdownLinkTarget(value) ?? value;
+  const resolved = resolveLinkPath(ctx, sourcePath, linkPath);
+  return resolved?.path === target.path;
+}
+
+function resolveLinkPath(ctx: WorkflowContext, sourcePath: string, linkPath: string): TFile | null {
+  const split = splitObsidianSubpath(linkPath);
+  const withSubpath = `${split.base}${split.subpath}`;
+  return ctx.host.getFirstLinkpathDest(withSubpath, sourcePath)
+    ?? (split.base ? ctx.host.getFirstLinkpathDest(split.base, sourcePath) : null);
+}
+
+function splitObsidianSubpath(value: string): { base: string; subpath: string } {
+  const normalizedSeparators = value.trim().replace(/\\/g, "/");
+  const hash = normalizedSeparators.indexOf("#");
+  if (hash === -1) {
+    return {
+      base: normalizeVaultPath(normalizedSeparators),
+      subpath: ""
+    };
+  }
+  return {
+    base: normalizeVaultPath(normalizedSeparators.slice(0, hash)),
+    subpath: normalizedSeparators.slice(hash).trim()
+  };
+}
+
+function wikiLinkTarget(value: string): string | undefined {
+  const match = value.trim().match(/^\[\[([^\]|]+)(?:\|[^\]]*)?\]\]$/);
+  return match?.[1]?.trim();
+}
+
+function markdownLinkTarget(value: string): string | undefined {
+  const match = value.trim().match(/^\[[^\]]+\]\(([^)]+)\)$/);
+  return match?.[1]?.trim();
 }
 
 function folderStyleChildFolder(file: TFile): string | undefined {

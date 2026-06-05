@@ -19,6 +19,10 @@ export type FrontmatterContext = {
   host: Pick<WorkflowHost, "getFileCache" | "read">;
 };
 
+type FrontmatterParseResult =
+  | { ok: true; frontmatter: Frontmatter }
+  | { ok: false };
+
 export function fileFrontmatter(ctx: FrontmatterContext, file: TFile): Frontmatter {
   return ctx.host.getFileCache(file)?.frontmatter ?? {};
 }
@@ -27,12 +31,12 @@ export function fileFrontmatter(ctx: FrontmatterContext, file: TFile): Frontmatt
 // asynchronously), so mutation/render paths should parse current file content first.
 export async function readFileFrontmatterFresh(ctx: FrontmatterContext, file: TFile): Promise<Frontmatter> {
   const content = await ctx.host.read(file);
-  const fresh = parseFrontmatterFromContent(content);
-  if (hasFrontmatterKeys(fresh)) return fresh;
+  const fresh = parseFrontmatterResult(content);
+  if (fresh.ok) return fresh.frontmatter;
 
   const cached = fileFrontmatter(ctx, file);
   if (contentHasYamlFrontmatterBlock(content) && hasFrontmatterKeys(cached)) return cached;
-  return fresh;
+  return {};
 }
 
 export async function readFileTypeFresh(ctx: FrontmatterContext, file: TFile): Promise<string> {
@@ -40,13 +44,21 @@ export async function readFileTypeFresh(ctx: FrontmatterContext, file: TFile): P
 }
 
 export function parseFrontmatterFromContent(content: string): Frontmatter {
+  const result = parseFrontmatterResult(content);
+  return result.ok ? result.frontmatter : {};
+}
+
+function parseFrontmatterResult(content: string): FrontmatterParseResult {
   const match = stripLeadingUtf8Bom(content).match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
-  if (!match) return {};
+  if (!match) return { ok: true, frontmatter: {} };
   try {
     const parsed = parseYaml(match[1]);
-    return parsed && typeof parsed === "object" ? parsed as Frontmatter : {};
+    return {
+      ok: true,
+      frontmatter: parsed && typeof parsed === "object" ? parsed as Frontmatter : {}
+    };
   } catch {
-    return {};
+    return { ok: false };
   }
 }
 

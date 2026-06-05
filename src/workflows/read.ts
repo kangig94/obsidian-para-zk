@@ -9,7 +9,7 @@ import {
   trimMarkdownBlock,
   type TextRange
 } from "../vault/sections";
-import { fileFrontmatter, pickFrontmatter, readFileFrontmatterFresh, readFileTypeFresh, readType, type Frontmatter } from "../vault/frontmatter";
+import { pickFrontmatter, readFileFrontmatterFresh, readFileTypeFresh, readType, type Frontmatter } from "../vault/frontmatter";
 import type {
   CollectionKind,
   CollectionReadOptions,
@@ -75,7 +75,7 @@ async function readSurface(
   rawKey: string | undefined,
   collectionOptions?: CollectionReadOptions
 ): Promise<Record<string, unknown>> {
-  const frontmatter = fileFrontmatter(ctx, file);
+  const frontmatter = await readFileFrontmatterFresh(ctx, file);
   const type = readType(frontmatter);
   const surface = await readSurfaceMap(ctx, file, spec);
   const key = rawKey?.trim();
@@ -130,7 +130,7 @@ async function readSurfaceMap(ctx: WorkflowContext, file: TFile, spec: ReadSurfa
       : value;
   }
 
-  if (spec.children) surface.children = childIndex(ctx, file);
+  if (spec.children) surface.children = await childIndex(ctx, file);
   return surface;
 }
 
@@ -269,7 +269,7 @@ async function readSurfaceKey(
   const child = findChild(ctx, source, childTitle);
   if (!child) throw new Error(`child not found: ${childTitle}`);
 
-  const childType = readType(fileFrontmatter(ctx, child));
+  const childType = await readFileTypeFresh(ctx, child);
   const childSpec = specForType(childType);
   if (parts.length > 2) {
     const childParts = parts.slice(2);
@@ -352,10 +352,10 @@ function specHasBacklinkSection(spec: ReadSurfaceSpec): boolean {
   return collectionKindForKey(spec, "backlinks") === "backlink";
 }
 
-function childIndex(ctx: WorkflowContext, parent: TFile): Record<string, unknown> {
+async function childIndex(ctx: WorkflowContext, parent: TFile): Promise<Record<string, unknown>> {
   const entries: Record<string, unknown> = {};
   for (const file of childFiles(ctx, parent)) {
-    const frontmatter = fileFrontmatter(ctx, file);
+    const frontmatter = await readFileFrontmatterFresh(ctx, file);
     const type = readType(frontmatter);
     const item: Record<string, unknown> = {
       path: file.path,

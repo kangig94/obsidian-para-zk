@@ -57,6 +57,11 @@ type DependencySpec = RequiredDependency & {
   configuration?: DependencyConfiguration;
 };
 
+type EnabledPluginConfigRead =
+  | { status: "ok"; enabled: Set<string> }
+  | { status: "missing"; enabled: Set<string> }
+  | { status: "unreadable"; error: string };
+
 export type PluginManager = {
   manifests?: Record<string, PluginManifest | undefined>;
   plugins?: Record<string, unknown>;
@@ -189,8 +194,13 @@ async function resolveDependency(
 
   if (before.installed && before.enabled) {
     if (options.installDeps && !options.dryRun && !enabledConfig?.has(dependency.id)) {
-      await ensureEnabledPluginConfig(app, dependency.id);
-      result.action = "enabled";
+      try {
+        await ensureEnabledPluginConfig(app, dependency.id);
+        result.action = "enabled";
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        options.warnings.push(`Failed to persist enabled plugin ${dependency.name} (${dependency.id}): ${message}`);
+      }
     }
     await configureDependency(app, manager, dependency, result, options);
     return result;
@@ -359,19 +369,37 @@ function readDependencyState(
 }
 
 async function readEnabledPluginConfig(app: App): Promise<Set<string> | undefined> {
+  const result = await readEnabledPluginConfigFile(app);
+  return result.status === "ok" ? result.enabled : undefined;
+}
+
+async function readEnabledPluginConfigFile(app: App): Promise<EnabledPluginConfigRead> {
   try {
-    if (!await app.vault.adapter.exists(COMMUNITY_PLUGINS_CONFIG)) return undefined;
+    if (!await app.vault.adapter.exists(COMMUNITY_PLUGINS_CONFIG)) {
+      return { status: "missing", enabled: new Set<string>() };
+    }
     const raw = await app.vault.adapter.read(COMMUNITY_PLUGINS_CONFIG);
     const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return undefined;
-    return new Set(parsed.filter((item): item is string => typeof item === "string"));
-  } catch {
-    return undefined;
+    if (!Array.isArray(parsed)) {
+      return { status: "unreadable", error: `${COMMUNITY_PLUGINS_CONFIG} must be a JSON array` };
+    }
+    return {
+      status: "ok",
+      enabled: new Set(parsed.filter((item): item is string => typeof item === "string"))
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { status: "unreadable", error: `Cannot read ${COMMUNITY_PLUGINS_CONFIG}: ${message}` };
   }
 }
 
 async function ensureEnabledPluginConfig(app: App, id: string): Promise<void> {
-  const enabled = await readEnabledPluginConfig(app) ?? new Set<string>();
+  const result = await readEnabledPluginConfigFile(app);
+  if (result.status === "unreadable") {
+    throw new Error(`${result.error}; not writing a reduced community plugin list`);
+  }
+
+  const enabled = result.enabled;
   if (enabled.has(id)) return;
   enabled.add(id);
   await app.vault.adapter.write(

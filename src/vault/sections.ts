@@ -187,7 +187,7 @@ export function stripProjectSummaryManagedBlock(content: string): string {
 
 export function stripManagedPrelude(content: string): string {
   return trimMarkdownBlock(
-    stripTrailingManagedBlock(stripYamlFrontmatter(content).replace(/^\s*```para-zk-props\n[\s\S]*?\n```\s*/, ""))
+    stripTrailingManagedBlock(stripYamlFrontmatter(content).replace(/^\uFEFF?\s*```para-zk-props\r?\n[\s\S]*?\r?\n```[ \t]*(?:\r?\n[ \t]*)*/, ""))
   );
 }
 
@@ -198,8 +198,8 @@ function stripYamlFrontmatter(content: string): string {
 
 export function trimMarkdownBlock(value: string): string {
   return value
-    .replace(/^(?:[ \t]*\n)+/, "")
-    .replace(/(?:\n[ \t]*)+$/, "");
+    .replace(/^(?:[ \t]*\r?\n)+/, "")
+    .replace(/(?:\r?\n[ \t]*)+$/, "");
 }
 
 export function lineTextRangeAt(
@@ -244,30 +244,10 @@ export function findSectionSplitHazard(
   value: string,
   sectionHeadingLevel: number
 ): SectionSplitHazard | undefined {
-  let cursor = 0;
-  while (cursor < value.length) {
-    const line = readLineSpan(value, cursor, value.length);
-    if (!line) break;
-
-    const heading = line.text.match(/^\s*(#{1,6})\s+/);
-    if (heading && heading[1].length <= sectionHeadingLevel) {
-      return {
-        kind: "heading",
-        level: heading[1].length
-      };
-    }
-
-    const thematicBreak = line.text.match(/^\s*(-{3,}|\*{3,}|_{3,})\s*$/);
-    if (thematicBreak) {
-      return {
-        kind: "thematicBreak",
-        marker: thematicBreak[1].slice(0, 3)
-      };
-    }
-
-    cursor = line.next;
-  }
-  return undefined;
+  const boundary = findMarkdownBoundary(value, sectionHeadingLevel);
+  return boundary
+    ? boundary.hazard
+    : undefined;
 }
 
 function startsWithMarkdownBoundary(content: string): boolean {
@@ -314,7 +294,7 @@ function readSectionByMatch(content: string, match: RegExpMatchArray | null): st
 
   const headingLevel = match.groups?.hashes.length ?? 6;
   const headerEnd = (match.index ?? 0) + match[0].length;
-  const sectionStart = content.charAt(headerEnd) === "\n" ? headerEnd + 1 : headerEnd;
+  const sectionStart = headerEnd + lineBreakLengthAt(content, headerEnd);
   const after = content.slice(sectionStart);
   const nextBoundaryRel = nextSectionBoundary(after, headingLevel);
   const sectionEnd = nextBoundaryRel === -1 ? content.length : sectionStart + nextBoundaryRel;
@@ -330,22 +310,124 @@ function findHeadingMatch(
   const headingPattern = escapeRegExp(heading).replace(/\s+/g, "\\s+");
   const hashesPattern = level === undefined ? "#{1,6}" : `#{${level}}`;
   const tailPattern = exact ? "\\s*(?:#+\\s*)?$" : "(?=\\s|$).*?$";
-  const headerRe = new RegExp(`^\\s*(?<hashes>${hashesPattern})\\s+${headingPattern}${tailPattern}`, "im");
-  return content.match(headerRe);
+  const headerRe = new RegExp(`^\\s*(?<hashes>${hashesPattern})\\s+${headingPattern}${tailPattern}`, "i");
+  return findLineMatchOutsideFences(content, headerRe);
 }
 
 function nextSectionBoundary(content: string, maxHeadingLevel: number | undefined): number {
-  const headingRe = maxHeadingLevel
-    ? new RegExp(`^\\s*#{1,${maxHeadingLevel}}\\s+`, "m")
-    : /^\s*#{1,6}\s+/m;
-  const thematicBreakRe = /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/m;
-  return minFoundIndex(content.search(headingRe), content.search(thematicBreakRe));
+  return findMarkdownBoundary(content, maxHeadingLevel)?.index ?? -1;
 }
 
-function minFoundIndex(left: number, right: number): number {
-  if (left === -1) return right;
-  if (right === -1) return left;
-  return Math.min(left, right);
+function findMarkdownBoundary(
+  content: string,
+  maxHeadingLevel: number | undefined
+): { index: number; hazard: SectionSplitHazard } | undefined {
+  let cursor = 0;
+  let fence: FenceState | undefined;
+  // The boundary index points to the start of the blank-line run immediately
+  // preceding the heading/break, so a section's trailing blank lines fall
+  // outside it (callers rely on this when splicing section content).
+  let blankRunStart: number | undefined;
+  while (cursor < content.length) {
+    const line = readLineSpan(content, cursor, content.length);
+    if (!line) break;
+
+    if (fence) {
+      fence = nextFenceState(line.text, fence);
+      blankRunStart = undefined;
+      cursor = line.next;
+      continue;
+    }
+
+    const openedFence = readFenceState(line.text);
+    if (openedFence) {
+      fence = openedFence;
+      blankRunStart = undefined;
+      cursor = line.next;
+      continue;
+    }
+
+    const heading = line.text.match(/^\s*(#{1,6})\s+/);
+    if (heading && (maxHeadingLevel === undefined || heading[1].length <= maxHeadingLevel)) {
+      return {
+        index: blankRunStart ?? cursor,
+        hazard: {
+          kind: "heading",
+          level: heading[1].length
+        }
+      };
+    }
+
+    const thematicBreak = line.text.match(/^\s*(-{3,}|\*{3,}|_{3,})\s*$/);
+    if (thematicBreak) {
+      return {
+        index: blankRunStart ?? cursor,
+        hazard: {
+          kind: "thematicBreak",
+          marker: thematicBreak[1].slice(0, 3)
+        }
+      };
+    }
+
+    blankRunStart = line.text.trim() === "" ? (blankRunStart ?? cursor) : undefined;
+    cursor = line.next;
+  }
+  return undefined;
+}
+
+function findLineMatchOutsideFences(content: string, lineRe: RegExp): RegExpMatchArray | null {
+  let cursor = 0;
+  let fence: FenceState | undefined;
+  while (cursor < content.length) {
+    const line = readLineSpan(content, cursor, content.length);
+    if (!line) break;
+
+    if (fence) {
+      fence = nextFenceState(line.text, fence);
+      cursor = line.next;
+      continue;
+    }
+
+    const openedFence = readFenceState(line.text);
+    if (openedFence) {
+      fence = openedFence;
+      cursor = line.next;
+      continue;
+    }
+
+    const match = line.text.match(lineRe);
+    if (match) {
+      match.index = cursor + (match.index ?? 0);
+      match.input = content;
+      return match;
+    }
+
+    cursor = line.next;
+  }
+  return null;
+}
+
+type FenceState = {
+  marker: "`" | "~";
+  length: number;
+};
+
+function nextFenceState(line: string, fence: FenceState): FenceState | undefined {
+  const marker = readFenceState(line);
+  if (marker && marker.marker === fence.marker && marker.length >= fence.length) {
+    return undefined;
+  }
+  return fence;
+}
+
+function readFenceState(line: string): FenceState | undefined {
+  const match = line.match(/^\s*(`{3,}|~{3,})/);
+  if (!match) return undefined;
+  const markerText = match[1];
+  return {
+    marker: markerText.charAt(0) as "`" | "~",
+    length: markerText.length
+  };
 }
 
 function stripLeadingFencedBlock(content: string, language: string): string {

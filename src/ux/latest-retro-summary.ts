@@ -25,6 +25,7 @@ export function registerLatestRetroSummaryRenderers(plugin: ParaZkPluginContext)
 
 class LatestRetroSummaryRenderChild extends MarkdownRenderChild {
   private renderTimer: number | undefined;
+  private renderGeneration = 0;
   private unloaded = true;
 
   constructor(
@@ -41,18 +42,23 @@ class LatestRetroSummaryRenderChild extends MarkdownRenderChild {
     this.registerEvent(this.plugin.app.vault.on("modify", (file) => this.onVaultFile(file)));
     this.registerEvent(this.plugin.app.vault.on("create", (file) => this.onVaultFile(file)));
     this.registerEvent(this.plugin.app.vault.on("delete", (file) => this.onVaultFile(file)));
-    this.registerEvent(this.plugin.app.vault.on("rename", (file) => this.onVaultFile(file)));
+    this.registerEvent(this.plugin.app.vault.on("rename", (file, oldPath) => this.onVaultFile(file, oldPath)));
   }
 
   onunload(): void {
     this.unloaded = true;
+    this.renderGeneration += 1;
     if (this.renderTimer !== undefined) window.clearTimeout(this.renderTimer);
     this.renderTimer = undefined;
   }
 
-  private onVaultFile(file: unknown): void {
+  private onVaultFile(file: unknown, oldPath?: string): void {
     if (!(file instanceof TFile)) return;
-    if (file.path !== this.sourcePath && !isInRetrosFolder(this.plugin, file)) return;
+    if (
+      file.path !== this.sourcePath
+      && !isInRetrosFolder(this.plugin, file)
+      && !isInRetrosFolderPath(this.plugin, oldPath)
+    ) return;
     this.scheduleRender();
   }
 
@@ -66,34 +72,49 @@ class LatestRetroSummaryRenderChild extends MarkdownRenderChild {
 
   private renderNow(): void {
     if (this.unloaded) return;
-    void renderLatestRetroSummary(this.plugin, this.containerEl, this.sourcePath)
+    const generation = ++this.renderGeneration;
+    void renderLatestRetroSummary(
+      this.plugin,
+      this.containerEl,
+      this.sourcePath,
+      () => this.isCurrentRender(generation)
+    )
       .catch((error: unknown) => {
-        if (!this.unloaded) renderLatestRetroSummaryError(this.containerEl, error);
+        if (this.isCurrentRender(generation)) renderLatestRetroSummaryError(this.containerEl, error);
       });
+  }
+
+  private isCurrentRender(generation: number): boolean {
+    return !this.unloaded && this.renderGeneration === generation;
   }
 }
 
 async function renderLatestRetroSummary(
   plugin: ParaZkPluginContext,
   el: HTMLElement,
-  sourcePath: MarkdownPostProcessorContext["sourcePath"]
+  sourcePath: MarkdownPostProcessorContext["sourcePath"],
+  isCurrent: () => boolean
 ): Promise<void> {
+  if (!isCurrent()) return;
   el.empty();
   el.addClass("para-zk-latest-retro-summary");
 
   const labels = localePack(plugin.settings.locale);
   if (!sourcePath) {
+    if (!isCurrent()) return;
     renderLatestRetroSummaryShell(el, labels, latestRetroSummaryEmpty(labels));
     return;
   }
 
   const sourceFile = plugin.app.vault.getFileByPath(sourcePath);
   if (!(sourceFile instanceof TFile)) {
+    if (!isCurrent()) return;
     renderLatestRetroSummaryShell(el, labels, latestRetroSummaryEmpty(labels));
     return;
   }
 
   const summary = await latestRetroSummary(plugin, sourceFile);
+  if (!isCurrent()) return;
   renderLatestRetroSummaryShell(el, labels, summary?.text || latestRetroSummaryEmpty(labels), summary?.file);
 }
 
@@ -137,8 +158,14 @@ async function latestRetroSummary(plugin: ParaZkPluginContext, sourceFile: TFile
 }
 
 function isInRetrosFolder(plugin: ParaZkPluginContext, file: TFile): boolean {
+  return isInRetrosFolderPath(plugin, file.path);
+}
+
+function isInRetrosFolderPath(plugin: ParaZkPluginContext, path: string | undefined): boolean {
+  if (!path) return false;
   const retroFolder = normalizeVaultPath(plugin.settings.paths.retrosFolder);
-  return file.path === retroFolder || file.path.startsWith(`${retroFolder}/`);
+  const normalized = normalizeVaultPath(path);
+  return normalized === retroFolder || normalized.startsWith(`${retroFolder}/`);
 }
 
 function retroProjectMatches(frontmatter: Record<string, unknown>, sourceFile: TFile): boolean {

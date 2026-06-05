@@ -22,7 +22,7 @@ import {
   type PropsSelectOption,
   type PropsViewType
 } from "../props/schema";
-import { frontmatterLinks } from "../vault/frontmatter";
+import { frontmatterLinks, readFileTypeFresh } from "../vault/frontmatter";
 import { workflowContext } from "../vault/host";
 import { normalizeVaultPath, wikiLink } from "../vault/paths";
 import { parseCodeBlockKeyValues } from "./code-block-args";
@@ -39,6 +39,14 @@ type AreaSuggestion = {
   path: string;
   link: string;
 };
+
+type PropsRerender = (delayMs?: number) => void;
+
+type PropsRerenderState = {
+  generation: number;
+};
+
+const propsRerenderStates = new WeakMap<HTMLElement, PropsRerenderState>();
 
 export function registerPropsControlRenderers(plugin: ParaZkPluginContext): void {
   plugin.registerMarkdownCodeBlockProcessor("para-zk-props", (source, el, ctx) => {
@@ -91,9 +99,10 @@ function renderInlinePropsInputs(plugin: ParaZkPluginContext, el: HTMLElement, c
 
     const container = document.createElement("span");
     container.addClass("para-zk-inline-input");
-    renderFieldControl(plugin, field, frontmatter, container, ctx.sourcePath, () => {
+    const rerender = latestPropsRerender(container, () => {
       renderSingleField(plugin, schema, field, container, ctx.sourcePath);
     });
+    renderFieldControl(plugin, field, frontmatter, container, ctx.sourcePath, rerender);
     codeEl.replaceWith(container);
   }
 }
@@ -194,9 +203,11 @@ function renderField(
   const fieldEl = rowEl.createDiv({ cls: "para-zk-props-field" });
   fieldEl.createDiv({ cls: "para-zk-props-label", text: field.label });
   const controlEl = fieldEl.createDiv({ cls: "para-zk-props-control" });
-  renderFieldControl(plugin, field, frontmatter, controlEl, sourcePath, () => {
-    renderPropsGrid(plugin, schema, rowEl.parentElement ?? rowEl, sourcePath);
+  const gridEl = rowEl.parentElement ?? rowEl;
+  const rerender = latestPropsRerender(gridEl, () => {
+    renderPropsGrid(plugin, schema, gridEl, sourcePath);
   });
+  renderFieldControl(plugin, field, frontmatter, controlEl, sourcePath, rerender);
 }
 
 function renderSingleField(
@@ -209,9 +220,10 @@ function renderSingleField(
   const file = sourceFile(plugin, sourcePath);
   const frontmatter = file ? fileFrontmatter(plugin, file) : {};
   container.empty();
-  renderFieldControl(plugin, findPropsField(schema, field.id) ?? field, frontmatter, container, sourcePath, () => {
+  const rerender = latestPropsRerender(container, () => {
     renderSingleField(plugin, schema, field, container, sourcePath);
   });
+  renderFieldControl(plugin, findPropsField(schema, field.id) ?? field, frontmatter, container, sourcePath, rerender);
 }
 
 function renderFieldControl(
@@ -220,7 +232,7 @@ function renderFieldControl(
   frontmatter: Frontmatter,
   container: HTMLElement,
   sourcePath: string | undefined,
-  rerender: () => void
+  rerender: PropsRerender
 ): void {
   switch (field.control) {
     case "text":
@@ -321,7 +333,7 @@ function renderAreaListInput(
   frontmatter: Frontmatter,
   container: HTMLElement,
   sourcePath: string | undefined,
-  rerender: () => void
+  rerender: PropsRerender
 ): void {
   const key = field.key;
   const values = key ? frontmatterLinks(frontmatter[key]) : [];
@@ -345,7 +357,7 @@ function renderAreaListInput(
       .onClick(async () => {
         if (!key) return;
         await writeFrontmatterValue(plugin, sourcePath, key, values.filter((_, itemIndex) => itemIndex !== index));
-        window.setTimeout(rerender, 50);
+        rerender(50);
       });
   }
 
@@ -365,7 +377,7 @@ function renderAreaListInput(
       }
       new AreaSuggestModal(plugin.app, suggestions, async (area) => {
         await writeFrontmatterValue(plugin, sourcePath, key, [...values, area.link]);
-        window.setTimeout(rerender, 50);
+        rerender(50);
       }).open();
     });
 }
@@ -536,11 +548,12 @@ async function writeFrontmatterValue(
   }
 
   try {
-    const type = String(fileFrontmatter(plugin, file).type ?? "").toLowerCase();
+    const workflow = workflowContext(plugin);
+    const type = (await readFileTypeFresh(workflow, file)).toLowerCase();
     if (type === "project" && key === "status") {
       const workflows = await import("../workflows");
       await workflows.updateProject(
-        workflowContext(plugin),
+        workflow,
         {
           path: file.path,
           key: "frontmatter/status",
@@ -559,6 +572,32 @@ async function writeFrontmatterValue(
     const message = error instanceof Error ? error.message : String(error);
     new Notice(`PARA-ZK: failed to update frontmatter: ${message}`);
   }
+}
+
+function latestPropsRerender(container: HTMLElement, render: () => void): PropsRerender {
+  return (delayMs = 0) => {
+    const state = propsRerenderState(container);
+    const generation = ++state.generation;
+    const apply = () => {
+      if (propsRerenderStates.get(container)?.generation !== generation) return;
+      if (!container.isConnected) return;
+      render();
+    };
+
+    if (delayMs > 0) {
+      window.setTimeout(apply, delayMs);
+      return;
+    }
+    apply();
+  };
+}
+
+function propsRerenderState(container: HTMLElement): PropsRerenderState {
+  const existing = propsRerenderStates.get(container);
+  if (existing) return existing;
+  const state: PropsRerenderState = { generation: 0 };
+  propsRerenderStates.set(container, state);
+  return state;
 }
 
 function readFieldValue(field: PropsField, frontmatter: Frontmatter): unknown {

@@ -11,7 +11,7 @@ import {
   type TextRange
 } from "../vault/sections";
 import { ensureFolder, isInFolder, parentFolder } from "../vault/files";
-import { fileFrontmatter, readType, type Frontmatter } from "../vault/frontmatter";
+import { readFileFrontmatterFresh, readFileTypeFresh, type Frontmatter } from "../vault/frontmatter";
 import { joinVaultPath, normalizeVaultPath, sanitizeFileName } from "../vault/paths";
 import type { RootTaskItem, TaskRead, TaskWritableField, WorkflowContext } from "./context";
 
@@ -91,7 +91,7 @@ async function ensureTaskShard(ctx: WorkflowContext, rootFile: TFile): Promise<T
   return shardFile;
 }
 
-export function readTaskShardFile(ctx: WorkflowContext, rootFile: TFile): TFile | undefined {
+export async function readTaskShardFile(ctx: WorkflowContext, rootFile: TFile): Promise<TFile | undefined> {
   return taskShardFile(ctx, rootFile);
 }
 
@@ -109,7 +109,7 @@ export function newRootId(): string {
 }
 
 export async function assertRootTaskExists(ctx: WorkflowContext, rootFile: TFile, taskId: string): Promise<void> {
-  const shardFile = readTaskShardFile(ctx, rootFile);
+  const shardFile = await readTaskShardFile(ctx, rootFile);
   if (!shardFile) throw new Error(`task not found: ${taskId}`);
   const content = await ctx.host.read(shardFile);
   const range = taskShardTaskRange(content);
@@ -119,7 +119,7 @@ export async function assertRootTaskExists(ctx: WorkflowContext, rootFile: TFile
 
 export async function readRootTaskMap(ctx: WorkflowContext, rootFile: TFile): Promise<Record<string, TaskRead>> {
   const items: Record<string, TaskRead> = {};
-  const shardFile = readTaskShardFile(ctx, rootFile);
+  const shardFile = await readTaskShardFile(ctx, rootFile);
   if (!shardFile) return items;
 
   const content = await ctx.host.read(shardFile);
@@ -144,7 +144,7 @@ export async function readRootTaskMap(ctx: WorkflowContext, rootFile: TFile): Pr
 }
 
 export async function readAllTaskItems(ctx: WorkflowContext): Promise<RootTaskItem[]> {
-  const rootFiles = rootFilesById(ctx);
+  const rootFiles = await rootFilesById(ctx);
   const results: RootTaskItem[] = [];
   for (const file of ctx.host.getMarkdownFiles()) {
     if (!isInFolder(file, taskCurrentFolder(ctx))) continue;
@@ -153,6 +153,7 @@ export async function readAllTaskItems(ctx: WorkflowContext): Promise<RootTaskIt
     const content = await ctx.host.read(file);
     const range = taskShardTaskRange(content);
     if (!range) continue;
+    const rootType = await readFileTypeFresh(ctx, rootFile);
     let cursor = range.start;
     const seen: Record<string, true> = {};
     while (cursor < range.end) {
@@ -165,7 +166,7 @@ export async function readAllTaskItems(ctx: WorkflowContext): Promise<RootTaskIt
         results.push({
           rootPath: rootFile.path,
           rootTitle: rootFile.basename,
-          rootType: readType(fileFrontmatter(ctx, rootFile)),
+          rootType,
           id,
           task: task.task
         });
@@ -198,7 +199,7 @@ export async function setRootTaskField(
   field: TaskWritableField,
   value: unknown
 ): Promise<boolean> {
-  const shardFile = readTaskShardFile(ctx, rootFile);
+  const shardFile = await readTaskShardFile(ctx, rootFile);
   if (!shardFile) throw new Error(`task not found: ${taskId}`);
   const before = await ctx.host.read(shardFile);
   const range = taskShardTaskRange(before);
@@ -214,7 +215,7 @@ export async function setRootTaskField(
 }
 
 export async function reorderRootTasks(ctx: WorkflowContext, rootFile: TFile, taskIds: string[]): Promise<boolean> {
-  const shardFile = readTaskShardFile(ctx, rootFile);
+  const shardFile = await readTaskShardFile(ctx, rootFile);
   if (!shardFile) throw new Error("task list not found");
   const before = await ctx.host.read(shardFile);
   const range = taskShardTaskRange(before);
@@ -248,7 +249,7 @@ export async function reorderRootTasks(ctx: WorkflowContext, rootFile: TFile, ta
 }
 
 export async function deleteRootTask(ctx: WorkflowContext, rootFile: TFile, taskId: string): Promise<boolean> {
-  const shardFile = readTaskShardFile(ctx, rootFile);
+  const shardFile = await readTaskShardFile(ctx, rootFile);
   if (!shardFile) throw new Error(`task not found: ${taskId}`);
   const before = await ctx.host.read(shardFile);
   const range = taskShardTaskRange(before);
@@ -262,7 +263,7 @@ export async function deleteRootTask(ctx: WorkflowContext, rootFile: TFile, task
 
 export function cycleTaskCheckbox(checkbox: string): string {
   const cycle = [" ", "/", "x", "-"];
-  const index = cycle.indexOf(checkbox);
+  const index = cycle.indexOf(checkbox.toLowerCase());
   return cycle[index === -1 || index === cycle.length - 1 ? 0 : index + 1];
 }
 
@@ -272,7 +273,7 @@ export function readTaskWritableField(value: string, originalKey: string): TaskW
 }
 
 async function ensureRootId(ctx: WorkflowContext, file: TFile): Promise<string> {
-  const existing = rootIdFromFrontmatter(fileFrontmatter(ctx, file));
+  const existing = rootIdFromFrontmatter(await readFileFrontmatterFresh(ctx, file));
   if (existing) return existing;
 
   const id = newRootId();
@@ -289,8 +290,8 @@ async function ensureRootId(ctx: WorkflowContext, file: TFile): Promise<string> 
   return resolved;
 }
 
-function taskShardFile(ctx: WorkflowContext, rootFile: TFile): TFile | undefined {
-  const rootId = rootIdFromFrontmatter(fileFrontmatter(ctx, rootFile));
+async function taskShardFile(ctx: WorkflowContext, rootFile: TFile): Promise<TFile | undefined> {
+  const rootId = rootIdFromFrontmatter(await readFileFrontmatterFresh(ctx, rootFile));
   return rootId ? ctx.host.getFile(taskShardPath(ctx, rootId, isArchivedFile(ctx, rootFile))) ?? undefined : undefined;
 }
 
@@ -422,11 +423,11 @@ function randomBytes(length: number): Uint8Array {
   return bytes;
 }
 
-function rootFilesById(ctx: WorkflowContext): Map<string, TFile> {
+async function rootFilesById(ctx: WorkflowContext): Promise<Map<string, TFile>> {
   const roots = new Map<string, TFile>();
   for (const file of ctx.host.getMarkdownFiles()) {
     if (isInFolder(file, taskRegistryFolder(ctx)) || isArchivedFile(ctx, file)) continue;
-    const rootId = rootIdFromFrontmatter(fileFrontmatter(ctx, file));
+    const rootId = rootIdFromFrontmatter(await readFileFrontmatterFresh(ctx, file));
     if (rootId && !roots.has(rootId)) roots.set(rootId, file);
   }
   return roots;

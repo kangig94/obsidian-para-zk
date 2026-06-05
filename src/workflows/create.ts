@@ -158,11 +158,18 @@ export async function createResource(ctx: WorkflowContext, options: CreateResour
 
 export async function createSubnote(ctx: WorkflowContext, options: CreateSubnoteOptions): Promise<CreateSubnoteResult> {
   const title = requireTitle(options.title, "subnote title");
-  const parent = await ensureFolderStyleParent(ctx, resolveRequiredFile(ctx, options.sourcePath, "source note"));
+  const source = resolveRequiredFile(ctx, options.sourcePath, "source note");
+  if (title === source.basename) {
+    throw new Error(`subnote title conflicts with parent note: ${title}`);
+  }
+  const parent = await ensureFolderStyleParent(ctx, source);
   const createdAt = localDateTimeSpace();
   const subnoteTypeCode = readOptionalCode(options.subnoteType, parseSubnoteTypeCode, "subnote_type", SUBNOTE_TYPE_CODE_HELP);
   const subnoteType = subnoteTypeCode ?? "free";
   const path = joinVaultPath(parent.childFolder, `${title}.md`);
+  if (path === parent.file.path) {
+    throw new Error(`subnote title conflicts with parent note: ${title}`);
+  }
   let created = true;
   let file = ctx.host.getFile(path);
 
@@ -388,7 +395,7 @@ async function readTemplate(ctx: WorkflowContext, templateName: TemplateName): P
 function applyTemplateVariables(content: string, variables: TemplateVariables): string {
   let result = content;
   for (const [key, value] of Object.entries(variables)) {
-    result = result.replace(new RegExp(`{{\\s*${escapeRegExp(key)}\\s*}}`, "g"), value ?? "");
+    result = result.replace(new RegExp(`{{\\s*${escapeRegExp(key)}\\s*}}`, "g"), () => value ?? "");
   }
   return normalizeTemplateOutput(collapseExcessBlankLines(result.replace(/{{\s*[A-Za-z0-9_]+\s*}}/g, "")));
 }

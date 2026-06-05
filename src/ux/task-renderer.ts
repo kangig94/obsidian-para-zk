@@ -4,11 +4,13 @@ import {
   Notice,
   Setting,
   TFile,
+  type CachedMetadata,
   type MarkdownPostProcessorContext
 } from "obsidian";
 import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { localDate } from "../time";
+import { readFileFrontmatterFresh } from "../vault/frontmatter";
 import { workflowContext } from "../vault/host";
 import { parseCodeBlockKeyValues } from "./code-block-args";
 import {
@@ -19,8 +21,10 @@ import {
   readRootTaskMap,
   reorderRootTasks,
   setRootTaskField,
-  type TaskRead
+  type TaskRead,
+  type WorkflowContext
 } from "../workflows";
+import { ROOT_ID_FRONTMATTER_KEY, rootIdFromFrontmatter } from "../workflows/tasks";
 import { promptText } from "./prompts";
 import {
   beginRegistryBlockRender,
@@ -246,13 +250,37 @@ function renderTaskToolbar(
 }
 
 async function currentRootTasks(plugin: ParaZkPluginContext, rootFile: TFile): Promise<RenderableTask[]> {
-  const taskMap = await readRootTaskMap(workflowContext(plugin), rootFile);
+  const workflow = workflowContext(plugin);
+  const taskMap = await readRootTaskMap(await workflowWithFreshRootId(workflow, rootFile), rootFile);
   return Object.entries(taskMap).map(([id, task]) => ({
     rootFile,
     rootTitle: rootFile.basename,
     id,
     task
   }));
+}
+
+async function workflowWithFreshRootId(ctx: WorkflowContext, rootFile: TFile): Promise<WorkflowContext> {
+  const rootId = rootIdFromFrontmatter(await readFileFrontmatterFresh(ctx, rootFile));
+  if (!rootId) return ctx;
+
+  return {
+    ...ctx,
+    host: {
+      ...ctx.host,
+      getFileCache: (file) => {
+        const cache = ctx.host.getFileCache(file);
+        if (file.path !== rootFile.path) return cache;
+        return {
+          ...(cache ?? {}),
+          frontmatter: {
+            ...(cache?.frontmatter ?? {}),
+            [ROOT_ID_FRONTMATTER_KEY]: rootId
+          }
+        } as CachedMetadata;
+      }
+    }
+  };
 }
 
 async function allRootTasks(plugin: ParaZkPluginContext): Promise<RenderableTask[]> {

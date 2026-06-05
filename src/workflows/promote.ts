@@ -7,6 +7,7 @@ import {
   localTime
 } from "../time";
 import type { CaptureResult, PromotionResult } from "../types";
+import { readFileFrontmatterFresh, readFileTypeFresh } from "../vault/frontmatter";
 import { ensureFolder } from "../vault/files";
 import type { WorkflowHost } from "../vault/host";
 import { joinVaultPath, wikiLink } from "../vault/paths";
@@ -74,6 +75,8 @@ export async function openJournal(ctx: WorkflowContext, options: OpenJournalOpti
 
 export async function promoteResource(ctx: WorkflowContext, options: PromoteResourceOptions = {}): Promise<PromotionResult> {
   const source = resolveRequiredFile(ctx, options.sourcePath, "source resource");
+  const sourceType = await readFileTypeFresh(ctx, source);
+  if (sourceType !== "resource") throw new Error(`file is not a resource note: ${source.path}`);
   const kind = readOptionalCode(options.kind, parseZkKind, "kind", ZK_KIND_CODE_HELP) ?? "Permanent";
   const maturityCode = readOptionalCode(options.maturity, parseMaturityCode, "maturity", MATURITY_CODE_HELP);
   const title = requireTitle(options.title || source.basename, "ZK title");
@@ -95,6 +98,8 @@ export async function promoteResource(ctx: WorkflowContext, options: PromoteReso
 
 export async function promoteFleeting(ctx: WorkflowContext, options: PromoteFleetingOptions = {}): Promise<PromotionResult> {
   const source = resolveRequiredFile(ctx, options.sourcePath, "source fleeting note");
+  const sourceType = await readFileTypeFresh(ctx, source);
+  if (sourceType !== "zk_fleeting") throw new Error(`file is not a fleeting ZK note: ${source.path}`);
   const kind = readOptionalCode(options.kind, parsePromotionKind, "kind", PROMOTION_ZK_KIND_CODE_HELP) ?? "Permanent";
   const maturityCode = readOptionalCode(options.maturity, parseMaturityCode, "maturity", MATURITY_CODE_HELP);
   const title = requireTitle(options.title || source.basename, "ZK title");
@@ -204,7 +209,7 @@ async function ensureJournal(ctx: WorkflowContext, options: OpenJournalOptions):
   file: TFile;
   created: boolean;
   date: string;
-  energy: EnergyCode;
+  energy: string;
 }> {
   const date = dateFromCli(options.date);
   const dateText = localDate(date);
@@ -235,11 +240,16 @@ async function ensureJournal(ctx: WorkflowContext, options: OpenJournalOptions):
     fm.tags = fm.tags || [tags.journal];
     applyCreatedUpdatedDefaults(fm, createdAt);
   });
+  const storedFrontmatter = await readFileFrontmatterFresh(ctx, file);
 
   return {
     file,
     created,
     date: dateText,
-    energy
+    energy: storedEnergy(storedFrontmatter.energy, energy)
   };
+}
+
+function storedEnergy(value: unknown, fallback: EnergyCode): string {
+  return typeof value === "string" ? value : fallback;
 }

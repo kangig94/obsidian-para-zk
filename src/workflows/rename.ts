@@ -303,7 +303,7 @@ async function updateTitleDerivedTag(
     const next = existing.map((tag) => {
       const normalized = tag.startsWith("#") ? tag.slice(1) : tag;
       if (knownPrefixes.some((prefix) => normalized.startsWith(`${prefix}/`))) {
-        const renamed = renamedTitleTag(normalized, knownPrefixes, activeTagPrefix, fromTitle, title, domain);
+        const renamed = renamedTitleTag(normalized, knownPrefixes, activeTagPrefix, fromTitle, title);
         if (renamed.changed) {
           replaced = true;
           namespaceMoves.push({
@@ -329,14 +329,12 @@ function renamedTitleTag(
   knownPrefixes: string[],
   activeTagPrefix: string,
   fromTitle: string,
-  title: string,
-  domain: TagDomain
+  title: string
 ): { tag: string; changed: boolean } {
   const oldTitleSlug = slugify(fromTitle);
   const titleSlug = slugify(title);
   const matchingPrefix = knownPrefixes.find((prefix) => tag.startsWith(`${prefix}/`));
-  if (!matchingPrefix) return { tag: `${activeTagPrefix}/${titleSlug}`, changed: true };
-  if (domain !== "area") return { tag: `${activeTagPrefix}/${titleSlug}`, changed: true };
+  if (!matchingPrefix) return { tag, changed: false };
 
   const rest = tag.slice(matchingPrefix.length + 1).split("/").filter(Boolean);
   if (rest.at(-1) !== oldTitleSlug) {

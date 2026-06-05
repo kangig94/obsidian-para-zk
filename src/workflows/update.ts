@@ -12,7 +12,7 @@ import {
   type TextRange
 } from "../vault/sections";
 import { ensureFolder, parentFolder } from "../vault/files";
-import { fileFrontmatter, readFileTypeFresh, readType } from "../vault/frontmatter";
+import { readFileFrontmatterFresh, readFileTypeFresh, readType } from "../vault/frontmatter";
 import { joinVaultPath, normalizeVaultPath } from "../vault/paths";
 import {
   ENERGY_CODE_HELP,
@@ -195,7 +195,7 @@ async function updateSurface(
   return {
     path: resultFile.path,
     title: resultFile.basename,
-    type: readType(fileFrontmatter(ctx, resultFile)),
+    type: await readFileTypeFresh(ctx, resultFile),
     archived: isArchivedFile(ctx, resultFile),
     key,
     operation,
@@ -227,11 +227,12 @@ async function resolveWritableSurfaceTarget(
     const childTitle = parts[1];
     const child = findChild(ctx, file, childTitle);
     if (!child) throw new Error(`child not found: ${childTitle}`);
+    const childType = await readFileTypeFresh(ctx, child);
 
     return resolveWritableSurfaceTarget(
       ctx,
       child,
-      specForType(readType(fileFrontmatter(ctx, child))),
+      specForType(childType),
       parts.slice(2).join("/"),
       originalKey
     );
@@ -345,14 +346,16 @@ async function updateFrontmatterSurface(
 ): Promise<TextUpdateResult> {
   if (operation !== "set") throw new Error("frontmatter keys only support op=set");
 
+  const frontmatter = await readFileFrontmatterFresh(ctx, target.file);
+  const type = readType(frontmatter);
   const value = normalizeFrontmatterUpdateValue(
-    readType(fileFrontmatter(ctx, target.file)),
+    type,
     target.frontmatterKey,
     requireUpdateValue(options)
   );
-  const movePlan = projectStatusMovePlan(ctx, target.file, target.frontmatterKey, value);
-  if (movePlan) assertCanMoveNoteBetweenRoots(ctx, target.file, movePlan.fromRoot, movePlan.toRoot);
-  const before = fileFrontmatter(ctx, target.file)[target.frontmatterKey];
+  const movePlan = projectStatusMovePlan(ctx, target.file, type, target.frontmatterKey, value);
+  if (movePlan) await assertCanMoveNoteBetweenRoots(ctx, target.file, movePlan.fromRoot, movePlan.toRoot);
+  const before = frontmatter[target.frontmatterKey];
   const frontmatterChanged = !frontmatterValuesEqual(before, value);
 
   if (frontmatterChanged) {
@@ -669,10 +672,11 @@ function normalizeFrontmatterUpdateValue(type: string, key: string, value: unkno
 function projectStatusMovePlan(
   ctx: WorkflowContext,
   file: TFile,
+  type: string,
   frontmatterKey: string,
   value: unknown
 ): { fromRoot: string; toRoot: string } | undefined {
-  if (frontmatterKey !== "status" || readType(fileFrontmatter(ctx, file)) !== "project") return undefined;
+  if (frontmatterKey !== "status" || type !== "project") return undefined;
 
   const archiveRoot = archivedCounterpartFolder(ctx, ctx.settings.paths.projectsFolder);
   const shouldBeArchived = value === "archived";
@@ -692,15 +696,15 @@ function projectStatusMovePlan(
   return undefined;
 }
 
-function assertCanMoveNoteBetweenRoots(
+async function assertCanMoveNoteBetweenRoots(
   ctx: WorkflowContext,
   file: TFile,
   fromRoot: string,
   toRoot: string
-): void {
+): Promise<void> {
   const normalizedFromRoot = normalizeVaultPath(fromRoot);
   const normalizedToRoot = normalizeVaultPath(toRoot);
-  assertCanMoveTaskShardBetweenArchiveStates(ctx, file, normalizedFromRoot, normalizedToRoot);
+  await assertCanMoveTaskShardBetweenArchiveStates(ctx, file, normalizedFromRoot, normalizedToRoot);
   const folderStyleFolder = folderStyleContainer(file);
   if (folderStyleFolder) {
     const relativeFolder = relativePathUnderRoot(folderStyleFolder.path, normalizedFromRoot);
@@ -721,9 +725,9 @@ async function moveNoteBetweenRoots(
   const normalizedFromRoot = normalizeVaultPath(fromRoot);
   const normalizedToRoot = normalizeVaultPath(toRoot);
   const fromPath = file.path;
-  const rootId = rootIdFromFrontmatter(fileFrontmatter(ctx, file));
+  const rootId = rootIdFromFrontmatter(await readFileFrontmatterFresh(ctx, file));
   const folderStyleFolder = folderStyleContainer(file);
-  assertCanMoveNoteBetweenRoots(ctx, file, normalizedFromRoot, normalizedToRoot);
+  await assertCanMoveNoteBetweenRoots(ctx, file, normalizedFromRoot, normalizedToRoot);
 
   if (folderStyleFolder) {
     const relativeFolder = relativePathUnderRoot(folderStyleFolder.path, normalizedFromRoot);
@@ -747,13 +751,13 @@ async function moveNoteBetweenRoots(
   return { file: moved, fromPath, toPath };
 }
 
-function assertCanMoveTaskShardBetweenArchiveStates(
+async function assertCanMoveTaskShardBetweenArchiveStates(
   ctx: WorkflowContext,
   file: TFile,
   fromRoot: string,
   toRoot: string
-): void {
-  const rootId = rootIdFromFrontmatter(fileFrontmatter(ctx, file));
+): Promise<void> {
+  const rootId = rootIdFromFrontmatter(await readFileFrontmatterFresh(ctx, file));
   if (!rootId) return;
 
   const fromArchived = isArchivedPath(ctx, fromRoot);

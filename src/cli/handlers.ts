@@ -1201,13 +1201,14 @@ function readRequiredCliString(args: CliArgs, key: string): string {
 }
 
 function readCliBoolean(args: CliArgs, key: string): boolean | undefined {
+  if (!Object.prototype.hasOwnProperty.call(args, key)) return undefined;
   const value = args[key];
   if (typeof value === "boolean") return value;
-  if (typeof value !== "string") return undefined;
+  if (typeof value !== "string") throw new Error(`${key} must be a boolean (got ${String(value)})`);
   const normalized = value.trim().toLowerCase();
   if (["true", "1", "yes", "on"].includes(normalized)) return true;
   if (["false", "0", "no", "off"].includes(normalized)) return false;
-  return undefined;
+  throw new Error(`${key} must be a boolean (got ${value})`);
 }
 
 function readCliTitle(args: CliArgs): string {

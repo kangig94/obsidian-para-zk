@@ -74,14 +74,14 @@ async function resolveManagedType(
   const file = plugin.app.vault.getFileByPath(sourcePath);
   if (!(file instanceof TFile)) return undefined;
 
-  const cachedType = readFrontmatterType(plugin.app.metadataCache.getFileCache(file)?.frontmatter?.type);
-  if (cachedType) return cachedType;
-
   try {
-    return readFrontmatterTypeFromText(await plugin.app.vault.cachedRead(file));
+    const freshType = readFrontmatterTypeFromText(await plugin.app.vault.read(file));
+    if (freshType) return freshType;
   } catch {
-    return undefined;
+    // Fall through to the cache only if the fresh file read cannot provide a type.
   }
+
+  return readFrontmatterType(plugin.app.metadataCache.getFileCache(file)?.frontmatter?.type);
 }
 
 function readManagedType(source: string): string | undefined {

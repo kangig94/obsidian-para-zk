@@ -3,7 +3,7 @@ import { localePack } from "../i18n";
 import { stripProjectSummaryManagedBlock, type TextRange } from "../vault/sections";
 import type { CollectionKind, ReferenceRead, SurfaceDescription, TaskRead, WorkflowContext } from "./context";
 import { readBacklinks } from "./backlinks";
-import { readReferenceItems } from "./references";
+import { readReferenceItemsFresh } from "./references";
 import { readRootTaskMap } from "./tasks";
 import { uniqueStrings } from "../text";
 
@@ -301,9 +301,9 @@ export function keyParts(key: string): string[] {
   return key.split("/").map((part) => part.trim()).filter(Boolean);
 }
 
-function readReferences(_content: string, context: SectionTransformContext): Record<string, ReferenceRead> {
+async function readReferences(_content: string, context: SectionTransformContext): Promise<Record<string, ReferenceRead>> {
   return Object.fromEntries(
-    readReferenceItems(context.ctx, context.file).map((item, index) => [String(index), item])
+    (await readReferenceItemsFresh(context.ctx, context.file)).map((item, index) => [String(index), item])
   );
 }
 

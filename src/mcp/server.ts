@@ -69,6 +69,10 @@ const BASE_MUTATION_PROPERTIES = {
     type: "string",
     description: "YYYY-MM-DD selector (journal; optional for retro)."
   },
+  archived: {
+    type: "boolean",
+    description: "When selecting a PARA/retro note by title, true selects the archived copy and false restricts lookup to active notes."
+  },
   key: {
     type: "string",
     description: "Section key, e.g. body or children/<title>/body."
@@ -339,9 +343,13 @@ function selectorArgs(type: UpdateType, params: UpdateParams): string[] {
   const title = readOptionalString(params, "title");
   const path = readOptionalString(params, "path");
   const date = readOptionalString(params, "date");
+  const archived = readOptionalBoolean(params, "archived");
+
+  if (archived !== undefined && !isArchiveAwareUpdateType(type)) {
+    throw new Error(`${type} does not support archived selector`);
+  }
 
   if (type === "journal") {
-    if (!date && !path) throw new Error("journal requires a date or path selector");
     const args: string[] = [];
     if (date) args.push(`date=${date}`);
     if (path) args.push(`path=${path}`);
@@ -353,7 +361,12 @@ function selectorArgs(type: UpdateType, params: UpdateParams): string[] {
   if (title) args.push(`title=${title}`);
   if (path) args.push(`path=${path}`);
   if (type === "retro" && date) args.push(`date=${date}`);
+  if (archived !== undefined) args.push(`archived=${archived ? "true" : "false"}`);
   return args;
+}
+
+function isArchiveAwareUpdateType(type: UpdateType): boolean {
+  return type === "project" || type === "area" || type === "resource" || type === "retro";
 }
 
 function readRequiredString(params: UpdateParams, key: string, options: { allowEmpty?: boolean } = {}): string {

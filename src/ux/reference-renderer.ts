@@ -231,12 +231,15 @@ function renderReferenceToolbar(
             );
             if (!title) return;
 
-            await createResource(workflowContext(plugin), {
-              title,
-              sourcePath: options.rootFile.path,
-              linkToSource: true,
-              open: true
-            });
+            await queueRegistryFileWrite(
+              options.rootFile,
+              () => createResource(workflowContext(plugin), {
+                title,
+                sourcePath: options.rootFile.path,
+                linkToSource: true,
+                open: true
+              })
+            );
             await options.rerender();
           });
         });
@@ -662,6 +665,7 @@ class ReferenceEditModal extends Modal {
     const file = this.resolveAnchorTargetFile(this.value.target);
     if (!isMarkdownFile(file)) {
       this.anchorSuggestions = [];
+      this.clearAnchorValue();
       this.setAnchorInputEnabled(false);
       return;
     }
@@ -670,6 +674,7 @@ class ReferenceEditModal extends Modal {
       const suggestions = await this.anchorSuggestionsForFile(file);
       if (generation !== this.anchorRefreshGeneration) return;
       this.anchorSuggestions = suggestions;
+      this.dropUnresolvedAnchor(suggestions);
       this.setAnchorInputEnabled(true);
     } catch (error) {
       if (generation !== this.anchorRefreshGeneration) return;
@@ -677,6 +682,18 @@ class ReferenceEditModal extends Modal {
       this.setAnchorInputEnabled(false);
       new Notice(registryErrorMessage(error));
     }
+  }
+
+  private clearAnchorValue(): void {
+    this.value.anchor = "";
+    if (this.anchorInputEl) this.anchorInputEl.value = "";
+  }
+
+  private dropUnresolvedAnchor(suggestions: ReferenceAnchorSuggestion[]): void {
+    const anchor = normalizeReferenceAnchor(this.value.anchor);
+    if (!anchor) return;
+    if (suggestions.some((suggestion) => normalizeReferenceAnchor(suggestion.value) === anchor)) return;
+    this.clearAnchorValue();
   }
 
   private setAnchorInputEnabled(enabled: boolean): void {

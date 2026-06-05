@@ -1542,22 +1542,40 @@ function focusVaultWindow(path) {
   return false;
 }
 
+// optsidian eval/raw stdout can be prefixed by console noise (e.g. the yaml
+// library's "[warn] Keys with collection values..." lines), so parse the JSON
+// payload rather than the whole stream: it is emitted as the last line.
+function parseStdoutJson(stdout) {
+  const trimmed = stdout.trim();
+  try {
+    return { ok: true, value: JSON.parse(trimmed) };
+  } catch {
+    const lines = trimmed.split("\n");
+    for (let i = lines.length - 1; i >= 0; i -= 1) {
+      const line = lines[i].trim();
+      if (!line.startsWith("{") && !line.startsWith("[")) continue;
+      try {
+        return { ok: true, value: JSON.parse(line) };
+      } catch {
+        // keep scanning earlier lines
+      }
+    }
+    return { ok: false };
+  }
+}
+
 function cliJson(command, commandArgs) {
   const result = run("optsidian", ["raw", command, ...commandArgs]);
-  try {
-    return JSON.parse(result.stdout);
-  } catch (error) {
-    throw new Error(`Command did not return JSON: ${command}\n${result.stdout}\n${result.stderr}`);
-  }
+  const parsed = parseStdoutJson(result.stdout);
+  if (parsed.ok) return parsed.value;
+  throw new Error(`Command did not return JSON: ${command}\n${result.stdout}\n${result.stderr}`);
 }
 
 function guiJson(code) {
   const result = run("optsidian", ["eval", `code=${code}`]);
-  try {
-    return JSON.parse(result.stdout);
-  } catch (error) {
-    throw new Error(`Obsidian eval did not return JSON\n${result.stdout}\n${result.stderr}`);
-  }
+  const parsed = parseStdoutJson(result.stdout);
+  if (parsed.ok) return parsed.value;
+  throw new Error(`Obsidian eval did not return JSON\n${result.stdout}\n${result.stderr}`);
 }
 
 function assertGuiLocaleLabels(expectedRibbonLabels, expectedCreateProjectCommandName, expectedEmptyTrashLabel) {

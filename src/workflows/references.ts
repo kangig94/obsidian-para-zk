@@ -1,7 +1,6 @@
 import { TFile } from "obsidian";
 import { hasOwn, isRecord } from "../records";
 import {
-  fileFrontmatter,
   readFileFrontmatterFresh,
   type Frontmatter
 } from "../vault/frontmatter";
@@ -101,11 +100,6 @@ type ParsedReferenceTarget = {
   syntax: "wiki" | "markdown" | "url" | "raw";
   target: string;
 };
-
-export function readReferenceItems(ctx: WorkflowContext, file: TFile): ReferenceRead[] {
-  return referenceItemsFromFrontmatter(fileFrontmatter(ctx, file))
-    .map((item) => deriveReferenceRead(ctx, file, item));
-}
 
 export async function readReferenceItemsFresh(ctx: WorkflowContext, file: TFile): Promise<ReferenceRead[]> {
   return referenceItemsFromFrontmatter(await readFileFrontmatterFresh(ctx, file))
