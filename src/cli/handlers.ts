@@ -716,6 +716,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       title: { value: "<title>", description: "Resource title." },
       path: { value: "<path>", description: "Source note path to receive the resource link." },
       link: { value: "<true|false>", description: "Whether to add the link to the source note." },
+      body: { value: "<markdown>", description: "Optional initial free-form body content." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -726,6 +727,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
         title: readCliTitle(args),
         sourcePath,
         linkToSource: readCliBoolean(args, "link") ?? Boolean(sourcePath),
+        body: readCliString(args, "body"),
         open: readCliBoolean(args, "open") ?? false
       };
     })
@@ -755,6 +757,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       title: { value: "<title>", description: "Subnote title." },
       path: { value: "<path>", description: "Parent note path." },
       subnote_type: { value: `<${SUBNOTE_TYPE_CODE_HELP}>`, description: "Locale-neutral subnote type code." },
+      body: { value: "<markdown>", description: "Optional initial free-form body content." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -763,6 +766,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       title: readCliTitle(args),
       sourcePath: readCliPath(args),
       subnoteType: readCliSubnoteType(args),
+      body: readCliString(args, "body"),
       open: readCliBoolean(args, "open") ?? false
     }))
   },
@@ -809,6 +813,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       title: { value: "<title>", description: "ZK note title." },
       kind: { value: `<${ZK_KIND_CODE_HELP}>`, description: "Locale-neutral ZK note kind." },
       maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
+      body: { value: "<markdown>", description: "Optional initial free-form body content." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -817,6 +822,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       title: readCliTitle(args),
       kind: readCliKind(args),
       maturity: readCliString(args, "maturity"),
+      body: readCliString(args, "body"),
       open: readCliBoolean(args, "open") ?? false
     }))
   },
@@ -848,6 +854,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       title: { value: "<title>", description: "New ZK note title." },
       kind: { value: `<${RESOURCE_CREATE_KIND_CODE_HELP}>`, description: "Locale-neutral target ZK kind (source|permanent)." },
       maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
+      body: { value: "<markdown>", description: "Optional initial free-form body content." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -857,6 +864,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       title: readCliTitle(args),
       kind: readCliKind(args),
       maturity: readCliString(args, "maturity"),
+      body: readCliString(args, "body"),
       open: readCliBoolean(args, "open") ?? false
     }))
   },
@@ -868,6 +876,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       title: { value: "<title>", description: "New permanent note title." },
       maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
       discard: { value: "<true|false>", description: "Discard the spark (move to trash) instead of keeping it marked processed. Default false." },
+      body: { value: "<markdown>", description: "Optional initial free-form body content for the new permanent." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -877,6 +886,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       title: readCliTitle(args),
       maturity: readCliString(args, "maturity"),
       discard: readCliBoolean(args, "discard") ?? false,
+      body: readCliString(args, "body"),
       open: readCliBoolean(args, "open") ?? false
     }))
   },
@@ -887,6 +897,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       path: { value: "<path>", description: "Source note path." },
       title: { value: "<title>", description: "New permanent note title." },
       maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
+      body: { value: "<markdown>", description: "Optional initial free-form body content." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -895,6 +906,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       sourcePath: readCliPath(args),
       title: readCliTitle(args),
       maturity: readCliString(args, "maturity"),
+      body: readCliString(args, "body"),
       open: readCliBoolean(args, "open") ?? false
     }))
   }

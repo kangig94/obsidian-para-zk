@@ -690,6 +690,7 @@ Options:
 | `title` | string | Required. |
 | `path` | path | Optional source note receiving the resource link. |
 | `link` | boolean | Defaults to `true` when `path` is present. |
+| `body` | markdown | Optional initial free-form body content. |
 | `open` | boolean | Default `false`. |
 
 Example:
@@ -774,6 +775,7 @@ Options:
 | `title` | string | Required. |
 | `path` | path | Required for deterministic CLI use. Parent project or area note. |
 | `subnote_type` | subnote type code | Defaults to `free`. |
+| `body` | markdown | Optional initial free-form body content. |
 | `open` | boolean | Default `false`. |
 
 Example:
@@ -853,6 +855,7 @@ Options:
 | `title` | string | Required. |
 | `kind` | ZK kind code | Defaults to `spark`. |
 | `maturity` | maturity code | Used for permanent notes. Defaults to `draft`. |
+| `body` | markdown | Optional initial free-form body content. |
 | `open` | boolean | Default `false`. |
 
 Example:
@@ -919,6 +922,7 @@ Options:
 | `title` | string | Optional. Defaults to source basename. |
 | `kind` | `source` \| `permanent` | Defaults to `permanent`. |
 | `maturity` | maturity code | Used for permanent notes. |
+| `body` | markdown | Optional initial free-form body content. |
 | `open` | boolean | Default `false`. |
 
 Example:
@@ -948,6 +952,7 @@ Options:
 | `path` | path | Required for deterministic CLI use. Source note. |
 | `title` | string | Optional. Defaults to source basename. |
 | `maturity` | maturity code | Permanent-note maturity. |
+| `body` | markdown | Optional initial free-form body content. |
 | `open` | boolean | Default `false`. |
 
 Example:
@@ -982,6 +987,7 @@ Options:
 | `title` | string | Optional. Defaults to source basename. |
 | `maturity` | maturity code | Permanent-note maturity. |
 | `discard` | boolean | Move the spark to trash instead of keeping it processed. Default `false`. |
+| `body` | markdown | Optional initial free-form body content for the new permanent. |
 | `open` | boolean | Default `false`. |
 
 Example:

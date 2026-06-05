@@ -11,6 +11,7 @@ import type { NoteResult, ZkKind } from "../types";
 import { frontmatterLinks, parseFrontmatterFromContent, readFileFrontmatterFresh, yamlScalar } from "../vault/frontmatter";
 import { ensureFolder, parentFolder } from "../vault/files";
 import { joinVaultPath, sanitizeFileName, wikiLink } from "../vault/paths";
+import { setEditableBody } from "../vault/sections";
 import {
   MATURITY_CODE_HELP,
   PRIORITY_CODE_HELP,
@@ -58,6 +59,16 @@ import {
 } from "./locations";
 import { insertReferenceItem } from "./references";
 import { ROOT_ID_FRONTMATTER_KEY, newRootId, rootIdFromFrontmatter } from "./tasks";
+
+// Fill the free-form editable body of a just-created note. Uses the same body
+// region + splice as `update key=body op=set`, so create-with-body and a later
+// edit stay consistent.
+export async function applyBody(ctx: WorkflowContext, file: TFile, body: string | undefined): Promise<void> {
+  const text = body?.trim();
+  if (!text) return;
+  const content = await ctx.host.read(file);
+  await ctx.host.modify(file, setEditableBody(content, text));
+}
 
 export async function createProject(ctx: WorkflowContext, options: CreateProjectOptions): Promise<CreateProjectResult> {
   const title = requireTitle(options.title, "project title");
@@ -148,6 +159,7 @@ export async function createResource(ctx: WorkflowContext, options: CreateResour
     linkedFromSource = (await insertReferenceItem(ctx, source, { link: wikiLink(file.path) })).added === true;
   }
 
+  await applyBody(ctx, file, options.body);
   await openIfRequested(ctx, file, options.open);
   return {
     ...noteResult(file, true, options.open),
@@ -185,6 +197,7 @@ export async function createSubnote(ctx: WorkflowContext, options: CreateSubnote
       fm.subnote_type = fm.subnote_type ?? subnoteType;
       applyCreatedUpdatedDefaults(fm, createdAt);
     });
+    await applyBody(ctx, file, options.body);
   } else {
     created = false;
   }
@@ -328,6 +341,7 @@ export async function createZk(ctx: WorkflowContext, options: CreateZkOptions): 
   const path = await uniqueMarkdownPath(ctx.host, joinVaultPath(folder, `${title}.md`));
   const file = await createZkFile(ctx, kind, path, title, { maturityCode });
 
+  await applyBody(ctx, file, options.body);
   await openIfRequested(ctx, file, options.open);
   return {
     ...noteResult(file, true, options.open),

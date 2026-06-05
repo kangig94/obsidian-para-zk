@@ -234,6 +234,30 @@ describe("subarea and child bodies", () => {
     const read = await cli.run("para-zk:read-project", { title: "Alpha", key: "children/Notes/body" });
     expect(String(read.value)).toContain("Body addition");
   });
+
+  it("fills the free-form body inline on create", async () => {
+    const zk = await cli.run("para-zk:create-zk", {
+      title: "Body Spark",
+      kind: "spark",
+      body: "First line.\n\nSecond line.",
+      open: "false"
+    });
+    const zkBody = await cli.run("para-zk:read-zk", { path: String(zk.path), key: "body" });
+    expect(String(zkBody.value)).toContain("First line.");
+    expect(String(zkBody.value)).toContain("Second line.");
+
+    // Subnote body via the inline arg is reachable through the parent's children key.
+    await cli.run("para-zk:create-project", { title: "Beta", open: "false" });
+    await cli.run("para-zk:create-subnote", {
+      title: "Plan",
+      path: "PARA/Projects/Beta/Beta.md",
+      subnote_type: "plan",
+      body: "Step 1.",
+      open: "false"
+    });
+    const subBody = await cli.run("para-zk:read-project", { title: "Beta", key: "children/Plan/body" });
+    expect(String(subBody.value)).toContain("Step 1.");
+  });
 });
 
 describe("managed UI preservation", () => {

@@ -1,6 +1,7 @@
 import { TFile } from "obsidian";
 import { hasOwn, isRecord } from "../records";
 import {
+  editableBodyRange,
   findSectionContentTargetByHeading,
   findSectionSplitHazard,
   markdownBodyRange,
@@ -254,7 +255,7 @@ async function resolveWritableSurfaceTarget(
     return {
       kind: "text",
       file,
-      range: writableBodyRange(content),
+      range: editableBodyRange(content),
       sectionKey: "body"
     };
   }
@@ -571,14 +572,6 @@ function writableSectionRange(content: string, section: ReadSectionSpec, origina
     end: editableEnd,
     headingLevel: range.headingLevel
   });
-}
-
-function writableBodyRange(content: string): TextRange {
-  const body = markdownBodyRange(content);
-  const prelude = content.slice(body.start, body.end).match(/^\s*```para-zk-props\r?\n[\s\S]*?\r?\n```\s*/);
-  const start = body.start + (prelude?.[0].length ?? 0);
-  const end = trailingManagedBlockStart(content, start, body.end) ?? body.end;
-  return trimTextRange(content, start, end);
 }
 
 function findSectionContentRange(content: string, section: ReadSectionSpec): SectionContentRange | undefined {

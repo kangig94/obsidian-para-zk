@@ -22,6 +22,7 @@ import { RESOURCE_CREATE_KIND_CODE_HELP, parseResourceCreateKind } from "../zk/k
 import { appendUniqueStrings, escapeRegExp } from "../text";
 import { readOptionalCode } from "./code-options";
 import {
+  applyBody,
   applyCreatedUpdatedDefaults,
   createMarkdownFile,
   createZkFile,
@@ -104,6 +105,7 @@ export async function createFromResource(ctx: WorkflowContext, options: CreateFr
   const kind = readOptionalCode(options.kind, parseResourceCreateKind, "kind", RESOURCE_CREATE_KIND_CODE_HELP) ?? "Permanent";
   const { source, file } = await createZkFromOrigin(ctx, options, { label: "source resource", expectedType: "resource" }, kind);
   await insertReferenceItem(ctx, file, { link: wikiLink(source.path) });
+  await applyBody(ctx, file, options.body);
   await openIfRequested(ctx, file, options.open);
   return { ...noteResult(file, true, options.open), sourcePath: source.path, kind };
 }
@@ -111,6 +113,7 @@ export async function createFromResource(ctx: WorkflowContext, options: CreateFr
 export async function createFromSource(ctx: WorkflowContext, options: CreateFromSourceOptions = {}): Promise<PromotionResult> {
   const { source, file } = await createZkFromOrigin(ctx, options, { label: "source note", expectedType: "zk_source" }, "Permanent");
   await insertReferenceItem(ctx, file, { link: wikiLink(source.path) });
+  await applyBody(ctx, file, options.body);
   await openIfRequested(ctx, file, options.open);
   return { ...noteResult(file, true, options.open), sourcePath: source.path, kind: "Permanent" as const };
 }
@@ -134,6 +137,7 @@ export async function distillSpark(ctx: WorkflowContext, options: DistillSparkOp
       fm.distilled_to = appendUniqueStrings(fm.distilled_to, [wikiLink(file.path)]);
     });
   }
+  await applyBody(ctx, file, options.body);
   await openIfRequested(ctx, file, options.open);
 
   return {

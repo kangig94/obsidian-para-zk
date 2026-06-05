@@ -38,6 +38,7 @@ export type CreateResourceOptions = {
   title: string;
   sourcePath?: string;
   linkToSource?: boolean;
+  body?: string;
   open?: boolean;
 };
 
@@ -52,6 +53,7 @@ export type CreateSubnoteOptions = {
   title: string;
   sourcePath?: string;
   subnoteType?: string;
+  body?: string;
   open?: boolean;
 };
 
@@ -73,6 +75,7 @@ export type CreateZkOptions = {
   title: string;
   kind?: string;
   maturity?: string;
+  body?: string;
   open?: boolean;
 };
 
@@ -95,6 +98,7 @@ export type CreateFromResourceOptions = {
   title?: string;
   kind?: string;
   maturity?: string;
+  body?: string;
   open?: boolean;
 };
 
@@ -102,6 +106,7 @@ export type CreateFromSourceOptions = {
   sourcePath?: string;
   title?: string;
   maturity?: string;
+  body?: string;
   open?: boolean;
 };
 
@@ -110,6 +115,7 @@ export type DistillSparkOptions = {
   title?: string;
   maturity?: string;
   discard?: boolean;
+  body?: string;
   open?: boolean;
 };
 

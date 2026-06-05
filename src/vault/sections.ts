@@ -133,6 +133,21 @@ export function trailingManagedBlockStart(content: string, start: number, end: n
   return match?.index === undefined ? undefined : start + match.index;
 }
 
+// The writable free-form body region: after the para-zk-props prelude and before
+// the trailing para-zk-managed tail (if any). Shared by update (key=body) and the
+// create workflows (inline body).
+export function editableBodyRange(content: string): TextRange {
+  const body = markdownBodyRange(content);
+  const prelude = content.slice(body.start, body.end).match(/^\s*```para-zk-props\r?\n[\s\S]*?\r?\n```\s*/);
+  const start = body.start + (prelude?.[0].length ?? 0);
+  const end = trailingManagedBlockStart(content, start, body.end) ?? body.end;
+  return trimTextRange(content, start, end);
+}
+
+export function setEditableBody(content: string, value: string): string {
+  return spliceTextRange(content, editableBodyRange(content), value);
+}
+
 export function readLineSpan(text: string, start: number, end: number): { text: string; next: number } | undefined {
   if (start >= end) return undefined;
   const lf = text.indexOf("\n", start);
