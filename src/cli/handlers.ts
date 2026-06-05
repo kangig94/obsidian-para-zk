@@ -13,7 +13,7 @@ import {
 } from "../vocabulary";
 import { PROMOTION_ZK_KIND_CODE_HELP, ZK_KIND_CODE_HELP } from "../zk/kinds";
 import { parseList } from "./parse";
-import { createObsidianHost } from "../vault/host";
+import { workflowContext } from "../vault/host";
 import { joinVaultPath, normalizeVaultPath, sanitizeFileName, wikiLink } from "../vault/paths";
 import {
   describeSurface,
@@ -22,8 +22,7 @@ import {
   surfaceTypes,
   surfaceWriteKeys,
   type CollectionReadOptions,
-  type SurfaceDescription,
-  type WorkflowContext
+  type SurfaceDescription
 } from "../workflows";
 
 type CliCapablePlugin = Plugin & {
@@ -120,6 +119,402 @@ type AttachedFile = {
   embed: string;
 };
 
+type WorkflowFunctionName =
+  | "addReference"
+  | "captureJournal"
+  | "createArea"
+  | "createProject"
+  | "createResource"
+  | "createRetro"
+  | "createSubarea"
+  | "createSubnote"
+  | "createZk"
+  | "deleteArea"
+  | "deleteJournal"
+  | "deleteProject"
+  | "deleteResource"
+  | "deleteRetro"
+  | "deleteZk"
+  | "promoteFleeting"
+  | "promoteResource"
+  | "readArea"
+  | "readJournal"
+  | "readProject"
+  | "readResource"
+  | "readRetro"
+  | "readZk"
+  | "renameArea"
+  | "renameProject"
+  | "renameResource"
+  | "renameZk"
+  | "updateArea"
+  | "updateJournal"
+  | "updateProject"
+  | "updateResource"
+  | "updateRetro"
+  | "updateZk";
+
+type WorkflowRunFunction = (
+  ctx: ReturnType<typeof workflowContext>,
+  options: Record<string, unknown>
+) => Promise<Record<string, unknown>>;
+
+type SelectorVariant =
+  | { variant: "by-title"; label: string }
+  | { variant: "zk" }
+  | { variant: "journal" }
+  | { variant: "retro" };
+
+type WorkflowOptionMode = "read" | "write" | "rename";
+
+type ParaNoteCommandConfig = {
+  type: string;
+  label: string;
+  article: "a" | "an";
+  readWorkflow: WorkflowFunctionName;
+  updateWorkflow: WorkflowFunctionName;
+  renameWorkflow: WorkflowFunctionName;
+  deleteWorkflow: WorkflowFunctionName;
+  renameDescription: string;
+};
+
+const FORMAT_OPTION: CliOptionSpec = { value: "<text|json>", description: "Output format (default: text)." };
+const ARCHIVED_OPTION: CliOptionSpec = {
+  value: "<true|false>",
+  description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy."
+};
+const ZK_KIND_FILTER_OPTION: CliOptionSpec = { value: `<${ZK_KIND_CODE_HELP}>`, description: "Optional ZK kind filter." };
+const JOURNAL_DATE_OPTION: CliOptionSpec = { value: "<YYYY-MM-DD>", description: "Journal date. Defaults to today." };
+const RETRO_DATE_OPTION: CliOptionSpec = { value: "<YYYY-MM-DD>", description: "Optional date used to narrow the ISO week folder." };
+
+const PARA_NOTE_COMMANDS: ParaNoteCommandConfig[] = [
+  {
+    type: "project",
+    label: "Project",
+    article: "a",
+    readWorkflow: "readProject",
+    updateWorkflow: "updateProject",
+    renameWorkflow: "renameProject",
+    deleteWorkflow: "deleteProject",
+    renameDescription: "Rename a project note, including its folder-style parent folder"
+  },
+  {
+    type: "area",
+    label: "Area",
+    article: "an",
+    readWorkflow: "readArea",
+    updateWorkflow: "updateArea",
+    renameWorkflow: "renameArea",
+    deleteWorkflow: "deleteArea",
+    renameDescription: "Rename an area note, including its folder-style parent folder"
+  },
+  {
+    type: "resource",
+    label: "Resource",
+    article: "a",
+    readWorkflow: "readResource",
+    updateWorkflow: "updateResource",
+    renameWorkflow: "renameResource",
+    deleteWorkflow: "deleteResource",
+    renameDescription: "Rename a resource note file"
+  }
+];
+
+let workflowsModulePromise: Promise<unknown> | undefined;
+
+function loadWorkflows(): Promise<unknown> {
+  return (workflowsModulePromise ??= import("../workflows"));
+}
+
+function workflowRun(
+  fnName: WorkflowFunctionName,
+  readOptions: (args: CliArgs) => Record<string, unknown>
+): NativeCliCommand["run"] {
+  return async (plugin, args) => {
+    const workflows = await loadWorkflows() as Record<WorkflowFunctionName, WorkflowRunFunction>;
+    const result = await workflows[fnName](workflowContext(plugin), readOptions(args));
+    return { ...result };
+  };
+}
+
+function makeReadCommand(config: {
+  command: string;
+  description: string;
+  options: Record<string, CliOptionSpec>;
+  text: string;
+  workflow: WorkflowFunctionName;
+  selector: SelectorVariant;
+}): NativeCliCommand {
+  return {
+    command: config.command,
+    description: config.description,
+    options: config.options,
+    text: config.text,
+    run: workflowRun(config.workflow, (args) => ({
+      ...selectorOptions(args, config.selector, "read"),
+      key: readCliString(args, "key"),
+      collection: readCliCollectionOptions(args)
+    }))
+  };
+}
+
+function makeUpdateCommand(config: {
+  command: string;
+  description: string;
+  options: Record<string, CliOptionSpec>;
+  text: string;
+  workflow: WorkflowFunctionName;
+  selector: SelectorVariant;
+}): NativeCliCommand {
+  return {
+    command: config.command,
+    description: config.description,
+    options: config.options,
+    text: config.text,
+    run: workflowRun(config.workflow, (args) => ({
+      ...selectorOptions(args, config.selector, "write"),
+      ...readCliUpdateOptions(args)
+    }))
+  };
+}
+
+function makeRenameCommand(config: {
+  command: string;
+  description: string;
+  options: Record<string, CliOptionSpec>;
+  text: string;
+  workflow: WorkflowFunctionName;
+  selector: Extract<SelectorVariant, { variant: "by-title" | "zk" }>;
+}): NativeCliCommand {
+  return {
+    command: config.command,
+    description: config.description,
+    options: config.options,
+    text: config.text,
+    run: workflowRun(config.workflow, (args) => ({
+      ...selectorOptions(args, config.selector, "rename"),
+      newTitle: readCliNewTitle(args)
+    }))
+  };
+}
+
+function makeDeleteCommand(config: {
+  command: string;
+  description: string;
+  options: Record<string, CliOptionSpec>;
+  text: string;
+  workflow: WorkflowFunctionName;
+  selector: Exclude<SelectorVariant, { variant: "journal" }>;
+}): NativeCliCommand {
+  return {
+    command: config.command,
+    description: config.description,
+    options: config.options,
+    text: config.text,
+    run: workflowRun(config.workflow, (args) => ({
+      ...selectorOptions(args, config.selector, "rename"),
+      force: readCliBoolean(args, "force") ?? false
+    }))
+  };
+}
+
+function makeParaReadCommand(config: ParaNoteCommandConfig): NativeCliCommand {
+  return makeReadCommand({
+    command: `para-zk:read-${config.type}`,
+    description: `Read ${config.article} ${config.type} note's stable PARA-ZK surface, optionally by map key`,
+    options: readCommandOptions({ variant: "by-title", label: config.label }, readKeyOption(config.type)),
+    text: `${config.type} read`,
+    workflow: config.readWorkflow,
+    selector: { variant: "by-title", label: config.label }
+  });
+}
+
+function makeParaUpdateCommand(config: ParaNoteCommandConfig): NativeCliCommand {
+  return makeUpdateCommand({
+    command: `para-zk:update-${config.type}`,
+    description: `Update ${config.article} ${config.type} note's stable PARA-ZK surface by map key`,
+    options: updateCommandOptions({ variant: "by-title", label: config.label }, writeKeyOption(config.type)),
+    text: `${config.type} updated`,
+    workflow: config.updateWorkflow,
+    selector: { variant: "by-title", label: config.label }
+  });
+}
+
+function makeParaRenameCommand(config: ParaNoteCommandConfig): NativeCliCommand {
+  return makeRenameCommand({
+    command: `para-zk:rename-${config.type}`,
+    description: config.renameDescription,
+    options: renameCommandOptions({ variant: "by-title", label: config.label }),
+    text: `${config.type} renamed`,
+    workflow: config.renameWorkflow,
+    selector: { variant: "by-title", label: config.label }
+  });
+}
+
+function makeParaDeleteCommand(config: ParaNoteCommandConfig): NativeCliCommand {
+  return makeDeleteCommand({
+    command: `para-zk:delete-${config.type}`,
+    description: `Move ${config.article} ${config.type} note to Obsidian trash and clean PARA-ZK-owned references`,
+    options: deleteCommandOptions({ variant: "by-title", label: config.label }),
+    text: `${config.type} deleted`,
+    workflow: config.deleteWorkflow,
+    selector: { variant: "by-title", label: config.label }
+  });
+}
+
+function readCommandOptions(selector: SelectorVariant, key: CliOptionSpec): Record<string, CliOptionSpec> {
+  switch (selector.variant) {
+    case "by-title":
+      return {
+        title: { value: "<title>", description: `${selector.label} title. Used when path is omitted.` },
+        path: { value: "<path>", description: `${selector.label} note path for exact selection.` },
+        archived: ARCHIVED_OPTION,
+        key,
+        ...READ_COLLECTION_OPTIONS,
+        format: FORMAT_OPTION
+      };
+    case "zk":
+      return {
+        title: { value: "<title>", description: "ZK note title. Used when path is omitted." },
+        path: { value: "<path>", description: "ZK note path for exact selection." },
+        kind: ZK_KIND_FILTER_OPTION,
+        key,
+        ...READ_COLLECTION_OPTIONS,
+        format: FORMAT_OPTION
+      };
+    case "journal":
+      return {
+        date: JOURNAL_DATE_OPTION,
+        path: { value: "<path>", description: "Journal note path for exact selection." },
+        key,
+        ...READ_COLLECTION_OPTIONS,
+        format: FORMAT_OPTION
+      };
+    case "retro":
+      return {
+        title: { value: "<title>", description: "Retro note title. Used when path is omitted." },
+        path: { value: "<path>", description: "Retro note path for exact selection." },
+        date: RETRO_DATE_OPTION,
+        archived: ARCHIVED_OPTION,
+        key,
+        ...READ_COLLECTION_OPTIONS,
+        format: FORMAT_OPTION
+      };
+  }
+}
+
+function updateCommandOptions(selector: SelectorVariant, key: CliOptionSpec): Record<string, CliOptionSpec> {
+  switch (selector.variant) {
+    case "by-title":
+      return {
+        title: { value: "<title>", description: `${selector.label} title. Used when path is omitted.` },
+        path: { value: "<path>", description: `${selector.label} note path for exact selection.` },
+        archived: ARCHIVED_OPTION,
+        key,
+        ...UPDATE_OPTIONS
+      };
+    case "zk":
+      return {
+        title: { value: "<title>", description: "ZK note title. Used when path is omitted." },
+        path: { value: "<path>", description: "ZK note path for exact selection." },
+        kind: ZK_KIND_FILTER_OPTION,
+        key,
+        ...UPDATE_OPTIONS
+      };
+    case "journal":
+      return {
+        date: JOURNAL_DATE_OPTION,
+        path: { value: "<path>", description: "Journal note path for exact selection." },
+        key,
+        ...UPDATE_OPTIONS
+      };
+    case "retro":
+      return {
+        title: { value: "<title>", description: "Retro note title. Used when path is omitted." },
+        path: { value: "<path>", description: "Retro note path for exact selection." },
+        date: RETRO_DATE_OPTION,
+        archived: ARCHIVED_OPTION,
+        key,
+        ...UPDATE_OPTIONS
+      };
+  }
+}
+
+function renameCommandOptions(selector: Extract<SelectorVariant, { variant: "by-title" | "zk" }>): Record<string, CliOptionSpec> {
+  switch (selector.variant) {
+    case "by-title":
+      return {
+        ...RENAME_OPTIONS,
+        archived: ARCHIVED_OPTION
+      };
+    case "zk":
+      return {
+        ...RENAME_OPTIONS,
+        kind: ZK_KIND_FILTER_OPTION
+      };
+  }
+}
+
+function deleteCommandOptions(selector: Exclude<SelectorVariant, { variant: "journal" }>): Record<string, CliOptionSpec> {
+  switch (selector.variant) {
+    case "by-title":
+      return {
+        ...DELETE_OPTIONS,
+        archived: ARCHIVED_OPTION
+      };
+    case "zk":
+      return {
+        ...DELETE_OPTIONS,
+        kind: ZK_KIND_FILTER_OPTION
+      };
+    case "retro":
+      return {
+        ...DELETE_OPTIONS,
+        date: RETRO_DATE_OPTION,
+        archived: ARCHIVED_OPTION
+      };
+  }
+}
+
+function selectorOptions(
+  args: CliArgs,
+  selector: SelectorVariant,
+  mode: WorkflowOptionMode
+): Record<string, unknown> {
+  switch (selector.variant) {
+    case "by-title":
+      return {
+        title: readCliTitle(args),
+        path: readCliPath(args),
+        archived: readCliBoolean(args, "archived")
+      };
+    case "zk":
+      return {
+        title: readCliTitle(args),
+        path: readCliPath(args),
+        kind: readCliZkKind(args, mode)
+      };
+    case "journal":
+      return {
+        date: readCliString(args, "date"),
+        path: readCliPath(args)
+      };
+    case "retro":
+      return {
+        title: readCliTitle(args),
+        path: readCliPath(args),
+        date: readCliString(args, "date"),
+        archived: readCliBoolean(args, "archived")
+      };
+  }
+}
+
+function readCliZkKind(args: CliArgs, mode: WorkflowOptionMode): string | undefined {
+  if (mode === "read") return readCliReadZkKind(args);
+  if (mode === "rename") return readCliRenameKind(args);
+  return readCliKind(args);
+}
+
 const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
   {
     command: "para-zk:describe",
@@ -183,475 +578,98 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     text: "file attached",
     run: async (plugin, args) => attachLocalFile(plugin, args)
   },
-  {
-    command: "para-zk:read-project",
-    description: "Read a project note's stable PARA-ZK surface, optionally by map key",
-    options: {
-      title: { value: "<title>", description: "Project title. Used when path is omitted." },
-      path: { value: "<path>", description: "Project note path for exact selection." },
-      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
-      key: readKeyOption("project"),
-      ...READ_COLLECTION_OPTIONS,
-      format: { value: "<text|json>", description: "Output format (default: text)." }
-    },
-    text: "project read",
-    run: async (plugin, args) => {
-      const { readProject } = await import("../workflows");
-      const result = await readProject(workflowContext(plugin), {
-        title: readCliTitle(args),
-        path: readCliPath(args),
-        archived: readCliBoolean(args, "archived"),
-        key: readCliString(args, "key"),
-        collection: readCliCollectionOptions(args)
-      });
-      return { ...result };
-    }
-  },
-  {
-    command: "para-zk:read-area",
-    description: "Read an area note's stable PARA-ZK surface, optionally by map key",
-    options: {
-      title: { value: "<title>", description: "Area title. Used when path is omitted." },
-      path: { value: "<path>", description: "Area note path for exact selection." },
-      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
-      key: readKeyOption("area"),
-      ...READ_COLLECTION_OPTIONS,
-      format: { value: "<text|json>", description: "Output format (default: text)." }
-    },
-    text: "area read",
-    run: async (plugin, args) => {
-      const { readArea } = await import("../workflows");
-      const result = await readArea(workflowContext(plugin), {
-        title: readCliTitle(args),
-        path: readCliPath(args),
-        archived: readCliBoolean(args, "archived"),
-        key: readCliString(args, "key"),
-        collection: readCliCollectionOptions(args)
-      });
-      return { ...result };
-    }
-  },
-  {
-    command: "para-zk:read-resource",
-    description: "Read a resource note's stable PARA-ZK surface, optionally by map key",
-    options: {
-      title: { value: "<title>", description: "Resource title. Used when path is omitted." },
-      path: { value: "<path>", description: "Resource note path for exact selection." },
-      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
-      key: readKeyOption("resource"),
-      ...READ_COLLECTION_OPTIONS,
-      format: { value: "<text|json>", description: "Output format (default: text)." }
-    },
-    text: "resource read",
-    run: async (plugin, args) => {
-      const { readResource } = await import("../workflows");
-      const result = await readResource(workflowContext(plugin), {
-        title: readCliTitle(args),
-        path: readCliPath(args),
-        archived: readCliBoolean(args, "archived"),
-        key: readCliString(args, "key"),
-        collection: readCliCollectionOptions(args)
-      });
-      return { ...result };
-    }
-  },
-  {
+  ...PARA_NOTE_COMMANDS.map(makeParaReadCommand),
+  makeReadCommand({
     command: "para-zk:read-zk",
     description: "Read a ZK note's stable PARA-ZK surface, optionally by map key",
-    options: {
-      title: { value: "<title>", description: "ZK note title. Used when path is omitted." },
-      path: { value: "<path>", description: "ZK note path for exact selection." },
-      kind: { value: `<${ZK_KIND_CODE_HELP}>`, description: "Optional ZK kind filter." },
-      key: zkKeyOption(surfaceReadKeys, "read"),
-      ...READ_COLLECTION_OPTIONS,
-      format: { value: "<text|json>", description: "Output format (default: text)." }
-    },
+    options: readCommandOptions({ variant: "zk" }, zkKeyOption(surfaceReadKeys, "read")),
     text: "ZK read",
-    run: async (plugin, args) => {
-      const { readZk } = await import("../workflows");
-      const result = await readZk(workflowContext(plugin), {
-        title: readCliTitle(args),
-        path: readCliPath(args),
-        kind: readCliReadZkKind(args),
-        key: readCliString(args, "key"),
-        collection: readCliCollectionOptions(args)
-      });
-      return { ...result };
-    }
-  },
-  {
+    workflow: "readZk",
+    selector: { variant: "zk" }
+  }),
+  makeReadCommand({
     command: "para-zk:read-journal",
     description: "Read a daily journal note's stable PARA-ZK surface, optionally by map key",
-    options: {
-      date: { value: "<YYYY-MM-DD>", description: "Journal date. Defaults to today." },
-      path: { value: "<path>", description: "Journal note path for exact selection." },
-      key: readKeyOption("journal"),
-      ...READ_COLLECTION_OPTIONS,
-      format: { value: "<text|json>", description: "Output format (default: text)." }
-    },
+    options: readCommandOptions({ variant: "journal" }, readKeyOption("journal")),
     text: "journal read",
-    run: async (plugin, args) => {
-      const { readJournal } = await import("../workflows");
-      const result = await readJournal(workflowContext(plugin), {
-        date: readCliString(args, "date"),
-        path: readCliPath(args),
-        key: readCliString(args, "key"),
-        collection: readCliCollectionOptions(args)
-      });
-      return { ...result };
-    }
-  },
-  {
+    workflow: "readJournal",
+    selector: { variant: "journal" }
+  }),
+  makeReadCommand({
     command: "para-zk:read-retro",
     description: "Read a retro note's stable PARA-ZK surface, optionally by map key",
-    options: {
-      title: { value: "<title>", description: "Retro note title. Used when path is omitted." },
-      path: { value: "<path>", description: "Retro note path for exact selection." },
-      date: { value: "<YYYY-MM-DD>", description: "Optional date used to narrow the ISO week folder." },
-      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
-      key: readKeyOption("retro"),
-      ...READ_COLLECTION_OPTIONS,
-      format: { value: "<text|json>", description: "Output format (default: text)." }
-    },
+    options: readCommandOptions({ variant: "retro" }, readKeyOption("retro")),
     text: "retro read",
-    run: async (plugin, args) => {
-      const { readRetro } = await import("../workflows");
-      const result = await readRetro(workflowContext(plugin), {
-        title: readCliTitle(args),
-        path: readCliPath(args),
-        date: readCliString(args, "date"),
-        archived: readCliBoolean(args, "archived"),
-        key: readCliString(args, "key"),
-        collection: readCliCollectionOptions(args)
-      });
-      return { ...result };
-    }
-  },
-  {
-    command: "para-zk:update-project",
-    description: "Update a project note's stable PARA-ZK surface by map key",
-    options: {
-      title: { value: "<title>", description: "Project title. Used when path is omitted." },
-      path: { value: "<path>", description: "Project note path for exact selection." },
-      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
-      key: writeKeyOption("project"),
-      ...UPDATE_OPTIONS
-    },
-    text: "project updated",
-    run: async (plugin, args) => {
-      const { updateProject } = await import("../workflows");
-      const result = await updateProject(workflowContext(plugin), {
-        title: readCliTitle(args),
-        path: readCliPath(args),
-        archived: readCliBoolean(args, "archived"),
-        ...readCliUpdateOptions(args)
-      });
-      return { ...result };
-    }
-  },
-  {
-    command: "para-zk:update-area",
-    description: "Update an area note's stable PARA-ZK surface by map key",
-    options: {
-      title: { value: "<title>", description: "Area title. Used when path is omitted." },
-      path: { value: "<path>", description: "Area note path for exact selection." },
-      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
-      key: writeKeyOption("area"),
-      ...UPDATE_OPTIONS
-    },
-    text: "area updated",
-    run: async (plugin, args) => {
-      const { updateArea } = await import("../workflows");
-      const result = await updateArea(workflowContext(plugin), {
-        title: readCliTitle(args),
-        path: readCliPath(args),
-        archived: readCliBoolean(args, "archived"),
-        ...readCliUpdateOptions(args)
-      });
-      return { ...result };
-    }
-  },
-  {
-    command: "para-zk:update-resource",
-    description: "Update a resource note's stable PARA-ZK surface by map key",
-    options: {
-      title: { value: "<title>", description: "Resource title. Used when path is omitted." },
-      path: { value: "<path>", description: "Resource note path for exact selection." },
-      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
-      key: writeKeyOption("resource"),
-      ...UPDATE_OPTIONS
-    },
-    text: "resource updated",
-    run: async (plugin, args) => {
-      const { updateResource } = await import("../workflows");
-      const result = await updateResource(workflowContext(plugin), {
-        title: readCliTitle(args),
-        path: readCliPath(args),
-        archived: readCliBoolean(args, "archived"),
-        ...readCliUpdateOptions(args)
-      });
-      return { ...result };
-    }
-  },
-  {
+    workflow: "readRetro",
+    selector: { variant: "retro" }
+  }),
+  ...PARA_NOTE_COMMANDS.map(makeParaUpdateCommand),
+  makeUpdateCommand({
     command: "para-zk:update-zk",
     description: "Update a ZK note's stable PARA-ZK surface by map key",
-    options: {
-      title: { value: "<title>", description: "ZK note title. Used when path is omitted." },
-      path: { value: "<path>", description: "ZK note path for exact selection." },
-      kind: { value: `<${ZK_KIND_CODE_HELP}>`, description: "Optional ZK kind filter." },
-      key: zkKeyOption(surfaceWriteKeys, "write"),
-      ...UPDATE_OPTIONS
-    },
+    options: updateCommandOptions({ variant: "zk" }, zkKeyOption(surfaceWriteKeys, "write")),
     text: "ZK updated",
-    run: async (plugin, args) => {
-      const { updateZk } = await import("../workflows");
-      const result = await updateZk(workflowContext(plugin), {
-        title: readCliTitle(args),
-        path: readCliPath(args),
-        kind: readCliKind(args),
-        ...readCliUpdateOptions(args)
-      });
-      return { ...result };
-    }
-  },
-  {
+    workflow: "updateZk",
+    selector: { variant: "zk" }
+  }),
+  makeUpdateCommand({
     command: "para-zk:update-journal",
     description: "Update a daily journal note's stable PARA-ZK surface by map key",
-    options: {
-      date: { value: "<YYYY-MM-DD>", description: "Journal date. Defaults to today." },
-      path: { value: "<path>", description: "Journal note path for exact selection." },
-      key: writeKeyOption("journal"),
-      ...UPDATE_OPTIONS
-    },
+    options: updateCommandOptions({ variant: "journal" }, writeKeyOption("journal")),
     text: "journal updated",
-    run: async (plugin, args) => {
-      const { updateJournal } = await import("../workflows");
-      const result = await updateJournal(workflowContext(plugin), {
-        date: readCliString(args, "date"),
-        path: readCliPath(args),
-        ...readCliUpdateOptions(args)
-      });
-      return { ...result };
-    }
-  },
-  {
+    workflow: "updateJournal",
+    selector: { variant: "journal" }
+  }),
+  makeUpdateCommand({
     command: "para-zk:update-retro",
     description: "Update a retro note's stable PARA-ZK surface by map key",
-    options: {
-      title: { value: "<title>", description: "Retro note title. Used when path is omitted." },
-      path: { value: "<path>", description: "Retro note path for exact selection." },
-      date: { value: "<YYYY-MM-DD>", description: "Optional date used to narrow the ISO week folder." },
-      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." },
-      key: writeKeyOption("retro"),
-      ...UPDATE_OPTIONS
-    },
+    options: updateCommandOptions({ variant: "retro" }, writeKeyOption("retro")),
     text: "retro updated",
-    run: async (plugin, args) => {
-      const { updateRetro } = await import("../workflows");
-      const result = await updateRetro(workflowContext(plugin), {
-        title: readCliTitle(args),
-        path: readCliPath(args),
-        date: readCliString(args, "date"),
-        archived: readCliBoolean(args, "archived"),
-        ...readCliUpdateOptions(args)
-      });
-      return { ...result };
-    }
-  },
-  {
-    command: "para-zk:rename-project",
-    description: "Rename a project note, including its folder-style parent folder",
-    options: {
-      ...RENAME_OPTIONS,
-      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." }
-    },
-    text: "project renamed",
-    run: async (plugin, args) => {
-      const { renameProject } = await import("../workflows");
-      const result = await renameProject(workflowContext(plugin), {
-        title: readCliTitle(args),
-        path: readCliPath(args),
-        archived: readCliBoolean(args, "archived"),
-        newTitle: readCliNewTitle(args)
-      });
-      return { ...result };
-    }
-  },
-  {
-    command: "para-zk:rename-area",
-    description: "Rename an area note, including its folder-style parent folder",
-    options: {
-      ...RENAME_OPTIONS,
-      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." }
-    },
-    text: "area renamed",
-    run: async (plugin, args) => {
-      const { renameArea } = await import("../workflows");
-      const result = await renameArea(workflowContext(plugin), {
-        title: readCliTitle(args),
-        path: readCliPath(args),
-        archived: readCliBoolean(args, "archived"),
-        newTitle: readCliNewTitle(args)
-      });
-      return { ...result };
-    }
-  },
-  {
-    command: "para-zk:rename-resource",
-    description: "Rename a resource note file",
-    options: {
-      ...RENAME_OPTIONS,
-      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." }
-    },
-    text: "resource renamed",
-    run: async (plugin, args) => {
-      const { renameResource } = await import("../workflows");
-      const result = await renameResource(workflowContext(plugin), {
-        title: readCliTitle(args),
-        path: readCliPath(args),
-        archived: readCliBoolean(args, "archived"),
-        newTitle: readCliNewTitle(args)
-      });
-      return { ...result };
-    }
-  },
-  {
+    workflow: "updateRetro",
+    selector: { variant: "retro" }
+  }),
+  ...PARA_NOTE_COMMANDS.map(makeParaRenameCommand),
+  makeRenameCommand({
     command: "para-zk:rename-zk",
     description: "Rename a ZK note file",
-    options: {
-      ...RENAME_OPTIONS,
-      kind: { value: `<${ZK_KIND_CODE_HELP}>`, description: "Optional ZK kind filter." }
-    },
+    options: renameCommandOptions({ variant: "zk" }),
     text: "ZK renamed",
-    run: async (plugin, args) => {
-      const { renameZk } = await import("../workflows");
-      const result = await renameZk(workflowContext(plugin), {
-        title: readCliTitle(args),
-        path: readCliPath(args),
-        kind: readCliRenameKind(args),
-        newTitle: readCliNewTitle(args)
-      });
-      return { ...result };
-    }
-  },
-  {
-    command: "para-zk:delete-project",
-    description: "Move a project note to Obsidian trash and clean PARA-ZK-owned references",
-    options: {
-      ...DELETE_OPTIONS,
-      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." }
-    },
-    text: "project deleted",
-    run: async (plugin, args) => {
-      const { deleteProject } = await import("../workflows");
-      const result = await deleteProject(workflowContext(plugin), {
-        title: readCliTitle(args),
-        path: readCliPath(args),
-        archived: readCliBoolean(args, "archived"),
-        force: readCliBoolean(args, "force") ?? false
-      });
-      return { ...result };
-    }
-  },
-  {
-    command: "para-zk:delete-area",
-    description: "Move an area note to Obsidian trash and clean PARA-ZK-owned references",
-    options: {
-      ...DELETE_OPTIONS,
-      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." }
-    },
-    text: "area deleted",
-    run: async (plugin, args) => {
-      const { deleteArea } = await import("../workflows");
-      const result = await deleteArea(workflowContext(plugin), {
-        title: readCliTitle(args),
-        path: readCliPath(args),
-        archived: readCliBoolean(args, "archived"),
-        force: readCliBoolean(args, "force") ?? false
-      });
-      return { ...result };
-    }
-  },
-  {
-    command: "para-zk:delete-resource",
-    description: "Move a resource note to Obsidian trash and clean PARA-ZK-owned references",
-    options: {
-      ...DELETE_OPTIONS,
-      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." }
-    },
-    text: "resource deleted",
-    run: async (plugin, args) => {
-      const { deleteResource } = await import("../workflows");
-      const result = await deleteResource(workflowContext(plugin), {
-        title: readCliTitle(args),
-        path: readCliPath(args),
-        archived: readCliBoolean(args, "archived"),
-        force: readCliBoolean(args, "force") ?? false
-      });
-      return { ...result };
-    }
-  },
-  {
+    workflow: "renameZk",
+    selector: { variant: "zk" }
+  }),
+  ...PARA_NOTE_COMMANDS.map(makeParaDeleteCommand),
+  makeDeleteCommand({
     command: "para-zk:delete-zk",
     description: "Move a ZK note to Obsidian trash and clean PARA-ZK-owned references",
-    options: {
-      ...DELETE_OPTIONS,
-      kind: { value: `<${ZK_KIND_CODE_HELP}>`, description: "Optional ZK kind filter." }
-    },
+    options: deleteCommandOptions({ variant: "zk" }),
     text: "ZK deleted",
-    run: async (plugin, args) => {
-      const { deleteZk } = await import("../workflows");
-      const result = await deleteZk(workflowContext(plugin), {
-        title: readCliTitle(args),
-        path: readCliPath(args),
-        kind: readCliRenameKind(args),
-        force: readCliBoolean(args, "force") ?? false
-      });
-      return { ...result };
-    }
-  },
+    workflow: "deleteZk",
+    selector: { variant: "zk" }
+  }),
   {
     command: "para-zk:delete-journal",
     description: "Move a daily journal note to Obsidian trash and report incoming links",
     options: {
-      date: { value: "<YYYY-MM-DD>", description: "Journal date. Defaults to today." },
+      date: JOURNAL_DATE_OPTION,
       path: { value: "<path>", description: "Exact journal note path." },
       force: { value: "<true|false>", description: "Reserved for consistency with other delete commands." },
-      format: { value: "<text|json>", description: "Output format (default: text)." }
+      format: FORMAT_OPTION
     },
     text: "journal deleted",
-    run: async (plugin, args) => {
-      const { deleteJournal } = await import("../workflows");
-      const result = await deleteJournal(workflowContext(plugin), {
-        date: readCliString(args, "date"),
-        path: readCliPath(args),
-        force: readCliBoolean(args, "force") ?? false
-      });
-      return { ...result };
-    }
+    run: workflowRun("deleteJournal", (args) => ({
+      date: readCliString(args, "date"),
+      path: readCliPath(args),
+      force: readCliBoolean(args, "force") ?? false
+    }))
   },
-  {
+  makeDeleteCommand({
     command: "para-zk:delete-retro",
     description: "Move a retro note to Obsidian trash and clean PARA-ZK-owned references",
-    options: {
-      ...DELETE_OPTIONS,
-      date: { value: "<YYYY-MM-DD>", description: "Optional date used to narrow the ISO week folder." },
-      archived: { value: "<true|false>", description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy." }
-    },
+    options: deleteCommandOptions({ variant: "retro" }),
     text: "retro deleted",
-    run: async (plugin, args) => {
-      const { deleteRetro } = await import("../workflows");
-      const result = await deleteRetro(workflowContext(plugin), {
-        title: readCliTitle(args),
-        path: readCliPath(args),
-        date: readCliString(args, "date"),
-        archived: readCliBoolean(args, "archived"),
-        force: readCliBoolean(args, "force") ?? false
-      });
-      return { ...result };
-    }
-  },
+    workflow: "deleteRetro",
+    selector: { variant: "retro" }
+  }),
   {
     command: "para-zk:create-project",
     description: "Create a PARA project note",
@@ -665,18 +683,14 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "project created",
-    run: async (plugin, args) => {
-      const { createProject } = await import("../workflows");
-      const result = await createProject(workflowContext(plugin), {
-        title: readCliTitle(args),
-        areas: parseList(readCliString(args, "areas")),
-        areaTitles: parseList(readCliAreaTitles(args)),
-        status: readCliString(args, "status"),
-        priority: readCliString(args, "priority"),
-        open: readCliBoolean(args, "open") ?? false
-      });
-      return { ...result };
-    }
+    run: workflowRun("createProject", (args) => ({
+      title: readCliTitle(args),
+      areas: parseList(readCliString(args, "areas")),
+      areaTitles: parseList(readCliAreaTitles(args)),
+      status: readCliString(args, "status"),
+      priority: readCliString(args, "priority"),
+      open: readCliBoolean(args, "open") ?? false
+    }))
   },
   {
     command: "para-zk:create-area",
@@ -688,15 +702,11 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "area created",
-    run: async (plugin, args) => {
-      const { createArea } = await import("../workflows");
-      const result = await createArea(workflowContext(plugin), {
-        title: readCliTitle(args),
-        parentPath: readCliString(args, "parent"),
-        open: readCliBoolean(args, "open") ?? false
-      });
-      return { ...result };
-    }
+    run: workflowRun("createArea", (args) => ({
+      title: readCliTitle(args),
+      parentPath: readCliString(args, "parent"),
+      open: readCliBoolean(args, "open") ?? false
+    }))
   },
   {
     command: "para-zk:create-resource",
@@ -709,17 +719,15 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "resource created",
-    run: async (plugin, args) => {
-      const { createResource } = await import("../workflows");
+    run: workflowRun("createResource", (args) => {
       const sourcePath = readCliPath(args);
-      const result = await createResource(workflowContext(plugin), {
+      return {
         title: readCliTitle(args),
         sourcePath,
         linkToSource: readCliBoolean(args, "link") ?? Boolean(sourcePath),
         open: readCliBoolean(args, "open") ?? false
-      });
-      return { ...result };
-    }
+      };
+    })
   },
   {
     command: "para-zk:add-reference",
@@ -732,16 +740,12 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "reference added",
-    run: async (plugin, args) => {
-      const { addReference } = await import("../workflows");
-      const result = await addReference(workflowContext(plugin), {
-        sourcePath: readCliPath(args),
-        target: readRequiredCliString(args, "target"),
-        description: readCliString(args, "description"),
-        open: readCliBoolean(args, "open") ?? false
-      });
-      return { ...result };
-    }
+    run: workflowRun("addReference", (args) => ({
+      sourcePath: readCliPath(args),
+      target: readRequiredCliString(args, "target"),
+      description: readCliString(args, "description"),
+      open: readCliBoolean(args, "open") ?? false
+    }))
   },
   {
     command: "para-zk:create-subnote",
@@ -754,16 +758,12 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "subnote created",
-    run: async (plugin, args) => {
-      const { createSubnote } = await import("../workflows");
-      const result = await createSubnote(workflowContext(plugin), {
-        title: readCliTitle(args),
-        sourcePath: readCliPath(args),
-        subnoteType: readCliSubnoteType(args),
-        open: readCliBoolean(args, "open") ?? false
-      });
-      return { ...result };
-    }
+    run: workflowRun("createSubnote", (args) => ({
+      title: readCliTitle(args),
+      sourcePath: readCliPath(args),
+      subnoteType: readCliSubnoteType(args),
+      open: readCliBoolean(args, "open") ?? false
+    }))
   },
   {
     command: "para-zk:create-subarea",
@@ -776,16 +776,12 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "subarea created",
-    run: async (plugin, args) => {
-      const { createSubarea } = await import("../workflows");
-      const result = await createSubarea(workflowContext(plugin), {
-        title: readCliTitle(args),
-        sourcePath: readCliPath(args),
-        inheritParentTag: readCliBoolean(args, "inheritParentTag") ?? true,
-        open: readCliBoolean(args, "open") ?? false
-      });
-      return { ...result };
-    }
+    run: workflowRun("createSubarea", (args) => ({
+      title: readCliTitle(args),
+      sourcePath: readCliPath(args),
+      inheritParentTag: readCliBoolean(args, "inheritParentTag") ?? true,
+      open: readCliBoolean(args, "open") ?? false
+    }))
   },
   {
     command: "para-zk:create-retro",
@@ -798,16 +794,12 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "retro created",
-    run: async (plugin, args) => {
-      const { createRetro } = await import("../workflows");
-      const result = await createRetro(workflowContext(plugin), {
-        sourcePath: readCliPath(args),
-        title: readCliTitle(args),
-        date: readCliString(args, "date"),
-        open: readCliBoolean(args, "open") ?? false
-      });
-      return { ...result };
-    }
+    run: workflowRun("createRetro", (args) => ({
+      sourcePath: readCliPath(args),
+      title: readCliTitle(args),
+      date: readCliString(args, "date"),
+      open: readCliBoolean(args, "open") ?? false
+    }))
   },
   {
     command: "para-zk:create-zk",
@@ -820,16 +812,12 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "ZK note created",
-    run: async (plugin, args) => {
-      const { createZk } = await import("../workflows");
-      const result = await createZk(workflowContext(plugin), {
-        title: readCliTitle(args),
-        kind: readCliKind(args),
-        maturity: readCliString(args, "maturity"),
-        open: readCliBoolean(args, "open") ?? false
-      });
-      return { ...result };
-    }
+    run: workflowRun("createZk", (args) => ({
+      title: readCliTitle(args),
+      kind: readCliKind(args),
+      maturity: readCliString(args, "maturity"),
+      open: readCliBoolean(args, "open") ?? false
+    }))
   },
   {
     command: "para-zk:capture-journal",
@@ -843,17 +831,13 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "journal captured",
-    run: async (plugin, args) => {
-      const { captureJournal } = await import("../workflows");
-      const result = await captureJournal(workflowContext(plugin), {
-        content: readCliContent(args),
-        date: readCliString(args, "date"),
-        time: readCliString(args, "time"),
-        energy: readCliString(args, "energy"),
-        open: readCliBoolean(args, "open") ?? false
-      });
-      return { ...result };
-    }
+    run: workflowRun("captureJournal", (args) => ({
+      content: readCliContent(args),
+      date: readCliString(args, "date"),
+      time: readCliString(args, "time"),
+      energy: readCliString(args, "energy"),
+      open: readCliBoolean(args, "open") ?? false
+    }))
   },
   {
     command: "para-zk:promote-resource",
@@ -867,17 +851,13 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "resource promoted",
-    run: async (plugin, args) => {
-      const { promoteResource } = await import("../workflows");
-      const result = await promoteResource(workflowContext(plugin), {
-        sourcePath: readCliPath(args),
-        title: readCliTitle(args),
-        kind: readCliKind(args),
-        maturity: readCliString(args, "maturity"),
-        open: readCliBoolean(args, "open") ?? false
-      });
-      return { ...result };
-    }
+    run: workflowRun("promoteResource", (args) => ({
+      sourcePath: readCliPath(args),
+      title: readCliTitle(args),
+      kind: readCliKind(args),
+      maturity: readCliString(args, "maturity"),
+      open: readCliBoolean(args, "open") ?? false
+    }))
   },
   {
     command: "para-zk:promote-fleeting",
@@ -891,17 +871,13 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "fleeting promoted",
-    run: async (plugin, args) => {
-      const { promoteFleeting } = await import("../workflows");
-      const result = await promoteFleeting(workflowContext(plugin), {
-        sourcePath: readCliPath(args),
-        title: readCliTitle(args),
-        kind: readCliKind(args),
-        maturity: readCliString(args, "maturity"),
-        open: readCliBoolean(args, "open") ?? false
-      });
-      return { ...result };
-    }
+    run: workflowRun("promoteFleeting", (args) => ({
+      sourcePath: readCliPath(args),
+      title: readCliTitle(args),
+      kind: readCliKind(args),
+      maturity: readCliString(args, "maturity"),
+      open: readCliBoolean(args, "open") ?? false
+    }))
   }
 ];
 
@@ -945,13 +921,6 @@ async function withCliErrors(
       error: message
     }, `error: ${message}`);
   }
-}
-
-function workflowContext(plugin: ParaZkPluginContext): WorkflowContext {
-  return {
-    host: createObsidianHost(plugin.app),
-    settings: plugin.settings
-  };
 }
 
 async function attachLocalFile(plugin: ParaZkPluginContext, args: CliArgs): Promise<Record<string, unknown>> {

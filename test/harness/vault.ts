@@ -5,9 +5,9 @@
 // engine (link rewriting on rename, backlink resolution, metadataCache write
 // lag) are intentionally NOT reproduced — those stay in the live smoke test.
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import type { App } from "obsidian";
+import type { ParaZkPluginContext } from "../../src/plugin-interface";
 import { DEFAULT_SETTINGS, type ParaZkSettings } from "../../src/types";
-import { createObsidianHost } from "../../src/vault/host";
+import { workflowContext } from "../../src/vault/host";
 import type { WorkflowContext } from "../../src/workflows";
 import { TAbstractFile, TFile, TFolder } from "../mocks/obsidian";
 
@@ -259,5 +259,5 @@ export function createTestContext(
     ...structuredClone(DEFAULT_SETTINGS),
     ...overrides
   };
-  return { ctx: { host: createObsidianHost(app as unknown as App), settings }, app };
+  return { ctx: workflowContext({ app, settings } as unknown as ParaZkPluginContext), app };
 }

@@ -2,8 +2,7 @@ import { Notice } from "obsidian";
 import { localePack, normalizeLocale } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { isRecord } from "../records";
-import { createObsidianHost } from "../vault/host";
-import type { WorkflowContext } from "../workflows";
+import { workflowContext } from "../vault/host";
 import {
   statusCommandEntries,
   workflowCommandEntries
@@ -159,13 +158,6 @@ async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: 
     default:
       throw new Error(`${localePack(plugin.settings.locale).messages.unknownCommand}: ${command}`);
   }
-}
-
-function workflowContext(plugin: ParaZkPluginContext): WorkflowContext {
-  return {
-    host: createObsidianHost(plugin.app),
-    settings: plugin.settings
-  };
 }
 
 function readCommandArgs(rawArgs: unknown[]): Record<string, unknown> {

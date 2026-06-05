@@ -9,7 +9,7 @@ import {
 import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { localDate } from "../time";
-import { createObsidianHost } from "../vault/host";
+import { workflowContext } from "../vault/host";
 import { parseCodeBlockKeyValues } from "./code-block-args";
 import {
   cycleTaskCheckbox,
@@ -19,8 +19,7 @@ import {
   readRootTaskMap,
   reorderRootTasks,
   setRootTaskField,
-  type TaskRead,
-  type WorkflowContext
+  type TaskRead
 } from "../workflows";
 import { promptText } from "./prompts";
 import {
@@ -126,7 +125,7 @@ async function renderTaskBlock(
       itemKey: taskItemKey,
       persistOrder: (nextIds) => queueRootTaskWrite(
         rootFile,
-        () => reorderRootTasks(taskContext(plugin), rootFile, nextIds)
+        () => reorderRootTasks(workflowContext(plugin), rootFile, nextIds)
       ),
       rerender: () => renderTaskBlock(plugin, source, el, ctx)
     }) : undefined;
@@ -236,7 +235,7 @@ function renderTaskToolbar(
                 labels.cancel
               );
               if (!name) return;
-              await queueRootTaskWrite(rootFile, () => insertRootTask(taskContext(plugin), rootFile, { name }));
+              await queueRootTaskWrite(rootFile, () => insertRootTask(workflowContext(plugin), rootFile, { name }));
               await renderTaskBlock(plugin, source, el, ctx);
             });
           });
@@ -247,7 +246,7 @@ function renderTaskToolbar(
 }
 
 async function currentRootTasks(plugin: ParaZkPluginContext, rootFile: TFile): Promise<RenderableTask[]> {
-  const taskMap = await readRootTaskMap(taskContext(plugin), rootFile);
+  const taskMap = await readRootTaskMap(workflowContext(plugin), rootFile);
   return Object.entries(taskMap).map(([id, task]) => ({
     rootFile,
     rootTitle: rootFile.basename,
@@ -257,7 +256,7 @@ async function currentRootTasks(plugin: ParaZkPluginContext, rootFile: TFile): P
 }
 
 async function allRootTasks(plugin: ParaZkPluginContext): Promise<RenderableTask[]> {
-  const items = await readAllTaskItems(taskContext(plugin));
+  const items = await readAllTaskItems(workflowContext(plugin));
   return items.flatMap((item) => {
     const rootFile = plugin.app.vault.getFileByPath(item.rootPath);
     if (!(rootFile instanceof TFile)) return [];
@@ -324,7 +323,7 @@ function renderTaskRow(
               await queueRootTaskWrite(
                 item.rootFile,
                 () => setRootTaskField(
-                  taskContext(plugin),
+                  workflowContext(plugin),
                   item.rootFile,
                   item.id,
                   "checkbox",
@@ -415,7 +414,7 @@ function renderTaskRow(
         .setTooltip("Delete task")
         .onClick(async () => {
           await runRegistryBlockAction(remove, async () => {
-            await queueRootTaskWrite(item.rootFile, () => deleteRootTask(taskContext(plugin), item.rootFile, item.id));
+            await queueRootTaskWrite(item.rootFile, () => deleteRootTask(workflowContext(plugin), item.rootFile, item.id));
             await options.rerender();
           });
         });
@@ -428,16 +427,9 @@ async function updateTaskFromEditor(plugin: ParaZkPluginContext, item: Renderabl
     const fields: Array<keyof TaskEditValue> = ["name", "priority", "due", "scheduled", "start"];
     for (const field of fields) {
       if ((item.task[field] ?? "") === (value[field] ?? "")) continue;
-      await setRootTaskField(taskContext(plugin), item.rootFile, item.id, field, value[field] ?? "");
+      await setRootTaskField(workflowContext(plugin), item.rootFile, item.id, field, value[field] ?? "");
     }
   });
-}
-
-function taskContext(plugin: ParaZkPluginContext): WorkflowContext {
-  return {
-    host: createObsidianHost(plugin.app),
-    settings: plugin.settings
-  };
 }
 
 function renderTaskError(el: HTMLElement, error: unknown): void {

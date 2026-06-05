@@ -1,0 +1,1310 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`native CLI command metadata is stable 1`] = `
+[
+  {
+    "command": "para-zk:add-reference",
+    "description": "Add an existing vault file, wikilink, markdown link, URL, or text to a note's frontmatter reference registry",
+    "options": {
+      "description": {
+        "description": "Optional per-reference description.",
+        "value": "<text>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "open": {
+        "description": "Open the source note in Obsidian.",
+        "value": "<true|false>",
+      },
+      "path": {
+        "description": "Source note path that receives the reference.",
+        "value": "<path>",
+      },
+      "target": {
+        "description": "Reference target to add.",
+        "value": "<path|url|wikilink|markdown-link|text>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:attach-file",
+    "description": "Copy local files or directories into the vault attachment folder",
+    "options": {
+      "folder": {
+        "description": "Vault-relative target folder (default: assets).",
+        "value": "<vault-folder>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "name": {
+        "description": "Optional destination filename. The source extension is preserved when omitted.",
+        "value": "<filename>",
+      },
+      "recursive": {
+        "description": "For directory sources, include nested files (default: true).",
+        "value": "<true|false>",
+      },
+      "source": {
+        "description": "Local file or directory path to copy into the vault.",
+        "value": "<local-path>",
+      },
+      "sources": {
+        "description": "Additional local file or directory paths to copy.",
+        "value": "<json|comma-list>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:capture-journal",
+    "description": "Append a quick memo to the daily journal",
+    "options": {
+      "content": {
+        "description": "Memo content.",
+        "value": "<content>",
+      },
+      "date": {
+        "description": "Journal date.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "energy": {
+        "description": "Locale-neutral daily energy code.",
+        "value": "<high|normal|low>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "open": {
+        "description": "Open the journal note in Obsidian.",
+        "value": "<true|false>",
+      },
+      "time": {
+        "description": "Memo time.",
+        "value": "<HH:mm>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:create-area",
+    "description": "Create a PARA area note",
+    "options": {
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "open": {
+        "description": "Open the created note in Obsidian.",
+        "value": "<true|false>",
+      },
+      "parent": {
+        "description": "Optional parent area path.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "Area title.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:create-project",
+    "description": "Create a PARA project note",
+    "options": {
+      "area_titles": {
+        "description": "Area titles to reuse or create and link.",
+        "value": "<json|comma-list>",
+      },
+      "areas": {
+        "description": "Area links to store in frontmatter.",
+        "value": "<json|comma-list>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "open": {
+        "description": "Open the created note in Obsidian.",
+        "value": "<true|false>",
+      },
+      "priority": {
+        "description": "Locale-neutral project priority code.",
+        "value": "<low|medium|high>",
+      },
+      "status": {
+        "description": "Locale-neutral project status code.",
+        "value": "<idea|in_progress|paused|done|archived>",
+      },
+      "title": {
+        "description": "Project title.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:create-resource",
+    "description": "Create a PARA resource note and optionally link it from a source note",
+    "options": {
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "link": {
+        "description": "Whether to add the link to the source note.",
+        "value": "<true|false>",
+      },
+      "open": {
+        "description": "Open the created note in Obsidian.",
+        "value": "<true|false>",
+      },
+      "path": {
+        "description": "Source note path to receive the resource link.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "Resource title.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:create-retro",
+    "description": "Create a weekly retro note, optionally scoped to a project or area",
+    "options": {
+      "date": {
+        "description": "Date used for ISO week calculation.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "open": {
+        "description": "Open the created note in Obsidian.",
+        "value": "<true|false>",
+      },
+      "path": {
+        "description": "Project or area note path.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "Retro title segment.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:create-subarea",
+    "description": "Create a child area under an area note",
+    "options": {
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "inheritParentTag": {
+        "description": "Include parent area tag as well as child tag.",
+        "value": "<true|false>",
+      },
+      "open": {
+        "description": "Open the created note in Obsidian.",
+        "value": "<true|false>",
+      },
+      "path": {
+        "description": "Parent area path.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "Subarea title.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:create-subnote",
+    "description": "Create a child document under a project or area note",
+    "options": {
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "open": {
+        "description": "Open the created note in Obsidian.",
+        "value": "<true|false>",
+      },
+      "path": {
+        "description": "Parent note path.",
+        "value": "<path>",
+      },
+      "subnote_type": {
+        "description": "Locale-neutral subnote type code.",
+        "value": "<free|checklist|todo|plan|research|meeting|decision|guide|risk|idea|settlement>",
+      },
+      "title": {
+        "description": "Subnote title.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:create-zk",
+    "description": "Create a ZK note",
+    "options": {
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "kind": {
+        "description": "Locale-neutral ZK note kind.",
+        "value": "<fleeting|literature|permanent>",
+      },
+      "maturity": {
+        "description": "Permanent-note maturity code.",
+        "value": "<draft|refined|evergreen>",
+      },
+      "open": {
+        "description": "Open the created note in Obsidian.",
+        "value": "<true|false>",
+      },
+      "title": {
+        "description": "ZK note title.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:delete-area",
+    "description": "Move an area note to Obsidian trash and clean PARA-ZK-owned references",
+    "options": {
+      "archived": {
+        "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
+        "value": "<true|false>",
+      },
+      "force": {
+        "description": "Required when deleting a folder-style note that contains child files.",
+        "value": "<true|false>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "path": {
+        "description": "Exact note path.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "Current note title. Used when path is omitted.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:delete-journal",
+    "description": "Move a daily journal note to Obsidian trash and report incoming links",
+    "options": {
+      "date": {
+        "description": "Journal date. Defaults to today.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "force": {
+        "description": "Reserved for consistency with other delete commands.",
+        "value": "<true|false>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "path": {
+        "description": "Exact journal note path.",
+        "value": "<path>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:delete-project",
+    "description": "Move a project note to Obsidian trash and clean PARA-ZK-owned references",
+    "options": {
+      "archived": {
+        "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
+        "value": "<true|false>",
+      },
+      "force": {
+        "description": "Required when deleting a folder-style note that contains child files.",
+        "value": "<true|false>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "path": {
+        "description": "Exact note path.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "Current note title. Used when path is omitted.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:delete-resource",
+    "description": "Move a resource note to Obsidian trash and clean PARA-ZK-owned references",
+    "options": {
+      "archived": {
+        "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
+        "value": "<true|false>",
+      },
+      "force": {
+        "description": "Required when deleting a folder-style note that contains child files.",
+        "value": "<true|false>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "path": {
+        "description": "Exact note path.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "Current note title. Used when path is omitted.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:delete-retro",
+    "description": "Move a retro note to Obsidian trash and clean PARA-ZK-owned references",
+    "options": {
+      "archived": {
+        "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
+        "value": "<true|false>",
+      },
+      "date": {
+        "description": "Optional date used to narrow the ISO week folder.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "force": {
+        "description": "Required when deleting a folder-style note that contains child files.",
+        "value": "<true|false>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "path": {
+        "description": "Exact note path.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "Current note title. Used when path is omitted.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:delete-zk",
+    "description": "Move a ZK note to Obsidian trash and clean PARA-ZK-owned references",
+    "options": {
+      "force": {
+        "description": "Required when deleting a folder-style note that contains child files.",
+        "value": "<true|false>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "kind": {
+        "description": "Optional ZK kind filter.",
+        "value": "<fleeting|literature|permanent>",
+      },
+      "path": {
+        "description": "Exact note path.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "Current note title. Used when path is omitted.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:describe",
+    "description": "Describe PARA-ZK CLI surface types, stable read/write keys, and collection filters",
+    "options": {
+      "format": {
+        "description": "Output format (default: text)",
+        "value": "<text|json>",
+      },
+      "type": {
+        "description": "Optional surface type. Omit to describe all supported surfaces.",
+        "value": "<project|area|resource|journal|retro|doc|zk_fleeting|zk_literature|zk_permanent|note>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:promote-fleeting",
+    "description": "Promote a fleeting note to Literature or Permanent and mark the source processed",
+    "options": {
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "kind": {
+        "description": "Locale-neutral target ZK kind.",
+        "value": "<literature|permanent>",
+      },
+      "maturity": {
+        "description": "Permanent-note maturity code.",
+        "value": "<draft|refined|evergreen>",
+      },
+      "open": {
+        "description": "Open the created note in Obsidian.",
+        "value": "<true|false>",
+      },
+      "path": {
+        "description": "Source fleeting note path.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "New ZK note title.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:promote-resource",
+    "description": "Promote a resource note to a ZK note",
+    "options": {
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "kind": {
+        "description": "Locale-neutral target ZK kind.",
+        "value": "<fleeting|literature|permanent>",
+      },
+      "maturity": {
+        "description": "Permanent-note maturity code.",
+        "value": "<draft|refined|evergreen>",
+      },
+      "open": {
+        "description": "Open the created note in Obsidian.",
+        "value": "<true|false>",
+      },
+      "path": {
+        "description": "Source resource path.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "New ZK note title.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:read-area",
+    "description": "Read an area note's stable PARA-ZK surface, optionally by map key",
+    "options": {
+      "archived": {
+        "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
+        "value": "<true|false>",
+      },
+      "checkbox": {
+        "description": "Task collection reads only: checkbox status character. Use space/blank/todo/open for [ ].",
+        "value": "<status>",
+      },
+      "due_after": {
+        "description": "Task collection reads only: include tasks due on or after this date.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "due_before": {
+        "description": "Task collection reads only: include tasks due on or before this date.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "key": {
+        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{parent}, overview, tasks, tasks/<id>, tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, children, children/<title>/<key>.",
+        "value": "<map-path>",
+      },
+      "limit": {
+        "description": "Collection key reads only: maximum items to return (default: 50).",
+        "value": "<number|all>",
+      },
+      "offset": {
+        "description": "Collection key reads only: zero-based item offset (default: 0).",
+        "value": "<number>",
+      },
+      "path": {
+        "description": "Area note path for exact selection.",
+        "value": "<path>",
+      },
+      "priority": {
+        "description": "Task collection reads only: parsed Tasks priority such as high or medium.",
+        "value": "<priority>",
+      },
+      "query": {
+        "description": "Collection key reads only: case-insensitive item text filter.",
+        "value": "<text>",
+      },
+      "ref_kind": {
+        "description": "Reference collection reads only: filter references by kind.",
+        "value": "<url|note|file|wiki|text>",
+      },
+      "title": {
+        "description": "Area title. Used when path is omitted.",
+        "value": "<title>",
+      },
+      "type": {
+        "description": "Backlink collection reads only: filter source notes by frontmatter type.",
+        "value": "<note-type>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:read-journal",
+    "description": "Read a daily journal note's stable PARA-ZK surface, optionally by map key",
+    "options": {
+      "checkbox": {
+        "description": "Task collection reads only: checkbox status character. Use space/blank/todo/open for [ ].",
+        "value": "<status>",
+      },
+      "date": {
+        "description": "Journal date. Defaults to today.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "due_after": {
+        "description": "Task collection reads only: include tasks due on or after this date.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "due_before": {
+        "description": "Task collection reads only: include tasks due on or before this date.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "key": {
+        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{date|energy}, focus, quick_memo, timeline, tasks, tasks/<id>, tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}, short_review, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}.",
+        "value": "<map-path>",
+      },
+      "limit": {
+        "description": "Collection key reads only: maximum items to return (default: 50).",
+        "value": "<number|all>",
+      },
+      "offset": {
+        "description": "Collection key reads only: zero-based item offset (default: 0).",
+        "value": "<number>",
+      },
+      "path": {
+        "description": "Journal note path for exact selection.",
+        "value": "<path>",
+      },
+      "priority": {
+        "description": "Task collection reads only: parsed Tasks priority such as high or medium.",
+        "value": "<priority>",
+      },
+      "query": {
+        "description": "Collection key reads only: case-insensitive item text filter.",
+        "value": "<text>",
+      },
+      "ref_kind": {
+        "description": "Reference collection reads only: filter references by kind.",
+        "value": "<url|note|file|wiki|text>",
+      },
+      "type": {
+        "description": "Backlink collection reads only: filter source notes by frontmatter type.",
+        "value": "<note-type>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:read-project",
+    "description": "Read a project note's stable PARA-ZK surface, optionally by map key",
+    "options": {
+      "archived": {
+        "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
+        "value": "<true|false>",
+      },
+      "checkbox": {
+        "description": "Task collection reads only: checkbox status character. Use space/blank/todo/open for [ ].",
+        "value": "<status>",
+      },
+      "due_after": {
+        "description": "Task collection reads only: include tasks due on or after this date.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "due_before": {
+        "description": "Task collection reads only: include tasks due on or before this date.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "key": {
+        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{areas|status|priority|start_date|due_date|done_date}, summary, goals, tasks, tasks/<id>, tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, children, children/<title>/<key>.",
+        "value": "<map-path>",
+      },
+      "limit": {
+        "description": "Collection key reads only: maximum items to return (default: 50).",
+        "value": "<number|all>",
+      },
+      "offset": {
+        "description": "Collection key reads only: zero-based item offset (default: 0).",
+        "value": "<number>",
+      },
+      "path": {
+        "description": "Project note path for exact selection.",
+        "value": "<path>",
+      },
+      "priority": {
+        "description": "Task collection reads only: parsed Tasks priority such as high or medium.",
+        "value": "<priority>",
+      },
+      "query": {
+        "description": "Collection key reads only: case-insensitive item text filter.",
+        "value": "<text>",
+      },
+      "ref_kind": {
+        "description": "Reference collection reads only: filter references by kind.",
+        "value": "<url|note|file|wiki|text>",
+      },
+      "title": {
+        "description": "Project title. Used when path is omitted.",
+        "value": "<title>",
+      },
+      "type": {
+        "description": "Backlink collection reads only: filter source notes by frontmatter type.",
+        "value": "<note-type>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:read-resource",
+    "description": "Read a resource note's stable PARA-ZK surface, optionally by map key",
+    "options": {
+      "archived": {
+        "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
+        "value": "<true|false>",
+      },
+      "checkbox": {
+        "description": "Task collection reads only: checkbox status character. Use space/blank/todo/open for [ ].",
+        "value": "<status>",
+      },
+      "due_after": {
+        "description": "Task collection reads only: include tasks due on or after this date.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "due_before": {
+        "description": "Task collection reads only: include tasks due on or before this date.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "key": {
+        "description": "Optional stable read key. Valid: overview, body, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}.",
+        "value": "<map-path>",
+      },
+      "limit": {
+        "description": "Collection key reads only: maximum items to return (default: 50).",
+        "value": "<number|all>",
+      },
+      "offset": {
+        "description": "Collection key reads only: zero-based item offset (default: 0).",
+        "value": "<number>",
+      },
+      "path": {
+        "description": "Resource note path for exact selection.",
+        "value": "<path>",
+      },
+      "priority": {
+        "description": "Task collection reads only: parsed Tasks priority such as high or medium.",
+        "value": "<priority>",
+      },
+      "query": {
+        "description": "Collection key reads only: case-insensitive item text filter.",
+        "value": "<text>",
+      },
+      "ref_kind": {
+        "description": "Reference collection reads only: filter references by kind.",
+        "value": "<url|note|file|wiki|text>",
+      },
+      "title": {
+        "description": "Resource title. Used when path is omitted.",
+        "value": "<title>",
+      },
+      "type": {
+        "description": "Backlink collection reads only: filter source notes by frontmatter type.",
+        "value": "<note-type>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:read-retro",
+    "description": "Read a retro note's stable PARA-ZK surface, optionally by map key",
+    "options": {
+      "archived": {
+        "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
+        "value": "<true|false>",
+      },
+      "checkbox": {
+        "description": "Task collection reads only: checkbox status character. Use space/blank/todo/open for [ ].",
+        "value": "<status>",
+      },
+      "date": {
+        "description": "Optional date used to narrow the ISO week folder.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "due_after": {
+        "description": "Task collection reads only: include tasks due on or after this date.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "due_before": {
+        "description": "Task collection reads only: include tasks due on or before this date.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "key": {
+        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{project|areas|date|week_iso|week_start|week_end}, week_progress, good, improve, risks, retro_summary, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}.",
+        "value": "<map-path>",
+      },
+      "limit": {
+        "description": "Collection key reads only: maximum items to return (default: 50).",
+        "value": "<number|all>",
+      },
+      "offset": {
+        "description": "Collection key reads only: zero-based item offset (default: 0).",
+        "value": "<number>",
+      },
+      "path": {
+        "description": "Retro note path for exact selection.",
+        "value": "<path>",
+      },
+      "priority": {
+        "description": "Task collection reads only: parsed Tasks priority such as high or medium.",
+        "value": "<priority>",
+      },
+      "query": {
+        "description": "Collection key reads only: case-insensitive item text filter.",
+        "value": "<text>",
+      },
+      "ref_kind": {
+        "description": "Reference collection reads only: filter references by kind.",
+        "value": "<url|note|file|wiki|text>",
+      },
+      "title": {
+        "description": "Retro note title. Used when path is omitted.",
+        "value": "<title>",
+      },
+      "type": {
+        "description": "Backlink collection reads only: filter source notes by frontmatter type.",
+        "value": "<note-type>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:read-zk",
+    "description": "Read a ZK note's stable PARA-ZK surface, optionally by map key",
+    "options": {
+      "checkbox": {
+        "description": "Task collection reads only: checkbox status character. Use space/blank/todo/open for [ ].",
+        "value": "<status>",
+      },
+      "due_after": {
+        "description": "Task collection reads only: include tasks due on or after this date.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "due_before": {
+        "description": "Task collection reads only: include tasks due on or before this date.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "key": {
+        "description": "Stable read key; depends on ZK kind. fleeting: frontmatter, frontmatter/{processed}, thought_summary, memo, tasks, tasks/<id>, tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}; literature: frontmatter, frontmatter/{sourceTitle|authors|published|url}, highlight_block, summary, insight, evidence, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}; permanent: frontmatter, frontmatter/{maturity|aliases}, one_sentence_summary, body, limitations, related_questions, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}.",
+        "value": "<map-path>",
+      },
+      "kind": {
+        "description": "Optional ZK kind filter.",
+        "value": "<fleeting|literature|permanent>",
+      },
+      "limit": {
+        "description": "Collection key reads only: maximum items to return (default: 50).",
+        "value": "<number|all>",
+      },
+      "offset": {
+        "description": "Collection key reads only: zero-based item offset (default: 0).",
+        "value": "<number>",
+      },
+      "path": {
+        "description": "ZK note path for exact selection.",
+        "value": "<path>",
+      },
+      "priority": {
+        "description": "Task collection reads only: parsed Tasks priority such as high or medium.",
+        "value": "<priority>",
+      },
+      "query": {
+        "description": "Collection key reads only: case-insensitive item text filter.",
+        "value": "<text>",
+      },
+      "ref_kind": {
+        "description": "Reference collection reads only: filter references by kind.",
+        "value": "<url|note|file|wiki|text>",
+      },
+      "title": {
+        "description": "ZK note title. Used when path is omitted.",
+        "value": "<title>",
+      },
+      "type": {
+        "description": "Backlink collection reads only: filter source notes by frontmatter type.",
+        "value": "<note-type>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:rename-area",
+    "description": "Rename an area note, including its folder-style parent folder",
+    "options": {
+      "archived": {
+        "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
+        "value": "<true|false>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "new_title": {
+        "description": "New note title.",
+        "value": "<title>",
+      },
+      "path": {
+        "description": "Exact note path.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "Current note title. Used when path is omitted.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:rename-project",
+    "description": "Rename a project note, including its folder-style parent folder",
+    "options": {
+      "archived": {
+        "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
+        "value": "<true|false>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "new_title": {
+        "description": "New note title.",
+        "value": "<title>",
+      },
+      "path": {
+        "description": "Exact note path.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "Current note title. Used when path is omitted.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:rename-resource",
+    "description": "Rename a resource note file",
+    "options": {
+      "archived": {
+        "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
+        "value": "<true|false>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "new_title": {
+        "description": "New note title.",
+        "value": "<title>",
+      },
+      "path": {
+        "description": "Exact note path.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "Current note title. Used when path is omitted.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:rename-zk",
+    "description": "Rename a ZK note file",
+    "options": {
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "kind": {
+        "description": "Optional ZK kind filter.",
+        "value": "<fleeting|literature|permanent>",
+      },
+      "new_title": {
+        "description": "New note title.",
+        "value": "<title>",
+      },
+      "path": {
+        "description": "Exact note path.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "Current note title. Used when path is omitted.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:setup",
+    "description": "Set up the PARA-ZK vault layout and managed files",
+    "options": {
+      "dryRun": {
+        "description": "Plan changes without writing.",
+        "value": "<true|false>",
+      },
+      "force": {
+        "description": "Overwrite PARA-ZK managed files when content differs.",
+        "value": "<true|false>",
+      },
+      "format": {
+        "description": "Output format (default: text)",
+        "value": "<text|json>",
+      },
+      "installDeps": {
+        "description": "Install and enable required community plugins.",
+        "value": "<true|false>",
+      },
+      "locale": {
+        "description": "Language for UI, generated files, and tags.",
+        "value": "<ko|en>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:update-area",
+    "description": "Update an area note's stable PARA-ZK surface by map key",
+    "options": {
+      "all": {
+        "description": "For op=replace, replace all matches instead of requiring a single match.",
+        "value": "<true|false>",
+      },
+      "archived": {
+        "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
+        "value": "<true|false>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "key": {
+        "description": "Stable writable key. Valid: frontmatter/{parent}=set, overview=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set, children/<title>/<key>.",
+        "value": "<map-path>",
+      },
+      "match": {
+        "description": "Exact text to match inside the selected key for op=replace.",
+        "value": "<text>",
+      },
+      "op": {
+        "description": "Update operation.",
+        "value": "<set|insert|append|prepend|replace|delete>",
+      },
+      "path": {
+        "description": "Area note path for exact selection.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "Area title. Used when path is omitted.",
+        "value": "<title>",
+      },
+      "value": {
+        "description": "Text value for scalar set, append, or prepend operations.",
+        "value": "<text>",
+      },
+      "value_json": {
+        "description": "Structured value for frontmatter updates and task inserts.",
+        "value": "<json>",
+      },
+      "with": {
+        "description": "Replacement text for op=replace.",
+        "value": "<text>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:update-journal",
+    "description": "Update a daily journal note's stable PARA-ZK surface by map key",
+    "options": {
+      "all": {
+        "description": "For op=replace, replace all matches instead of requiring a single match.",
+        "value": "<true|false>",
+      },
+      "date": {
+        "description": "Journal date. Defaults to today.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "key": {
+        "description": "Stable writable key. Valid: frontmatter/{date|energy}=set, focus=set|append|prepend|replace, quick_memo=set|append|prepend|replace, timeline=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, short_review=set|append|prepend|replace, references=insert, references/<i>=delete, references/<i>/{link|description}=set.",
+        "value": "<map-path>",
+      },
+      "match": {
+        "description": "Exact text to match inside the selected key for op=replace.",
+        "value": "<text>",
+      },
+      "op": {
+        "description": "Update operation.",
+        "value": "<set|insert|append|prepend|replace|delete>",
+      },
+      "path": {
+        "description": "Journal note path for exact selection.",
+        "value": "<path>",
+      },
+      "value": {
+        "description": "Text value for scalar set, append, or prepend operations.",
+        "value": "<text>",
+      },
+      "value_json": {
+        "description": "Structured value for frontmatter updates and task inserts.",
+        "value": "<json>",
+      },
+      "with": {
+        "description": "Replacement text for op=replace.",
+        "value": "<text>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:update-project",
+    "description": "Update a project note's stable PARA-ZK surface by map key",
+    "options": {
+      "all": {
+        "description": "For op=replace, replace all matches instead of requiring a single match.",
+        "value": "<true|false>",
+      },
+      "archived": {
+        "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
+        "value": "<true|false>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "key": {
+        "description": "Stable writable key. Valid: frontmatter/{areas|status|priority|start_date|due_date|done_date}=set, summary=set|append|prepend|replace, goals=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set, children/<title>/<key>.",
+        "value": "<map-path>",
+      },
+      "match": {
+        "description": "Exact text to match inside the selected key for op=replace.",
+        "value": "<text>",
+      },
+      "op": {
+        "description": "Update operation.",
+        "value": "<set|insert|append|prepend|replace|delete>",
+      },
+      "path": {
+        "description": "Project note path for exact selection.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "Project title. Used when path is omitted.",
+        "value": "<title>",
+      },
+      "value": {
+        "description": "Text value for scalar set, append, or prepend operations.",
+        "value": "<text>",
+      },
+      "value_json": {
+        "description": "Structured value for frontmatter updates and task inserts.",
+        "value": "<json>",
+      },
+      "with": {
+        "description": "Replacement text for op=replace.",
+        "value": "<text>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:update-resource",
+    "description": "Update a resource note's stable PARA-ZK surface by map key",
+    "options": {
+      "all": {
+        "description": "For op=replace, replace all matches instead of requiring a single match.",
+        "value": "<true|false>",
+      },
+      "archived": {
+        "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
+        "value": "<true|false>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "key": {
+        "description": "Stable writable key. Valid: overview=set|append|prepend|replace, body=set|append|prepend|replace, references=insert, references/<i>=delete, references/<i>/{link|description}=set.",
+        "value": "<map-path>",
+      },
+      "match": {
+        "description": "Exact text to match inside the selected key for op=replace.",
+        "value": "<text>",
+      },
+      "op": {
+        "description": "Update operation.",
+        "value": "<set|insert|append|prepend|replace|delete>",
+      },
+      "path": {
+        "description": "Resource note path for exact selection.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "Resource title. Used when path is omitted.",
+        "value": "<title>",
+      },
+      "value": {
+        "description": "Text value for scalar set, append, or prepend operations.",
+        "value": "<text>",
+      },
+      "value_json": {
+        "description": "Structured value for frontmatter updates and task inserts.",
+        "value": "<json>",
+      },
+      "with": {
+        "description": "Replacement text for op=replace.",
+        "value": "<text>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:update-retro",
+    "description": "Update a retro note's stable PARA-ZK surface by map key",
+    "options": {
+      "all": {
+        "description": "For op=replace, replace all matches instead of requiring a single match.",
+        "value": "<true|false>",
+      },
+      "archived": {
+        "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
+        "value": "<true|false>",
+      },
+      "date": {
+        "description": "Optional date used to narrow the ISO week folder.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "key": {
+        "description": "Stable writable key. Valid: frontmatter/{project|areas|date|week_iso|week_start|week_end}=set, week_progress=set|append|prepend|replace, good=set|append|prepend|replace, improve=set|append|prepend|replace, risks=set|append|prepend|replace, retro_summary=set|append|prepend|replace.",
+        "value": "<map-path>",
+      },
+      "match": {
+        "description": "Exact text to match inside the selected key for op=replace.",
+        "value": "<text>",
+      },
+      "op": {
+        "description": "Update operation.",
+        "value": "<set|insert|append|prepend|replace|delete>",
+      },
+      "path": {
+        "description": "Retro note path for exact selection.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "Retro note title. Used when path is omitted.",
+        "value": "<title>",
+      },
+      "value": {
+        "description": "Text value for scalar set, append, or prepend operations.",
+        "value": "<text>",
+      },
+      "value_json": {
+        "description": "Structured value for frontmatter updates and task inserts.",
+        "value": "<json>",
+      },
+      "with": {
+        "description": "Replacement text for op=replace.",
+        "value": "<text>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:update-zk",
+    "description": "Update a ZK note's stable PARA-ZK surface by map key",
+    "options": {
+      "all": {
+        "description": "For op=replace, replace all matches instead of requiring a single match.",
+        "value": "<true|false>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "key": {
+        "description": "Stable write key; depends on ZK kind. fleeting: frontmatter/{processed}=set, thought_summary=set|append|prepend|replace, memo=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set; literature: frontmatter/{sourceTitle|authors|published|url}=set, highlight_block=set|append|prepend|replace, summary=set|append|prepend|replace, insight=set|append|prepend|replace, evidence=set|append|prepend|replace, references=insert, references/<i>=delete, references/<i>/{link|description}=set; permanent: frontmatter/{maturity|aliases}=set, one_sentence_summary=set|append|prepend|replace, body=set|append|prepend|replace, limitations=set|append|prepend|replace, related_questions=set|append|prepend|replace, references=insert, references/<i>=delete, references/<i>/{link|description}=set.",
+        "value": "<map-path>",
+      },
+      "kind": {
+        "description": "Optional ZK kind filter.",
+        "value": "<fleeting|literature|permanent>",
+      },
+      "match": {
+        "description": "Exact text to match inside the selected key for op=replace.",
+        "value": "<text>",
+      },
+      "op": {
+        "description": "Update operation.",
+        "value": "<set|insert|append|prepend|replace|delete>",
+      },
+      "path": {
+        "description": "ZK note path for exact selection.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "ZK note title. Used when path is omitted.",
+        "value": "<title>",
+      },
+      "value": {
+        "description": "Text value for scalar set, append, or prepend operations.",
+        "value": "<text>",
+      },
+      "value_json": {
+        "description": "Structured value for frontmatter updates and task inserts.",
+        "value": "<json>",
+      },
+      "with": {
+        "description": "Replacement text for op=replace.",
+        "value": "<text>",
+      },
+    },
+  },
+]
+`;

@@ -1,4 +1,6 @@
 import type { App, CachedMetadata, TAbstractFile, TFile } from "obsidian";
+import type { ParaZkPluginContext } from "../plugin-interface";
+import type { WorkflowContext } from "../workflows/context";
 
 export interface WorkflowHost {
   getFile(path: string): TFile | null;
@@ -20,7 +22,7 @@ export interface WorkflowHost {
   getActiveFile(): TFile | null;
 }
 
-export function createObsidianHost(app: App): WorkflowHost {
+function createObsidianHost(app: App): WorkflowHost {
   const fileManager = app.fileManager as typeof app.fileManager & {
     trashFile?: (file: TAbstractFile) => Promise<void>;
   };
@@ -46,4 +48,8 @@ export function createObsidianHost(app: App): WorkflowHost {
     openFile: async (file) => { await app.workspace.getLeaf(true).openFile(file); },
     getActiveFile: () => app.workspace.getActiveFile()
   };
+}
+
+export function workflowContext(plugin: ParaZkPluginContext): WorkflowContext {
+  return { host: createObsidianHost(plugin.app), settings: plugin.settings };
 }

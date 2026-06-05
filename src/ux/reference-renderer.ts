@@ -11,7 +11,7 @@ import {
 } from "obsidian";
 import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
-import { createObsidianHost } from "../vault/host";
+import { workflowContext } from "../vault/host";
 import {
   createResource,
   deleteReferenceItem,
@@ -231,7 +231,7 @@ function renderReferenceToolbar(
             );
             if (!title) return;
 
-            await createResource(referenceContext(plugin), {
+            await createResource(workflowContext(plugin), {
               title,
               sourcePath: options.rootFile.path,
               linkToSource: true,
@@ -342,7 +342,7 @@ function renderReferenceRow(
 }
 
 async function currentReferences(plugin: ParaZkPluginContext, rootFile: TFile): Promise<RenderableReference[]> {
-  const items = await readReferenceItemsFresh(referenceContext(plugin), rootFile);
+  const items = await readReferenceItemsFresh(workflowContext(plugin), rootFile);
   return items.map((reference, index) => ({
     rootFile,
     index,
@@ -359,7 +359,7 @@ async function insertReferenceFromEditor(
   rootFile: TFile,
   value: ReferenceEditValue
 ): Promise<void> {
-  await insertReferenceItem(referenceContext(plugin), rootFile, {
+  await insertReferenceItem(workflowContext(plugin), rootFile, {
     link: buildReferenceLinkInput(value.target, value.anchor),
     ...(value.description.trim() ? { description: value.description } : {})
   });
@@ -371,7 +371,7 @@ async function updateReferenceFromEditor(
   value: ReferenceEditValue
 ): Promise<void> {
   await queueRegistryFileWrite(item.rootFile, async () => {
-    const workflow = referenceContext(plugin);
+    const workflow = workflowContext(plugin);
     const index = await currentReferenceIndex(
       workflow,
       item.rootFile,
@@ -398,7 +398,7 @@ async function updateReferenceFromEditor(
 
 async function deleteReferenceFromRow(plugin: ParaZkPluginContext, item: RenderableReference): Promise<void> {
   await queueRegistryFileWrite(item.rootFile, async () => {
-    const workflow = referenceContext(plugin);
+    const workflow = workflowContext(plugin);
     const index = await currentReferenceIndex(
       workflow,
       item.rootFile,
@@ -415,7 +415,7 @@ async function persistReferenceOrder(
   renderedLinks: string[],
   nextLinks: string[]
 ): Promise<void> {
-  const workflow = referenceContext(plugin);
+  const workflow = workflowContext(plugin);
   const currentLinks = (await readReferenceItemsFresh(workflow, rootFile)).map((item) => item.link);
   const goneMessage = referenceGoneMessage(plugin);
   assertSameReferenceLinkSet(renderedLinks, currentLinks, goneMessage);
@@ -444,13 +444,6 @@ function assertSameReferenceLinkSet(left: string[], right: string[], goneMessage
   for (const link of leftSet) {
     if (!rightSet.has(link)) throw new Error(goneMessage);
   }
-}
-
-function referenceContext(plugin: ParaZkPluginContext): WorkflowContext {
-  return {
-    host: createObsidianHost(plugin.app),
-    settings: plugin.settings
-  };
 }
 
 function renderReferenceError(el: HTMLElement, error: unknown): void {

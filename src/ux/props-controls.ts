@@ -23,7 +23,7 @@ import {
   type PropsViewType
 } from "../props/schema";
 import { frontmatterLinks } from "../vault/frontmatter";
-import { createObsidianHost } from "../vault/host";
+import { workflowContext } from "../vault/host";
 import { normalizeVaultPath, wikiLink } from "../vault/paths";
 import { parseCodeBlockKeyValues } from "./code-block-args";
 
@@ -540,7 +540,7 @@ async function writeFrontmatterValue(
     if (type === "project" && key === "status") {
       const workflows = await import("../workflows");
       await workflows.updateProject(
-        { host: createObsidianHost(plugin.app), settings: plugin.settings },
+        workflowContext(plugin),
         {
           path: file.path,
           key: "frontmatter/status",
