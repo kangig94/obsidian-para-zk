@@ -67,7 +67,7 @@ function prepareVault() {
   assertVault(vaultPath);
   mkdirSync(pluginDir, { recursive: true });
 
-  if (args.clean) cleanVault(vaultPath, pluginDir);
+  cleanVault(vaultPath, pluginDir);
 
   if (args.build !== false) {
     run("npm", ["run", "build"], {
@@ -1212,16 +1212,11 @@ function assertDryRunInit() {
 function parseArgs(rawArgs) {
   const parsed = {
     build: true,
-    clean: true,
     installDeps: true
   };
 
   for (const arg of rawArgs) {
-    if (arg === "--clean") {
-      parsed.clean = true;
-    } else if (arg === "--no-clean") {
-      parsed.clean = false;
-    } else if (arg === "--no-build") {
+    if (arg === "--no-build") {
       parsed.build = false;
     } else if (arg === "--no-install-deps") {
       parsed.installDeps = false;
@@ -1254,14 +1249,14 @@ function takeNext(rawArgs, flag) {
 }
 
 function printHelp() {
-  console.log(`Usage: npm run smoke:vault -- [--vault <path>] [--no-clean] [--no-build] [--no-install-deps]
+  console.log(`Usage: npm run smoke:vault -- [--vault <path>] [--no-build] [--no-install-deps]
 
-By default the vault contents are wiped and fully re-initialized before the run
-so verification always starts from a clean state.
+The vault contents are ALWAYS wiped and fully re-initialized before the run,
+so verification always starts from a clean state. This is intentionally
+non-optional: pass only a disposable test vault.
 
 Options:
   --vault <path>       Disposable test vault path. Defaults to PARA_ZK_TEST_VAULT or a local para-zk vault.
-  --no-clean           Skip the default wipe; run against the vault's current contents.
   --no-build           Skip npm run build and plugin sync.
   --no-install-deps    Run para-zk:setup without installing required dependencies.
   --stamp <value>      Stable suffix for generated smoke-test notes.

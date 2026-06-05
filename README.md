@@ -80,5 +80,6 @@ root on build.
 
 `npm run smoke:vault -- --vault /path/to/test-vault` runs the checks that need a
 real Obsidian engine (dependency config, ribbon/command labels, rename link
-rewriting, backlink resolution, live renderers). It wipes and re-initializes the
-vault each run; pass `--no-clean` to keep the current contents.
+rewriting, backlink resolution, live renderers). It always wipes and
+re-initializes the vault from scratch each run, so point it only at a disposable
+test vault.
