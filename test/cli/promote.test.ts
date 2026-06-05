@@ -34,6 +34,31 @@ describe("promote-resource", () => {
   });
 });
 
+describe("promote-literature", () => {
+  it("creates a permanent note linked back to the preserved literature source", async () => {
+    const literature = await cli.run("para-zk:create-zk", { title: "Book note", kind: "literature", open: "false" });
+
+    const promoted = await cli.run("para-zk:promote-literature", {
+      path: String(literature.path),
+      title: "Evergreen book note",
+      maturity: "refined",
+      open: "false"
+    });
+    expect(promoted.created).toBe(true);
+    expect(promoted.kind).toBe("Permanent");
+
+    const promotedContent = cli.app.readPath(String(promoted.path)) ?? "";
+    expect(promotedContent).toContain("type: zk_permanent");
+    expect(promotedContent).toContain("maturity: refined");
+    expect(promotedContent).toContain(`[[${literature.path}]]`);
+
+    const literatureContent = cli.app.readPath(String(literature.path));
+    expect(literatureContent, "literature source should remain after creating a permanent note").toBeDefined();
+    expect(literatureContent).toContain(`[[${promoted.path}|Evergreen book note]]`);
+    expect(literatureContent).not.toContain("processed: true");
+  });
+});
+
 describe("promote-fleeting", () => {
   it("creates a permanent note and keeps the processed fleeting source in place", async () => {
     const fleeting = await cli.run("para-zk:create-zk", { title: "Spark", kind: "fleeting", open: "false" });

@@ -475,8 +475,34 @@ exports[`native CLI command metadata is stable 1`] = `
     },
   },
   {
+    "command": "para-zk:promote-literature",
+    "description": "Create a Permanent note from a literature note (source preserved)",
+    "options": {
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "maturity": {
+        "description": "Permanent-note maturity code.",
+        "value": "<draft|refined|evergreen>",
+      },
+      "open": {
+        "description": "Open the created note in Obsidian.",
+        "value": "<true|false>",
+      },
+      "path": {
+        "description": "Source literature note path.",
+        "value": "<path>",
+      },
+      "title": {
+        "description": "New permanent note title.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
     "command": "para-zk:promote-resource",
-    "description": "Promote a resource note to a ZK note",
+    "description": "Create a ZK note from a resource (source preserved)",
     "options": {
       "format": {
         "description": "Output format (default: text).",

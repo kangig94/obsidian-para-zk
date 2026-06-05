@@ -366,6 +366,10 @@ export function managedUiBlockForType(type: string, settings: ParaZkSettings): s
         paraZkReferencesBlock("current", t.labels.references)
       ]);
     case "zk_literature":
+      return joinManagedUiBlocks([
+        paraZkViewBlock("literature-promotion", t.labels.createPermanent),
+        paraZkReferencesBlock("current", t.labels.references)
+      ]);
     case "zk_permanent":
       return joinManagedUiBlocks([
         paraZkReferencesBlock("current", t.labels.references)
@@ -451,6 +455,13 @@ function dataviewFleetingPromotion(t: ReturnType<typeof localePack>): string[] {
   ]);
 }
 
+function dataviewLiteraturePromotion(t: ReturnType<typeof localePack>): string[] {
+  return fenced("dataview", [
+    `TABLE WITHOUT ID promoted_to AS "${t.labels.createPermanent}"`,
+    "WHERE file.path = this.file.path AND promoted_to"
+  ]);
+}
+
 export const DATAVIEW_VIEW_KEYS = [
   "project-subnotes",
   "project-retros",
@@ -459,7 +470,8 @@ export const DATAVIEW_VIEW_KEYS = [
   "area-subnotes",
   "area-retros",
   "resource-zk-links",
-  "fleeting-promotion"
+  "fleeting-promotion",
+  "literature-promotion"
 ] as const;
 
 export type DataviewViewKey = typeof DATAVIEW_VIEW_KEYS[number];
@@ -480,6 +492,7 @@ export function dataviewViewBlock(key: string, settings: ParaZkSettings, sourceP
     case "area-retros": return dataviewAreaRetros(t, settings, sourcePath).join("\n");
     case "resource-zk-links": return dataviewResourceZkLinks(t, settings, sourcePath).join("\n");
     case "fleeting-promotion": return dataviewFleetingPromotion(t).join("\n");
+    case "literature-promotion": return dataviewLiteraturePromotion(t).join("\n");
     default: return undefined;
   }
 }

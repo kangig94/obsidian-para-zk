@@ -48,6 +48,7 @@ describe("managed templates", () => {
       expect(content).not.toContain("area-subareas");
       expect(content).not.toContain("resource-zk-links");
       expect(content).not.toContain("fleeting-promotion");
+      expect(content).not.toContain("literature-promotion");
     }
   });
 
@@ -72,16 +73,19 @@ describe("managed templates", () => {
     expect(area).toContain("area-subnotes");
     expect(area).toContain("area-retros");
     expect(resource).toContain("resource-zk-links");
-    expect(resource).toContain("title: Promote to ZK");
+    expect(resource).toContain("title: Create ZK");
     expect(journal).toContain("para-zk-tasks");
     expect(managedUiBlockForType("retro", DEFAULT_SETTINGS)).toBeUndefined();
     expect(fleeting).toContain("fleeting-promotion");
+    expect(literature).toContain("literature-promotion");
+    expect(literature).toContain("title: Create permanent");
     expect(literature).toContain("para-zk-references");
     expect(managedUiBlockForType("doc", DEFAULT_SETTINGS)).toBeUndefined();
   });
 
-  it("renders a Dataview block for fleeting promotion state", () => {
+  it("renders Dataview blocks for promotion state", () => {
     expect(dataviewViewBlock("fleeting-promotion", DEFAULT_SETTINGS)).toContain("promoted_to");
+    expect(dataviewViewBlock("literature-promotion", DEFAULT_SETTINGS)).toContain("promoted_to AS \"Create permanent\"");
   });
 
   it("matches Dataview relationship views against the source note link", () => {

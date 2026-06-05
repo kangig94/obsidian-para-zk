@@ -155,6 +155,10 @@ async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: 
       const title = await prompt(plugin, labels.promoteFleetingCommandName, labels.promptZkTitle, sourceFile?.basename ?? "");
       return title ? workflows.promoteFleeting(ctx, { sourcePath: activePath, title, kind, open: true }) : undefined;
     }
+    case "promote-literature": {
+      const title = await prompt(plugin, labels.promoteLiteratureCommandName, labels.promptZkTitle, sourceFile?.basename ?? "");
+      return title ? workflows.promoteLiterature(ctx, { sourcePath: activePath, title, open: true }) : undefined;
+    }
     default:
       throw new Error(`${localePack(plugin.settings.locale).messages.unknownCommand}: ${command}`);
   }

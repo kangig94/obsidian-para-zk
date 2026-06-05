@@ -34,6 +34,7 @@ import type {
   OpenJournalOptions,
   OpenJournalResult,
   PromoteFleetingOptions,
+  PromoteLiteratureOptions,
   PromoteResourceOptions,
   WorkflowContext
 } from "./context";
@@ -93,6 +94,28 @@ export async function promoteResource(ctx: WorkflowContext, options: PromoteReso
     ...noteResult(file, true, options.open),
     sourcePath: source.path,
     kind
+  };
+}
+
+export async function promoteLiterature(ctx: WorkflowContext, options: PromoteLiteratureOptions = {}): Promise<PromotionResult> {
+  const source = resolveRequiredFile(ctx, options.sourcePath, "source literature note");
+  const sourceType = await readFileTypeFresh(ctx, source);
+  if (sourceType !== "zk_literature") throw new Error("file is not a literature ZK note: " + source.path);
+  const maturityCode = readOptionalCode(options.maturity, parseMaturityCode, "maturity", MATURITY_CODE_HELP);
+  const title = requireTitle(options.title || source.basename, "ZK title");
+  const folder = folderForZkKind(ctx.settings, "Permanent");
+  await ensureFolder(ctx.host, folder);
+  const path = await uniqueMarkdownPath(ctx.host, joinVaultPath(folder, `${title}.md`));
+  const file = await createZkFile(ctx, "Permanent", path, title, { maturityCode });
+
+  await insertReferenceItem(ctx, file, { link: wikiLink(source.path) });
+  await appendPromotionLinkToBody(ctx.host, source, `- ${localePack(ctx.settings.locale).labels.createPermanent}: ${linkToFile(file)}`, file.path);
+  await openIfRequested(ctx, file, options.open);
+
+  return {
+    ...noteResult(file, true, options.open),
+    sourcePath: source.path,
+    kind: "Permanent" as const
   };
 }
 

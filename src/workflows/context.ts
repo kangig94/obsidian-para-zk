@@ -98,6 +98,13 @@ export type PromoteResourceOptions = {
   open?: boolean;
 };
 
+export type PromoteLiteratureOptions = {
+  sourcePath?: string;
+  title?: string;
+  maturity?: string;
+  open?: boolean;
+};
+
 export type PromoteFleetingOptions = {
   sourcePath?: string;
   title?: string;

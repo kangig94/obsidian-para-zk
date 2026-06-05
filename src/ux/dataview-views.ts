@@ -191,6 +191,8 @@ function dataviewViewToolbar(plugin: ParaZkPluginContext, key: DataviewViewKey):
       return actionToolbar("promote-resource", labels.promoteToZk, "arrow-up-right");
     case "fleeting-promotion":
       return actionToolbar("promote-fleeting", labels.promote, "arrow-up-right");
+    case "literature-promotion":
+      return actionToolbar("promote-literature", labels.createPermanent, "arrow-up-right");
     case "area-projects":
       return undefined;
   }

@@ -81,7 +81,8 @@ export function workflowCommandEntries(labels: Labels): Array<readonly [string, 
     ["open-journal", labels.openJournalCommandName],
     ["capture-journal", labels.captureJournalCommandName],
     ["promote-resource", labels.promoteResourceCommandName],
-    ["promote-fleeting", labels.promoteFleetingCommandName]
+    ["promote-fleeting", labels.promoteFleetingCommandName],
+    ["promote-literature", labels.promoteLiteratureCommandName]
   ];
 }
 

@@ -136,6 +136,7 @@ type WorkflowFunctionName =
   | "deleteRetro"
   | "deleteZk"
   | "promoteFleeting"
+  | "promoteLiterature"
   | "promoteResource"
   | "readArea"
   | "readJournal"
@@ -841,7 +842,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
   },
   {
     command: "para-zk:promote-resource",
-    description: "Promote a resource note to a ZK note",
+    description: "Create a ZK note from a resource (source preserved)",
     options: {
       path: { value: "<path>", description: "Source resource path." },
       title: { value: "<title>", description: "New ZK note title." },
@@ -875,6 +876,24 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       sourcePath: readCliPath(args),
       title: readCliTitle(args),
       kind: readCliKind(args),
+      maturity: readCliString(args, "maturity"),
+      open: readCliBoolean(args, "open") ?? false
+    }))
+  },
+  {
+    command: "para-zk:promote-literature",
+    description: "Create a Permanent note from a literature note (source preserved)",
+    options: {
+      path: { value: "<path>", description: "Source literature note path." },
+      title: { value: "<title>", description: "New permanent note title." },
+      maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
+      open: { value: "<true|false>", description: "Open the created note in Obsidian." },
+      format: { value: "<text|json>", description: "Output format (default: text)." }
+    },
+    text: "permanent created",
+    run: workflowRun("promoteLiterature", (args) => ({
+      sourcePath: readCliPath(args),
+      title: readCliTitle(args),
       maturity: readCliString(args, "maturity"),
       open: readCliBoolean(args, "open") ?? false
     }))
