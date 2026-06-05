@@ -17,7 +17,8 @@ describe("MCP server pure helpers", () => {
       surfaceTypes: ["project", "area"],
       schema: "optsidian raw para-zk:describe type=<surfaceType> format=json",
       commands: "optsidian --help",
-      howto: expect.stringContaining("Locale-neutral")
+      howto: expect.stringContaining("Locale-neutral"),
+      install: expect.stringContaining("plugin:install")
     });
   });
 
@@ -28,6 +29,7 @@ describe("MCP server pure helpers", () => {
       invoke: "obsidian para-zk:<command> [args...] format=json",
       commands: "obsidian --help",
       howto: expect.stringContaining("Open the vault in Obsidian"),
+      install: expect.stringContaining("manifest.json"),
       reason: "spawn obsidian ENOENT"
     });
   });
@@ -39,6 +41,11 @@ describe("MCP server pure helpers", () => {
   it("guides optsidian users to launch via open-gui in the fallback howto", () => {
     expect(buildFallback({ cli: "optsidian" }).howto).toContain("optsidian open-gui");
     expect(buildFallback({ cli: "obsidian" }).howto).not.toContain("open-gui");
+  });
+
+  it("offers CLI-matched vault install guidance (both running states)", () => {
+    expect(buildFallback({ cli: "optsidian" }).install).toContain("plugin:install url=");
+    expect(buildFallback({ cli: "obsidian" }).install).toContain("manifest.json");
   });
 
   it("explains optsidian only when it is the chosen CLI", () => {

@@ -62,7 +62,11 @@ Build the bundle with `npm run build` before registering it.
 
 ### `describe`
 
-Returns a compact live index with the preferred CLI invocation, supported surface types, schema drill-down command, help command, and usage notes. Use `schema` from the result to fetch per-type read/write keys.
+Returns a compact index with the preferred CLI invocation, help command, usage notes, and an `install` string describing how to install PARA-ZK into a vault. When a running PARA-ZK vault is reachable (`running: true`), it also returns the supported surface types and the `schema` drill-down command; use `schema` to fetch per-type read/write keys.
+
+When no running vault is reachable (`running: false`), it returns a `reason` and a `howto` for recovery — with `optsidian`, the `howto` points at `optsidian open-gui` to launch the last-opened vault, then retry.
+
+The `install` field is present in both states (the active vault running PARA-ZK does not mean a target vault has it) and adapts to the CLI: with `optsidian` it suggests `optsidian plugin:install url=<repo> enable`; without it, copying the built `manifest.json`/`main.js`/`styles.css` into `<vault>/.obsidian/plugins/para-zk/` per the README.
 
 ### `replace`
 

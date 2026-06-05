@@ -22,6 +22,9 @@ const HOWTO_BASE = "Locale-neutral codes. Collections (tasks/references/backlink
 const OPTSIDIAN_NOTE = " `optsidian` is an Obsidian-based optimized CLI; run the `invoke`/`schema`/`commands` strings exactly as given and do not substitute `obsidian`.";
 const FALLBACK_HOWTO_OBSIDIAN = "PARA-ZK CLI detected but no running Obsidian vault was reachable (or no obsidian CLI on PATH). Open the vault in Obsidian and ensure the CLI is on PATH, then call this tool again for the live schema.";
 const FALLBACK_HOWTO_OPTSIDIAN = "PARA-ZK CLI detected but no running Obsidian vault was reachable. Launch Obsidian with `optsidian open-gui` (it opens your last-opened vault and waits until the vault is ready), then call this tool again for the live schema. If optsidian is not found, ensure it is on PATH.";
+const REPO_URL = "https://github.com/kangig94/obsidian-para-zk";
+const INSTALL_OPTSIDIAN = `If PARA-ZK is not installed in the vault, install it with optsidian: \`optsidian plugin:install url=${REPO_URL} enable\` (clones the repo's prebuilt plugin into <vault>/.obsidian/plugins/para-zk and enables it; add vault-path=<path> to target a non-active vault).`;
+const INSTALL_OBSIDIAN = `If PARA-ZK is not installed in the vault, install it (no optsidian): copy manifest.json, main.js, and styles.css from ${REPO_URL} into <vault>/.obsidian/plugins/para-zk/ and enable PARA-ZK under Settings > Community plugins (see the repo README).`;
 const DESCRIBE_INPUT_SCHEMA = {
   type: "object",
   properties: {},
@@ -157,6 +160,10 @@ function fallbackHowto(cli: ParaZkCli): string {
   return cli === "optsidian" ? FALLBACK_HOWTO_OPTSIDIAN : FALLBACK_HOWTO_OBSIDIAN;
 }
 
+function installHowto(cli: ParaZkCli): string {
+  return cli === "optsidian" ? INSTALL_OPTSIDIAN : INSTALL_OBSIDIAN;
+}
+
 export function buildUpdateArgs({ cli, tool, params }: { cli: ParaZkCli; tool: UpdateTool; params: unknown }): string[] {
   const record = readParams(params);
   const type = readUpdateType(record);
@@ -214,7 +221,8 @@ export function buildEnvelope({ cli, describe }: { cli: ParaZkCli; describe: Des
     surfaceTypes: surfaceTypes(describe),
     schema: schemaCommand(cli),
     commands: helpCommand(cli),
-    howto: howtoFor(cli)
+    howto: howtoFor(cli),
+    install: installHowto(cli)
   };
 }
 
@@ -225,6 +233,7 @@ export function buildFallback({ cli, reason }: { cli: ParaZkCli; reason?: string
     invoke: invokePattern(cli),
     commands: helpCommand(cli),
     howto: fallbackHowto(cli),
+    install: installHowto(cli),
     ...(reason ? { reason } : {})
   };
 }
