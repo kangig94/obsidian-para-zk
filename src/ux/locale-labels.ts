@@ -82,7 +82,7 @@ export function workflowCommandEntries(labels: Labels): Array<readonly [string, 
     ["capture-journal", labels.captureJournalCommandName],
     ["create-from-resource", labels.createZkButton],
     ["distill-spark", labels.distillButton],
-    ["create-from-source", labels.createPermanentButton]
+    ["create-from-digest", labels.createPermanentButton]
   ];
 }
 

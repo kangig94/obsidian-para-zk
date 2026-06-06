@@ -123,7 +123,7 @@ async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: 
     case "create-zk": {
       const kind = await chooseValue(plugin.app, labels.promptCreateKind, [
         { label: "Spark", value: "spark" },
-        { label: "Source", value: "source" },
+        { label: "Digest", value: "digest" },
         { label: "Permanent", value: "permanent" }
       ]);
       if (!kind) return undefined;
@@ -138,7 +138,7 @@ async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: 
     }
     case "create-from-resource": {
       const kind = await chooseValue(plugin.app, labels.promptCreateKind, [
-        { label: "Source", value: "source" },
+        { label: "Digest", value: "digest" },
         { label: "Permanent", value: "permanent" }
       ]);
       if (!kind) return undefined;
@@ -168,9 +168,9 @@ async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: 
       );
       return confirmed ? workflows.deleteZk(ctx, { path: activePath }) : undefined;
     }
-    case "create-from-source": {
+    case "create-from-digest": {
       const title = await prompt(plugin, labels.createPermanentButton, labels.promptZkTitle, sourceFile?.basename ?? "");
-      return title ? workflows.createFromSource(ctx, { sourcePath: activePath, title, open: true }) : undefined;
+      return title ? workflows.createFromDigest(ctx, { sourcePath: activePath, title, open: true }) : undefined;
     }
     default:
       throw new Error(`${localePack(plugin.settings.locale).messages.unknownCommand}: ${command}`);

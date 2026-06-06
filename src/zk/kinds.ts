@@ -1,18 +1,30 @@
 import type { ResourceCreateKind, ZkKind } from "../types";
 
-const ZK_KIND_CODES = ["spark", "source", "permanent"] as const;
-const RESOURCE_CREATE_KIND_CODES = ["source", "permanent"] as const;
+const ZK_KIND_CODES = ["spark", "digest", "permanent"] as const;
+const RESOURCE_CREATE_KIND_CODES = ["digest", "permanent"] as const;
 
-type ZkKindCode = typeof ZK_KIND_CODES[number];
+export type ZkKindCode = typeof ZK_KIND_CODES[number];
 
 export const ZK_KIND_CODE_HELP = codeHelp(ZK_KIND_CODES);
 export const RESOURCE_CREATE_KIND_CODE_HELP = codeHelp(RESOURCE_CREATE_KIND_CODES);
 
 const ZK_KIND_BY_CODE: Record<ZkKindCode, ZkKind> = {
   spark: "Spark",
-  source: "Source",
+  digest: "Digest",
   permanent: "Permanent"
 };
+
+const ZK_CODE_BY_KIND: Record<ZkKind, ZkKindCode> = {
+  Spark: "spark",
+  Digest: "digest",
+  Permanent: "permanent"
+};
+
+// Locale-neutral code for a ZkKind — the form result envelopes expose, matching the
+// `kind=` input codes (so CLI/MCP output and input speak the same vocabulary).
+export function zkKindCode(kind: ZkKind): ZkKindCode {
+  return ZK_CODE_BY_KIND[kind];
+}
 
 export function parseZkKind(value: string | undefined): ZkKind | undefined {
   const code = parseCode(value, ZK_KIND_CODES);
@@ -21,7 +33,7 @@ export function parseZkKind(value: string | undefined): ZkKind | undefined {
 
 export function parseResourceCreateKind(value: string | undefined): ResourceCreateKind | undefined {
   const kind = parseZkKind(value);
-  return kind === "Source" || kind === "Permanent" ? kind : undefined;
+  return kind === "Digest" || kind === "Permanent" ? kind : undefined;
 }
 
 export function normalizeZkKind(value: string | undefined, fallback: ZkKind = "Spark"): ZkKind {

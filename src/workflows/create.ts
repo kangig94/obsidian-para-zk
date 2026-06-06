@@ -23,7 +23,7 @@ import {
   parseSubnoteTypeCode,
   type MaturityCode
 } from "../vocabulary";
-import { ZK_KIND_CODE_HELP, parseZkKind } from "../zk/kinds";
+import { ZK_KIND_CODE_HELP, parseZkKind, zkKindCode } from "../zk/kinds";
 import { escapeRegExp, slugify, uniqueStrings } from "../text";
 import { readOptionalCode } from "./code-options";
 import type {
@@ -368,7 +368,7 @@ export async function createZk(ctx: WorkflowContext, options: CreateZkOptions): 
   await openIfRequested(ctx, file, options.open);
   return {
     ...noteResult(file, true, options.open),
-    kind
+    kind: zkKindCode(kind)
   };
 }
 
@@ -383,8 +383,8 @@ export async function createZkFile(
   let templateName: TemplateName = "zk_permanent";
   if (kind === "Spark") {
     templateName = "zk_spark";
-  } else if (kind === "Source") {
-    templateName = "zk_source";
+  } else if (kind === "Digest") {
+    templateName = "zk_digest";
   }
   const maturity = options.maturityCode ?? "draft";
   const file = await createMarkdownFile(ctx, templateName, path, {

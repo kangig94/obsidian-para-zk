@@ -12,6 +12,14 @@ export function uniqueStrings(values: string[]): string[] {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
+// Wrap a single text value as a frontmatter list: a one-item list when non-empty,
+// an empty list when blank. List-typed scalar fields like Obsidian `aliases` resolve
+// for links/quick-switcher only in list form, so the GUI stores even a single value this way.
+export function singleItemList(value: string): string[] {
+  const trimmed = value.trim();
+  return trimmed ? [trimmed] : [];
+}
+
 // Coerce an unknown frontmatter value into a string list, then append the
 // (already-transformed) additions that are non-empty and not already present.
 export function appendUniqueStrings(current: unknown, additions: string[]): string[] {

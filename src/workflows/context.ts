@@ -1,9 +1,9 @@
 import type {
   NoteResult,
-  ParaZkSettings,
-  ZkKind
+  ParaZkSettings
 } from "../types";
 import type { WorkflowHost } from "../vault/host";
+import type { ZkKindCode } from "../zk/kinds";
 
 export type WorkflowContext = {
   host: WorkflowHost;
@@ -117,7 +117,7 @@ export type CreateFromResourceOptions = {
   open?: boolean;
 };
 
-export type CreateFromSourceOptions = {
+export type CreateFromDigestOptions = {
   sourcePath?: string;
   sourceTitle?: string;
   title?: string;
@@ -400,7 +400,7 @@ export type CreateResourceResult = NoteResult & { sourcePath?: string; linkedFro
 export type CreateSubnoteResult = NoteResult & { parentPath: string };
 export type CreateSubareaResult = NoteResult & { parentPath: string };
 export type CreateRetroResult = NoteResult & { sourcePath?: string; weekIso: string };
-export type CreateZkResult = NoteResult & { kind: ZkKind };
+export type CreateZkResult = NoteResult & { kind: ZkKindCode };
 export type OpenJournalResult = NoteResult & { date: string; energy: string };
 export type AddReferenceResult = {
   path: string;

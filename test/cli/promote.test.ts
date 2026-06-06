@@ -8,7 +8,7 @@ beforeEach(() => {
 });
 
 describe("create-from-resource", () => {
-  it("creates a source ZK note that references the preserved resource", async () => {
+  it("creates a digest ZK note that references the preserved resource", async () => {
     await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
     const resource = await cli.run("para-zk:create-resource", {
       title: "Source",
@@ -21,12 +21,13 @@ describe("create-from-resource", () => {
     const created = await cli.run("para-zk:create-from-resource", {
       source_title: "Source",
       title: "Distilled source",
-      kind: "source",
+      kind: "digest",
       open: "false"
     });
     expect(created.created).toBe(true);
+    expect(created.kind).toBe("digest");
     const content = cli.app.readPath(String(created.path)) ?? "";
-    expect(content).toContain("type: zk_source");
+    expect(content).toContain("type: zk_digest");
     expect(content).toContain(`[[${resource.path}]]`);
 
     // Single-direction reference: the resource is preserved but gets no reverse
@@ -38,18 +39,18 @@ describe("create-from-resource", () => {
   });
 });
 
-describe("create-from-source", () => {
+describe("create-from-digest", () => {
   it("creates a permanent note that references the preserved source", async () => {
-    const source = await cli.run("para-zk:create-zk", { title: "Book note", kind: "source", open: "false" });
+    const source = await cli.run("para-zk:create-zk", { title: "Book note", kind: "digest", open: "false" });
 
-    const created = await cli.run("para-zk:create-from-source", {
+    const created = await cli.run("para-zk:create-from-digest", {
       source_title: "Book note",
       title: "Evergreen book note",
       maturity: "refined",
       open: "false"
     });
     expect(created.created).toBe(true);
-    expect(created.kind).toBe("Permanent");
+    expect(created.kind).toBe("permanent");
 
     const createdContent = cli.app.readPath(String(created.path)) ?? "";
     expect(createdContent).toContain("type: zk_permanent");
@@ -74,7 +75,7 @@ describe("distill-spark", () => {
       open: "false"
     });
     expect(distilled.created).toBe(true);
-    expect(distilled.kind).toBe("Permanent");
+    expect(distilled.kind).toBe("permanent");
 
     const distilledContent = cli.app.readPath(String(distilled.path)) ?? "";
     expect(distilledContent).toContain("type: zk_permanent");

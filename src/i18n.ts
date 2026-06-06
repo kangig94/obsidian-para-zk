@@ -28,6 +28,7 @@ export type LocalePack = {
     evergreen: string;
   };
   subnoteTypes: string[];
+  resourceKinds: string[];
   energy: {
     high: string;
     normal: string;
@@ -76,6 +77,15 @@ const ko: LocalePack = {
     "이슈/위험",
     "아이디어",
     "정산"
+  ],
+  resourceKinds: [
+    "논문",
+    "기사",
+    "도서",
+    "영상",
+    "웹",
+    "코드",
+    "기타"
   ],
   energy: {
     high: "🔋",
@@ -201,7 +211,6 @@ const ko: LocalePack = {
     week: "주차",
     kind: "종류",
     source: "출처",
-    authors: "저자",
     published: "발행일",
     url: "링크",
     firstAuthor: "제1저자",
@@ -272,7 +281,7 @@ const ko: LocalePack = {
     folderRetros: "회고",
     folderArchives: "완료/보존용 산출물",
     folderSpark: "번뜩이는 생각(임시)",
-    folderSource: "출처 소화 노트",
+    folderDigest: "다이제스트 노트",
     folderPermanent: "영구 노트",
     folderJournal: "일지",
     folderDashboard: "대시보드",
@@ -335,6 +344,15 @@ const en: LocalePack = {
     "Issue/Risk",
     "Idea",
     "Accounting"
+  ],
+  resourceKinds: [
+    "Paper",
+    "Article",
+    "Book",
+    "Video",
+    "Web",
+    "Code",
+    "Other"
   ],
   energy: {
     high: "🔋",
@@ -460,7 +478,6 @@ const en: LocalePack = {
     week: "Week",
     kind: "Type",
     source: "Source",
-    authors: "Authors",
     published: "Published",
     url: "URL",
     firstAuthor: "First author",
@@ -531,7 +548,7 @@ const en: LocalePack = {
     folderRetros: "retrospectives",
     folderArchives: "completed or archived material",
     folderSpark: "transient sparks",
-    folderSource: "source digests",
+    folderDigest: "digest notes",
     folderPermanent: "permanent notes",
     folderJournal: "daily notes",
     folderDashboard: "dashboards",

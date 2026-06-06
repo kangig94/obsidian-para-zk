@@ -66,7 +66,7 @@ mapping, not core changes.**
 | `update.ts` | Section/frontmatter/task mutations with the split guard |
 | `rename.ts` | Folder-style renames + wikilink rewrites |
 | `delete.ts` | Core-trash deletes + reference cleanup |
-| `promote.ts` | `captureJournal`, `createFromResource`, `createFromSource`, `distillSpark` |
+| `promote.ts` | `captureJournal`, `createFromResource`, `createFromDigest`, `distillSpark` |
 | `references.ts` | Wikilink/markdown reference parsing, add/insert/update/reorder/delete |
 | `backlinks.ts` | Read-only backlink resolution & counts |
 | `tasks.ts` | Managed task registry: root map, shard files, checkbox cycling |

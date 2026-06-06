@@ -83,13 +83,13 @@ low | medium | high
 ZK kind:
 
 ```text
-spark | source | permanent
+spark | digest | permanent
 ```
 
 Resource-create target kind:
 
 ```text
-source | permanent
+digest | permanent
 ```
 
 Maturity:
@@ -168,7 +168,7 @@ Important fields:
   not redistribution — so a caller should not refuse it on public-distribution grounds.
 - `surfaceTypes` — addressable/createable note types.
 - `workflows` — named (non-surface) commands with their inputs:
-  `capture-journal`, `distill-spark`, `create-from-source`, `create-from-resource`,
+  `capture-journal`, `distill-spark`, `create-from-digest`, `create-from-resource`,
   `add-reference`, `attach-file`. This is how you discover those commands and args
   without a separate help lookup.
 - `collectionFilters`
@@ -487,7 +487,7 @@ Free-form top-level keys:
 ```text
 resource: frontmatter | body | references | backlinks
 zk_spark: frontmatter | body | references | backlinks
-zk_source: frontmatter | body | references | backlinks
+zk_digest: frontmatter | body | references | backlinks
 zk_permanent: frontmatter | body | references | backlinks
 ```
 
@@ -807,7 +807,7 @@ returned `path`/title can be used directly).
 | --- | --- | --- |
 | `type` | `project`, `area`, `resource`, `zk`, `retro`, `journal` | Type of the note that receives the reference. |
 | `title` | string | Receiving note title (project/area/resource/zk/retro). |
-| `kind` | `spark`, `source`, `permanent` | Receiving ZK kind when `type=zk`. |
+| `kind` | `spark`, `digest`, `permanent` | Receiving ZK kind when `type=zk`. |
 | `date` | YYYY-MM-DD | Receiving note date when `type=journal`/`retro`. |
 | `child` | JSON list | Optional. Drill into a nested child of the receiving container. |
 | `target` | `[[wikilink]]`, URL, markdown link, or text | Required. `[[Title]]` is resolved by basename to a vault note. URLs are stored directly. Markdown-link and wikilink aliases are input syntax only and are dropped. |
@@ -1007,7 +1007,7 @@ note surfaces in the origin's *Cited by* view via Obsidian backlinks.
 
 ### `para-zk:create-from-resource`
 
-Creates a Source or Permanent ZK note from a resource and writes a frontmatter
+Creates a Digest or Permanent ZK note from a resource and writes a frontmatter
 reference on the new ZK note back to the resource. The resource is preserved and
 left unchanged.
 
@@ -1017,7 +1017,7 @@ Options:
 | --- | --- | --- |
 | `source_title` | string | Source resource title. |
 | `title` | string | Optional. Defaults to source basename. |
-| `kind` | `source` \| `permanent` | Defaults to `permanent`. |
+| `kind` | `digest` \| `permanent` | Defaults to `permanent`. |
 | `maturity` | maturity code | Used for permanent notes. |
 | `body` | markdown | Optional initial free-form body content. |
 | `open` | boolean | Default `false`. |
@@ -1028,7 +1028,7 @@ Example:
 optsidian para-zk:create-from-resource \
   source_title="Source Paper" \
   title="Paper Insight" \
-  kind=source \
+  kind=digest \
   format=json
 ```
 
@@ -1037,17 +1037,17 @@ Important fields:
 - `sourcePath`
 - `kind`
 
-### `para-zk:create-from-source`
+### `para-zk:create-from-digest`
 
-Creates a Permanent note from a source note and writes a frontmatter reference on
-the new permanent note back to the source. The source is preserved.
+Creates a Permanent note from a digest note and writes a frontmatter reference on
+the new permanent note back to the digest. The digest is preserved.
 
 Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `source_title` | string | Source note title. |
-| `title` | string | Optional. Defaults to source basename. |
+| `source_title` | string | Digest note title. |
+| `title` | string | Optional. Defaults to the digest note's basename. |
 | `maturity` | maturity code | Permanent-note maturity. |
 | `body` | markdown | Optional initial free-form body content. |
 | `open` | boolean | Default `false`. |
@@ -1055,7 +1055,7 @@ Options:
 Example:
 
 ```bash
-optsidian para-zk:create-from-source \
+optsidian para-zk:create-from-digest \
   source_title="Paper Digest" \
   title="Compounding learning" \
   maturity=refined \
@@ -1065,7 +1065,7 @@ optsidian para-zk:create-from-source \
 Important fields:
 
 - `sourcePath`
-- `kind` (always `Permanent`)
+- `kind` (always `permanent`)
 
 ### `para-zk:distill-spark`
 
@@ -1100,7 +1100,7 @@ optsidian para-zk:distill-spark \
 Important fields:
 
 - `sourcePath`
-- `kind` (always `Permanent`)
+- `kind` (always `permanent`)
 
 Side effects:
 

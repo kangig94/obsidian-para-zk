@@ -145,13 +145,13 @@ Required: `type`, `key`, `content`, and a valid selector for the type. `position
 | `retro` | `update-retro` | `title` | optional `date` passes through |
 | `journal` | `update-journal` | `date` | no title selector |
 | `zk_spark` | `update-zk` | `title` | `kind=spark` |
-| `zk_source` | `update-zk` | `title` | `kind=source` |
+| `zk_digest` | `update-zk` | `title` | `kind=digest` |
 | `zk_permanent` | `update-zk` | `title` | `kind=permanent` |
 
 Child subnote/note bodies are edited through their container by passing `child: ["<Child Title>"]` (a JSON list, left to right) plus the child's own `key` (e.g. `body`).
 
 Structured types (`project`, `area`, `journal`, `retro`) use template section
-keys. Free-form types (`resource`, `zk_spark`, `zk_source`,
+keys. Free-form types (`resource`, `zk_spark`, `zk_digest`,
 `zk_permanent`, child `subnote`, and fallback `note`) use `key=body` for prose;
 their Markdown headings are content, not enforced keys. `describe` remains the
 source of truth for each type's read/write keys and collections.

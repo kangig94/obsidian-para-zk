@@ -15,7 +15,7 @@ export const TEMPLATE_NAMES = [
   "retro",
   "subnote",
   "zk_spark",
-  "zk_source",
+  "zk_digest",
   "zk_permanent"
 ] as const;
 
@@ -89,16 +89,16 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
       return [
         frontmatter([
           "type: project",
-          "areas:",
-          "status: {{status}}",
-          "priority: {{priority}}",
-          "start_date:",
-          "due_date:",
-          "done_date:",
           "tags:",
           `  - ${tags.project}/${slugPlaceholder}`,
           `created: ${nowPlaceholder}`,
-          "updated:"
+          "updated:",
+          "areas:",
+          "due_date:",
+          "status: {{status}}",
+          "start_date:",
+          "priority: {{priority}}",
+          "done_date:"
         ]),
         paraZkPropsBlock("project"),
         `# ${t.labels.summary}`,
@@ -155,12 +155,12 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
       return [
         frontmatter([
           "type: journal",
-          "date: {{date}}",
-          "energy: {{energy}}",
           "tags:",
           `  - ${tags.journal}`,
           `created: ${nowPlaceholder}`,
-          "updated:"
+          "updated:",
+          "date: {{date}}",
+          "energy: {{energy}}"
         ]),
         paraZkPropsBlock("journal"),
         `# ${t.labels.focus}`,
@@ -183,16 +183,16 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
       return [
         frontmatter([
           "type: retro",
+          "tags:",
+          `  - ${tags.retro}`,
+          `created: ${nowPlaceholder}`,
+          "updated:",
           "project: {{project_frontmatter}}",
           "date: {{date}}",
           "week_iso: {{week_iso}}",
           "week_start: {{week_start}}",
           "week_end: {{week_end}}",
-          "areas: {{areas_frontmatter}}",
-          "tags:",
-          `  - ${tags.retro}`,
-          `created: ${nowPlaceholder}`,
-          "updated:"
+          "areas: {{areas_frontmatter}}"
         ]),
         paraZkPropsBlock("retro"),
         "---",
@@ -215,10 +215,10 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
       return [
         frontmatter([
           "type: subnote",
-          "subnote_type: {{subnote_type}}",
-          "parent:",
           `created: ${nowPlaceholder}`,
-          "updated:"
+          "updated:",
+          "subnote_type: {{subnote_type}}",
+          "parent:"
         ]),
         paraZkPropsBlock("subnote"),
         "",
@@ -241,20 +241,20 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         paraZkManagedBlock(),
         ""
       ].join("\n");
-    case "zk_source":
+    case "zk_digest":
       return [
         frontmatter([
-          "type: zk_source",
+          "type: zk_digest",
           "tags:",
           `  - ${tags.knowledge}/${slugPlaceholder}`,
-          "sourceTitle:",
-          "authors:",
-          "published:",
-          "url:",
           `created: ${nowPlaceholder}`,
-          "updated:"
+          "updated:",
+          "sourceTitle:",
+          "url:",
+          "first_author:",
+          "published:"
         ]),
-        paraZkPropsBlock("zk_source"),
+        paraZkPropsBlock("zk_digest"),
         "{{cursor}}",
         "",
         paraZkManagedBlock(),
@@ -266,10 +266,10 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "type: zk_permanent",
           "tags:",
           `  - ${tags.knowledge}/${slugPlaceholder}`,
-          "maturity: {{maturity}}",
-          "aliases:",
           `created: ${nowPlaceholder}`,
-          "updated:"
+          "updated:",
+          "maturity: {{maturity}}",
+          "aliases:"
         ]),
         paraZkPropsBlock("zk_permanent"),
         "{{cursor}}",
@@ -368,9 +368,9 @@ export function managedUiBlockForType(type: string, settings: ParaZkSettings): s
         paraZkViewBlock("spark-distill", t.labels.createdFromThis),
         paraZkReferencesBlock("current", t.labels.references)
       ]);
-    case "zk_source":
+    case "zk_digest":
       return joinManagedUiBlocks([
-        paraZkViewBlock("source-cited-by", t.labels.createdFromThis),
+        paraZkViewBlock("digest-cited-by", t.labels.createdFromThis),
         paraZkReferencesBlock("current", t.labels.references)
       ]);
     case "zk_permanent":
@@ -475,7 +475,7 @@ export const DATAVIEW_VIEW_KEYS = [
   "resource-cited-by",
   "permanent-cited-by",
   "spark-distill",
-  "source-cited-by"
+  "digest-cited-by"
 ] as const;
 
 export type DataviewViewKey = typeof DATAVIEW_VIEW_KEYS[number];
@@ -496,7 +496,7 @@ export function dataviewViewBlock(key: string, settings: ParaZkSettings, sourceP
     case "area-retros": return dataviewAreaRetros(t, settings, sourcePath).join("\n");
     case "resource-cited-by":
     case "permanent-cited-by":
-    case "source-cited-by":
+    case "digest-cited-by":
       return dataviewCitedBy(t, settings, sourcePath).join("\n");
     case "spark-distill": return dataviewDistilledInto(t).join("\n");
     default: return undefined;
@@ -522,7 +522,7 @@ function renderGuide(settings: ParaZkSettings): string {
     `- ${settings.paths.retrosFolder}: ${t.labels.folderRetros}`,
     `- ${settings.paths.archivesFolder}: ${t.labels.folderArchives}`,
     `- ${settings.paths.sparkFolder}: ${t.labels.folderSpark}`,
-    `- ${settings.paths.sourceFolder}: ${t.labels.folderSource}`,
+    `- ${settings.paths.digestFolder}: ${t.labels.folderDigest}`,
     `- ${settings.paths.permanentFolder}: ${t.labels.folderPermanent}`,
     `- ${settings.paths.journalFolder}: ${t.labels.folderJournal}`,
     `- ${settings.paths.dashboardFolder}: ${t.labels.folderDashboard}`,
@@ -689,7 +689,7 @@ function renderDashboardBody(
         "",
         "---",
         `## ${t.labels.recentlyCreated}`,
-        ...dashboardRecentSource(t, settings)
+        ...dashboardRecentDigest(t, settings)
       ];
     case "tasks":
       return [
@@ -784,7 +784,7 @@ function zkSourceFolders(settings: ParaZkSettings): string[] {
   return minimalFolders([
     settings.paths.zkFolder,
     settings.paths.sparkFolder,
-    settings.paths.sourceFolder,
+    settings.paths.digestFolder,
     settings.paths.permanentFolder
   ]);
 }
@@ -965,10 +965,10 @@ function dashboardDraftPermanent(t: ReturnType<typeof localePack>, settings: Par
   ]);
 }
 
-function dashboardRecentSource(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
+function dashboardRecentDigest(t: ReturnType<typeof localePack>, settings: ParaZkSettings): string[] {
   return fenced("dataview", [
-    `TABLE WITHOUT ID file.link AS "Source", file.ctime AS "${t.labels.created}", file.mtime AS "${t.labels.updated}"`,
-    `FROM ${dataviewSource(settings.paths.sourceFolder)}`,
+    `TABLE WITHOUT ID file.link AS "Digest", file.ctime AS "${t.labels.created}", file.mtime AS "${t.labels.updated}"`,
+    `FROM ${dataviewSource(settings.paths.digestFolder)}`,
     "SORT file.ctime DESC",
     "LIMIT 10"
   ]);

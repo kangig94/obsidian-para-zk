@@ -37,6 +37,23 @@ describe("zk notes", () => {
     expect(update.changed).toBe(true);
   });
 
+  it("round-trips zk_digest frontmatter keys (first_author, url) through update and read", async () => {
+    const digest = await cli.run("para-zk:create-zk", { title: "DDIM digest", kind: "digest", open: "false" });
+    expect(digest.created).toBe(true);
+
+    await cli.run("para-zk:update-zk", {
+      title: "DDIM digest", kind: "digest", key: "frontmatter/first_author", op: "set", value: "Song"
+    });
+    await cli.run("para-zk:update-zk", {
+      title: "DDIM digest", kind: "digest", key: "frontmatter/url", op: "set", value: "https://example.com/ddim"
+    });
+
+    const author = await cli.run("para-zk:read-zk", { title: "DDIM digest", kind: "digest", key: "frontmatter/first_author" });
+    expect(author.value).toBe("Song");
+    const url = await cli.run("para-zk:read-zk", { title: "DDIM digest", kind: "digest", key: "frontmatter/url" });
+    expect(url.value).toBe("https://example.com/ddim");
+  });
+
   it("renames and deletes a permanent note", async () => {
     await cli.run("para-zk:create-zk", { title: "Old idea", kind: "permanent", maturity: "draft", open: "false" });
     const renamed = await cli.run("para-zk:rename-zk", { title: "Old idea", kind: "permanent", new_title: "New idea" });
@@ -459,7 +476,7 @@ describe("resource body updates", () => {
   it("keeps body reads and writes working after ZK template headings are removed", async () => {
     const created = await cli.run("para-zk:create-zk", {
       title: "Template Destroyed",
-      kind: "source",
+      kind: "digest",
       open: "false"
     });
     const path = String(created.path);
@@ -474,14 +491,14 @@ describe("resource body updates", () => {
     ].join("\n");
     await cli.app.vault.modify(file!, [
       "---",
-      "type: zk_source",
+      "type: zk_digest",
       "sourceTitle:",
-      "authors:",
-      "published:",
       "url:",
+      "first_author:",
+      "published:",
       "---",
       "```para-zk-props",
-      "type: zk_source",
+      "type: zk_digest",
       "```",
       body,
       "",
@@ -492,14 +509,14 @@ describe("resource body updates", () => {
 
     const read = await cli.run("para-zk:read-zk", {
       title: "Template Destroyed",
-      kind: "source",
+      kind: "digest",
       key: "body"
     });
     expect(read.value).toBe(body);
 
     const append = await cli.run("para-zk:update-zk", {
       title: "Template Destroyed",
-      kind: "source",
+      kind: "digest",
       key: "body",
       op: "append",
       value: "# Replacement\nWorks"
@@ -508,7 +525,7 @@ describe("resource body updates", () => {
 
     const roundTrip = await cli.run("para-zk:read-zk", {
       title: "Template Destroyed",
-      kind: "source",
+      kind: "digest",
       key: "body"
     });
     expect(roundTrip.value).toBe(`${body}\n# Replacement\nWorks`);

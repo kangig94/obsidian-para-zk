@@ -10,7 +10,7 @@ import {
 describe("parseZkKind", () => {
   it("maps lower-case codes to display kinds", () => {
     expect(parseZkKind("spark")).toBe("Spark");
-    expect(parseZkKind("source")).toBe("Source");
+    expect(parseZkKind("digest")).toBe("Digest");
     expect(parseZkKind("permanent")).toBe("Permanent");
   });
 
@@ -22,8 +22,8 @@ describe("parseZkKind", () => {
 });
 
 describe("parseResourceCreateKind", () => {
-  it("accepts only source and permanent", () => {
-    expect(parseResourceCreateKind("source")).toBe("Source");
+  it("accepts only digest and permanent", () => {
+    expect(parseResourceCreateKind("digest")).toBe("Digest");
     expect(parseResourceCreateKind("permanent")).toBe("Permanent");
     expect(parseResourceCreateKind("spark")).toBeUndefined();
   });
@@ -32,13 +32,13 @@ describe("parseResourceCreateKind", () => {
 describe("normalize helpers", () => {
   it("apply documented fallbacks", () => {
     expect(normalizeZkKind(undefined)).toBe("Spark");
-    expect(normalizeZkKind("source")).toBe("Source");
+    expect(normalizeZkKind("digest")).toBe("Digest");
   });
 });
 
 describe("code help strings", () => {
   it("list the accepted codes", () => {
-    expect(ZK_KIND_CODE_HELP).toBe("spark|source|permanent");
-    expect(RESOURCE_CREATE_KIND_CODE_HELP).toBe("source|permanent");
+    expect(ZK_KIND_CODE_HELP).toBe("spark|digest|permanent");
+    expect(RESOURCE_CREATE_KIND_CODE_HELP).toBe("digest|permanent");
   });
 });

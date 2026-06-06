@@ -132,10 +132,10 @@ can discover them.
 ZK creation uses single-direction links (the new note references its origin; the
 origin surfaces it via backlinks / its *Cited by* view — no reverse link is stored):
 
-- **Create from resource** (`create-from-resource`) makes a Source or Permanent note
+- **Create from resource** (`create-from-resource`) makes a Digest or Permanent note
   that references the resource; the resource is preserved and left unchanged.
-- **Create permanent from source** (`create-from-source`) makes a Permanent note that
-  references the source; the source is preserved.
+- **Create permanent from digest** (`create-from-digest`) makes a Permanent note that
+  references the digest; the digest is preserved.
 - **Distill spark** (`distill-spark`) moves a spark's idea into a new Permanent note,
   marks the spark `processed: true`, and leaves it for manual discard (a spark may yield
   several permanents). The permanent does not link back to the ephemeral spark.

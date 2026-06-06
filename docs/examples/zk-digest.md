@@ -1,5 +1,5 @@
 ---
-type: zk_source
+type: zk_digest
 ---
 
 Starting from [[Compounding learning — forgetting as depreciation (spark)]].

@@ -1,3 +1,5 @@
+import type { ZkKindCode } from "./zk/kinds";
+
 export type CliArgs = Record<string, unknown>;
 
 export type CliOptionSpec = {
@@ -5,9 +7,9 @@ export type CliOptionSpec = {
   description: string;
 };
 
-export type ZkKind = "Spark" | "Source" | "Permanent";
+export type ZkKind = "Spark" | "Digest" | "Permanent";
 
-export type ResourceCreateKind = "Source" | "Permanent";
+export type ResourceCreateKind = "Digest" | "Permanent";
 
 export type Locale = "en" | "ko";
 
@@ -19,7 +21,7 @@ type ParaZkPaths = {
   archivesFolder: string;
   zkFolder: string;
   sparkFolder: string;
-  sourceFolder: string;
+  digestFolder: string;
   permanentFolder: string;
   journalFolder: string;
   dashboardFolder: string;
@@ -90,7 +92,7 @@ export type NoteResult = {
 
 export type PromotionResult = NoteResult & {
   sourcePath: string;
-  kind: ZkKind;
+  kind: ZkKindCode;
 };
 
 export type CaptureResult = {
@@ -108,7 +110,7 @@ const DEFAULT_PATHS: ParaZkPaths = {
   archivesFolder: "PARA/Archives",
   zkFolder: "ZK",
   sparkFolder: "ZK/Spark",
-  sourceFolder: "ZK/Source",
+  digestFolder: "ZK/Digest",
   permanentFolder: "ZK/Permanent",
   journalFolder: "Journal",
   dashboardFolder: "Dashboard",
@@ -126,7 +128,7 @@ const DEFAULT_LAYOUT_FOLDERS = [
   "PARA/Archives",
   "ZK",
   "ZK/Spark",
-  "ZK/Source",
+  "ZK/Digest",
   "ZK/Permanent",
   "Journal",
   "Dashboard",

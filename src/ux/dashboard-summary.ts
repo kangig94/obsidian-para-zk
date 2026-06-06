@@ -62,7 +62,7 @@ function summaryCards(plugin: ParaZkPluginContext, type: DashboardSummaryType): 
         card("🧱", t.labels.area, groups.areas.length),
         card("📚", t.labels.references, groups.resources.length),
         card("🌟", "Spark", groups.spark.length),
-        card("📚", "Source", groups.source.length),
+        card("📚", "Digest", groups.digest.length),
         card("🧠", "Permanent", groups.permanent.length)
       ];
     case "projects": {
@@ -115,7 +115,7 @@ function summaryCards(plugin: ParaZkPluginContext, type: DashboardSummaryType): 
       const stale = groups.spark.filter((record) => record.file.stat.ctime <= Date.now() - days(7));
       return [
         card("🌟", "Spark", groups.spark.length, `${t.labels.staleSpark} ${stale.length}`),
-        card("📚", "Source", groups.source.length),
+        card("📚", "Digest", groups.digest.length),
         card("🧠", "Permanent", groups.permanent.length),
         card("📝", t.maturity.draft, groups.permanent.filter((record) => record.frontmatter.maturity === "draft").length),
         card("✨", t.maturity.refined, groups.permanent.filter((record) => record.frontmatter.maturity === "refined").length),
@@ -128,7 +128,7 @@ function summaryCards(plugin: ParaZkPluginContext, type: DashboardSummaryType): 
         card("📄", t.labels.createdThisWeek, groups.resources.filter((record) => record.file.stat.ctime >= weekStart).length),
         card("✏️", t.labels.updatedThisWeek, groups.resources.filter((record) => record.file.stat.mtime >= weekStart).length),
         card("🌟", "Spark", groups.spark.filter((record) => record.file.stat.ctime >= weekStart).length),
-        card("📚", "Source", groups.source.filter((record) => record.file.stat.ctime >= weekStart).length),
+        card("📚", "Digest", groups.digest.filter((record) => record.file.stat.ctime >= weekStart).length),
         card("🧠", "Permanent", groups.permanent.filter((record) => record.file.stat.ctime >= weekStart).length)
       ];
     }
@@ -140,7 +140,7 @@ function dashboardRecordGroups(records: FileRecord[], settings: ParaZkSettings):
   areas: FileRecord[];
   resources: FileRecord[];
   spark: FileRecord[];
-  source: FileRecord[];
+  digest: FileRecord[];
   permanent: FileRecord[];
 } {
   return {
@@ -148,7 +148,7 @@ function dashboardRecordGroups(records: FileRecord[], settings: ParaZkSettings):
     areas: records.filter((record) => record.frontmatter.type === "area" && isInFolder(record.file, settings.paths.areasFolder)),
     resources: records.filter((record) => record.frontmatter.type === "resource" && isInFolder(record.file, settings.paths.resourcesFolder)),
     spark: records.filter((record) => isInFolder(record.file, settings.paths.sparkFolder) && record.frontmatter.processed !== true),
-    source: records.filter((record) => isInFolder(record.file, settings.paths.sourceFolder)),
+    digest: records.filter((record) => isInFolder(record.file, settings.paths.digestFolder)),
     permanent: records.filter((record) => isInFolder(record.file, settings.paths.permanentFolder))
   };
 }

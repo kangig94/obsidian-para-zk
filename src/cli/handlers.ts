@@ -40,7 +40,7 @@ type NativeCliCommand = {
   run: (plugin: ParaZkPluginContext, args: CliArgs) => Promise<Record<string, unknown>>;
 };
 
-const ZK_KEY_TYPES = ["zk_spark", "zk_source", "zk_permanent"];
+const ZK_KEY_TYPES = ["zk_spark", "zk_digest", "zk_permanent"];
 
 function readKeyOption(type: string): CliOptionSpec {
   return { value: "<map-path>", description: `Optional stable read key. Valid: ${surfaceReadKeys(type).join(", ")}.` };
@@ -132,7 +132,7 @@ type WorkflowFunctionName =
   | "deleteRetro"
   | "deleteZk"
   | "distillSpark"
-  | "createFromSource"
+  | "createFromDigest"
   | "createFromResource"
   | "listNotes"
   | "readArea"
@@ -895,11 +895,11 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
   },
   {
     command: "para-zk:create-from-resource",
-    description: "Create a Source or Permanent ZK note from a resource (resource preserved)",
+    description: "Create a Digest or Permanent ZK note from a resource (resource preserved)",
     options: {
       source_title: { value: "<title>", description: "Source resource title." },
       title: { value: "<title>", description: "New ZK note title." },
-      kind: { value: `<${RESOURCE_CREATE_KIND_CODE_HELP}>`, description: "Locale-neutral target ZK kind (source|permanent)." },
+      kind: { value: `<${RESOURCE_CREATE_KIND_CODE_HELP}>`, description: "Locale-neutral target ZK kind (digest|permanent)." },
       maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
       body: { value: "<markdown>", description: "Optional initial free-form body content." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
@@ -938,10 +938,10 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     }))
   },
   {
-    command: "para-zk:create-from-source",
-    description: "Create a Permanent note from a source note (source preserved)",
+    command: "para-zk:create-from-digest",
+    description: "Create a Permanent note from a digest note (digest preserved)",
     options: {
-      source_title: { value: "<title>", description: "Source note title." },
+      source_title: { value: "<title>", description: "Digest note title." },
       title: { value: "<title>", description: "New permanent note title." },
       maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
       body: { value: "<markdown>", description: "Optional initial free-form body content." },
@@ -949,7 +949,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "permanent created",
-    run: workflowRun("createFromSource", (args) => ({
+    run: workflowRun("createFromDigest", (args) => ({
       sourceTitle: readCliString(args, "source_title"),
       title: readCliTitle(args),
       maturity: readCliString(args, "maturity"),
@@ -973,7 +973,7 @@ const NAMED_WORKFLOW_COMMANDS = [
   "para-zk:list",
   "para-zk:capture-journal",
   "para-zk:distill-spark",
-  "para-zk:create-from-source",
+  "para-zk:create-from-digest",
   "para-zk:create-from-resource",
   "para-zk:add-reference",
   "para-zk:attach-file"

@@ -7,11 +7,14 @@ Notable changes for PARA-ZK are tracked here.
 ### Added
 
 - Recorded source provenance in the `resource` frontmatter: `url`, `first_author`,
-  `license`, and `kind` (the source's type, e.g. paper/article). They render as editable
-  fields in the resource props block (order: created, updated, url, first_author, license,
-  kind) and are seeded empty in the generated resource template — so an imported resource
-  carries where it came from as structured, queryable frontmatter rather than a free-text
-  section. (`first_author` Korean label: 제1저자; `kind` reuses the existing 종류/Type label.)
+  `license`, and `kind` (the source's type). They render as editable fields in the resource
+  props block (order: created, updated, url, first_author, license, kind) and are seeded
+  empty in the generated resource template — so an imported resource carries where it came
+  from as structured, queryable frontmatter rather than a free-text section. `kind` is a
+  fixed dropdown over a small locale-neutral vocabulary (`paper`, `article`, `book`, `video`,
+  `web`, `code`, with `other` as the catch-all) so the field stays consistent and filterable;
+  extend the list when a kind recurs. (`first_author` Korean label: 제1저자; `kind` reuses the
+  existing 종류/Type label.)
 - Bundled an `import-resource` skill in the Claude Code and Codex plugins
   (`clients/skills/import-resource/`; Claude auto-discovers it, Codex declares it via the
   `skills` field in `.codex-plugin/plugin.json`). It encodes a general procedure for turning a request
@@ -137,6 +140,32 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Changed
 
+- Workflow result envelopes now report `kind` as a locale-neutral code (`spark`/`digest`/
+  `permanent`) instead of the internal display form (`Spark`/`Digest`/`Permanent`), so the
+  CLI/MCP output speaks the same vocabulary as the `kind=` input. Affects `create-zk`,
+  `create-from-resource`, `create-from-digest`, and `distill-spark`.
+- The permanent note's `aliases` props field (Obsidian-native) now stores its value as a
+  single-item YAML list instead of a bare string, the form Obsidian resolves for
+  `[[ ]]`/quick-switcher/mentions. The control stays a single text input (one alias by
+  intent); clearing it writes an empty list. Implemented as a new `text-list` props control.
+- Normalized frontmatter key order across every managed template to a fixed prefix
+  `type → tags → created → updated → <domain fields>`, with the template's domain keys
+  following the props block's reading order (top-to-bottom, left-to-right). Previously
+  some templates led with domain fields and trailed `created`/`updated` (`zk_digest`,
+  `zk_permanent`, `subnote`, `project`, `journal`, `retro`) while others already led with
+  the audit block (`area`, `resource`, `zk_spark`) — now all agree. `resource`/`zk_digest`
+  share one canonical provenance order (`sourceTitle → url → first_author → published →
+  license → kind`, each type rendering its subset). `project`'s two-column props layout
+  (left = a choose-one field, right = a date) is preserved, and `created`/`updated` stay
+  hidden in the `project`/`journal`/`retro` props (those notes surface more relevant time
+  fields). Frontmatter key order is cosmetic (YAML is unordered) — no behavior change.
+- Renamed the ZK literature kind from `source` to **`digest`** everywhere: the stored
+  type `zk_digest`, the kind code (`kind=digest`), the folder (`ZK/Digest`), the
+  `create-from-digest` command, the GUI/props/dashboard labels, and the managed
+  "Created from this" view key (`digest-cited-by`). Unified its frontmatter on a single
+  `first_author` (replacing `authors`, matching `resource`); `sourceTitle`/`published`/`url`
+  are unchanged. No migration is performed — the plugin is pre-release, so existing vaults
+  should re-run `para-zk:setup`.
 - Dropped the redundant `raw` prefix from `para-zk:*` CLI invocations. optsidian
   delegates `para-zk:*` to Obsidian regardless, so `optsidian para-zk:<command>` is the
   canonical form; `raw` only matters for forcing Obsidian's version of a command declared
@@ -171,15 +200,15 @@ Notable changes for PARA-ZK are tracked here.
   (CRUD, template shapes, references incl. subpath dedupe, promotion, attach,
   reference cleanup on delete) is now covered only by the Vitest unit suite.
 - Reworked the ZK model around its original Zettelkasten intent. Renamed the
-  three kinds to **spark** (`zk_spark`, transient capture), **source**
-  (`zk_source`, your own-words digest of an external source), and **permanent**
+  three kinds to **spark** (`zk_spark`, transient capture), **digest**
+  (`zk_digest`, your own-words digest of an external source), and **permanent**
   (`zk_permanent`, your atomic connected idea — the common, primary output).
   Split the old single "promote" path into two operations: **distill**
   (`distill-spark`, spark → permanent, consuming) and **create**
-  (`create-from-source` from a source, `create-from-resource` for source/permanent).
+  (`create-from-digest` from a digest, `create-from-resource` for digest/permanent).
   ZK creation now uses single-direction links (the new note references its origin;
   the origin surfaces it via a derived backlink view — a "Created from this" list
-  on spark/source/resource, "Cited by" on permanent) and no longer writes reverse
+  on spark/digest/resource, "Cited by" on permanent) and no longer writes reverse
   body links or `promoted_to` frontmatter. Sparks no longer get auto-inserted task
   items; a kept spark records what it became via `distilled_to`.
 - Full (no-key) reads now summarize prose sections as `{ chars: N }` (mirroring

@@ -11,7 +11,7 @@ describe("managed templates", () => {
     const retro = renderTemplate("retro", DEFAULT_SETTINGS);
     const subnote = renderTemplate("subnote", DEFAULT_SETTINGS);
     const spark = renderTemplate("zk_spark", DEFAULT_SETTINGS);
-    const source = renderTemplate("zk_source", DEFAULT_SETTINGS);
+    const source = renderTemplate("zk_digest", DEFAULT_SETTINGS);
     const permanent = renderTemplate("zk_permanent", DEFAULT_SETTINGS);
     const templates = [project, area, resource, journal, retro, subnote, spark, source, permanent];
 
@@ -28,7 +28,7 @@ describe("managed templates", () => {
     expect(spark).toContain("```para-zk-props\ntype: zk_spark\n```\n{{cursor}}\n\n```para-zk-managed");
     expect(spark).not.toContain("# One-line thought summary");
     expect(spark).not.toContain("# Memo");
-    expect(source).toContain("```para-zk-props\ntype: zk_source\n```\n{{cursor}}\n\n```para-zk-managed");
+    expect(source).toContain("```para-zk-props\ntype: zk_digest\n```\n{{cursor}}\n\n```para-zk-managed");
     expect(source).not.toContain("## Highlights (quotes/evidence)");
     expect(source).not.toContain("# Summary");
     expect(source).not.toContain("# Key insights");
@@ -48,7 +48,7 @@ describe("managed templates", () => {
       expect(content).not.toContain("area-subareas");
       expect(content).not.toContain("resource-cited-by");
       expect(content).not.toContain("spark-distill");
-      expect(content).not.toContain("source-cited-by");
+      expect(content).not.toContain("digest-cited-by");
     }
   });
 
@@ -58,7 +58,7 @@ describe("managed templates", () => {
     const resource = managedUiBlockForType("resource", DEFAULT_SETTINGS) ?? "";
     const journal = managedUiBlockForType("journal", DEFAULT_SETTINGS) ?? "";
     const spark = managedUiBlockForType("zk_spark", DEFAULT_SETTINGS) ?? "";
-    const source = managedUiBlockForType("zk_source", DEFAULT_SETTINGS) ?? "";
+    const source = managedUiBlockForType("zk_digest", DEFAULT_SETTINGS) ?? "";
     const permanent = managedUiBlockForType("zk_permanent", DEFAULT_SETTINGS) ?? "";
 
     expect(project).not.toContain("para-zk-latest-retro-summary");
@@ -78,7 +78,7 @@ describe("managed templates", () => {
     expect(journal).toContain("para-zk-tasks");
     expect(managedUiBlockForType("retro", DEFAULT_SETTINGS)).toBeUndefined();
     expect(spark).toContain("spark-distill");
-    expect(source).toContain("source-cited-by");
+    expect(source).toContain("digest-cited-by");
     expect(source).toContain("para-zk-references");
     expect(permanent).toContain("permanent-cited-by");
     expect(permanent).toContain("title: Cited by");
@@ -88,7 +88,7 @@ describe("managed templates", () => {
   it("renders Dataview tables for managed ZK views (cited-by and distilled-into)", () => {
     expect(dataviewViewBlock("permanent-cited-by", DEFAULT_SETTINGS)).toContain("contains(file.outlinks");
     expect(dataviewViewBlock("resource-cited-by", DEFAULT_SETTINGS)).toContain("contains(file.outlinks");
-    expect(dataviewViewBlock("source-cited-by", DEFAULT_SETTINGS)).toContain("contains(file.outlinks");
+    expect(dataviewViewBlock("digest-cited-by", DEFAULT_SETTINGS)).toContain("contains(file.outlinks");
     expect(dataviewViewBlock("spark-distill", DEFAULT_SETTINGS)).toContain("distilled_to");
   });
 

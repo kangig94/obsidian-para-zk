@@ -70,7 +70,7 @@ describe("describe", () => {
     const addReference = workflows.find((w) => w.command === "para-zk:add-reference");
     expect(addReference?.inputs).toEqual(expect.arrayContaining(["type", "title", "target"]));
     expect(workflows.map((w) => w.command)).toEqual(
-      expect.arrayContaining(["para-zk:capture-journal", "para-zk:distill-spark", "para-zk:create-from-source"])
+      expect.arrayContaining(["para-zk:capture-journal", "para-zk:distill-spark", "para-zk:create-from-digest"])
     );
 
     const retro = await cli.run("para-zk:describe", { type: "retro" });
@@ -83,7 +83,7 @@ describe("describe", () => {
     expect(String(bad.error)).toContain("unknown surface type");
   });
 
-  it("describes resource and ZK source as free-form body surfaces", async () => {
+  it("describes resource and ZK digest as free-form body surfaces", async () => {
     const resourceResult = await cli.run("para-zk:describe", { type: "resource" });
     const resource = (resourceResult.surfaces as Array<Record<string, unknown>>)[0];
     expect(resource.readKeys).toEqual(["references", "backlinks", "body"]);
@@ -94,9 +94,9 @@ describe("describe", () => {
     });
     expect(resource.readKeys).not.toEqual(expect.arrayContaining(["overview"]));
 
-    const sourceResult = await cli.run("para-zk:describe", { type: "zk_source" });
+    const sourceResult = await cli.run("para-zk:describe", { type: "zk_digest" });
     const source = (sourceResult.surfaces as Array<Record<string, unknown>>)[0];
-    expect(source.frontmatterKeys).toEqual(["sourceTitle", "authors", "published", "url"]);
+    expect(source.frontmatterKeys).toEqual(["sourceTitle", "url", "first_author", "published"]);
     expect(source.readKeys).toEqual(["frontmatter", "references", "backlinks", "body"]);
     expect(source.writeKeys).toEqual(["frontmatter", "references", "body"]);
     expect(source.collections).toEqual({

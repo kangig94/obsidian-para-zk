@@ -12,6 +12,7 @@ import {
 } from "obsidian";
 import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
+import { singleItemList } from "../text";
 import {
   findPropsField,
   inferPropsViewType,
@@ -238,6 +239,9 @@ function renderFieldControl(
     case "text":
       renderTextInput(plugin, field, frontmatter, container, sourcePath);
       return;
+    case "text-list":
+      renderTextInput(plugin, field, frontmatter, container, sourcePath, { list: true });
+      return;
     case "date":
       renderDateInput(plugin, field, frontmatter, container, sourcePath, "date");
       return;
@@ -261,7 +265,8 @@ function renderTextInput(
   field: PropsField,
   frontmatter: Frontmatter,
   container: HTMLElement,
-  sourcePath?: string
+  sourcePath?: string,
+  options: { list?: boolean } = {}
 ): void {
   const input = new TextComponent(container);
   input.inputEl.type = "text";
@@ -270,7 +275,13 @@ function renderTextInput(
     .setValue(valueText(readFieldValue(field, frontmatter)))
     .setDisabled(!field.key || !sourcePath);
   input.inputEl.addEventListener("change", () => {
-    if (field.key) void writeFrontmatterValue(plugin, sourcePath, field.key, input.getValue());
+    if (!field.key) return;
+    const raw = input.getValue();
+    // A list-backed text field (e.g. Obsidian-native `aliases`) keeps a single
+    // typed value but stores it as a one-item YAML list, the form Obsidian resolves
+    // for links/quick-switcher. Empty clears it to an empty list.
+    const value = options.list ? singleItemList(raw) : raw;
+    void writeFrontmatterValue(plugin, sourcePath, field.key, value);
   });
 }
 

@@ -18,12 +18,22 @@ export const SUBNOTE_TYPE_CODES = [
   "idea",
   "settlement"
 ] as const;
+export const RESOURCE_KIND_CODES = [
+  "paper",
+  "article",
+  "book",
+  "video",
+  "web",
+  "code",
+  "other"
+] as const;
 
 export type ProjectStatusCode = typeof PROJECT_STATUS_CODES[number];
 export type PriorityCode = typeof PRIORITY_CODES[number];
 export type MaturityCode = typeof MATURITY_CODES[number];
 export type EnergyCode = typeof ENERGY_CODES[number];
 export type SubnoteTypeCode = typeof SUBNOTE_TYPE_CODES[number];
+export type ResourceKindCode = typeof RESOURCE_KIND_CODES[number];
 
 export const PROJECT_STATUS_CODE_HELP = codeHelp(PROJECT_STATUS_CODES);
 export const PRIORITY_CODE_HELP = codeHelp(PRIORITY_CODES);
@@ -71,6 +81,10 @@ export function subnoteTypeLabel(code: SubnoteTypeCode, locale: Locale): string 
   return subnoteTypeLabels(locale)[code];
 }
 
+export function resourceKindLabel(code: ResourceKindCode, locale: Locale): string {
+  return resourceKindLabels(locale)[code];
+}
+
 function projectStatusLabels(locale: Locale): Record<ProjectStatusCode, string> {
   const status = localePack(locale).projectStatus;
   return {
@@ -108,6 +122,19 @@ function subnoteTypeLabels(locale: Locale): Record<SubnoteTypeCode, string> {
     risk: labels[8] ?? "Issue/Risk",
     idea: labels[9] ?? "Idea",
     settlement: labels[10] ?? "Accounting"
+  };
+}
+
+function resourceKindLabels(locale: Locale): Record<ResourceKindCode, string> {
+  const labels = localePack(locale).resourceKinds;
+  return {
+    paper: labels[0] ?? "Paper",
+    article: labels[1] ?? "Article",
+    book: labels[2] ?? "Book",
+    video: labels[3] ?? "Video",
+    web: labels[4] ?? "Web",
+    code: labels[5] ?? "Code",
+    other: labels[6] ?? "Other"
   };
 }
 

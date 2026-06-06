@@ -18,7 +18,7 @@ import {
   parseMaturityCode,
   type EnergyCode
 } from "../vocabulary";
-import { RESOURCE_CREATE_KIND_CODE_HELP, parseResourceCreateKind } from "../zk/kinds";
+import { RESOURCE_CREATE_KIND_CODE_HELP, parseResourceCreateKind, zkKindCode } from "../zk/kinds";
 import { appendUniqueStrings, escapeRegExp } from "../text";
 import { readOptionalCode } from "./code-options";
 import {
@@ -34,7 +34,7 @@ import type {
   OpenJournalOptions,
   OpenJournalResult,
   DistillSparkOptions,
-  CreateFromSourceOptions,
+  CreateFromDigestOptions,
   CreateFromResourceOptions,
   WorkflowContext
 } from "./context";
@@ -79,13 +79,13 @@ export async function openJournal(ctx: WorkflowContext, options: OpenJournalOpti
 // caller need only supply a title. Maps the stored type to an addressing token.
 function resolveOriginByName(ctx: WorkflowContext, expectedType: string, title: string | undefined): Promise<TFile> {
   if (expectedType === "resource") return resolveRequiredByType(ctx, "resource", { title });
-  if (expectedType === "zk_source") return resolveRequiredByType(ctx, "zk", { title, kind: "source" });
+  if (expectedType === "zk_digest") return resolveRequiredByType(ctx, "zk", { title, kind: "digest" });
   if (expectedType === "zk_spark") return resolveRequiredByType(ctx, "zk", { title, kind: "spark" });
   return resolveRequiredByType(ctx, expectedType, { title });
 }
 
 // Shared scaffold: resolve a typed origin note and create a new ZK note of
-// `kind` from it. Behind createFromResource / createFromSource /
+// `kind` from it. Behind createFromResource / createFromDigest /
 // distillSpark — each adds only its distinct post-create step.
 async function createZkFromOrigin(
   ctx: WorkflowContext,
@@ -118,15 +118,15 @@ export async function createFromResource(ctx: WorkflowContext, options: CreateFr
   await insertReferenceItem(ctx, file, { link: wikiLink(source.path) });
   await applyBody(ctx, file, options.body);
   await openIfRequested(ctx, file, options.open);
-  return { ...noteResult(file, true, options.open), sourcePath: source.path, kind };
+  return { ...noteResult(file, true, options.open), sourcePath: source.path, kind: zkKindCode(kind) };
 }
 
-export async function createFromSource(ctx: WorkflowContext, options: CreateFromSourceOptions = {}): Promise<PromotionResult> {
-  const { source, file } = await createZkFromOrigin(ctx, options, { label: "source note", expectedType: "zk_source" }, "Permanent");
+export async function createFromDigest(ctx: WorkflowContext, options: CreateFromDigestOptions = {}): Promise<PromotionResult> {
+  const { source, file } = await createZkFromOrigin(ctx, options, { label: "source digest note", expectedType: "zk_digest" }, "Permanent");
   await insertReferenceItem(ctx, file, { link: wikiLink(source.path) });
   await applyBody(ctx, file, options.body);
   await openIfRequested(ctx, file, options.open);
-  return { ...noteResult(file, true, options.open), sourcePath: source.path, kind: "Permanent" as const };
+  return { ...noteResult(file, true, options.open), sourcePath: source.path, kind: "permanent" };
 }
 
 // Distill consumes a spark: its idea moves into a new permanent note. The spark
@@ -154,7 +154,7 @@ export async function distillSpark(ctx: WorkflowContext, options: DistillSparkOp
   return {
     ...noteResult(file, true, options.open),
     sourcePath: source.path,
-    kind: "Permanent" as const
+    kind: "permanent"
   };
 }
 

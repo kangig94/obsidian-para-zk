@@ -217,7 +217,7 @@ function assertManagedTemplateFiles() {
     "retro",
     "subnote",
     "zk_spark",
-    "zk_source",
+    "zk_digest",
     "zk_permanent"
   ];
 
@@ -298,7 +298,7 @@ function oldZkStarterHeadings(type) {
   switch (type) {
     case "zk_spark":
       return ["# One-line thought summary", "# Memo"];
-    case "zk_source":
+    case "zk_digest":
       return ["## Highlights (quotes/evidence)", "# Summary", "# Key insights", "# Important quotes/evidence"];
     case "zk_permanent":
       return ["# One-sentence summary", "# Body", "## Limitations", "## Related questions"];

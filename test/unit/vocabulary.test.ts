@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   PRIORITY_CODE_HELP,
   PROJECT_STATUS_CODE_HELP,
+  RESOURCE_KIND_CODES,
   SUBNOTE_TYPE_CODE_HELP,
   parsePriorityCode,
   parseProjectStatusCode,
   parseSubnoteTypeCode,
   priorityLabel,
-  projectStatusLabel
+  projectStatusLabel,
+  resourceKindLabel
 } from "../../src/vocabulary";
 
 describe("code parsing", () => {
@@ -37,5 +39,16 @@ describe("localized labels", () => {
     expect(ko).toBeTruthy();
     expect(en).not.toBe(ko);
     expect(priorityLabel("high", "en")).toBeTruthy();
+  });
+
+  it("gives every resource kind a real, locale-specific label in both ko and en", () => {
+    for (const code of RESOURCE_KIND_CODES) {
+      const en = resourceKindLabel(code, "en");
+      const ko = resourceKindLabel(code, "ko");
+      expect(en, code).toBeTruthy();
+      expect(ko, code).toBeTruthy();
+      // A missing ko entry would fall back to the English default — guard against that.
+      expect(ko, code).not.toBe(en);
+    }
   });
 });
