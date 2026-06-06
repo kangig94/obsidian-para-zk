@@ -1269,7 +1269,7 @@ function assertObsidianCoreConfig() {
 
   const ignoreFilters = appConfig.userIgnoreFilters;
   assert(Array.isArray(ignoreFilters), "app.json userIgnoreFilters is not an array");
-  for (const filter of ["Templates/", "Dashboard/", "Tasks/", "README"]) {
+  for (const filter of ["Templates/", "Templates/para-zk/", "Dashboard/", "Tasks/", "README"]) {
     assert(ignoreFilters.includes(filter), `app.json userIgnoreFilters is missing ${filter}`);
   }
 

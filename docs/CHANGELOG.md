@@ -346,6 +346,10 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Fixed
 
+- `para-zk:setup` now also adds the managed templates subfolder (`Templates/para-zk`)
+  to Obsidian's excluded-files (`userIgnoreFilters`). Those filters are not recursive,
+  so excluding `Templates/` did not hide the nested managed-templates folder from search
+  and link suggestions.
 - The references block now re-renders live when the host note's frontmatter
   references change from outside the block — e.g. `add-reference` or
   `create-resource` run from the CLI/MCP, or an edit in another view. Previously

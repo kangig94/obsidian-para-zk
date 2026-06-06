@@ -87,6 +87,9 @@ function mergeAppConfig(current: Record<string, unknown>, settings: ParaZkSettin
     trashOption: "local",
     userIgnoreFilters: appendUniqueStrings(current.userIgnoreFilters, [
       ignoreFilterFolder(settings.paths.templatesFolder),
+      // Obsidian's excluded-files filters are not recursive, so the nested managed
+      // templates folder needs its own entry even though it sits under templatesFolder.
+      ignoreFilterFolder(settings.paths.managedTemplatesFolder),
       ignoreFilterFolder(settings.paths.dashboardFolder),
       ignoreFilterFolder(settings.paths.tasksFolder),
       "README"
