@@ -7,16 +7,39 @@ const EMPTY_TRASH_COMMAND_ID = "obsidian-trash-explorer:empty-trash";
 const EMPTY_TRASH_CLASS = "para-zk-explorer-action-empty-trash";
 
 export function registerExplorerActions(plugin: ParaZkPluginContext): void {
-  const renderActions = () => {
-    for (const leaf of plugin.app.workspace.getLeavesOfType("file-explorer")) {
-      const container = readNavButtonsContainer(leaf.view);
-      if (!container || container.querySelector(`.${EMPTY_TRASH_CLASS}`)) continue;
-      addEmptyTrashButton(plugin, container);
-    }
-  };
+  // The button is injected into the core file-explorer DOM, which outlives this plugin
+  // instance — registerDomEvent removes the click listener on unload but not the element,
+  // so a reload would leave a dead (listener-less) button that the add-guard then refuses
+  // to replace. Clear any such orphan on load, and remove our buttons on unload.
+  removeEmptyTrashButtons();
+  plugin.register(removeEmptyTrashButtons);
 
-  plugin.app.workspace.onLayoutReady(renderActions);
-  plugin.registerEvent(plugin.app.workspace.on("layout-change", renderActions));
+  const render = () => renderEmptyTrashAction(plugin);
+  plugin.app.workspace.onLayoutReady(render);
+  plugin.registerEvent(plugin.app.workspace.on("layout-change", render));
+}
+
+// Re-applies the empty-trash action to the current setting; called by the settings toggle.
+export function refreshExplorerActions(plugin: ParaZkPluginContext): void {
+  renderEmptyTrashAction(plugin);
+}
+
+function renderEmptyTrashAction(plugin: ParaZkPluginContext): void {
+  if (!plugin.settings.showEmptyTrashAction) {
+    removeEmptyTrashButtons();
+    return;
+  }
+  for (const leaf of plugin.app.workspace.getLeavesOfType("file-explorer")) {
+    const container = readNavButtonsContainer(leaf.view);
+    if (!container || container.querySelector(`.${EMPTY_TRASH_CLASS}`)) continue;
+    addEmptyTrashButton(plugin, container);
+  }
+}
+
+function removeEmptyTrashButtons(): void {
+  for (const button of document.querySelectorAll(`.${EMPTY_TRASH_CLASS}`)) {
+    button.remove();
+  }
 }
 
 export function refreshExplorerActionLabels(plugin: ParaZkPluginContext): void {

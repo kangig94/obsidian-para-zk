@@ -32,6 +32,7 @@ export type ParaZkSettings = {
   paths: ParaZkPaths;
   layoutFolders: string[];
   locale: Locale;
+  showEmptyTrashAction: boolean;
   setupAt?: string;
   managedFiles: Record<string, ManagedFileState>;
 };
@@ -141,5 +142,6 @@ export const DEFAULT_SETTINGS: ParaZkSettings = {
   paths: DEFAULT_PATHS,
   layoutFolders: DEFAULT_LAYOUT_FOLDERS,
   locale: "en",
+  showEmptyTrashAction: true,
   managedFiles: {}
 };

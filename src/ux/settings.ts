@@ -3,6 +3,7 @@ import { localePack, normalizeLocale } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import type { SetupOptions, SetupResult } from "../types";
 import { normalizeVaultPath } from "../vault/paths";
+import { refreshExplorerActions } from "./explorer-actions";
 import { refreshRegisteredLocaleLabels } from "./locale-labels";
 
 export class ParaZkSettingTab extends PluginSettingTab {
@@ -58,6 +59,19 @@ export class ParaZkSettingTab extends PluginSettingTab {
           .setButtonText(labels.settingsInstallDepsButton)
           .onClick(() => {
             void this.runSetupAction(button, { installDeps: true });
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(labels.settingsEmptyTrashAction)
+      .setDesc(labels.settingsEmptyTrashActionDesc)
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.showEmptyTrashAction)
+          .onChange(async (value) => {
+            this.plugin.settings.showEmptyTrashAction = value;
+            await this.plugin.saveSettings();
+            refreshExplorerActions(this.plugin);
           });
       });
 

@@ -6,6 +6,8 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- Added a setting to show/hide the file-explorer empty-trash button
+  (`showEmptyTrashAction`, on by default), toggled live from the PARA-ZK settings tab.
 - Added a `vault` context field to discovery so a cold automation caller reasons from
   the right premise. `para-zk:describe` and the MCP envelope (both `running` states)
   now state that the vault is one user's private, local, single-user Obsidian "second
@@ -308,6 +310,11 @@ Notable changes for PARA-ZK are tracked here.
 - The file-explorer "empty trash" action now reports failure instead of silently
   doing nothing: it respects Obsidian's `executeCommandById` result and shows a Notice
   when the Trash Explorer command is unavailable or did not run.
+- Fixed the empty-trash button going dead ("dangling") after a plugin reload. The button
+  is injected into the core file-explorer DOM, which outlives the plugin instance;
+  `registerDomEvent` removed its click listener on unload but not the element, so the
+  orphaned button blocked a fresh listener from being attached on reload. The action now
+  clears orphaned buttons on load and removes its buttons on unload.
 
 ### Removed
 
