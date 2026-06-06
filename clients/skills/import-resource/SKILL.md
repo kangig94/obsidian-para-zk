@@ -44,6 +44,12 @@ command + inputs. Identify the note(s) to link from (area / project / resource).
 - **Web research** → search authoritative sources, cross-check facts, collect citations
   (prefer primary/official sources; for papers, arXiv/DOI).
 
+**Prefer an HTML/text rendering over a PDF.** Converting a PDF to Markdown is slow and
+lossy, so when the same source exists as HTML or Markdown, fetch that instead — even if you
+were handed a PDF link. For arXiv papers, use the HTML view (`https://arxiv.org/html/<id>`,
+or `https://ar5iv.org/abs/<id>`), never the PDF. Fall back to a PDF only when no HTML/text
+rendering is available.
+
 Record provenance for everything (URL, file path, identifier, date, license/permission where
 relevant). For images:
 - A **web** image → embed it by its source URL with `![alt](https://…)`; Obsidian renders
