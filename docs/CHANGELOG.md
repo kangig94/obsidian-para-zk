@@ -6,6 +6,12 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- Added per-command help: any native CLI command answers `help=true` (and a
+  forwarded `--help`/`-h`) by returning its own option schema — `{ ok, command,
+  description, options }` under `format=json`, or a text listing — instead of
+  running and failing on a missing required argument. Works uniformly across
+  optsidian, native obsidian, and MCP since it rides the shared `key=value`
+  parsing; `para-zk:describe` remains the full machine-readable index.
 - Added `para-zk:list` — structured enumeration of notes by `type` with
   `archived`/`query` filters and `offset`/`limit` pagination (content search is
   left to the host CLI's grep/search). Returns `{ title, type, path }` items.

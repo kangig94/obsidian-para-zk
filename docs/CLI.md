@@ -29,6 +29,22 @@ the origin type is ambiguous, e.g. scoped retro / resource link). Each concept
 uses exactly one option name: `title`, `kind`, `area_titles`, `subnote_type`,
 `content`, `child`, `parent_type`, `parent_title`, `source_type`, `source_title`.
 
+### Discovering a command's arguments
+
+Any command answers `help=true` by returning its own option schema instead of
+running — so you can inspect arguments without first hitting a "required" error:
+
+```bash
+optsidian raw para-zk:create-area help=true format=json
+# → {"ok":true,"command":"para-zk:create-area","description":"...",
+#    "options":[{"name":"title","value":"<title>","description":"Area title."}, ...]}
+```
+
+`help=true` works identically through every surface (optsidian, native obsidian,
+MCP) because it rides the same `key=value` parsing. A bare `--help`/`-h` flag is
+honored too when the host forwards it. For the full machine-readable surface
+(types, stable keys, create inputs), `para-zk:describe` remains the index.
+
 ## Stable Codes
 
 CLI options store locale-neutral codes in frontmatter. The GUI and generated

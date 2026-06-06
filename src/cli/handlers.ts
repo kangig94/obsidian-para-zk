@@ -998,14 +998,45 @@ export function registerNativeCliHandlers(plugin: ParaZkPluginContext): void {
       command.command,
       command.description,
       command.options,
-      async (args = {}) => withCliErrors(
-        args,
-        command.command,
-        () => command.run(plugin, args),
-        command.text
-      )
+      async (args = {}) =>
+        isHelpRequest(args)
+          ? renderCommandHelp(command, args)
+          : withCliErrors(args, command.command, () => command.run(plugin, args), command.text)
     );
   }
+}
+
+// Any command answers `help=true` with its own option schema instead of running,
+// so a caller can discover arguments without first triggering a "required" error.
+// `--help`/`-h` are honored too when the host forwards them as args.
+function isHelpRequest(args: CliArgs): boolean {
+  for (const key of ["help", "--help", "-h"]) {
+    if (!Object.prototype.hasOwnProperty.call(args, key)) continue;
+    const value = args[key];
+    if (value === false) return false;
+    if (typeof value === "string" && ["false", "0", "no", "off"].includes(value.trim().toLowerCase())) {
+      return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+function renderCommandHelp(command: NativeCliCommand, args: CliArgs): string {
+  const options = Object.entries(command.options).map(([name, spec]) => ({
+    name,
+    value: spec.value ?? null,
+    description: spec.description
+  }));
+  if (readCliString(args, "format") === "json") {
+    return JSON.stringify({ ok: true, command: command.command, description: command.description, options });
+  }
+  const lines = [command.command, `  ${command.description}`, "", "Options:"];
+  for (const { name, value, description } of options) {
+    lines.push(`  ${value ? `${name}=${value}` : name}`);
+    lines.push(`      ${description}`);
+  }
+  return lines.join("\n");
 }
 
 async function withCliErrors(
