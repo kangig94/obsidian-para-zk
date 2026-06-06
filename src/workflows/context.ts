@@ -190,6 +190,14 @@ export type ReadRetroOptions = ReadOptionsWithCollection & ByTitleSelectorOption
   date?: string;
 };
 
+export type ListOptions = {
+  type?: string;
+  archived?: boolean;
+  query?: string;
+  offset?: number;
+  limit?: number | "all";
+};
+
 export type UpdateOperation = "set" | "insert" | "append" | "prepend" | "replace" | "delete";
 
 export type UpdatePayloadOptions = {
@@ -367,6 +375,7 @@ export type SurfaceAddressing = {
   selectors?: string[];
   addressVia?: string;
   create?: string;
+  createInputs?: string[];
   rename?: boolean;
 };
 

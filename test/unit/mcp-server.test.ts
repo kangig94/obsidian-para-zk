@@ -22,6 +22,18 @@ describe("MCP server pure helpers", () => {
     });
   });
 
+  it("passes named workflows through to the discovery index", () => {
+    const describePayload = {
+      ok: true as const,
+      surfaceTypes: ["project"],
+      collectionFilters: {},
+      workflows: [{ command: "para-zk:add-reference", inputs: ["type", "title", "target"] }]
+    };
+
+    const envelope = buildEnvelope({ cli: "optsidian", describe: describePayload }) as { workflows?: unknown };
+    expect(envelope.workflows).toEqual([{ command: "para-zk:add-reference", inputs: ["type", "title", "target"] }]);
+  });
+
   it("builds a fallback index carrying the failure reason", () => {
     expect(buildFallback({ cli: "obsidian", reason: "spawn obsidian ENOENT" })).toEqual({
       running: false,

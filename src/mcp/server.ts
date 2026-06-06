@@ -224,6 +224,7 @@ export function buildEnvelope({ cli, describe }: { cli: ParaZkCli; describe: Des
     cli,
     invoke: invokePattern(cli),
     surfaceTypes: surfaceTypes(describe),
+    ...(Array.isArray(describe.workflows) ? { workflows: describe.workflows } : {}),
     schema: schemaCommand(cli),
     commands: helpCommand(cli),
     howto: howtoFor(cli),

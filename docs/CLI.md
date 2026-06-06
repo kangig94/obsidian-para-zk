@@ -128,9 +128,48 @@ optsidian raw para-zk:describe type=project format=json
 
 Important fields:
 
-- `surfaceTypes`
+- `surfaceTypes` — addressable/createable note types.
+- `workflows` — named (non-surface) commands with their inputs:
+  `capture-journal`, `distill-spark`, `create-from-source`, `create-from-resource`,
+  `add-reference`, `attach-file`. This is how you discover those commands and args
+  without a separate help lookup.
 - `collectionFilters`
-- `surfaces` when `type` is provided
+- `surfaces` when `type` is provided. Each surface carries an `addressing` facet:
+  - `addressable` — whether the type is reached directly (`true`) or only through a
+    container + `child=` (`false`, e.g. `subnote`/`subarea`).
+  - `selectors` — how to address an existing note of this type.
+  - `create` — the command that creates it, and `createInputs` — that command's
+    arguments (so a caller learns the full create call from `describe` alone).
+  - `addressVia` — for non-addressable types, how to reach existing ones.
+
+`describe type=<t>` is the self-contained contract for one type: address selectors,
+create command + inputs, stable read/write keys, and collections.
+
+### `para-zk:list`
+
+Structured enumeration of PARA-ZK notes by type — use it to find a note (and its
+title) before addressing it by name. `list` filters by type and frontmatter only.
+**For content/full-text search, use `optsidian grep` or `optsidian search`** (these
+are optsidian-implemented; the Obsidian native CLI does not provide them).
+
+Options:
+
+| Option | Values | Notes |
+| --- | --- | --- |
+| `type` | `project`, `area`, `subarea`, `resource`, `zk`, `retro`, `journal`, `subnote` | Optional. Omit to list all PARA-ZK notes. `zk` spans all stored ZK kinds. |
+| `archived` | boolean | `true` lists archived notes; default lists active notes. |
+| `query` | string | Optional case-insensitive title substring filter. |
+| `offset` | number | Zero-based item offset (default `0`). |
+| `limit` | number or `all` | Maximum items to return (default `50`). |
+
+```bash
+optsidian raw para-zk:list type=project query=eval format=json
+optsidian raw para-zk:list type=zk limit=all format=json
+```
+
+Returns `{ count, offset, limit, returned, has_more, items }`; each item is
+`{ title, type, path }` (plus `archived: true` in archived listings). `type` is
+the stored type (e.g. `zk_permanent` for a `type=zk` listing).
 
 ### `para-zk:setup`
 

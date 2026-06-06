@@ -6,6 +6,16 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- Added `para-zk:list` — structured enumeration of notes by `type` with
+  `archived`/`query` filters and `offset`/`limit` pagination (content search is
+  left to the host CLI's grep/search). Returns `{ title, type, path }` items.
+- Made `para-zk:describe` self-contained for LLM discovery: each surface's
+  `addressing` facet now includes `createInputs` (the create command's
+  arguments, derived from the real command spec — no drift), and the index +
+  MCP envelope expose `workflows` (named non-surface commands such as
+  `add-reference`, `capture-journal`, `distill-spark`, `create-from-*`,
+  `attach-file`, `list`, each with its inputs). A caller can now learn the full
+  create/workflow contract from `describe` alone, without a separate help lookup.
 - Added native Obsidian commands and native CLI handlers for PARA/ZK workflows:
   vault setup, project/area/resource creation, subnotes, retros, ZK notes,
   journal capture, and note promotion.

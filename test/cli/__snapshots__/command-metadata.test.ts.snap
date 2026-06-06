@@ -571,6 +571,36 @@ exports[`native CLI command metadata is stable 1`] = `
     },
   },
   {
+    "command": "para-zk:list",
+    "description": "List PARA-ZK notes by type with optional filters (structured enumeration by name/frontmatter). For content/full-text search, use \`optsidian grep\` or \`optsidian search\`.",
+    "options": {
+      "archived": {
+        "description": "true lists archived notes; default lists active notes.",
+        "value": "<true|false>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "limit": {
+        "description": "Maximum items to return (default: 50).",
+        "value": "<number|all>",
+      },
+      "offset": {
+        "description": "Zero-based item offset (default: 0).",
+        "value": "<number>",
+      },
+      "query": {
+        "description": "Optional case-insensitive title substring filter.",
+        "value": "<text>",
+      },
+      "type": {
+        "description": "Optional note-type filter. Omit to list all PARA-ZK notes; zk spans all ZK kinds.",
+        "value": "<project|area|subarea|resource|zk|retro|journal|subnote>",
+      },
+    },
+  },
+  {
     "command": "para-zk:read-area",
     "description": "Read an area note's stable PARA-ZK surface, optionally by map key",
     "options": {

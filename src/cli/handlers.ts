@@ -136,6 +136,7 @@ type WorkflowFunctionName =
   | "distillSpark"
   | "createFromSource"
   | "createFromResource"
+  | "listNotes"
   | "readArea"
   | "readJournal"
   | "readProject"
@@ -543,15 +544,36 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       if (!type) {
         return {
           surfaceTypes: surfaceTypes(),
-          collectionFilters: describeCollectionFilters(describeSurfaces())
+          collectionFilters: describeCollectionFilters(describeSurfaces()),
+          workflows: namedWorkflows()
         };
       }
-      const surfaces = [describeSurface(type)];
+      const surfaces = [describeSurface(type)].map(withCreateInputs);
       return {
         collectionFilters: describeCollectionFilters(surfaces),
         surfaces
       };
     }
+  },
+  {
+    command: "para-zk:list",
+    description: "List PARA-ZK notes by type with optional filters (structured enumeration by name/frontmatter). For content/full-text search, use `optsidian grep` or `optsidian search`.",
+    options: {
+      type: { value: "<project|area|subarea|resource|zk|retro|journal|subnote>", description: "Optional note-type filter. Omit to list all PARA-ZK notes; zk spans all ZK kinds." },
+      archived: { value: "<true|false>", description: "true lists archived notes; default lists active notes." },
+      query: { value: "<text>", description: "Optional case-insensitive title substring filter." },
+      offset: { value: "<number>", description: "Zero-based item offset (default: 0)." },
+      limit: { value: "<number|all>", description: "Maximum items to return (default: 50)." },
+      format: { value: "<text|json>", description: "Output format (default: text)." }
+    },
+    text: "notes listed",
+    run: workflowRun("listNotes", (args) => ({
+      type: readCliString(args, "type"),
+      archived: readCliBoolean(args, "archived"),
+      query: readCliString(args, "query"),
+      offset: readCliInteger(args, "offset"),
+      limit: readCliCollectionLimit(args)
+    }))
   },
   {
     command: "para-zk:setup",
@@ -937,6 +959,35 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     }))
   }
 ];
+
+// Discoverability: derive create/workflow inputs from the real command option
+// specs so `describe` is self-contained (a caller never needs `obsidian help`).
+// Sourced from NATIVE_CLI_COMMANDS itself, so there is no drift to maintain.
+const UNIVERSAL_OPTIONS = new Set(["open", "format"]);
+const NAMED_WORKFLOW_COMMANDS = [
+  "para-zk:list",
+  "para-zk:capture-journal",
+  "para-zk:distill-spark",
+  "para-zk:create-from-source",
+  "para-zk:create-from-resource",
+  "para-zk:add-reference",
+  "para-zk:attach-file"
+];
+
+function commandInputs(command: string): string[] {
+  const entry = NATIVE_CLI_COMMANDS.find((candidate) => candidate.command === command);
+  return entry ? Object.keys(entry.options).filter((key) => !UNIVERSAL_OPTIONS.has(key)) : [];
+}
+
+function namedWorkflows(): Array<{ command: string; inputs: string[] }> {
+  return NAMED_WORKFLOW_COMMANDS.map((command) => ({ command, inputs: commandInputs(command) }));
+}
+
+function withCreateInputs(surface: SurfaceDescription): SurfaceDescription {
+  const create = surface.addressing?.create;
+  if (!create) return surface;
+  return { ...surface, addressing: { ...surface.addressing, createInputs: commandInputs(create) } };
+}
 
 export function registerNativeCliHandlers(plugin: ParaZkPluginContext): void {
   const cliPlugin = plugin as CliCapablePlugin;

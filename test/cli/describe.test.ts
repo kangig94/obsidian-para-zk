@@ -62,6 +62,14 @@ describe("describe", () => {
       backlink: expect.arrayContaining(["type"])
     });
 
+    // Named (non-surface) workflows are discoverable from the index, with inputs.
+    const workflows = all.workflows as Array<{ command: string; inputs: string[] }>;
+    const addReference = workflows.find((w) => w.command === "para-zk:add-reference");
+    expect(addReference?.inputs).toEqual(expect.arrayContaining(["type", "title", "target"]));
+    expect(workflows.map((w) => w.command)).toEqual(
+      expect.arrayContaining(["para-zk:capture-journal", "para-zk:distill-spark", "para-zk:create-from-source"])
+    );
+
     const retro = await cli.run("para-zk:describe", { type: "retro" });
     expect(retro.collectionFilters).toEqual({
       backlink: ["offset", "limit", "query", "type"]
@@ -104,10 +112,16 @@ describe("describe", () => {
     for (const type of ["subnote", "subarea"]) {
       const result = await cli.run("para-zk:describe", { type });
       const surface = (result.surfaces as Array<Record<string, unknown>>)[0];
-      const addressing = surface.addressing as { addressable: boolean; addressVia?: string; create: string };
+      const addressing = surface.addressing as { addressable: boolean; addressVia?: string; create: string; createInputs: string[] };
       expect(addressing.addressable).toBe(false);
       expect(addressing.addressVia).toContain("child=");
       expect(addressing.create).toBe(`para-zk:create-${type}`);
+      // createInputs come from the real create command's options (no obsidian help needed).
+      expect(addressing.createInputs).toEqual(expect.arrayContaining(["title", "parent_title"]));
     }
+    const subnote = (await cli.run("para-zk:describe", { type: "subnote" })).surfaces as Array<Record<string, unknown>>;
+    expect((subnote[0].addressing as { createInputs: string[] }).createInputs).toEqual(
+      expect.arrayContaining(["subnote_type", "body"])
+    );
   });
 });
