@@ -1,7 +1,7 @@
 import { TFile } from "obsidian";
 import { localePack } from "../i18n";
 import { stripProjectSummaryManagedBlock, type TextRange } from "../vault/sections";
-import type { CollectionKind, ReferenceRead, SurfaceDescription, TaskRead, WorkflowContext } from "./context";
+import type { CollectionKind, ReferenceRead, SurfaceAddressing, SurfaceDescription, TaskRead, WorkflowContext } from "./context";
 import { readBacklinks } from "./backlinks";
 import { readReferenceItemsFresh } from "./references";
 import { readRootTaskMap } from "./tasks";
@@ -43,10 +43,11 @@ const BACKLINK_READ_SECTION: ReadSectionSpec = {
 const SURFACE_TYPES = [
   "project",
   "area",
+  "subarea",
   "resource",
   "journal",
   "retro",
-  "doc",
+  "subnote",
   "zk_spark",
   "zk_source",
   "zk_permanent",
@@ -112,7 +113,7 @@ export const RETRO_READ_SPEC: ReadSurfaceSpec = {
   ]
 };
 
-const DOC_READ_SPEC: ReadSurfaceSpec = {
+const SUBNOTE_READ_SPEC: ReadSurfaceSpec = {
   frontmatter: ["subnote_type"],
   sections: [
     BACKLINK_READ_SECTION
@@ -158,10 +159,11 @@ const NOTE_READ_SPEC: ReadSurfaceSpec = {
 export function specForType(type: string): ReadSurfaceSpec {
   if (type === "project") return PROJECT_READ_SPEC;
   if (type === "area") return AREA_READ_SPEC;
+  if (type === "subarea") return AREA_READ_SPEC;
   if (type === "resource") return RESOURCE_READ_SPEC;
   if (type === "journal") return JOURNAL_READ_SPEC;
   if (type === "retro") return RETRO_READ_SPEC;
-  if (type === "doc") return DOC_READ_SPEC;
+  if (type === "subnote") return SUBNOTE_READ_SPEC;
   if (type === "zk_spark") return ZK_SPARK_READ_SPEC;
   if (type === "zk_source") return ZK_SOURCE_READ_SPEC;
   if (type === "zk_permanent") return ZK_PERMANENT_READ_SPEC;
@@ -191,7 +193,7 @@ function readKeyHints(spec: ReadSurfaceSpec): string[] {
     }
   }
   if (spec.body) keys.push("body");
-  if (spec.children) keys.push("children", "children/<title>/<key>");
+  if (spec.children) keys.push("children");
   return keys;
 }
 
@@ -212,7 +214,6 @@ function compactWriteKeys(spec: ReadSurfaceSpec): string[] {
     keys.push(section.key);
   }
   if (spec.body) keys.push("body");
-  if (spec.children) keys.push("children");
   return keys;
 }
 
@@ -239,7 +240,6 @@ function writeKeyHints(spec: ReadSurfaceSpec): string[] {
     }
   }
   if (spec.body) keys.push("body=set|append|prepend|replace");
-  if (spec.children) keys.push("children/<title>/<key>");
   return keys;
 }
 
@@ -286,10 +286,38 @@ function specForSurfaceType(type: SurfaceType): ReadSurfaceSpec {
   return specForType(type);
 }
 
+// Addressing facet: how an LLM reaches/creates a note of this type. Separated from
+// the surface (keys) facet because some types are create-able but not directly
+// addressable for R/U/R/D — they are reached through their container with child=.
+function addressingForType(type: SurfaceType): SurfaceAddressing {
+  switch (type) {
+    case "project":
+    case "area":
+      return { addressable: true, selectors: ["title", "archived", "child"], create: `para-zk:create-${type}`, rename: true };
+    case "resource":
+      return { addressable: true, selectors: ["title", "archived"], create: "para-zk:create-resource", rename: true };
+    case "retro":
+      return { addressable: true, selectors: ["title", "date", "archived"], create: "para-zk:create-retro", rename: false };
+    case "journal":
+      return { addressable: true, selectors: ["date"], create: "para-zk:capture-journal", rename: false };
+    case "subnote":
+      return { addressable: false, addressVia: `container type + child=["title"]`, create: "para-zk:create-subnote", rename: true };
+    case "subarea":
+      return { addressable: false, addressVia: `container type + child=["title"]`, create: "para-zk:create-subarea", rename: true };
+    case "zk_spark":
+    case "zk_source":
+    case "zk_permanent":
+      return { addressable: true, selectors: ["title", "kind"], create: "para-zk:create-zk", rename: true };
+    case "note":
+      return { addressable: false, addressVia: `container type + child=["title"]`, rename: true };
+  }
+}
+
 function describeSurfaceSpec(type: SurfaceType, spec: ReadSurfaceSpec): SurfaceDescription {
   const frontmatterKeys = [...spec.frontmatter];
   return {
     type,
+    addressing: addressingForType(type),
     readKeys: compactReadKeys(spec),
     writeKeys: compactWriteKeys(spec),
     ...(frontmatterKeys.length > 0 ? { frontmatterKeys } : {}),

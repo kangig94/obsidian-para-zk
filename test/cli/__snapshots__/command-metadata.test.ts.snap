@@ -6,6 +6,14 @@ exports[`native CLI command metadata is stable 1`] = `
     "command": "para-zk:add-reference",
     "description": "Add an existing vault file, wikilink, markdown link, URL, or text to a note's frontmatter reference registry",
     "options": {
+      "child": {
+        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
+        "value": "<["title", ...]>",
+      },
+      "date": {
+        "description": "Receiving note date when type=journal/retro.",
+        "value": "<YYYY-MM-DD>",
+      },
       "description": {
         "description": "Optional per-reference description.",
         "value": "<text>",
@@ -14,17 +22,25 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Output format (default: text).",
         "value": "<text|json>",
       },
+      "kind": {
+        "description": "Receiving ZK kind when type=zk.",
+        "value": "<spark|source|permanent>",
+      },
       "open": {
-        "description": "Open the source note in Obsidian.",
+        "description": "Open the receiving note in Obsidian.",
         "value": "<true|false>",
       },
-      "path": {
-        "description": "Source note path that receives the reference.",
-        "value": "<path>",
-      },
       "target": {
-        "description": "Reference target to add.",
-        "value": "<path|url|wikilink|markdown-link|text>",
+        "description": "Reference target to add. Use [[Title]] to reference a note by name.",
+        "value": "<[[wikilink]]|url|markdown-link|text>",
+      },
+      "title": {
+        "description": "Receiving note title (project/area/resource/zk/retro).",
+        "value": "<title>",
+      },
+      "type": {
+        "description": "Type of the note that receives the reference.",
+        "value": "<project|area|resource|zk|retro|journal>",
       },
     },
   },
@@ -100,10 +116,6 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Open the created note in Obsidian.",
         "value": "<true|false>",
       },
-      "parent": {
-        "description": "Optional parent area path.",
-        "value": "<path>",
-      },
       "title": {
         "description": "Area title.",
         "value": "<title>",
@@ -134,9 +146,9 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Open the created note in Obsidian.",
         "value": "<true|false>",
       },
-      "path": {
-        "description": "Source resource path.",
-        "value": "<path>",
+      "source_title": {
+        "description": "Source resource title.",
+        "value": "<title>",
       },
       "title": {
         "description": "New ZK note title.",
@@ -164,9 +176,9 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Open the created note in Obsidian.",
         "value": "<true|false>",
       },
-      "path": {
-        "description": "Source note path.",
-        "value": "<path>",
+      "source_title": {
+        "description": "Source note title.",
+        "value": "<title>",
       },
       "title": {
         "description": "New permanent note title.",
@@ -228,9 +240,13 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Open the created note in Obsidian.",
         "value": "<true|false>",
       },
-      "path": {
-        "description": "Source note path to receive the resource link.",
-        "value": "<path>",
+      "source_title": {
+        "description": "Optional source note title to link this resource from.",
+        "value": "<title>",
+      },
+      "source_type": {
+        "description": "Optional source note type to link this resource from.",
+        "value": "<project|area|resource|zk>",
       },
       "title": {
         "description": "Resource title.",
@@ -254,9 +270,13 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Open the created note in Obsidian.",
         "value": "<true|false>",
       },
-      "path": {
-        "description": "Project or area note path.",
-        "value": "<path>",
+      "source_title": {
+        "description": "Optional scope note title.",
+        "value": "<title>",
+      },
+      "source_type": {
+        "description": "Optional scope note type.",
+        "value": "<project|area>",
       },
       "title": {
         "description": "Retro title segment.",
@@ -268,6 +288,10 @@ exports[`native CLI command metadata is stable 1`] = `
     "command": "para-zk:create-subarea",
     "description": "Create a child area under an area note",
     "options": {
+      "child": {
+        "description": "Optional: drill from the named parent area into a nested subarea (JSON list) to create under it.",
+        "value": "<["title", ...]>",
+      },
       "format": {
         "description": "Output format (default: text).",
         "value": "<text|json>",
@@ -280,9 +304,9 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Open the created note in Obsidian.",
         "value": "<true|false>",
       },
-      "path": {
-        "description": "Parent area path.",
-        "value": "<path>",
+      "parent_title": {
+        "description": "Parent area title.",
+        "value": "<title>",
       },
       "title": {
         "description": "Subarea title.",
@@ -298,6 +322,10 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Optional initial free-form body content.",
         "value": "<markdown>",
       },
+      "child": {
+        "description": "Optional: drill from the named parent into a nested child container (JSON list) to create under it.",
+        "value": "<["title", ...]>",
+      },
       "format": {
         "description": "Output format (default: text).",
         "value": "<text|json>",
@@ -306,9 +334,13 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Open the created note in Obsidian.",
         "value": "<true|false>",
       },
-      "path": {
-        "description": "Parent note path.",
-        "value": "<path>",
+      "parent_title": {
+        "description": "Parent note title.",
+        "value": "<title>",
+      },
+      "parent_type": {
+        "description": "Parent note type.",
+        "value": "<project|area>",
       },
       "subnote_type": {
         "description": "Locale-neutral subnote type code.",
@@ -358,6 +390,10 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
         "value": "<true|false>",
       },
+      "child": {
+        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
+        "value": "<["title", ...]>",
+      },
       "force": {
         "description": "Required when deleting a folder-style note that contains child files.",
         "value": "<true|false>",
@@ -366,12 +402,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Output format (default: text).",
         "value": "<text|json>",
       },
-      "path": {
-        "description": "Exact note path.",
-        "value": "<path>",
-      },
       "title": {
-        "description": "Current note title. Used when path is omitted.",
+        "description": "Current note title.",
         "value": "<title>",
       },
     },
@@ -384,17 +416,9 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Journal date. Defaults to today.",
         "value": "<YYYY-MM-DD>",
       },
-      "force": {
-        "description": "Reserved for consistency with other delete commands.",
-        "value": "<true|false>",
-      },
       "format": {
         "description": "Output format (default: text).",
         "value": "<text|json>",
-      },
-      "path": {
-        "description": "Exact journal note path.",
-        "value": "<path>",
       },
     },
   },
@@ -406,6 +430,10 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
         "value": "<true|false>",
       },
+      "child": {
+        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
+        "value": "<["title", ...]>",
+      },
       "force": {
         "description": "Required when deleting a folder-style note that contains child files.",
         "value": "<true|false>",
@@ -414,12 +442,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Output format (default: text).",
         "value": "<text|json>",
       },
-      "path": {
-        "description": "Exact note path.",
-        "value": "<path>",
-      },
       "title": {
-        "description": "Current note title. Used when path is omitted.",
+        "description": "Current note title.",
         "value": "<title>",
       },
     },
@@ -432,6 +456,10 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
         "value": "<true|false>",
       },
+      "child": {
+        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
+        "value": "<["title", ...]>",
+      },
       "force": {
         "description": "Required when deleting a folder-style note that contains child files.",
         "value": "<true|false>",
@@ -440,12 +468,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Output format (default: text).",
         "value": "<text|json>",
       },
-      "path": {
-        "description": "Exact note path.",
-        "value": "<path>",
-      },
       "title": {
-        "description": "Current note title. Used when path is omitted.",
+        "description": "Current note title.",
         "value": "<title>",
       },
     },
@@ -470,12 +494,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Output format (default: text).",
         "value": "<text|json>",
       },
-      "path": {
-        "description": "Exact note path.",
-        "value": "<path>",
-      },
       "title": {
-        "description": "Current note title. Used when path is omitted.",
+        "description": "Current note title.",
         "value": "<title>",
       },
     },
@@ -496,12 +516,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Optional ZK kind filter.",
         "value": "<spark|source|permanent>",
       },
-      "path": {
-        "description": "Exact note path.",
-        "value": "<path>",
-      },
       "title": {
-        "description": "Current note title. Used when path is omitted.",
+        "description": "Current note title.",
         "value": "<title>",
       },
     },
@@ -516,7 +532,7 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "type": {
         "description": "Optional surface type. Omit to describe all supported surfaces.",
-        "value": "<project|area|resource|journal|retro|doc|zk_spark|zk_source|zk_permanent|note>",
+        "value": "<project|area|subarea|resource|journal|retro|subnote|zk_spark|zk_source|zk_permanent|note>",
       },
     },
   },
@@ -544,9 +560,9 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Open the created note in Obsidian.",
         "value": "<true|false>",
       },
-      "path": {
-        "description": "Source spark note path.",
-        "value": "<path>",
+      "source_title": {
+        "description": "Source spark note title.",
+        "value": "<title>",
       },
       "title": {
         "description": "New permanent note title.",
@@ -566,6 +582,10 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Task collection reads only: checkbox status character. Use space/blank/todo/open for [ ].",
         "value": "<status>",
       },
+      "child": {
+        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
+        "value": "<["title", ...]>",
+      },
       "due_after": {
         "description": "Task collection reads only: include tasks due on or after this date.",
         "value": "<YYYY-MM-DD>",
@@ -579,7 +599,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{parent}, overview, tasks, tasks/<id>, tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, children, children/<title>/<key>.",
+        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{parent}, overview, tasks, tasks/<id>, tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, children.",
         "value": "<map-path>",
       },
       "limit": {
@@ -589,10 +609,6 @@ exports[`native CLI command metadata is stable 1`] = `
       "offset": {
         "description": "Collection key reads only: zero-based item offset (default: 0).",
         "value": "<number>",
-      },
-      "path": {
-        "description": "Area note path for exact selection.",
-        "value": "<path>",
       },
       "priority": {
         "description": "Task collection reads only: parsed Tasks priority such as high or medium.",
@@ -607,7 +623,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<url|note|file|wiki|text>",
       },
       "title": {
-        "description": "Area title. Used when path is omitted.",
+        "description": "Area title.",
         "value": "<title>",
       },
       "type": {
@@ -652,10 +668,6 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Collection key reads only: zero-based item offset (default: 0).",
         "value": "<number>",
       },
-      "path": {
-        "description": "Journal note path for exact selection.",
-        "value": "<path>",
-      },
       "priority": {
         "description": "Task collection reads only: parsed Tasks priority such as high or medium.",
         "value": "<priority>",
@@ -686,6 +698,10 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Task collection reads only: checkbox status character. Use space/blank/todo/open for [ ].",
         "value": "<status>",
       },
+      "child": {
+        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
+        "value": "<["title", ...]>",
+      },
       "due_after": {
         "description": "Task collection reads only: include tasks due on or after this date.",
         "value": "<YYYY-MM-DD>",
@@ -699,7 +715,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{areas|status|priority|start_date|due_date|done_date}, summary, goals, tasks, tasks/<id>, tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, children, children/<title>/<key>.",
+        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{areas|status|priority|start_date|due_date|done_date}, summary, goals, tasks, tasks/<id>, tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, children.",
         "value": "<map-path>",
       },
       "limit": {
@@ -709,10 +725,6 @@ exports[`native CLI command metadata is stable 1`] = `
       "offset": {
         "description": "Collection key reads only: zero-based item offset (default: 0).",
         "value": "<number>",
-      },
-      "path": {
-        "description": "Project note path for exact selection.",
-        "value": "<path>",
       },
       "priority": {
         "description": "Task collection reads only: parsed Tasks priority such as high or medium.",
@@ -727,7 +739,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<url|note|file|wiki|text>",
       },
       "title": {
-        "description": "Project title. Used when path is omitted.",
+        "description": "Project title.",
         "value": "<title>",
       },
       "type": {
@@ -747,6 +759,10 @@ exports[`native CLI command metadata is stable 1`] = `
       "checkbox": {
         "description": "Task collection reads only: checkbox status character. Use space/blank/todo/open for [ ].",
         "value": "<status>",
+      },
+      "child": {
+        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
+        "value": "<["title", ...]>",
       },
       "due_after": {
         "description": "Task collection reads only: include tasks due on or after this date.",
@@ -772,10 +788,6 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Collection key reads only: zero-based item offset (default: 0).",
         "value": "<number>",
       },
-      "path": {
-        "description": "Resource note path for exact selection.",
-        "value": "<path>",
-      },
       "priority": {
         "description": "Task collection reads only: parsed Tasks priority such as high or medium.",
         "value": "<priority>",
@@ -789,7 +801,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<url|note|file|wiki|text>",
       },
       "title": {
-        "description": "Resource title. Used when path is omitted.",
+        "description": "Resource title.",
         "value": "<title>",
       },
       "type": {
@@ -838,10 +850,6 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Collection key reads only: zero-based item offset (default: 0).",
         "value": "<number>",
       },
-      "path": {
-        "description": "Retro note path for exact selection.",
-        "value": "<path>",
-      },
       "priority": {
         "description": "Task collection reads only: parsed Tasks priority such as high or medium.",
         "value": "<priority>",
@@ -855,7 +863,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<url|note|file|wiki|text>",
       },
       "title": {
-        "description": "Retro note title. Used when path is omitted.",
+        "description": "Retro note title.",
         "value": "<title>",
       },
       "type": {
@@ -900,10 +908,6 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Collection key reads only: zero-based item offset (default: 0).",
         "value": "<number>",
       },
-      "path": {
-        "description": "ZK note path for exact selection.",
-        "value": "<path>",
-      },
       "priority": {
         "description": "Task collection reads only: parsed Tasks priority such as high or medium.",
         "value": "<priority>",
@@ -917,7 +921,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<url|note|file|wiki|text>",
       },
       "title": {
-        "description": "ZK note title. Used when path is omitted.",
+        "description": "ZK note title.",
         "value": "<title>",
       },
       "type": {
@@ -934,6 +938,10 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
         "value": "<true|false>",
       },
+      "child": {
+        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
+        "value": "<["title", ...]>",
+      },
       "format": {
         "description": "Output format (default: text).",
         "value": "<text|json>",
@@ -942,12 +950,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "New note title.",
         "value": "<title>",
       },
-      "path": {
-        "description": "Exact note path.",
-        "value": "<path>",
-      },
       "title": {
-        "description": "Current note title. Used when path is omitted.",
+        "description": "Current note title.",
         "value": "<title>",
       },
     },
@@ -960,6 +964,10 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
         "value": "<true|false>",
       },
+      "child": {
+        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
+        "value": "<["title", ...]>",
+      },
       "format": {
         "description": "Output format (default: text).",
         "value": "<text|json>",
@@ -968,12 +976,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "New note title.",
         "value": "<title>",
       },
-      "path": {
-        "description": "Exact note path.",
-        "value": "<path>",
-      },
       "title": {
-        "description": "Current note title. Used when path is omitted.",
+        "description": "Current note title.",
         "value": "<title>",
       },
     },
@@ -986,6 +990,10 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
         "value": "<true|false>",
       },
+      "child": {
+        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
+        "value": "<["title", ...]>",
+      },
       "format": {
         "description": "Output format (default: text).",
         "value": "<text|json>",
@@ -994,12 +1002,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "New note title.",
         "value": "<title>",
       },
-      "path": {
-        "description": "Exact note path.",
-        "value": "<path>",
-      },
       "title": {
-        "description": "Current note title. Used when path is omitted.",
+        "description": "Current note title.",
         "value": "<title>",
       },
     },
@@ -1020,12 +1024,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "New note title.",
         "value": "<title>",
       },
-      "path": {
-        "description": "Exact note path.",
-        "value": "<path>",
-      },
       "title": {
-        "description": "Current note title. Used when path is omitted.",
+        "description": "Current note title.",
         "value": "<title>",
       },
     },
@@ -1068,12 +1068,16 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
         "value": "<true|false>",
       },
+      "child": {
+        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
+        "value": "<["title", ...]>",
+      },
       "format": {
         "description": "Output format (default: text).",
         "value": "<text|json>",
       },
       "key": {
-        "description": "Stable writable key. Valid: frontmatter/{parent}=set, overview=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set, children/<title>/<key>.",
+        "description": "Stable writable key. Valid: frontmatter/{parent}=set, overview=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set.",
         "value": "<map-path>",
       },
       "match": {
@@ -1084,12 +1088,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Update operation.",
         "value": "<set|insert|append|prepend|replace|delete>",
       },
-      "path": {
-        "description": "Area note path for exact selection.",
-        "value": "<path>",
-      },
       "title": {
-        "description": "Area title. Used when path is omitted.",
+        "description": "Area title.",
         "value": "<title>",
       },
       "value": {
@@ -1134,10 +1134,6 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Update operation.",
         "value": "<set|insert|append|prepend|replace|delete>",
       },
-      "path": {
-        "description": "Journal note path for exact selection.",
-        "value": "<path>",
-      },
       "value": {
         "description": "Text value for scalar set, append, or prepend operations.",
         "value": "<text>",
@@ -1164,12 +1160,16 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
         "value": "<true|false>",
       },
+      "child": {
+        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
+        "value": "<["title", ...]>",
+      },
       "format": {
         "description": "Output format (default: text).",
         "value": "<text|json>",
       },
       "key": {
-        "description": "Stable writable key. Valid: frontmatter/{areas|status|priority|start_date|due_date|done_date}=set, summary=set|append|prepend|replace, goals=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set, children/<title>/<key>.",
+        "description": "Stable writable key. Valid: frontmatter/{areas|status|priority|start_date|due_date|done_date}=set, summary=set|append|prepend|replace, goals=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set.",
         "value": "<map-path>",
       },
       "match": {
@@ -1180,12 +1180,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Update operation.",
         "value": "<set|insert|append|prepend|replace|delete>",
       },
-      "path": {
-        "description": "Project note path for exact selection.",
-        "value": "<path>",
-      },
       "title": {
-        "description": "Project title. Used when path is omitted.",
+        "description": "Project title.",
         "value": "<title>",
       },
       "value": {
@@ -1214,6 +1210,10 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
         "value": "<true|false>",
       },
+      "child": {
+        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
+        "value": "<["title", ...]>",
+      },
       "format": {
         "description": "Output format (default: text).",
         "value": "<text|json>",
@@ -1230,12 +1230,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Update operation.",
         "value": "<set|insert|append|prepend|replace|delete>",
       },
-      "path": {
-        "description": "Resource note path for exact selection.",
-        "value": "<path>",
-      },
       "title": {
-        "description": "Resource title. Used when path is omitted.",
+        "description": "Resource title.",
         "value": "<title>",
       },
       "value": {
@@ -1284,12 +1280,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Update operation.",
         "value": "<set|insert|append|prepend|replace|delete>",
       },
-      "path": {
-        "description": "Retro note path for exact selection.",
-        "value": "<path>",
-      },
       "title": {
-        "description": "Retro note title. Used when path is omitted.",
+        "description": "Retro note title.",
         "value": "<title>",
       },
       "value": {
@@ -1334,12 +1326,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Update operation.",
         "value": "<set|insert|append|prepend|replace|delete>",
       },
-      "path": {
-        "description": "ZK note path for exact selection.",
-        "value": "<path>",
-      },
       "title": {
-        "description": "ZK note title. Used when path is omitted.",
+        "description": "ZK note title.",
         "value": "<title>",
       },
       "value": {

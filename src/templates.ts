@@ -210,7 +210,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
     case "subnote":
       return [
         frontmatter([
-          "type: doc",
+          "type: subnote",
           "subnote_type: {{subnote_type}}",
           "parent:",
           `created: ${nowPlaceholder}`,
@@ -415,7 +415,7 @@ function dataviewChildAreas(t: ReturnType<typeof localePack>, settings: ParaZkSe
   return fenced("dataview", [
     `TABLE WITHOUT ID file.link AS "${t.labels.area}", file.mtime AS "${t.labels.updated}"`,
     `FROM ${dataviewSource(settings.paths.areasFolder)}`,
-    `WHERE parent = ${dataviewCurrentFileLink(sourcePath)} AND type = "area"`,
+    `WHERE parent = ${dataviewCurrentFileLink(sourcePath)} AND type = "subarea"`,
     "SORT file.name ASC"
   ]);
 }
@@ -424,7 +424,7 @@ function dataviewChildDocs(t: ReturnType<typeof localePack>, sourcePath?: string
   return fenced("dataview", [
     `TABLE WITHOUT ID file.link AS "${t.labels.filename}", file.mtime AS "${t.labels.updated}"`,
     "FROM \"\"",
-    `WHERE parent = ${dataviewCurrentFileLink(sourcePath)} AND type = "doc"`,
+    `WHERE parent = ${dataviewCurrentFileLink(sourcePath)} AND type = "subnote"`,
     "SORT file.name ASC"
   ]);
 }
@@ -837,7 +837,7 @@ function dashboardRecentCoreNotes(t: ReturnType<typeof localePack>, settings: Pa
       settings.paths.resourcesFolder,
       ...zkSourceFolders(settings)
     ])}`,
-    `WHERE (type = "project" OR type = "area" OR type = "resource" OR startswith(type, "zk_")) AND ${dataviewNotArchived(settings)}`,
+    `WHERE (type = "project" OR type = "area" OR type = "subarea" OR type = "resource" OR startswith(type, "zk_")) AND ${dataviewNotArchived(settings)}`,
     "SORT file.mtime DESC",
     `LIMIT ${limit}`
   ]);

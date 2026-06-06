@@ -47,7 +47,8 @@ describe("create-project", () => {
 
     const subnote = await cli.run("para-zk:create-subnote", {
       title: "Template Child",
-      path: "PARA/Projects/Template Shape/Template Shape.md",
+      parent_type: "project",
+      parent_title: "Template Shape",
       open: "false"
     });
     expect(subnote.ok).toBe(true);
@@ -64,7 +65,8 @@ describe("create-project", () => {
 
     const child = await cli.run("para-zk:create-subnote", {
       title: "Child",
-      path: "PARA/Projects/Alpha 1/Alpha 1.md",
+      parent_type: "project",
+      parent_title: "Alpha 1",
       open: "false"
     });
     expect(child.path).toBe("PARA/Projects/Alpha 1/Child.md");
@@ -84,7 +86,8 @@ describe("read-project", () => {
     await createBaseProject();
     await cli.run("para-zk:create-subnote", {
       title: "Kickoff",
-      path: "PARA/Projects/Alpha/Alpha.md",
+      parent_type: "project",
+      parent_title: "Alpha",
       subnote_type: "meeting",
       open: "false"
     });
@@ -133,10 +136,10 @@ describe("read-project", () => {
       ""
     ].join("\n"));
 
-    const exact = await cli.run("para-zk:read-project", { path: "PARA/Projects/Nested.md", key: "summary" });
+    const exact = await cli.run("para-zk:read-project", { title: "Nested", key: "summary" });
     expect(exact.value).toBe(summary);
 
-    const compact = await cli.run("para-zk:read-project", { path: "PARA/Projects/Nested.md" });
+    const compact = await cli.run("para-zk:read-project", { title: "Nested" });
     expect(compact.summary).toEqual({ chars: summary.length });
     expect(compact.goals).toEqual({ chars: "Goal text.".length });
   });
@@ -155,13 +158,15 @@ describe("read-project", () => {
     await createBaseProject();
     await cli.run("para-zk:create-subnote", {
       title: "Kickoff",
-      path: "PARA/Projects/Alpha/Alpha.md",
+      parent_type: "project",
+      parent_title: "Alpha",
       subnote_type: "meeting",
       open: "false"
     });
     const type = await cli.run("para-zk:read-project", {
       title: "Alpha",
-      key: "children/Kickoff/frontmatter/subnote_type"
+      child: '["Kickoff"]',
+      key: "frontmatter/subnote_type"
     });
     expect(type.value).toBe("meeting");
   });
@@ -183,7 +188,7 @@ describe("read-project", () => {
     ].join("\n"));
     await cli.app.vault.create("PARA/Projects/Child.md", [
       "---",
-      "type: doc",
+      "type: subnote",
       "parent: \"[[PARA/Projects/Alpha.md|Alpha]]\"",
       "---",
       "Child body",
@@ -191,7 +196,7 @@ describe("read-project", () => {
     ].join("\n"));
 
     const read = await cli.run("para-zk:read-project", {
-      path: "PARA/Projects/Alpha.md",
+      title: "Alpha",
       key: "children"
     });
     const children = read.value as Record<string, { path: string }>;
@@ -199,8 +204,9 @@ describe("read-project", () => {
     expect(children.Beta).toBeUndefined();
 
     const rejected = await cli.run("para-zk:read-project", {
-      path: "PARA/Projects/Alpha.md",
-      key: "children/Beta/summary"
+      title: "Alpha",
+      child: '["Beta"]',
+      key: "summary"
     });
     expect(rejected.ok).toBe(false);
     expect(String(rejected.error)).toContain("child not found");

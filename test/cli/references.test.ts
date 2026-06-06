@@ -1,8 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createCliHarness, type CliHarness } from "../harness/cli";
 
-const PROJECT = "PARA/Projects/Alpha/Alpha.md";
-
 let cli: CliHarness;
 
 beforeEach(async () => {
@@ -13,7 +11,8 @@ beforeEach(async () => {
 describe("add-reference", () => {
   it("adds a URL reference at index 0 with a canonical link", async () => {
     const ref = await cli.run("para-zk:add-reference", {
-      path: PROJECT,
+      type: "project",
+      title: "Alpha",
       target: "https://example.com/source",
       description: "Source",
       open: "false"
@@ -24,9 +23,52 @@ describe("add-reference", () => {
     expect(ref.link).toBe("https://example.com/source");
   });
 
+  it("preserves subpath wikilinks, dedupes wiki/markdown syntax, and keeps distinct subpaths", async () => {
+    await cli.run("para-zk:create-resource", { title: "Target", open: "false" });
+    const targetPath = "PARA/Resources/Target.md";
+    const heading = "Section";
+
+    const headingRef = await cli.run("para-zk:add-reference", {
+      type: "project",
+      title: "Alpha",
+      target: `[[${targetPath}#${heading}]]`,
+      description: "Heading description",
+      open: "false"
+    });
+    expect(headingRef.added).toBe(true);
+    expect(headingRef.link).toBe(`[[${targetPath}#${heading}]]`);
+
+    // The same target written as a markdown link dedupes to the existing wiki entry.
+    const dupMarkdown = await cli.run("para-zk:add-reference", {
+      type: "project",
+      title: "Alpha",
+      target: `[Markdown heading](${targetPath}#${heading})`,
+      open: "false"
+    });
+    expect(dupMarkdown.added).toBe(false);
+    expect(dupMarkdown.index).toBe(headingRef.index);
+    expect(dupMarkdown.link).toBe(`[[${targetPath}#${heading}]]`);
+
+    // A different subpath (block ref) on the same file is a distinct reference.
+    const blockRef = await cli.run("para-zk:add-reference", {
+      type: "project",
+      title: "Alpha",
+      target: `[[${targetPath}#^smoke-block]]`,
+      open: "false"
+    });
+    expect(blockRef.added).toBe(true);
+
+    const read = await cli.run("para-zk:read-project", { title: "Alpha", key: "references", limit: "all" });
+    const value = read.value as { count: number; items?: Record<string, { link: string; path: string }> };
+    const items = Object.values(value.items ?? {});
+    expect(items.find((i) => i.link === `[[${targetPath}#${heading}]]`)?.path).toBe(targetPath);
+    expect(items.find((i) => i.link === `[[${targetPath}#^smoke-block]]`)?.path).toBe(targetPath);
+    expect(value.count).toBe(2);
+  });
+
   it("treats a duplicate URL as a no-op returning the existing index", async () => {
-    await cli.run("para-zk:add-reference", { path: PROJECT, target: "https://example.com/x", open: "false" });
-    const dup = await cli.run("para-zk:add-reference", { path: PROJECT, target: "https://example.com/x", open: "false" });
+    await cli.run("para-zk:add-reference", { type: "project", title: "Alpha", target: "https://example.com/x", open: "false" });
+    const dup = await cli.run("para-zk:add-reference", { type: "project", title: "Alpha", target: "https://example.com/x", open: "false" });
     expect(dup.ok).toBe(true);
     expect(dup.added).toBe(false);
     expect(dup.index).toBe(0);

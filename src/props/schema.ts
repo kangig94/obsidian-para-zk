@@ -69,6 +69,7 @@ export function inferPropsViewType(frontmatter: Record<string, unknown> | undefi
   const type = typeof frontmatter?.type === "string" ? frontmatter.type : undefined;
 
   if (type === "doc") return "subnote";
+  if (type === "subarea") return "area";
   return parsePropsViewType(type);
 }
 

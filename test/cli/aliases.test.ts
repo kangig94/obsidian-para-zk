@@ -12,10 +12,11 @@ beforeEach(async () => {
 
 describe("canonical CLI argument aliases", () => {
   const cases: Array<{ label: string; command: string; args: Record<string, unknown>; message: string }> = [
-    { label: "file_path", command: "para-zk:create-subnote", args: { title: "X", file_path: PROJECT }, message: "Use path instead of file_path" },
     { label: "name", command: "para-zk:create-area", args: { name: "Alias Area" }, message: "Use title instead of name" },
+    { label: "path (removed)", command: "para-zk:read-project", args: { title: "Alpha", path: "PARA/Projects/Alpha/Alpha.md" }, message: "path is not supported" },
+    { label: "sourcePath (removed)", command: "para-zk:create-subnote", args: { title: "X", sourcePath: "PARA/Projects/Alpha/Alpha.md" }, message: "sourcePath is not supported" },
     { label: "areaTitles", command: "para-zk:create-project", args: { title: "Alias Project", areaTitles: JSON.stringify(["A"]) }, message: "Use area_titles instead of areaTitles" },
-    { label: "subnoteType", command: "para-zk:create-subnote", args: { title: "X", path: PROJECT, subnoteType: "meeting" }, message: "Use subnote_type instead of subnoteType" },
+    { label: "subnoteType", command: "para-zk:create-subnote", args: { title: "X", subnoteType: "meeting" }, message: "Use subnote_type instead of subnoteType" },
     { label: "type", command: "para-zk:create-zk", args: { title: "Alias ZK", type: "permanent" }, message: "Use kind instead of type" },
     { label: "memo", command: "para-zk:capture-journal", args: { memo: "Alias memo" }, message: "Use content instead of memo" },
     { label: "text", command: "para-zk:capture-journal", args: { text: "Alias text" }, message: "Use content instead of text" }
@@ -48,7 +49,8 @@ describe("frontmatter relationship cleanup on delete", () => {
   it("clears a deleted resource from the source frontmatter references", async () => {
     const resource = await cli.run("para-zk:create-resource", {
       title: "Source",
-      path: PROJECT,
+      source_type: "project",
+      source_title: "Alpha",
       link: "true",
       open: "false"
     });

@@ -168,20 +168,15 @@ function assertGuiJournalCommand(today) {
 }
 
 function runLiveScenario() {
-  // These scenarios verify behavior only Obsidian's real engine provides:
-  // link rewriting on rename, backlink resolution, metadataCache timing, and
-  // the live reference/task-block renderers. Pure workflow logic (CRUD,
-  // references, tasks, archive, rename, delete) is covered by the vitest unit
-  // suite (npm test) and is no longer re-checked here.
-  assertGeneratedTemplateShapes();
-  assertFreeFormReadWriteScenario();
-  assertCreateFromResourceScenario();
-  assertReferenceSubpathScenario();
-  assertObjectReferenceDeleteCleanup();
+  // Smoke verifies ONLY behavior that needs Obsidian's real engine: link
+  // rewriting on rename, real backlink/metadataCache resolution, and the live
+  // reference/task-block/dataview renderers. Pure workflow logic — CRUD,
+  // template shapes, free-form body read/write, references (incl. subpath
+  // dedupe), promotion, reference cleanup on delete, attach-file — is covered
+  // by the vitest unit suite (npm test) and is intentionally NOT re-checked here.
   assertObjectReferenceRenameSurvival();
   assertRenameAreaLinkRewrite();
   assertBacklinkReadKeyScenario();
-  assertAttachFileCliScenario();
 
   const reorderProject = cliJson("para-zk:create-project", [
     `title=Smoke Reorder ${stamp}`,
@@ -189,8 +184,8 @@ function runLiveScenario() {
     "format=json"
   ]);
   assertCreated(reorderProject, "reference reorder project");
-  cliJson("para-zk:add-reference", [`path=${reorderProject.path}`, "target=https://example.com/reorder-a", "open=false", "format=json"]);
-  cliJson("para-zk:add-reference", [`path=${reorderProject.path}`, "target=https://example.com/reorder-b", "open=false", "format=json"]);
+  cliJson("para-zk:add-reference", ["type=project", `title=Smoke Reorder ${stamp}`, "target=https://example.com/reorder-a", "open=false", "format=json"]);
+  cliJson("para-zk:add-reference", ["type=project", `title=Smoke Reorder ${stamp}`, "target=https://example.com/reorder-b", "open=false", "format=json"]);
   assertReferenceRendererReorder(reorderProject.path);
 
   const taskProject = cliJson("para-zk:create-project", [
@@ -212,44 +207,6 @@ function runLiveScenario() {
   assertCreateRetroButtonProjectLink();
 }
 
-function assertAttachFileCliScenario() {
-  const localTemp = mkdtempSync(join(tmpdir(), "para-zk-smoke-attach-"));
-  const vaultTarget = `assets/smoke-attach-${stamp}`;
-
-  try {
-    const singleSource = join(localTemp, "attach smoke.png");
-    writeFileSync(singleSource, Buffer.from([1, 2, 3]));
-    const single = cliJson("para-zk:attach-file", [
-      `source=${singleSource}`,
-      `folder=${vaultTarget}`,
-      "format=json"
-    ]);
-    assert(single.ok === true, `attach-file single failed: ${JSON.stringify(single)}`);
-    assert(single.path === `${vaultTarget}/attach smoke.png`, `unexpected attach-file path: ${single.path}`);
-    assert(single.kind === "image", `unexpected attach-file kind: ${single.kind}`);
-    assertFileExists(single.path, "attach-file single did not create file");
-
-    const mediaDir = join(localTemp, "media");
-    mkdirSync(join(mediaDir, "nested"), { recursive: true });
-    writeFileSync(join(mediaDir, "a.png"), Buffer.from([4]));
-    writeFileSync(join(mediaDir, "nested", "sound.mp3"), Buffer.from([5]));
-    const directory = cliJson("para-zk:attach-file", [
-      `source=${mediaDir}`,
-      `folder=${vaultTarget}`,
-      "format=json"
-    ]);
-    assert(directory.ok === true, `attach-file directory failed: ${JSON.stringify(directory)}`);
-    assert(directory.count === 2, `attach-file directory count mismatch: ${JSON.stringify(directory)}`);
-    const paths = Array.isArray(directory.files) ? directory.files.map((file) => file.path) : [];
-    assert(paths.includes(`${vaultTarget}/media/a.png`), `attach-file directory missing root file: ${JSON.stringify(directory)}`);
-    assert(paths.includes(`${vaultTarget}/media/nested/sound.mp3`), `attach-file directory missing nested file: ${JSON.stringify(directory)}`);
-    assertFileExists(`${vaultTarget}/media/a.png`, "attach-file directory did not create root file");
-    assertFileExists(`${vaultTarget}/media/nested/sound.mp3`, "attach-file directory did not create nested file");
-  } finally {
-    rmSync(localTemp, { recursive: true, force: true });
-    rmSync(join(vaultPath, vaultTarget), { recursive: true, force: true });
-  }
-}
 
 function assertManagedTemplateFiles() {
   const templateNames = [
@@ -293,77 +250,6 @@ function assertManagedTemplateFiles() {
   ]);
 }
 
-function assertGeneratedTemplateShapes() {
-  const project = cliJson("para-zk:create-project", [
-    `title=Smoke Template Project ${stamp}`,
-    "open=false",
-    "format=json"
-  ]);
-  assertCreated(project, "template-shape project");
-  assertGeneratedNoteTemplateShape(project.path, "project");
-
-  const area = cliJson("para-zk:create-area", [
-    `title=Smoke Template Area ${stamp}`,
-    "open=false",
-    "format=json"
-  ]);
-  assertCreated(area, "template-shape area");
-  assertGeneratedNoteTemplateShape(area.path, "area");
-
-  const resource = cliJson("para-zk:create-resource", [
-    `title=Smoke Template Resource ${stamp}`,
-    "link=false",
-    "open=false",
-    "format=json"
-  ]);
-  assertCreated(resource, "template-shape resource");
-  assertGeneratedNoteTemplateShape(resource.path, "resource");
-
-  const subnote = cliJson("para-zk:create-subnote", [
-    `title=Smoke Template Subnote ${stamp}`,
-    `path=${project.path}`,
-    "open=false",
-    "format=json"
-  ]);
-  assertCreated(subnote, "template-shape subnote");
-  assertGeneratedNoteTemplateShape(subnote.path, "subnote");
-
-  const retro = cliJson("para-zk:create-retro", [
-    `title=Smoke Template Retro ${stamp}`,
-    `date=${todayIso()}`,
-    "open=false",
-    "format=json"
-  ]);
-  assertCreated(retro, "template-shape retro");
-  assertGeneratedNoteTemplateShape(retro.path, "retro");
-
-  const spark = cliJson("para-zk:create-zk", [
-    `title=Smoke Template Spark ${stamp}`,
-    "kind=spark",
-    "open=false",
-    "format=json"
-  ]);
-  assertCreated(spark, "template-shape spark");
-  assertGeneratedNoteTemplateShape(spark.path, "zk_spark");
-
-  const source = cliJson("para-zk:create-zk", [
-    `title=Smoke Template Source ${stamp}`,
-    "kind=source",
-    "open=false",
-    "format=json"
-  ]);
-  assertCreated(source, "template-shape source");
-  assertGeneratedNoteTemplateShape(source.path, "zk_source");
-
-  const permanent = cliJson("para-zk:create-zk", [
-    `title=Smoke Template Permanent ${stamp}`,
-    "kind=permanent",
-    "open=false",
-    "format=json"
-  ]);
-  assertCreated(permanent, "template-shape permanent");
-  assertGeneratedNoteTemplateShape(permanent.path, "zk_permanent");
-}
 
 function assertGeneratedNoteTemplateShape(path, type, options = {}) {
   assertVaultTextEventually(path, (text) => {
@@ -429,153 +315,8 @@ function editableBodyBeforeManagedTail(path, text) {
   return text.slice(props.index + props[0].length, tail.index);
 }
 
-function assertFreeFormReadWriteScenario() {
-  const resource = cliJson("para-zk:create-resource", [
-    `title=Smoke Free Body Resource ${stamp}`,
-    "link=false",
-    "open=false",
-    "format=json"
-  ]);
-  assertCreated(resource, "free-form resource");
-  const resourceBody = `# Smoke Resource Body ${stamp}\n\nH1 headings are valid inside a free-form resource body.`;
-  assertFreeFormBodyReadWrite({
-    label: "resource",
-    updateCommand: "para-zk:update-resource",
-    readCommand: "para-zk:read-resource",
-    selectorArgs: [`path=${resource.path}`],
-    body: resourceBody,
-    droppedKeys: [
-      "overview",
-      "body-section",
-      "summary",
-      "insight",
-      "evidence",
-      "highlight_block",
-      "one_sentence_summary",
-      "limitations",
-      "related_questions",
-      "thought_summary",
-      "memo",
-      "tasks",
-      "untracked"
-    ]
-  });
 
-  for (const { kind, type, droppedKeys } of [
-    {
-      kind: "spark",
-      type: "zk_spark",
-      droppedKeys: ["thought_summary", "memo", "tasks", "untracked"]
-    },
-    {
-      kind: "source",
-      type: "zk_source",
-      droppedKeys: ["highlight_block", "summary", "insight", "evidence", "untracked"]
-    },
-    {
-      kind: "permanent",
-      type: "zk_permanent",
-      droppedKeys: ["one_sentence_summary", "limitations", "related_questions", "tasks", "untracked"]
-    }
-  ]) {
-    const note = cliJson("para-zk:create-zk", [
-      `title=Smoke Free Body ${kind} ${stamp}`,
-      `kind=${kind}`,
-      "open=false",
-      "format=json"
-    ]);
-    assertCreated(note, `free-form ${kind}`);
-    assertGeneratedNoteTemplateShape(note.path, type);
 
-    const body = `# Smoke ${kind} Body ${stamp}\n\n## Nested Heading\n\nFree-form ZK body text.`;
-    assertFreeFormBodyReadWrite({
-      label: type,
-      updateCommand: "para-zk:update-zk",
-      readCommand: "para-zk:read-zk",
-      selectorArgs: [`path=${note.path}`],
-      body,
-      droppedKeys
-    });
-  }
-}
-
-function assertFreeFormBodyReadWrite({ label, updateCommand, readCommand, selectorArgs, body, droppedKeys }) {
-  const update = cliJson(updateCommand, [
-    ...selectorArgs,
-    "key=body",
-    "op=set",
-    `value=${body}`,
-    "format=json"
-  ]);
-  assert(update.ok === true && update.changed === true, `${label} key=body update failed: ${JSON.stringify(update)}`);
-
-  const exact = cliJson(readCommand, [
-    ...selectorArgs,
-    "key=body",
-    "format=json"
-  ]);
-  assert(exact.mode === "exact", `${label} key=body read did not return exact mode`);
-  assert(exact.value === body, `${label} key=body read returned unexpected body: ${JSON.stringify(exact.value)}`);
-
-  const full = cliJson(readCommand, [
-    ...selectorArgs,
-    "format=json"
-  ]);
-  assert(full.mode === "compact", `${label} full read did not return compact mode`);
-  assert(full.body?.chars === body.length, `${label} full read did not summarize body chars: ${JSON.stringify(full)}`);
-  for (const key of droppedKeys) {
-    assert(!hasOwnKey(full, key), `${label} full read exposed dropped prose key: ${key}`);
-  }
-}
-
-function assertCreateFromResourceScenario() {
-  const resource = cliJson("para-zk:create-resource", [
-    `title=Smoke Promote Source ${stamp}`,
-    "link=false",
-    "open=false",
-    "format=json"
-  ]);
-  assertCreated(resource, "promote resource source");
-  const sourceBody = `# Promotion Source Body ${stamp}\n\nSource notes stay above the managed tail.`;
-  const setup = cliJson("para-zk:update-resource", [
-    `path=${resource.path}`,
-    "key=body",
-    "op=set",
-    `value=${sourceBody}`,
-    "format=json"
-  ]);
-  assert(setup.ok === true, "promote resource source body setup failed");
-
-  const created = cliJson("para-zk:create-from-resource", [
-    `path=${resource.path}`,
-    `title=Smoke Created Source ${stamp}`,
-    "kind=source",
-    "open=false",
-    "format=json"
-  ]);
-  assertCreated(created, "create-from-resource target");
-  assert(created.sourcePath === resource.path, "create-from-resource result lost sourcePath");
-  assertGeneratedNoteTemplateShape(created.path, "zk_source");
-
-  // Single-direction reference: the resource is preserved and unchanged; no
-  // reverse link is written back into it (the new note surfaces via backlinks).
-  const bodyRead = cliJson("para-zk:read-resource", [
-    `path=${resource.path}`,
-    "key=body",
-    "format=json"
-  ]);
-  assert(bodyRead.value.includes(sourceBody), "create-from-resource resource body lost existing text");
-  assert(!bodyRead.value.includes(`[[${created.path}`), "create-from-resource must not write a reverse link into the resource");
-
-  const references = cliJson("para-zk:read-zk", [
-    `path=${created.path}`,
-    "key=references",
-    "limit=all",
-    "format=json"
-  ]);
-  const items = Object.values(references.value?.items ?? {});
-  assert(items.some((item) => item.path === resource.path), "created ZK note does not reference source resource");
-}
 
 function assertProjectSummaryShape(path, summaryText = "") {
   assertVaultTextEventually(path, (text) => assertProjectSummaryText(path, text, summaryText));
@@ -774,159 +515,7 @@ function assertBacklinkReadKeyScenario() {
   assert(!projectItems.some((item) => item.path === area.path), "backlink type=project filter included a non-project source");
 }
 
-function assertReferenceSubpathScenario() {
-  const subpathProjectTitle = `Smoke Reference Subpath ${stamp}`;
-  const subpathTargetTitle = `Smoke Reference Subpath Target ${stamp}`;
-  const heading = `Smoke Heading ${stamp}`;
-  const blockId = `^smoke-block-${stamp}`;
-  const subpathProject = cliJson("para-zk:create-project", [
-    `title=${subpathProjectTitle}`,
-    "open=false",
-    "format=json"
-  ]);
-  assertCreated(subpathProject, "reference subpath project");
-  const subpathTarget = cliJson("para-zk:create-resource", [
-    `title=${subpathTargetTitle}`,
-    "link=false",
-    "open=false",
-    "format=json"
-  ]);
-  assertCreated(subpathTarget, "reference subpath target");
 
-  const headingLink = wikiReferenceLink(`${subpathTarget.path}#${heading}`);
-  const headingReference = cliJson("para-zk:add-reference", [
-    `path=${subpathProject.path}`,
-    `target=${headingLink}`,
-    "description=Heading description",
-    "open=false",
-    "format=json"
-  ]);
-  assert(headingReference.ok === true && headingReference.added === true, "wiki subpath reference failed");
-  assert(headingReference.link === headingLink, "wiki subpath reference did not preserve subpath");
-
-  const duplicateMarkdown = cliJson("para-zk:add-reference", [
-    `path=${subpathProject.path}`,
-    `target=[Markdown heading](${subpathTarget.path}#${heading})`,
-    "description=Different heading description",
-    "open=false",
-    "format=json"
-  ]);
-  assert(duplicateMarkdown.ok === true, "markdown duplicate subpath command failed");
-  assert(duplicateMarkdown.added === false, "markdown duplicate subpath was added");
-  assert(duplicateMarkdown.index === headingReference.index, "markdown duplicate subpath did not return existing index");
-  assert(duplicateMarkdown.link === headingLink, "markdown duplicate subpath did not canonicalize to wiki link");
-
-  const blockLink = wikiReferenceLink(`${subpathTarget.path}#${blockId}`);
-  const blockReference = cliJson("para-zk:add-reference", [
-    `path=${subpathProject.path}`,
-    `target=${blockLink}`,
-    "open=false",
-    "format=json"
-  ]);
-  assert(blockReference.ok === true && blockReference.added === true, "different subpath reference was not added");
-  assert(blockReference.link === blockLink, "block subpath reference did not preserve subpath");
-
-  const subpathRead = cliJson("para-zk:read-project", [
-    `title=${subpathProjectTitle}`,
-    "key=references",
-    "limit=all",
-    "format=json"
-  ]);
-  const headingItem = Object.values(subpathRead.value?.items ?? {}).find((item) => item.link === headingLink);
-  const blockItem = Object.values(subpathRead.value?.items ?? {}).find((item) => item.link === blockLink);
-  assert(headingItem?.path === subpathTarget.path, "heading subpath read did not derive base path");
-  assert(blockItem?.path === subpathTarget.path, "block subpath read did not derive base path");
-  assert(subpathRead.value?.count === 2, "same-subpath dedupe or different-subpath distinctness failed");
-}
-
-function assertObjectReferenceDeleteCleanup() {
-  const cleanupProjectTitle = `Smoke Reference Cleanup ${stamp}`;
-  const cleanupEmptyProjectTitle = `Smoke Reference Cleanup Empty ${stamp}`;
-  const cleanupTargetTitle = `Smoke Reference Cleanup Target ${stamp}`;
-  const cleanupKeepTitle = `Smoke Reference Cleanup Keep ${stamp}`;
-
-  const cleanupProject = cliJson("para-zk:create-project", [
-    `title=${cleanupProjectTitle}`,
-    "open=false",
-    "format=json"
-  ]);
-  assertCreated(cleanupProject, "reference cleanup project");
-  const cleanupEmptyProject = cliJson("para-zk:create-project", [
-    `title=${cleanupEmptyProjectTitle}`,
-    "open=false",
-    "format=json"
-  ]);
-  assertCreated(cleanupEmptyProject, "reference cleanup empty project");
-  const cleanupTarget = cliJson("para-zk:create-resource", [
-    `title=${cleanupTargetTitle}`,
-    "link=false",
-    "open=false",
-    "format=json"
-  ]);
-  assertCreated(cleanupTarget, "reference cleanup target");
-  const cleanupKeep = cliJson("para-zk:create-resource", [
-    `title=${cleanupKeepTitle}`,
-    "link=false",
-    "open=false",
-    "format=json"
-  ]);
-  assertCreated(cleanupKeep, "reference cleanup keep");
-
-  const cleanupBodyLink = cliJson("para-zk:update-project", [
-    `title=${cleanupProjectTitle}`,
-    "key=summary",
-    "op=set",
-    `value=Body mention [[${cleanupTargetTitle}]]`,
-    "format=json"
-  ]);
-  assert(cleanupBodyLink.ok === true, "reference cleanup body link setup failed");
-  const cleanupDeleteReference = cliJson("para-zk:update-project", [
-    `title=${cleanupProjectTitle}`,
-    "key=references",
-    "op=insert",
-    `value_json=${JSON.stringify({ link: cleanupTarget.path, description: "Delete object" })}`,
-    "format=json"
-  ]);
-  assert(cleanupDeleteReference.ok === true, "reference cleanup delete object setup failed");
-  const cleanupKeepReference = cliJson("para-zk:update-project", [
-    `title=${cleanupProjectTitle}`,
-    "key=references",
-    "op=insert",
-    `value_json=${JSON.stringify({ link: cleanupKeep.path, description: "Keep object" })}`,
-    "format=json"
-  ]);
-  assert(cleanupKeepReference.ok === true, "reference cleanup keep object setup failed");
-  const cleanupEmptyReference = cliJson("para-zk:update-project", [
-    `title=${cleanupEmptyProjectTitle}`,
-    "key=references",
-    "op=insert",
-    `value_json=${JSON.stringify({ link: cleanupTarget.path, description: "Only object" })}`,
-    "format=json"
-  ]);
-  assert(cleanupEmptyReference.ok === true, "reference cleanup empty object setup failed");
-
-  const deletedCleanupTarget = cliJson("para-zk:delete-resource", [
-    `title=${cleanupTargetTitle}`,
-    "format=json"
-  ]);
-  assert(deletedCleanupTarget.ok === true && deletedCleanupTarget.trashed === true, "reference cleanup target delete failed");
-  assert(deletedCleanupTarget.cleaned?.references >= 2, "object reference delete cleanup did not report removed references");
-  assertFileMissing(cleanupTarget.path, "reference cleanup target file remained");
-  const cleanupRead = cliJson("para-zk:read-project", [
-    `title=${cleanupProjectTitle}`,
-    "key=references",
-    "limit=all",
-    "format=json"
-  ]);
-  const cleanupItems = Object.values(cleanupRead.value?.items ?? {});
-  assert(cleanupRead.value?.count === 1, "object reference delete cleanup did not remove exactly one matching entry");
-  assert(cleanupItems[0]?.path === cleanupKeep.path, "object reference delete cleanup removed nonmatching entry");
-  assert(cleanupItems[0]?.description === "Keep object", "object reference delete cleanup lost preserved description");
-  assert(waitForNoFrontmatterReferences(cleanupEmptyProject.path) === true, "object reference delete cleanup did not remove empty references key");
-  assertFileContains(cleanupProject.path, [
-    `Body mention [[${cleanupTargetTitle}]]`
-  ]);
-}
 
 function assertObjectReferenceRenameSurvival() {
   const renameProjectTitle = `Smoke Object Rename Source ${stamp}`;
@@ -946,7 +535,7 @@ function assertObjectReferenceRenameSurvival() {
   ]);
   assertCreated(renameTarget, "object rename target");
   const objectReference = cliJson("para-zk:add-reference", [
-    `path=${renameProject.path}`,
+    "type=project", `title=${renameProjectTitle}`,
     `target=${renameTarget.path}`,
     "description=Object rename description",
     "open=false",
@@ -982,7 +571,7 @@ function assertObjectReferenceRenameSurvival() {
   // (Obsidian normalized it to a bare basename; dedupe resolves both forms to the same
   // file, so no duplicate entry is created).
   const readdAfterRename = cliJson("para-zk:add-reference", [
-    `path=${renameProject.path}`,
+    "type=project", `title=${renameProjectTitle}`,
     `target=${renamedTarget.path}`,
     "open=false",
     "format=json"
@@ -1173,11 +762,12 @@ function assertCreateRetroButtonProjectLink() {
   assert(created.buttonText === L.createRetro, `Create retro button text mismatch: ${created.buttonText}`);
   assert(typeof created.retroPath === "string" && created.retroPath.length > 0, "Create retro button did not create a retro");
 
+  const retroTitle = basename(created.retroPath, ".md");
   let frontmatter = {};
   let projectLink = "";
   for (let index = 0; index < 20; index += 1) {
     frontmatter = cliJson("para-zk:read-retro", [
-      `path=${created.retroPath}`,
+      `title=${retroTitle}`,
       "key=frontmatter",
       "format=json"
     ]);
@@ -1192,14 +782,14 @@ function assertCreateRetroButtonProjectLink() {
   const retroDate = String(frontmatter.value?.date ?? "");
   assert(/^\d{4}-\d{2}-\d{2}$/.test(retroDate), `retro date missing or invalid: ${retroDate}`);
 
-  const retroTitle = basename(created.retroPath, ".md");
   const retroWeekLabel = created.retroPath.match(/(?:^|\/)(\d{4}_W\d{2})(?:\/|$)/)?.[1]
     ?? retroTitle.match(/(\d{4}_W\d{2})$/)?.[1]
     ?? "";
   assert(retroWeekLabel.length > 0, `Could not derive retro week label from ${created.retroPath}`);
 
   const reopened = cliJson("para-zk:create-retro", [
-    `path=${project.path}`,
+    "source_type=project",
+    `source_title=${project.title}`,
     `date=${retroDate}`,
     "open=false",
     "format=json"
@@ -1240,7 +830,7 @@ function assertCreateRetroButtonProjectLink() {
   assert(beforeSummary.hasUpdatedColumn === true, `Project Retros Dataview did not include Updated before summary update: ${beforeSummary.retrosText}`);
 
   const update = cliJson("para-zk:update-retro", [
-    `path=${created.retroPath}`,
+    `title=${retroTitle}`,
     "key=retro_summary",
     "op=set",
     `value=${summaryText}`,
@@ -1295,7 +885,7 @@ function assertCreateRetroButtonProjectLink() {
   assert(rendered.codeBlocks === 0, "latest retro summary leaked as a code block");
 
   const clear = cliJson("para-zk:update-retro", [
-    `path=${created.retroPath}`,
+    `title=${retroTitle}`,
     "key=retro_summary",
     "op=set",
     "value=",
@@ -1326,22 +916,6 @@ function readFrontmatterReferences(path) {
   return snapshot.hasReferences ? snapshot.references : undefined;
 }
 
-function waitForNoFrontmatterReferences(path) {
-  const snapshot = guiJson(`(async () => {
-    const file = app.vault.getFileByPath(${JSON.stringify(path)});
-    if (!file) throw new Error("frontmatter file not found: " + ${JSON.stringify(path)});
-    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-    let hasReferences = true;
-    for (let index = 0; index < 30; index += 1) {
-      const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter;
-      hasReferences = Boolean(frontmatter && Object.prototype.hasOwnProperty.call(frontmatter, "references"));
-      if (!hasReferences) break;
-      await sleep(100);
-    }
-    console.log(JSON.stringify({ ok: true, removed: !hasReferences }));
-  })()`);
-  return snapshot.removed === true;
-}
 
 function waitForBacklink(targetPath, sourcePath) {
   const snapshot = guiJson(`(async () => {
@@ -1857,15 +1431,6 @@ function assertFileExists(path, message) {
   assert(false, `${message}: ${path}`);
 }
 
-function assertFileMissing(path, message) {
-  const absolute = join(vaultPath, path);
-  const deadline = Date.now() + 3000;
-  while (Date.now() <= deadline) {
-    if (!existsSync(absolute)) return;
-    sleepMs(100);
-  }
-  assert(false, `${message}: ${path}`);
-}
 
 function assertFileContains(path, needles) {
   const absolute = join(vaultPath, path);
@@ -1917,9 +1482,6 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-function hasOwnKey(value, key) {
-  return Object.prototype.hasOwnProperty.call(value, key);
-}
 
 function assertNearlyEqual(actual, expected, tolerance, message) {
   assert(

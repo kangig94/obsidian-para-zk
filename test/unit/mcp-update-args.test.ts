@@ -53,7 +53,7 @@ describe("MCP update arg builder", () => {
     ]);
   });
 
-  it("builds set args with path selectors and raw multi-line content", () => {
+  it("builds set args with child drill and raw multi-line content", () => {
     const content = "first line\nsecond line with $ and `backticks`";
 
     expect(buildUpdateArgs({
@@ -61,17 +61,44 @@ describe("MCP update arg builder", () => {
       tool: "set",
       params: {
         type: "area",
-        path: "Areas/Health.md",
-        key: "children/Habits/body",
+        title: "Health",
+        child: ["Habits"],
+        key: "body",
         content
       }
     })).toEqual([
       "raw",
       "para-zk:update-area",
-      "path=Areas/Health.md",
-      "key=children/Habits/body",
+      "title=Health",
+      `child=${JSON.stringify(["Habits"])}`,
+      "key=body",
       "op=set",
       `value=${content}`,
+      "format=json"
+    ]);
+  });
+
+  it("rejects a child selector that is not an array of strings", () => {
+    expect(() => buildUpdateArgs({
+      cli: "optsidian",
+      tool: "set",
+      params: { type: "area", title: "Health", child: "Habits", key: "body", content: "x" }
+    })).toThrow(/child must be an array of strings/);
+  });
+
+  it("emits a child drill as a single JSON-list argv element", () => {
+    expect(buildUpdateArgs({
+      cli: "optsidian",
+      tool: "set",
+      params: { type: "area", title: "Ops", child: ["Hiring", "Interviews"], key: "body", content: "x" }
+    })).toEqual([
+      "raw",
+      "para-zk:update-area",
+      "title=Ops",
+      `child=${JSON.stringify(["Hiring", "Interviews"])}`,
+      "key=body",
+      "op=set",
+      "value=x",
       "format=json"
     ]);
   });
@@ -180,7 +207,7 @@ describe("MCP update arg builder", () => {
       cli: "optsidian",
       tool: "add",
       params: { type: "project", key: "body", content: "text" }
-    })).toThrow(/requires a title or path selector/);
+    })).toThrow(/requires a title selector/);
 
     expect(() => buildUpdateArgs({
       cli: "optsidian",

@@ -78,7 +78,6 @@ Params:
 {
   "type": "project",
   "title": "Example",
-  "path": "Projects/Example.md",
   "date": "2026-06-04",
   "key": "body",
   "old_string": "old text",
@@ -99,7 +98,6 @@ Params:
 {
   "type": "project",
   "title": "Example",
-  "path": "Projects/Example.md",
   "date": "2026-06-04",
   "key": "body",
   "content": "full section content"
@@ -118,7 +116,6 @@ Params:
 {
   "type": "project",
   "title": "Example",
-  "path": "Projects/Example.md",
   "date": "2026-06-04",
   "key": "body",
   "content": "content to add",
@@ -132,20 +129,20 @@ Required: `type`, `key`, `content`, and a valid selector for the type. `position
 
 | `type` | CLI command | Required selector | Extra args |
 | --- | --- | --- | --- |
-| `project` | `update-project` | `title` or `path` | |
-| `area` | `update-area` | `title` or `path` | |
-| `resource` | `update-resource` | `title` or `path` | |
-| `retro` | `update-retro` | `title` or `path` | optional `date` passes through |
-| `journal` | `update-journal` | `date` or `path` | no title selector |
-| `zk_spark` | `update-zk` | `title` or `path` | `kind=spark` |
-| `zk_source` | `update-zk` | `title` or `path` | `kind=source` |
-| `zk_permanent` | `update-zk` | `title` or `path` | `kind=permanent` |
+| `project` | `update-project` | `title` | |
+| `area` | `update-area` | `title` | |
+| `resource` | `update-resource` | `title` | |
+| `retro` | `update-retro` | `title` | optional `date` passes through |
+| `journal` | `update-journal` | `date` | no title selector |
+| `zk_spark` | `update-zk` | `title` | `kind=spark` |
+| `zk_source` | `update-zk` | `title` | `kind=source` |
+| `zk_permanent` | `update-zk` | `title` | `kind=permanent` |
 
-Child doc/note bodies are edited through their parent note by passing the child key, for example `children/<Child Title>/body`.
+Child subnote/note bodies are edited through their container by passing `child: ["<Child Title>"]` (a JSON list, left to right) plus the child's own `key` (e.g. `body`).
 
 Structured types (`project`, `area`, `journal`, `retro`) use template section
 keys. Free-form types (`resource`, `zk_spark`, `zk_source`,
-`zk_permanent`, child `doc`, and fallback `note`) use `key=body` for prose;
+`zk_permanent`, child `subnote`, and fallback `note`) use `key=body` for prose;
 their Markdown headings are content, not enforced keys. `describe` remains the
 source of truth for each type's read/write keys and collections.
 

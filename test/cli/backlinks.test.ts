@@ -254,7 +254,8 @@ describe("backlink read collection", () => {
     const parentPath = await createProject("Child Backlinks");
     const docChild = await cli.run("para-zk:create-subnote", {
       title: "Doc Child",
-      path: parentPath,
+      parent_type: "project",
+      parent_title: "Child Backlinks",
       subnote_type: "meeting",
       open: "false"
     });
@@ -269,54 +270,60 @@ describe("backlink read collection", () => {
 
     const docCompact = await cli.run("para-zk:read-project", {
       title: "Child Backlinks",
-      key: "children/Doc Child"
+      child: '["Doc Child"]'
     });
-    expect((docCompact.value as { type: string; backlinks?: { count: number } }).type).toBe("doc");
-    expect((docCompact.value as { backlinks?: { count: number } }).backlinks?.count).toBe(1);
+    expect((docCompact as { type: string }).type).toBe("subnote");
+    expect((docCompact as { backlinks?: { count: number } }).backlinks?.count).toBe(1);
 
     const noteCompact = await cli.run("para-zk:read-project", {
       title: "Child Backlinks",
-      key: "children/Loose Child"
+      child: '["Loose Child"]'
     });
-    expect((noteCompact.value as { type: string; backlinks?: { count: number } }).type).toBe("note");
-    expect((noteCompact.value as { backlinks?: { count: number } }).backlinks?.count).toBe(1);
+    expect((noteCompact as { type: string }).type).toBe("note");
+    expect((noteCompact as { backlinks?: { count: number } }).backlinks?.count).toBe(1);
 
     const page = await cli.run("para-zk:read-project", {
       title: "Child Backlinks",
-      key: "children/Doc Child/backlinks"
+      child: '["Doc Child"]',
+      key: "backlinks"
     });
     expect(collectionValue(page).count).toBe(1);
     expect(collectionValue(page).items["0"]?.path).toBe(sourcePath);
 
     const notePage = await cli.run("para-zk:read-project", {
       title: "Child Backlinks",
-      key: "children/Loose Child/backlinks"
+      child: '["Loose Child"]',
+      key: "backlinks"
     });
     expect(collectionValue(notePage).count).toBe(1);
     expect(collectionValue(notePage).items["0"]?.path).toBe(sourcePath);
 
     const single = await cli.run("para-zk:read-project", {
       title: "Child Backlinks",
-      key: "children/Doc Child/backlinks/0"
+      child: '["Doc Child"]',
+      key: "backlinks/0"
     });
     expect((single.value as Record<string, unknown>).path).toBe(sourcePath);
 
     const noteSingle = await cli.run("para-zk:read-project", {
       title: "Child Backlinks",
-      key: "children/Loose Child/backlinks/0"
+      child: '["Loose Child"]',
+      key: "backlinks/0"
     });
     expect((noteSingle.value as Record<string, unknown>).path).toBe(sourcePath);
 
     const docUnknown = await cli.run("para-zk:read-project", {
       title: "Child Backlinks",
-      key: "children/Doc Child/__missing__"
+      child: '["Doc Child"]',
+      key: "__missing__"
     });
     expect(docUnknown.ok).toBe(false);
     expect(String(docUnknown.error)).toContain("backlinks");
 
     const noteUnknown = await cli.run("para-zk:read-project", {
       title: "Child Backlinks",
-      key: "children/Loose Child/__missing__"
+      child: '["Loose Child"]',
+      key: "__missing__"
     });
     expect(noteUnknown.ok).toBe(false);
     expect(String(noteUnknown.error)).toContain("backlinks");
@@ -335,7 +342,8 @@ describe("backlink read collection", () => {
 
     const retroScopePath = await createProject("Retro Scope");
     const retro = await cli.run("para-zk:create-retro", {
-      path: retroScopePath,
+      source_type: "project",
+      source_title: "Retro Scope",
       date: "2026-06-02",
       open: "false"
     });
@@ -349,7 +357,7 @@ describe("backlink read collection", () => {
     });
 
     const journalRead = await cli.run("para-zk:read-journal", {
-      path: journalPath,
+      date: "2026-06-02",
       key: "backlinks",
       limit: "all"
     });
@@ -358,7 +366,7 @@ describe("backlink read collection", () => {
     expect(Object.values(journalValue.items).some((item) => item.path === journalSourcePath)).toBe(true);
 
     const retroRead = await cli.run("para-zk:read-retro", {
-      path: retroPath,
+      title: retroPath.split("/").pop()!.replace(/\.md$/, ""),
       key: "backlinks",
       limit: "all"
     });
@@ -430,14 +438,16 @@ describe("backlink read collection", () => {
     const projectPath = await createProject("No Scan");
     const child = await cli.run("para-zk:create-subnote", {
       title: "Body Child",
-      path: projectPath,
+      parent_type: "project",
+      parent_title: "No Scan",
       subnote_type: "free",
       open: "false"
     });
     expect(child.ok).toBe(true);
     await cli.run("para-zk:update-project", {
       title: "No Scan",
-      key: "children/Body Child/body",
+      child: '["Body Child"]',
+      key: "body",
       op: "set",
       value: "Exact child body"
     });
@@ -456,7 +466,8 @@ describe("backlink read collection", () => {
 
     const childBody = await cli.run("para-zk:read-project", {
       title: "No Scan",
-      key: "children/Body Child/body"
+      child: '["Body Child"]',
+      key: "body"
     });
     expect(childBody.ok).toBe(true);
     expect(childBody.value).toBe("Exact child body");

@@ -38,7 +38,7 @@ import type {
   CreateFromResourceOptions,
   WorkflowContext
 } from "./context";
-import { folderForZkKind, requireTitle, resolveRequiredFile, uniqueMarkdownPath } from "./locations";
+import { folderForZkKind, requireTitle, resolveRequiredByType, resolveRequiredFile, uniqueMarkdownPath } from "./locations";
 import { insertReferenceItem } from "./references";
 import { deleteZk } from "./delete";
 
@@ -75,16 +75,27 @@ export async function openJournal(ctx: WorkflowContext, options: OpenJournalOpti
   };
 }
 
+// Name-based origin lookup: the command implies the stored origin type, so the
+// caller need only supply a title. Maps the stored type to an addressing token.
+function resolveOriginByName(ctx: WorkflowContext, expectedType: string, title: string | undefined): Promise<TFile> {
+  if (expectedType === "resource") return resolveRequiredByType(ctx, "resource", { title });
+  if (expectedType === "zk_source") return resolveRequiredByType(ctx, "zk", { title, kind: "source" });
+  if (expectedType === "zk_spark") return resolveRequiredByType(ctx, "zk", { title, kind: "spark" });
+  return resolveRequiredByType(ctx, expectedType, { title });
+}
+
 // Shared scaffold: resolve a typed origin note and create a new ZK note of
 // `kind` from it. Behind createFromResource / createFromSource /
 // distillSpark — each adds only its distinct post-create step.
 async function createZkFromOrigin(
   ctx: WorkflowContext,
-  options: { sourcePath?: string; title?: string; maturity?: string },
+  options: { sourcePath?: string; sourceTitle?: string; title?: string; maturity?: string },
   origin: { label: string; expectedType: string },
   kind: ZkKind
 ): Promise<{ source: TFile; file: TFile }> {
-  const source = resolveRequiredFile(ctx, options.sourcePath, origin.label);
+  const source = options.sourcePath
+    ? resolveRequiredFile(ctx, options.sourcePath, origin.label)
+    : await resolveOriginByName(ctx, origin.expectedType, options.sourceTitle);
   const sourceType = await readFileTypeFresh(ctx, source);
   if (sourceType !== origin.expectedType) {
     throw new Error(`file is not a ${origin.expectedType} note: ${source.path}`);

@@ -21,6 +21,8 @@ describe("describe", () => {
     expect(surfaces).toHaveLength(1);
     const project = surfaces[0];
     expect(project.type).toBe("project");
+    expect((project.addressing as { addressable: boolean; create: string }).addressable).toBe(true);
+    expect((project.addressing as { create: string }).create).toBe("para-zk:create-project");
     expect(project).not.toHaveProperty("body");
     expect(project).not.toHaveProperty("children");
     expect(project.frontmatterKeys).toEqual(expect.arrayContaining(["status", "priority"]));
@@ -38,8 +40,7 @@ describe("describe", () => {
       "summary",
       "goals",
       "tasks",
-      "references",
-      "children"
+      "references"
     ]);
     expect(project.collections).toEqual({
       tasks: "task",
@@ -97,5 +98,16 @@ describe("describe", () => {
       "insight",
       "evidence"
     ]));
+  });
+
+  it("marks subnote/subarea as create-able but not directly addressable", async () => {
+    for (const type of ["subnote", "subarea"]) {
+      const result = await cli.run("para-zk:describe", { type });
+      const surface = (result.surfaces as Array<Record<string, unknown>>)[0];
+      const addressing = surface.addressing as { addressable: boolean; addressVia?: string; create: string };
+      expect(addressing.addressable).toBe(false);
+      expect(addressing.addressVia).toContain("child=");
+      expect(addressing.create).toBe(`para-zk:create-${type}`);
+    }
   });
 });

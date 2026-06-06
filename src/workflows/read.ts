@@ -36,36 +36,36 @@ import {
   unknownReadKeyError
 } from "./describe";
 import { countBacklinks, readBacklinks } from "./backlinks";
-import { childFiles, findChild, isArchivedFile, resolveRequiredArea, resolveRequiredJournal, resolveRequiredProject, resolveRequiredResource, resolveRequiredRetro, resolveRequiredZk } from "./locations";
+import { childFiles, drillToChild, isArchivedFile, resolveRequiredArea, resolveRequiredJournal, resolveRequiredProject, resolveRequiredResource, resolveRequiredRetro, resolveRequiredZk } from "./locations";
 import { parseWikiLink, pathBasenameWithoutExtension, splitObsidianSubpath } from "./references";
 
 type ReadMap = Record<string, unknown>;
 type ReadCollectionKind = CollectionKind;
 
 export async function readProject(ctx: WorkflowContext, options: ReadProjectOptions): Promise<Record<string, unknown>> {
-  return readSurface(ctx, await resolveRequiredProject(ctx, options), PROJECT_READ_SPEC, options.key, options.collection);
+  return readSurface(ctx, await resolveRequiredProject(ctx, options), PROJECT_READ_SPEC, options.key, options.collection, options.child);
 }
 
 export async function readArea(ctx: WorkflowContext, options: ReadAreaOptions): Promise<Record<string, unknown>> {
-  return readSurface(ctx, await resolveRequiredArea(ctx, options), AREA_READ_SPEC, options.key, options.collection);
+  return readSurface(ctx, await resolveRequiredArea(ctx, options), AREA_READ_SPEC, options.key, options.collection, options.child);
 }
 
 export async function readResource(ctx: WorkflowContext, options: ReadResourceOptions): Promise<Record<string, unknown>> {
-  return readSurface(ctx, await resolveRequiredResource(ctx, options), RESOURCE_READ_SPEC, options.key, options.collection);
+  return readSurface(ctx, await resolveRequiredResource(ctx, options), RESOURCE_READ_SPEC, options.key, options.collection, options.child);
 }
 
 export async function readZk(ctx: WorkflowContext, options: ReadZkOptions): Promise<Record<string, unknown>> {
   const file = await resolveRequiredZk(ctx, options);
   const type = await readFileTypeFresh(ctx, file);
-  return readSurface(ctx, file, specForType(type), options.key, options.collection);
+  return readSurface(ctx, file, specForType(type), options.key, options.collection, options.child);
 }
 
 export async function readJournal(ctx: WorkflowContext, options: ReadJournalOptions): Promise<Record<string, unknown>> {
-  return readSurface(ctx, await resolveRequiredJournal(ctx, options), JOURNAL_READ_SPEC, options.key, options.collection);
+  return readSurface(ctx, await resolveRequiredJournal(ctx, options), JOURNAL_READ_SPEC, options.key, options.collection, options.child);
 }
 
 export async function readRetro(ctx: WorkflowContext, options: ReadRetroOptions): Promise<Record<string, unknown>> {
-  return readSurface(ctx, await resolveRequiredRetro(ctx, options), RETRO_READ_SPEC, options.key, options.collection);
+  return readSurface(ctx, await resolveRequiredRetro(ctx, options), RETRO_READ_SPEC, options.key, options.collection, options.child);
 }
 
 async function readSurface(
@@ -73,8 +73,13 @@ async function readSurface(
   file: TFile,
   spec: ReadSurfaceSpec,
   rawKey: string | undefined,
-  collectionOptions?: CollectionReadOptions
+  collectionOptions?: CollectionReadOptions,
+  child?: string[]
 ): Promise<Record<string, unknown>> {
+  if (child && child.length > 0) {
+    file = drillToChild(ctx, file, child);
+    spec = specForType(await readFileTypeFresh(ctx, file));
+  }
   const frontmatter = await readFileFrontmatterFresh(ctx, file);
   const type = readType(frontmatter);
   const surface = await readSurfaceMap(ctx, file, spec);
@@ -264,25 +269,7 @@ async function readSurfaceKey(
     throw unknownReadKeyError(spec, originalKey);
   }
   if (parts.length === 1) return surface.children;
-
-  const childTitle = parts[1];
-  const child = findChild(ctx, source, childTitle);
-  if (!child) throw new Error(`child not found: ${childTitle}`);
-
-  const childType = await readFileTypeFresh(ctx, child);
-  const childSpec = specForType(childType);
-  if (parts.length > 2) {
-    const childParts = parts.slice(2);
-    if (childParts[0] === "backlinks") {
-      return readBacklinkSurfaceKey(ctx, child, childSpec, childParts, originalKey, collectionOptions);
-    }
-  }
-
-  const childSurface = await readSurfaceMap(ctx, child, childSpec);
-  if (parts.length === 2) {
-    return compactReadEnvelope(ctx, child, childType, childSurface, childSpec);
-  }
-  return readSurfaceKey(ctx, child, childSurface, childSpec, parts.slice(2).join("/"), collectionOptions, originalKey);
+  throw new Error(`children is a read-only index; use child=["${parts[1]}"] to address a child`);
 }
 
 function readBacklinkSurfaceKey(

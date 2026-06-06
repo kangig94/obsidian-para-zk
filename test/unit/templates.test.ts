@@ -82,7 +82,7 @@ describe("managed templates", () => {
     expect(source).toContain("para-zk-references");
     expect(permanent).toContain("permanent-cited-by");
     expect(permanent).toContain("title: Cited by");
-    expect(managedUiBlockForType("doc", DEFAULT_SETTINGS)).toBeUndefined();
+    expect(managedUiBlockForType("subnote", DEFAULT_SETTINGS)).toBeUndefined();
   });
 
   it("renders Dataview tables for managed ZK views (cited-by and distilled-into)", () => {

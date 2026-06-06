@@ -7,6 +7,7 @@ import { slugify, uniqueStrings } from "../text";
 import type { RenameByTitleOptions, RenameResult, RenameZkOptions, WorkflowContext } from "./context";
 import {
   assertVacantPath,
+  drillToChild,
   folderName,
   folderStyleContainer,
   requireTitle,
@@ -18,21 +19,17 @@ import {
 import { stringReferencesAnyTarget } from "./references";
 
 export async function renameProject(ctx: WorkflowContext, options: RenameByTitleOptions): Promise<RenameResult> {
-  return renameFolderStyleNote(
-    ctx,
-    await resolveRequiredProject(ctx, options),
-    requireTitle(options.newTitle, "new_title"),
-    "project"
-  );
+  const container = await resolveRequiredProject(ctx, options);
+  const newTitle = requireTitle(options.newTitle, "new_title");
+  if (options.child && options.child.length > 0) return renameChildTarget(ctx, container, options.child, newTitle);
+  return renameFolderStyleNote(ctx, container, newTitle, "project");
 }
 
 export async function renameArea(ctx: WorkflowContext, options: RenameByTitleOptions): Promise<RenameResult> {
-  return renameFolderStyleNote(
-    ctx,
-    await resolveRequiredArea(ctx, options),
-    requireTitle(options.newTitle, "new_title"),
-    "area"
-  );
+  const container = await resolveRequiredArea(ctx, options);
+  const newTitle = requireTitle(options.newTitle, "new_title");
+  if (options.child && options.child.length > 0) return renameChildTarget(ctx, container, options.child, newTitle);
+  return renameFolderStyleNote(ctx, container, newTitle, "area");
 }
 
 export async function renameResource(ctx: WorkflowContext, options: RenameByTitleOptions): Promise<RenameResult> {
@@ -51,6 +48,22 @@ export async function renameZk(ctx: WorkflowContext, options: RenameZkOptions): 
     requireTitle(options.newTitle, "new_title"),
     "knowledge"
   );
+}
+
+// A child reached via child= can be a flat subnote or a folder-style subarea;
+// dispatch by the resolved note's stored type.
+async function renameChildTarget(
+  ctx: WorkflowContext,
+  container: TFile,
+  child: string[],
+  newTitle: string
+): Promise<RenameResult> {
+  const file = drillToChild(ctx, container, child);
+  const type = readType(fileFrontmatter(ctx, file));
+  if (type === "project" || type === "area" || type === "subarea") {
+    return renameFolderStyleNote(ctx, file, newTitle, type === "project" ? "project" : "area");
+  }
+  return renameFlatNote(ctx, file, newTitle, type === "resource" ? "resource" : "knowledge");
 }
 
 type TagDomain = "project" | "area" | "resource" | "knowledge";

@@ -12,7 +12,8 @@ describe("delete-project", () => {
     await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
     await cli.run("para-zk:create-subnote", {
       title: "Child",
-      path: "PARA/Projects/Alpha/Alpha.md",
+      parent_type: "project",
+      parent_title: "Alpha",
       subnote_type: "free",
       open: "false"
     });
@@ -26,7 +27,8 @@ describe("delete-project", () => {
     await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
     await cli.run("para-zk:create-subnote", {
       title: "Child",
-      path: "PARA/Projects/Alpha/Alpha.md",
+      parent_type: "project",
+      parent_title: "Alpha",
       subnote_type: "free",
       open: "false"
     });
@@ -37,6 +39,23 @@ describe("delete-project", () => {
     expect(deleted.trashMethod).not.toBe("trash-explorer");
     expect(cli.app.readPath("PARA/Projects/Alpha/Alpha.md")).toBeUndefined();
     expect(cli.app.readPath("PARA/Projects/Alpha/Child.md")).toBeUndefined();
+  });
+
+  it("deletes a child subnote via child drill, leaving the container", async () => {
+    await cli.run("para-zk:create-project", { title: "Host", open: "false" });
+    await cli.run("para-zk:create-subnote", {
+      title: "Scratch",
+      parent_type: "project",
+      parent_title: "Host",
+      subnote_type: "free",
+      open: "false"
+    });
+    expect(cli.app.readPath("PARA/Projects/Host/Scratch.md")).toBeDefined();
+
+    const deleted = await cli.run("para-zk:delete-project", { title: "Host", child: '["Scratch"]' });
+    expect(deleted.ok).toBe(true);
+    expect(cli.app.readPath("PARA/Projects/Host/Scratch.md")).toBeUndefined();
+    expect(cli.app.readPath("PARA/Projects/Host/Host.md")).toBeDefined();
   });
 });
 

@@ -19,11 +19,15 @@ optsidian raw para-zk:describe format=json
 Use `format=json` for automation. Text output is for humans and may omit fields
 that JSON includes.
 
-All paths are vault-relative. Use the canonical `path` option when a command
-needs an existing note. Legacy aliases such as `file_path`, `filePath`,
-`source`, `sourcePath`, and `file` are rejected.
-Other concepts also use exactly one option name: for example `title`, `kind`,
-`area_titles`, `subnote_type`, and `content`.
+Notes are addressed **by name, never by file path** — the CLI never exposes a
+`path` option. Address a note by its `title` (project/area/resource), `date`
+(journal/retro), or `title`+`kind` (zk). An existing child note (subnote/subarea)
+is reached through its container plus a `child=["<title>", ...]` drill (left to
+right). New children name their parent with `parent_type`+`parent_title`; ZK
+notes derived from an origin name it with `source_title` (and `source_type` where
+the origin type is ambiguous, e.g. scoped retro / resource link). Each concept
+uses exactly one option name: `title`, `kind`, `area_titles`, `subnote_type`,
+`content`, `child`, `parent_type`, `parent_title`, `source_type`, `source_title`.
 
 ## Stable Codes
 
@@ -210,7 +214,6 @@ Options:
 | Option | Values | Notes |
 | --- | --- | --- |
 | `title` | string | Required. |
-| `parent` | path | Optional parent area path. |
 | `open` | boolean | Default `false`. |
 
 Example:
@@ -224,7 +227,9 @@ Side effects:
 - Creates `PARA/Areas/<title>/<title>.md`.
 - Sets `type: area`.
 - Sets a localized area tag.
-- Sets `parent` if `parent` was provided.
+
+To nest an area under another area, use `para-zk:create-subarea` (it creates the
+folder-style child). A root area has no parent.
 
 ### `para-zk:read-project`
 
@@ -236,8 +241,7 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `title` | string | Project title. Used when `path` is omitted. |
-| `path` | path | Optional exact project note path. |
+| `title` | string | Project title. |
 | `archived` | boolean | When selecting by title, `true` restricts lookup to `PARA/Archives`; `false` restricts lookup to the active PARA folder. |
 | `key` | map path | Optional stable key path. |
 | `offset` | number | Collection key reads only. Zero-based offset, default `0`. |
@@ -266,7 +270,7 @@ optsidian raw para-zk:read-project title="Model Evaluation" key=tasks checkbox=/
 optsidian raw para-zk:read-project title="Model Evaluation" key=references ref_kind=url format=json
 optsidian raw para-zk:read-project title="Model Evaluation" key=backlinks type=project limit=20 format=json
 optsidian raw para-zk:read-project title="Model Evaluation" key=children format=json
-optsidian raw para-zk:read-project title="Model Evaluation" key="children/Planning Meeting/body" format=json
+optsidian raw para-zk:read-project title="Model Evaluation" child='["Planning Meeting"]' key=body format=json
 ```
 
 Full read responses include `mode: "compact"`. Frontmatter values are inlined
@@ -281,24 +285,26 @@ Frontmatter wikilinks are shown by display title in full reads; read the exact
 Use a `key` read when you need to distinguish an explicitly empty section from
 an omitted one. Key reads include `mode: "exact"`.
 
-`children` is a map keyed by child note title. Child entries include only the
-selector and type information needed for follow-up reads:
+`children` is a **read-only index** keyed by child note title. To read or edit a
+child, address the container and drill with `child=["<title>", ...]` (left to
+right; the index basenames are exactly the `child=` values). Child entries
+include only the selector and type information needed for that follow-up:
 
 ```json
 {
   "children": {
     "Planning Meeting": {
       "path": "PARA/Projects/Model Evaluation/Planning Meeting.md",
-      "type": "doc",
+      "type": "subnote",
       "subnote_type": "meeting"
     }
   }
 }
 ```
 
-DOC and fallback NOTE children also expose read-only backlinks through
-`key="children/<title>/backlinks"` for paged collection reads and
-`key="children/<title>/backlinks/<i>"` for a single item.
+Subnote and fallback NOTE children also expose read-only backlinks through
+`child=["<title>"] key=backlinks` for paged collection reads and
+`child=["<title>"] key=backlinks/<i>` for a single item.
 
 Task, reference, and backlink surfaces are structured collections rather than raw Markdown.
 Full compact reads return only `count`; collection items are omitted by design.
@@ -373,8 +379,8 @@ Important fields:
 - `backlinks`: read-only inbound resolved-link collection. Items expose the
   source note `link`, `path`, `title`, and `type`; use `type=` to filter by
   source note type.
-- `children`: child-note index; child bodies are read only when requested with
-  a `children/<title>/...` key.
+- `children`: read-only child-note index; read or edit a child by drilling from
+  the container with `child=["<title>", ...]`.
 - `value`: present when `key` is provided.
 
 The same map-path read algorithm is used by the other domain read commands. The
@@ -386,18 +392,18 @@ When selecting by `title`, `read-project`, `read-area`, `read-resource`, and
 
 Surface types fall into two groups. `project`, `area`, `journal`, and `retro`
 are structured: their load-bearing template sections are stable keys. `resource`,
-child `doc`/fallback `note`, and `zk_*` notes are free-form: prose is exposed as
+child `subnote`/fallback `note`, and `zk_*` notes are free-form: prose is exposed as
 one `body` key for the whole editable Markdown body before the managed tail.
 Free-form bodies may contain H1 headings; those headings are content, not extra
 stable keys.
 
 | Command | Selector | Top-level keys |
 | --- | --- | --- |
-| `para-zk:read-area` | `title` or `path` | `frontmatter`, `overview`, `tasks`, `references`, `backlinks`, `children` |
-| `para-zk:read-resource` | `title` or `path` | `frontmatter`, `body`, `references`, `backlinks` |
-| `para-zk:read-zk` | `title` plus optional `kind`, or `path` | `frontmatter`, `body`, `references`, `backlinks` |
-| `para-zk:read-journal` | `date` or `path` | `frontmatter`, `focus`, `quick_memo`, `timeline`, `tasks`, `short_review`, `references`, `backlinks` |
-| `para-zk:read-retro` | `title` plus optional `date`, or `path` | `frontmatter`, `week_progress`, `good`, `improve`, `risks`, `tasks`, `retro_summary`, `references`, `backlinks` |
+| `para-zk:read-area` | `title` | `frontmatter`, `overview`, `tasks`, `references`, `backlinks`, `children` |
+| `para-zk:read-resource` | `title` | `frontmatter`, `body`, `references`, `backlinks` |
+| `para-zk:read-zk` | `title` plus optional `kind` | `frontmatter`, `body`, `references`, `backlinks` |
+| `para-zk:read-journal` | `date` | `frontmatter`, `focus`, `quick_memo`, `timeline`, `tasks`, `short_review`, `references`, `backlinks` |
+| `para-zk:read-retro` | `title` plus optional `date` | `frontmatter`, `week_progress`, `good`, `improve`, `risks`, `tasks`, `retro_summary`, `references`, `backlinks` |
 
 Free-form top-level keys:
 
@@ -423,7 +429,7 @@ optsidian raw para-zk:read-resource title="Source Paper" key=body format=json
 optsidian raw para-zk:read-zk title="Stable Interface Contracts" kind=permanent key=body format=json
 optsidian raw para-zk:read-zk title="Stable Interface Contracts" kind=permanent key=frontmatter/maturity format=json
 optsidian raw para-zk:read-journal date=2026-05-30 key=quick_memo format=json
-optsidian raw para-zk:read-retro path="PARA/Retros/2026_W22/Retro-General-2026_W22.md" key=retro_summary format=json
+optsidian raw para-zk:read-retro title="Retro-General-2026_W22" key=retro_summary format=json
 ```
 
 ### `para-zk:update-project`
@@ -436,10 +442,9 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `title` | string | Project title. Used when `path` is omitted. |
-| `path` | path | Optional exact project note path. |
+| `title` | string | Project title. |
 | `archived` | boolean | Same title lookup behavior as `read-project`. |
-| `key` | writable map path | Required. Examples: `frontmatter/status`, `summary`, `children/Planning Meeting/body`. |
+| `key` | writable map path | Required. Examples: `frontmatter/status`, `summary`, `body`. Drill into a child with `child=["<title>"]` and use the child's own key. |
 | `op` | `set`, `insert`, `append`, `prepend`, `replace`, `delete` | Required update operation. |
 | `value` | text | Required for scalar `set`, `append`, and `prepend`. |
 | `value_json` | JSON | Structured value for frontmatter updates and task/reference inserts. |
@@ -450,7 +455,7 @@ Options:
 Writable keys are a subset of read keys. `frontmatter/<key>` supports `op=set`
 only and uses Obsidian frontmatter mutation. Section/body keys support
 `set`, `append`, `prepend`, and exact literal `replace`.
-For free-form resource, child doc/note, and ZK prose, use `key=body`; old starter
+For free-form resource, child subnote/note, and ZK prose, use `key=body`; old starter
 headings such as `summary`, `memo`, `insight`, or `limitations` are not writable
 map keys.
 Task collections are structured and do not accept raw Markdown task lines.
@@ -513,7 +518,7 @@ optsidian raw para-zk:update-project title="Model Evaluation" key=references/0/d
 optsidian raw para-zk:update-project title="Model Evaluation" key=references/0 op=delete format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key=tasks/a8f3k2m9/checkbox op=set value=x format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key=tasks/a8f3k2m9 op=delete format=json
-optsidian raw para-zk:update-project title="Model Evaluation" key="children/Planning Meeting/body" op=append value="Decision: ship the baseline." format=json
+optsidian raw para-zk:update-project title="Model Evaluation" child='["Planning Meeting"]' key=body op=append value="Decision: ship the baseline." format=json
 optsidian raw para-zk:update-project title="Model Evaluation" key=frontmatter/status op=set value=archived format=json
 ```
 
@@ -524,8 +529,8 @@ non-archived status restores it to `PARA/Projects`.
 
 Result fields:
 
-- `path`: the actual file that was updated. For `children/<title>/...`, this is
-  the child note path.
+- `path`: the actual file that was updated. With `child=[...]`, this is the
+  resolved child note path.
 - `key`: the original requested key.
 - `operation`: the applied operation.
 - `changed`: false when the requested `set` value already matched.
@@ -539,11 +544,11 @@ The same update algorithm is used by the other domain update commands:
 
 | Command | Selector | Notes |
 | --- | --- | --- |
-| `para-zk:update-area` | `title` or `path` | Supports area surface keys and `children/<title>/...`. |
-| `para-zk:update-resource` | `title` or `path` | Uses free-form `body`, `references`, and frontmatter keys. |
-| `para-zk:update-zk` | `title` plus optional `kind`, or `path` | Uses free-form `body`, `references`, and type-specific frontmatter keys. |
-| `para-zk:update-journal` | `date` or `path` | Supports journal surface keys such as `quick_memo` and `tasks`. |
-| `para-zk:update-retro` | `title` plus optional `date`, or `path` | Supports retro surface keys such as `tasks`. |
+| `para-zk:update-area` | `title` | Supports area surface keys; drill into children with `child=[...]`. |
+| `para-zk:update-resource` | `title` | Uses free-form `body`, `references`, and frontmatter keys. |
+| `para-zk:update-zk` | `title` plus optional `kind` | Uses free-form `body`, `references`, and type-specific frontmatter keys. |
+| `para-zk:update-journal` | `date` | Supports journal surface keys such as `quick_memo` and `tasks`. |
+| `para-zk:update-retro` | `title` plus optional `date` | Supports retro surface keys such as `tasks`. |
 
 ### Rename Commands
 
@@ -555,17 +560,17 @@ retros are left in place.
 
 | Command | Selector | Notes |
 | --- | --- | --- |
-| `para-zk:rename-project` | `title` or `path`; optional `archived` | Renames the folder-style project folder and main note. Child notes move with the folder; default project-scoped retros are renamed with it. |
-| `para-zk:rename-area` | `title` or `path`; optional `archived` | Renames the folder-style area folder and main note. Child areas move with the folder; default area-scoped retros and area tag namespaces are updated without dropping inherited parent tags. |
-| `para-zk:rename-resource` | `title` or `path`; optional `archived` | Renames the resource note file in place. |
-| `para-zk:rename-zk` | `title` plus optional `kind`, or `path` | Renames the selected ZK note file in place. |
+| `para-zk:rename-project` | `title`; optional `archived` | Renames the folder-style project folder and main note. Child notes move with the folder; default project-scoped retros are renamed with it. |
+| `para-zk:rename-area` | `title`; optional `archived` | Renames the folder-style area folder and main note. Child areas move with the folder; default area-scoped retros and area tag namespaces are updated without dropping inherited parent tags. |
+| `para-zk:rename-resource` | `title`; optional `archived` | Renames the resource note file in place. |
+| `para-zk:rename-zk` | `title` plus optional `kind` | Renames the selected ZK note file in place. |
 
 Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `title` | string | Current note title. Used when `path` is omitted. |
-| `path` | path | Optional exact note path. |
+| `title` | string | Current note title. |
+| `child` | JSON list | `rename-project`/`rename-area` only. Drill into a nested child (subnote/subarea) to rename it instead of the container, e.g. `["Hiring","Interviews"]`. |
 | `new_title` | string | Required new note title. Aliases such as `newTitle` are rejected. |
 | `archived` | boolean | PARA rename commands only; same title lookup behavior as reads. |
 | `kind` | ZK kind code | `rename-zk` only; narrows title lookup. |
@@ -604,19 +609,19 @@ needed. PARA-ZK only cleans relationships it owns directly:
 
 | Command | Selector | Notes |
 | --- | --- | --- |
-| `para-zk:delete-project` | `title` or `path`; optional `archived` | Deletes the folder-style project container. Requires `force=true` if child files are inside. |
-| `para-zk:delete-area` | `title` or `path`; optional `archived` | Deletes the folder-style area container. Requires `force=true` if child files are inside. |
-| `para-zk:delete-resource` | `title` or `path`; optional `archived` | Deletes the resource note and removes matching frontmatter reference items. |
-| `para-zk:delete-zk` | `title` plus optional `kind`, or `path` | Deletes the selected ZK note and removes matching frontmatter reference items. |
-| `para-zk:delete-journal` | `date` or `path` | Deletes a daily journal note. |
-| `para-zk:delete-retro` | `title` plus optional `date`, or `path` | Deletes a retro note. |
+| `para-zk:delete-project` | `title`; optional `archived` | Deletes the folder-style project container. Requires `force=true` if child files are inside. |
+| `para-zk:delete-area` | `title`; optional `archived` | Deletes the folder-style area container. Requires `force=true` if child files are inside. |
+| `para-zk:delete-resource` | `title`; optional `archived` | Deletes the resource note and removes matching frontmatter reference items. |
+| `para-zk:delete-zk` | `title` plus optional `kind` | Deletes the selected ZK note and removes matching frontmatter reference items. |
+| `para-zk:delete-journal` | `date` | Deletes a daily journal note. |
+| `para-zk:delete-retro` | `title` plus optional `date` | Deletes a retro note. |
 
 Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `title` | string | Current note title. Used when `path` is omitted. |
-| `path` | path | Optional exact note path. |
+| `title` | string | Current note title. |
+| `child` | JSON list | `delete-project`/`delete-area` only. Drill into a nested child (subnote/subarea) to delete it instead of the container. |
 | `archived` | boolean | PARA delete commands only; same title lookup behavior as reads. |
 | `kind` | ZK kind code | `delete-zk` only; narrows title lookup. |
 | `date` | `YYYY-MM-DD` | `delete-journal` and `delete-retro` only. |
@@ -688,8 +693,9 @@ Options:
 | Option | Values | Notes |
 | --- | --- | --- |
 | `title` | string | Required. |
-| `path` | path | Optional source note receiving the resource link. |
-| `link` | boolean | Defaults to `true` when `path` is present. |
+| `source_type` | `project`, `area`, `resource`, `zk` | Optional source note type to link this resource from. |
+| `source_title` | string | Optional source note title. |
+| `link` | boolean | Defaults to `true` when `source_title` is provided. |
 | `body` | markdown | Optional initial free-form body content. |
 | `open` | boolean | Default `false`. |
 
@@ -698,7 +704,7 @@ Example:
 ```bash
 optsidian raw para-zk:create-resource \
   title="Source Paper" \
-  path="PARA/Projects/Model Evaluation/Model Evaluation.md" \
+  source_type=project source_title="Model Evaluation" \
   link=true \
   format=json
 ```
@@ -715,10 +721,19 @@ a note's frontmatter `references` array.
 
 Options:
 
+The receiving note is addressed **by name** (like every other command). The
+`target` references another note by name too — use `[[Title]]`, which Obsidian
+resolves by basename, so you never need a full path (and a just-created note's
+returned `path`/title can be used directly).
+
 | Option | Values | Notes |
 | --- | --- | --- |
-| `path` | path | Required for deterministic CLI use. Source note receiving the reference. |
-| `target` | path, URL, wikilink, markdown link, or text | Required. Existing vault files are stored as alias-free wikilinks. URLs are stored directly. Markdown-link and wikilink aliases are input syntax only and are dropped. |
+| `type` | `project`, `area`, `resource`, `zk`, `retro`, `journal` | Type of the note that receives the reference. |
+| `title` | string | Receiving note title (project/area/resource/zk/retro). |
+| `kind` | `spark`, `source`, `permanent` | Receiving ZK kind when `type=zk`. |
+| `date` | YYYY-MM-DD | Receiving note date when `type=journal`/`retro`. |
+| `child` | JSON list | Optional. Drill into a nested child of the receiving container. |
+| `target` | `[[wikilink]]`, URL, markdown link, or text | Required. `[[Title]]` is resolved by basename to a vault note. URLs are stored directly. Markdown-link and wikilink aliases are input syntax only and are dropped. |
 | `description` | string | Optional per-reference description. |
 | `open` | boolean | Default `false`. |
 
@@ -726,12 +741,13 @@ Examples:
 
 ```bash
 optsidian raw para-zk:add-reference \
-  path="PARA/Projects/Model Evaluation/Model Evaluation.md" \
-  target="assets/model-eval.pdf" \
+  type=resource title="Attention Is All You Need" \
+  target="[[Telegram Clone]]" \
+  description="Project that applies this" \
   format=json
 
 optsidian raw para-zk:add-reference \
-  path="PARA/Projects/Model Evaluation/Model Evaluation.md" \
+  type=project title="Model Evaluation" \
   target="https://example.com/paper" \
   description="Source paper" \
   format=json
@@ -773,7 +789,9 @@ Options:
 | Option | Values | Notes |
 | --- | --- | --- |
 | `title` | string | Required. |
-| `path` | path | Required for deterministic CLI use. Parent project or area note. |
+| `parent_type` | `project`, `area` | Parent note type. |
+| `parent_title` | string | Parent note title. |
+| `child` | JSON list | Optional. Drill from the named parent into a nested child container to create under it, e.g. `["Hiring","Interviews"]`. |
 | `subnote_type` | subnote type code | Defaults to `free`. |
 | `body` | markdown | Optional initial free-form body content. |
 | `open` | boolean | Default `false`. |
@@ -783,7 +801,7 @@ Example:
 ```bash
 optsidian raw para-zk:create-subnote \
   title="Planning Meeting" \
-  path="PARA/Projects/Model Evaluation/Model Evaluation.md" \
+  parent_type=project parent_title="Model Evaluation" \
   subnote_type=meeting \
   format=json
 ```
@@ -803,7 +821,8 @@ Options:
 | Option | Values | Notes |
 | --- | --- | --- |
 | `title` | string | Required. |
-| `path` | path | Required for deterministic CLI use. Parent area note. |
+| `parent_title` | string | Parent area title. |
+| `child` | JSON list | Optional. Drill from the named parent area into a nested subarea to create under it. |
 | `inheritParentTag` | boolean | Defaults to `true`. |
 | `open` | boolean | Default `false`. |
 
@@ -812,7 +831,7 @@ Example:
 ```bash
 optsidian raw para-zk:create-subarea \
   title="LLM Tooling" \
-  path="PARA/Areas/AI/AI.md" \
+  parent_title="AI" \
   inheritParentTag=true \
   format=json
 ```
@@ -825,7 +844,8 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `path` | path | Optional project or area source note. |
+| `source_type` | `project`, `area` | Optional scope note type. |
+| `source_title` | string | Optional scope note title. |
 | `title` | string | Optional retro title segment. |
 | `date` | `YYYY-MM-DD` | Date used for ISO week calculation. Defaults to today. |
 | `open` | boolean | Default `false`. |
@@ -834,7 +854,7 @@ Example:
 
 ```bash
 optsidian raw para-zk:create-retro \
-  path="PARA/Projects/Model Evaluation/Model Evaluation.md" \
+  source_type=project source_title="Model Evaluation" \
   date=2026-05-29 \
   format=json
 ```
@@ -918,7 +938,7 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `path` | path | Required for deterministic CLI use. Source resource note. |
+| `source_title` | string | Source resource title. |
 | `title` | string | Optional. Defaults to source basename. |
 | `kind` | `source` \| `permanent` | Defaults to `permanent`. |
 | `maturity` | maturity code | Used for permanent notes. |
@@ -929,7 +949,7 @@ Example:
 
 ```bash
 optsidian raw para-zk:create-from-resource \
-  path="PARA/Resources/Source Paper.md" \
+  source_title="Source Paper" \
   title="Paper Insight" \
   kind=source \
   format=json
@@ -949,7 +969,7 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `path` | path | Required for deterministic CLI use. Source note. |
+| `source_title` | string | Source note title. |
 | `title` | string | Optional. Defaults to source basename. |
 | `maturity` | maturity code | Permanent-note maturity. |
 | `body` | markdown | Optional initial free-form body content. |
@@ -959,7 +979,7 @@ Example:
 
 ```bash
 optsidian raw para-zk:create-from-source \
-  path="ZK/Source/Paper Digest.md" \
+  source_title="Paper Digest" \
   title="Compounding learning" \
   maturity=refined \
   format=json
@@ -983,7 +1003,7 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `path` | path | Required for deterministic CLI use. Source spark note. |
+| `source_title` | string | Source spark title. |
 | `title` | string | Optional. Defaults to source basename. |
 | `maturity` | maturity code | Permanent-note maturity. |
 | `discard` | boolean | Move the spark to trash instead of keeping it processed. Default `false`. |
@@ -994,7 +1014,7 @@ Example:
 
 ```bash
 optsidian raw para-zk:distill-spark \
-  path="ZK/Spark/Raw Thought.md" \
+  source_title="Raw Thought" \
   title="Durable Thought" \
   maturity=evergreen \
   format=json

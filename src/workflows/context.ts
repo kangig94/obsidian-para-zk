@@ -30,13 +30,14 @@ export type ProjectAreaResult = {
 
 export type CreateAreaOptions = {
   title: string;
-  parentPath?: string;
   open?: boolean;
 };
 
 export type CreateResourceOptions = {
   title: string;
   sourcePath?: string;
+  sourceType?: string;
+  sourceTitle?: string;
   linkToSource?: boolean;
   body?: string;
   open?: boolean;
@@ -44,6 +45,11 @@ export type CreateResourceOptions = {
 
 export type AddReferenceOptions = {
   sourcePath?: string;
+  type?: string;
+  title?: string;
+  kind?: string;
+  date?: string;
+  child?: string[];
   target: string;
   description?: string;
   open?: boolean;
@@ -52,6 +58,9 @@ export type AddReferenceOptions = {
 export type CreateSubnoteOptions = {
   title: string;
   sourcePath?: string;
+  parentType?: string;
+  parentTitle?: string;
+  child?: string[];
   subnoteType?: string;
   body?: string;
   open?: boolean;
@@ -60,12 +69,17 @@ export type CreateSubnoteOptions = {
 export type CreateSubareaOptions = {
   title: string;
   sourcePath?: string;
+  parentType?: string;
+  parentTitle?: string;
+  child?: string[];
   inheritParentTag?: boolean;
   open?: boolean;
 };
 
 export type CreateRetroOptions = {
   sourcePath?: string;
+  sourceType?: string;
+  sourceTitle?: string;
   title?: string;
   date?: string;
   open?: boolean;
@@ -95,6 +109,7 @@ export type OpenJournalOptions = {
 
 export type CreateFromResourceOptions = {
   sourcePath?: string;
+  sourceTitle?: string;
   title?: string;
   kind?: string;
   maturity?: string;
@@ -104,6 +119,7 @@ export type CreateFromResourceOptions = {
 
 export type CreateFromSourceOptions = {
   sourcePath?: string;
+  sourceTitle?: string;
   title?: string;
   maturity?: string;
   body?: string;
@@ -112,6 +128,7 @@ export type CreateFromSourceOptions = {
 
 export type DistillSparkOptions = {
   sourcePath?: string;
+  sourceTitle?: string;
   title?: string;
   maturity?: string;
   discard?: boolean;
@@ -142,6 +159,7 @@ type ByTitleSelectorOptions = {
   title?: string;
   key?: string;
   archived?: boolean;
+  child?: string[];
 };
 
 type ZkSelectorOptions = {
@@ -149,12 +167,14 @@ type ZkSelectorOptions = {
   title?: string;
   key?: string;
   kind?: string;
+  child?: string[];
 };
 
 type JournalSelectorOptions = {
   path?: string;
   date?: string;
   key?: string;
+  child?: string[];
 };
 
 type ReadByTitleOptions = ReadOptionsWithCollection & ByTitleSelectorOptions;
@@ -180,6 +200,7 @@ export type UpdatePayloadOptions = {
   match?: string;
   replacement?: string;
   all?: boolean;
+  child?: string[];
 };
 
 type UpdateByTitleOptions = ByTitleSelectorOptions & UpdatePayloadOptions;
@@ -213,6 +234,7 @@ export type RenameByTitleOptions = {
   title?: string;
   newTitle?: string;
   archived?: boolean;
+  child?: string[];
 };
 
 export type RenameZkOptions = {
@@ -220,6 +242,7 @@ export type RenameZkOptions = {
   title?: string;
   newTitle?: string;
   kind?: string;
+  child?: string[];
 };
 
 export type RenameResult = {
@@ -241,6 +264,7 @@ export type DeleteByTitleOptions = {
   title?: string;
   archived?: boolean;
   force?: boolean;
+  child?: string[];
 };
 
 export type DeleteZkOptions = {
@@ -248,12 +272,14 @@ export type DeleteZkOptions = {
   title?: string;
   kind?: string;
   force?: boolean;
+  child?: string[];
 };
 
 export type DeleteJournalOptions = {
   path?: string;
   date?: string;
   force?: boolean;
+  child?: string[];
 };
 
 export type DeleteRetroOptions = DeleteByTitleOptions & {
@@ -336,8 +362,17 @@ export type ReferenceMutationResult = {
   added?: boolean;
 };
 
+export type SurfaceAddressing = {
+  addressable: boolean;
+  selectors?: string[];
+  addressVia?: string;
+  create?: string;
+  rename?: boolean;
+};
+
 export type SurfaceDescription = {
   type: string;
+  addressing: SurfaceAddressing;
   readKeys: string[];
   writeKeys: string[];
   frontmatterKeys?: string[];

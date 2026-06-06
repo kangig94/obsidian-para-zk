@@ -14,6 +14,7 @@ import type {
   WorkflowContext
 } from "./context";
 import {
+  drillToChild,
   folderStyleContainer,
   resolveRequiredArea,
   resolveRequiredJournal,
@@ -52,8 +53,11 @@ export async function deleteRetro(ctx: WorkflowContext, options: DeleteRetroOpti
 async function deleteDomainNote(
   ctx: WorkflowContext,
   file: TFile,
-  options: { force?: boolean }
+  options: { force?: boolean; child?: string[] }
 ): Promise<DeleteResult> {
+  if (options.child && options.child.length > 0) {
+    file = drillToChild(ctx, file, options.child);
+  }
   const type = readType(fileFrontmatter(ctx, file));
   const container = deleteContainer(ctx, file);
   const containerPath = container.path;
@@ -94,7 +98,7 @@ async function deleteDomainNote(
 
 function deleteContainer(ctx: WorkflowContext, file: TFile): TAbstractFile {
   const type = readType(fileFrontmatter(ctx, file));
-  if (type !== "project" && type !== "area") return file;
+  if (type !== "project" && type !== "area" && type !== "subarea") return file;
   return folderStyleContainer(file) ?? file;
 }
 

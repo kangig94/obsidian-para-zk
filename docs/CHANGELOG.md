@@ -89,6 +89,29 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Changed
 
+- Made the CLI/MCP surface fully **name-based** — no command exposes a vault
+  file `path` anymore. Notes are addressed by `title` (project/area/resource),
+  `date` (journal/retro), or `title`+`kind` (zk). Existing children are reached
+  through their container with a single list-valued `child=["a","b"]` drill;
+  new children name their parent with `parent_type`+`parent_title` (+ optional
+  `child=` to nest at any depth); transforms/scoped-retro/resource links name
+  their origin with `source_type`/`source_title`; `add-reference` addresses the
+  receiving note by `type`+`title` and its target by `[[Title]]` wikilink.
+  Removed-path aliases (`path`, `file_path`, `sourcePath`, …) are now rejected
+  with a direct error instead of being silently ignored. `attach-file` keeps its
+  filesystem `source`/`sources` (external file import, not note addressing).
+- Renamed stored child types for finder correctness: child documents
+  `doc` → **`subnote`**, child areas `type: area` → **`subarea`** (so the area
+  finder resolves only root areas). The `children` map is now a read-only index;
+  read/edit a child via `child=` rather than a `children/<title>/<key>` key.
+- `describe` now reports an `addressing` facet per type (`addressable`,
+  `selectors`, `addressVia`, `create` command, `rename`) so an LLM can learn how
+  to reach and create each type before acting. `delete-journal` dropped its
+  no-op `force` option.
+- Trimmed the live smoke harness to scenarios that need Obsidian's real engine
+  (link rewriting, backlink resolution, live renderers); pure workflow logic
+  (CRUD, template shapes, references incl. subpath dedupe, promotion, attach,
+  reference cleanup on delete) is now covered only by the Vitest unit suite.
 - Reworked the ZK model around its original Zettelkasten intent. Renamed the
   three kinds to **spark** (`zk_spark`, transient capture), **source**
   (`zk_source`, your own-words digest of an external source), and **permanent**

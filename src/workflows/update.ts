@@ -59,7 +59,7 @@ import {
 import {
   archivedCounterpartFolder,
   assertVacantPath,
-  findChild,
+  drillToChild,
   folderStyleContainer,
   isArchivedFile,
   isArchivedPath,
@@ -165,6 +165,10 @@ async function updateSurface(
   spec: ReadSurfaceSpec,
   options: UpdatePayloadOptions
 ): Promise<UpdateSurfaceResult> {
+  if (options.child && options.child.length > 0) {
+    file = drillToChild(ctx, file, options.child);
+    spec = specForType(await readFileTypeFresh(ctx, file));
+  }
   const key = requireUpdateKey(options.key);
   const operation = parseUpdateOperation(options.operation);
   const target = await resolveWritableSurfaceTarget(ctx, file, spec, key, key);
@@ -223,20 +227,7 @@ async function resolveWritableSurfaceTarget(
 
   if (parts[0] === "children") {
     if (!spec.children) throw unknownUpdateKeyError(spec, originalKey);
-    if (parts.length < 3) throw new Error(`children map is read-only; use children/<title>/<key>`);
-
-    const childTitle = parts[1];
-    const child = findChild(ctx, file, childTitle);
-    if (!child) throw new Error(`child not found: ${childTitle}`);
-    const childType = await readFileTypeFresh(ctx, child);
-
-    return resolveWritableSurfaceTarget(
-      ctx,
-      child,
-      specForType(childType),
-      parts.slice(2).join("/"),
-      originalKey
-    );
+    throw new Error(`children is a read-only index; use child=["<title>"] to address a child`);
   }
 
   if (parts[0] === "frontmatter") {
@@ -646,7 +637,7 @@ function normalizeFrontmatterUpdateValue(type: string, key: string, value: unkno
   if (type === "journal" && key === "energy") {
     return readOptionalCode(String(value), parseEnergyCode, "energy", ENERGY_CODE_HELP);
   }
-  if (type === "doc" && key === "subnote_type") {
+  if (type === "subnote" && key === "subnote_type") {
     return readOptionalCode(String(value), parseSubnoteTypeCode, "subnote_type", SUBNOTE_TYPE_CODE_HELP);
   }
   if (type === "zk_permanent" && key === "maturity") {

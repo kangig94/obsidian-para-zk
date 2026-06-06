@@ -45,6 +45,7 @@ import type {
   WorkflowContext
 } from "./context";
 import {
+  drillToChild,
   ensureFolderStyleParent,
   findAreaByTitle,
   findExistingSourceRetroForWeek,
@@ -52,6 +53,7 @@ import {
   linkToFile,
   requireTitle,
   resolveOptionalFile,
+  resolveRequiredByType,
   resolveRequiredFile,
   retroSourceType,
   uniqueFolderStyleMarkdownPath,
@@ -117,7 +119,6 @@ export async function createArea(ctx: WorkflowContext, options: CreateAreaOption
   await ensureFolder(ctx.host, target.folder);
 
   const createdAt = localDateTimeSpace();
-  const parent = resolveOptionalFile(ctx, options.parentPath);
   const file = await createMarkdownFile(ctx, "area", target.path, {
     created: createdAt,
     slug: slugify(target.title),
@@ -128,7 +129,6 @@ export async function createArea(ctx: WorkflowContext, options: CreateAreaOption
   await ctx.host.processFrontMatter(file, (fm) => {
     fm.type = "area";
     fm.tags = [`${tags.area}/${slugify(target.title)}`];
-    if (parent) fm.parent = linkToFile(parent);
     applyCreatedUpdatedDefaults(fm, createdAt);
   });
 
@@ -136,9 +136,32 @@ export async function createArea(ctx: WorkflowContext, options: CreateAreaOption
   return noteResult(file, true, options.open);
 }
 
+// Origin/parent addressing: prefer an explicit sourcePath (GUI/active note),
+// otherwise resolve by name (CLI: type + title). Path stays internal-only.
+async function resolveOptionalOrigin(
+  ctx: WorkflowContext,
+  opts: { sourcePath?: string; sourceType?: string; sourceTitle?: string }
+): Promise<TFile | undefined> {
+  if (opts.sourcePath) return resolveOptionalFile(ctx, opts.sourcePath);
+  if (opts.sourceTitle) return resolveRequiredByType(ctx, opts.sourceType ?? "", { title: opts.sourceTitle });
+  return undefined;
+}
+
+async function resolveRequiredParent(
+  ctx: WorkflowContext,
+  opts: { sourcePath?: string; parentType?: string; parentTitle?: string; child?: string[] },
+  defaultType?: string
+): Promise<TFile> {
+  if (opts.sourcePath) return resolveRequiredFile(ctx, opts.sourcePath, "parent note");
+  // Root container by name, then drill to a nested parent (areas/subareas nest
+  // arbitrarily) so a child can be created at any depth.
+  const root = await resolveRequiredByType(ctx, opts.parentType ?? defaultType ?? "", { title: opts.parentTitle });
+  return opts.child && opts.child.length > 0 ? drillToChild(ctx, root, opts.child) : root;
+}
+
 export async function createResource(ctx: WorkflowContext, options: CreateResourceOptions): Promise<CreateResourceResult> {
   const title = requireTitle(options.title, "resource title");
-  const source = resolveOptionalFile(ctx, options.sourcePath);
+  const source = await resolveOptionalOrigin(ctx, options);
   const createdAt = localDateTimeSpace();
   const path = await uniqueMarkdownPath(ctx.host, joinVaultPath(ctx.settings.paths.resourcesFolder, `${title}.md`));
   const file = await createMarkdownFile(ctx, "resource", path, {
@@ -170,7 +193,7 @@ export async function createResource(ctx: WorkflowContext, options: CreateResour
 
 export async function createSubnote(ctx: WorkflowContext, options: CreateSubnoteOptions): Promise<CreateSubnoteResult> {
   const title = requireTitle(options.title, "subnote title");
-  const source = resolveRequiredFile(ctx, options.sourcePath, "source note");
+  const source = await resolveRequiredParent(ctx, options);
   if (title === source.basename) {
     throw new Error(`subnote title conflicts with parent note: ${title}`);
   }
@@ -192,7 +215,7 @@ export async function createSubnote(ctx: WorkflowContext, options: CreateSubnote
       cursor: ""
     });
     await ctx.host.processFrontMatter(file, (fm) => {
-      fm.type = fm.type || "doc";
+      fm.type = fm.type || "subnote";
       fm.parent = linkToFile(parent.file);
       fm.subnote_type = fm.subnote_type ?? subnoteType;
       applyCreatedUpdatedDefaults(fm, createdAt);
@@ -211,7 +234,7 @@ export async function createSubnote(ctx: WorkflowContext, options: CreateSubnote
 
 export async function createSubarea(ctx: WorkflowContext, options: CreateSubareaOptions): Promise<CreateSubareaResult> {
   const title = requireTitle(options.title, "subarea title");
-  const parent = await ensureFolderStyleParent(ctx, resolveRequiredFile(ctx, options.sourcePath, "source area"));
+  const parent = await ensureFolderStyleParent(ctx, await resolveRequiredParent(ctx, options, "area"));
   const subareaFolder = joinVaultPath(parent.childFolder, title);
   await ensureFolder(ctx.host, subareaFolder);
 
@@ -235,7 +258,7 @@ export async function createSubarea(ctx: WorkflowContext, options: CreateSubarea
   const parentNamespace = parentTags.find((tag) => tag.startsWith(`${tags.area}/`)) ?? `${tags.area}/${slugify(parent.file.basename)}`;
   const childNamespace = `${parentNamespace}/${slugify(title)}`;
   await ctx.host.processFrontMatter(file, (fm) => {
-    fm.type = "area";
+    fm.type = "subarea";
     fm.parent = linkToFile(parent.file);
     fm.tags = options.inheritParentTag === false
       ? [childNamespace]
@@ -251,7 +274,7 @@ export async function createSubarea(ctx: WorkflowContext, options: CreateSubarea
 }
 
 export async function createRetro(ctx: WorkflowContext, options: CreateRetroOptions = {}): Promise<CreateRetroResult> {
-  const source = resolveOptionalFile(ctx, options.sourcePath);
+  const source = await resolveOptionalOrigin(ctx, options);
   const date = dateFromCli(options.date);
   const dateText = localDate(date);
   const createdAt = localDateTimeSpace();

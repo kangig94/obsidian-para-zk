@@ -15,7 +15,7 @@ import type {
   ReferenceWriteInput,
   WorkflowContext
 } from "./context";
-import { resolveRequiredFile } from "./locations";
+import { drillToChild, resolveRequiredByType, resolveRequiredFile } from "./locations";
 
 export function pathBasenameWithoutExtension(path: string): string {
   const last = path.split("/").filter(Boolean).pop() ?? path;
@@ -75,7 +75,11 @@ export function isExternalReference(value: string): boolean {
 
 
 export async function addReference(ctx: WorkflowContext, options: AddReferenceOptions): Promise<AddReferenceResult> {
-  const source = resolveRequiredFile(ctx, options.sourcePath, "source note");
+  // The receiving note is addressed by name (type + title/date, optional child drill);
+  // sourcePath stays internal for GUI callers acting on the active note.
+  const source = options.sourcePath
+    ? resolveRequiredFile(ctx, options.sourcePath, "source note")
+    : await resolveReceivingNote(ctx, options);
   const reference = await insertReferenceItem(ctx, source, {
     link: options.target,
     ...(options.description !== undefined ? { description: options.description } : {})
@@ -89,6 +93,15 @@ export async function addReference(ctx: WorkflowContext, options: AddReferenceOp
     added: reference.added === true,
     opened: options.open || undefined
   };
+}
+
+async function resolveReceivingNote(ctx: WorkflowContext, options: AddReferenceOptions): Promise<TFile> {
+  const root = await resolveRequiredByType(ctx, options.type ?? "", {
+    title: options.title,
+    kind: options.kind,
+    date: options.date
+  });
+  return options.child && options.child.length > 0 ? drillToChild(ctx, root, options.child) : root;
 }
 
 type NormalizedReferenceItem = {

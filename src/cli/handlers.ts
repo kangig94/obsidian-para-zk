@@ -68,15 +68,13 @@ const UPDATE_OPTIONS: Record<string, CliOptionSpec> = {
 };
 
 const RENAME_OPTIONS: Record<string, CliOptionSpec> = {
-  title: { value: "<title>", description: "Current note title. Used when path is omitted." },
-  path: { value: "<path>", description: "Exact note path." },
+  title: { value: "<title>", description: "Current note title." },
   new_title: { value: "<title>", description: "New note title." },
   format: { value: "<text|json>", description: "Output format (default: text)." }
 };
 
 const DELETE_OPTIONS: Record<string, CliOptionSpec> = {
-  title: { value: "<title>", description: "Current note title. Used when path is omitted." },
-  path: { value: "<path>", description: "Exact note path." },
+  title: { value: "<title>", description: "Current note title." },
   force: { value: "<true|false>", description: "Required when deleting a folder-style note that contains child files." },
   format: { value: "<text|json>", description: "Output format (default: text)." }
 };
@@ -180,6 +178,10 @@ type ParaNoteCommandConfig = {
 };
 
 const FORMAT_OPTION: CliOptionSpec = { value: "<text|json>", description: "Output format (default: text)." };
+const CHILD_OPTION: CliOptionSpec = {
+  value: `<["title", ...]>`,
+  description: "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly."
+};
 const ARCHIVED_OPTION: CliOptionSpec = {
   value: "<true|false>",
   description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy."
@@ -227,11 +229,25 @@ function loadWorkflows(): Promise<unknown> {
   return (workflowsModulePromise ??= import("../workflows"));
 }
 
+// Notes are addressed by name, never by path. Reject the removed path-style
+// aliases with a direct error instead of silently ignoring them (file imports
+// use attach-file's `source`, which runs outside workflowRun).
+const PATH_ALIASES = ["path", "file_path", "filePath", "sourcePath", "source", "file"];
+
+function rejectPathAliases(args: CliArgs): void {
+  for (const alias of PATH_ALIASES) {
+    if (Object.prototype.hasOwnProperty.call(args, alias)) {
+      throw new Error(`${alias} is not supported — address notes by name (title/date, plus parent_*/source_*/child for relations)`);
+    }
+  }
+}
+
 function workflowRun(
   fnName: WorkflowFunctionName,
   readOptions: (args: CliArgs) => Record<string, unknown>
 ): NativeCliCommand["run"] {
   return async (plugin, args) => {
+    rejectPathAliases(args);
     const workflows = await loadWorkflows() as Record<WorkflowFunctionName, WorkflowRunFunction>;
     const result = await workflows[fnName](workflowContext(plugin), readOptions(args));
     return { ...result };
@@ -367,17 +383,16 @@ function readCommandOptions(selector: SelectorVariant, key: CliOptionSpec): Reco
   switch (selector.variant) {
     case "by-title":
       return {
-        title: { value: "<title>", description: `${selector.label} title. Used when path is omitted.` },
-        path: { value: "<path>", description: `${selector.label} note path for exact selection.` },
+        title: { value: "<title>", description: `${selector.label} title.` },
         archived: ARCHIVED_OPTION,
+        child: CHILD_OPTION,
         key,
         ...READ_COLLECTION_OPTIONS,
         format: FORMAT_OPTION
       };
     case "zk":
       return {
-        title: { value: "<title>", description: "ZK note title. Used when path is omitted." },
-        path: { value: "<path>", description: "ZK note path for exact selection." },
+        title: { value: "<title>", description: "ZK note title." },
         kind: ZK_KIND_FILTER_OPTION,
         key,
         ...READ_COLLECTION_OPTIONS,
@@ -386,15 +401,13 @@ function readCommandOptions(selector: SelectorVariant, key: CliOptionSpec): Reco
     case "journal":
       return {
         date: JOURNAL_DATE_OPTION,
-        path: { value: "<path>", description: "Journal note path for exact selection." },
         key,
         ...READ_COLLECTION_OPTIONS,
         format: FORMAT_OPTION
       };
     case "retro":
       return {
-        title: { value: "<title>", description: "Retro note title. Used when path is omitted." },
-        path: { value: "<path>", description: "Retro note path for exact selection." },
+        title: { value: "<title>", description: "Retro note title." },
         date: RETRO_DATE_OPTION,
         archived: ARCHIVED_OPTION,
         key,
@@ -408,16 +421,15 @@ function updateCommandOptions(selector: SelectorVariant, key: CliOptionSpec): Re
   switch (selector.variant) {
     case "by-title":
       return {
-        title: { value: "<title>", description: `${selector.label} title. Used when path is omitted.` },
-        path: { value: "<path>", description: `${selector.label} note path for exact selection.` },
+        title: { value: "<title>", description: `${selector.label} title.` },
         archived: ARCHIVED_OPTION,
+        child: CHILD_OPTION,
         key,
         ...UPDATE_OPTIONS
       };
     case "zk":
       return {
-        title: { value: "<title>", description: "ZK note title. Used when path is omitted." },
-        path: { value: "<path>", description: "ZK note path for exact selection." },
+        title: { value: "<title>", description: "ZK note title." },
         kind: ZK_KIND_FILTER_OPTION,
         key,
         ...UPDATE_OPTIONS
@@ -425,14 +437,12 @@ function updateCommandOptions(selector: SelectorVariant, key: CliOptionSpec): Re
     case "journal":
       return {
         date: JOURNAL_DATE_OPTION,
-        path: { value: "<path>", description: "Journal note path for exact selection." },
         key,
         ...UPDATE_OPTIONS
       };
     case "retro":
       return {
-        title: { value: "<title>", description: "Retro note title. Used when path is omitted." },
-        path: { value: "<path>", description: "Retro note path for exact selection." },
+        title: { value: "<title>", description: "Retro note title." },
         date: RETRO_DATE_OPTION,
         archived: ARCHIVED_OPTION,
         key,
@@ -445,7 +455,10 @@ function renameCommandOptions(selector: Extract<SelectorVariant, { variant: "by-
   switch (selector.variant) {
     case "by-title":
       return {
-        ...RENAME_OPTIONS,
+        title: RENAME_OPTIONS.title,
+        child: CHILD_OPTION,
+        new_title: RENAME_OPTIONS.new_title,
+        format: RENAME_OPTIONS.format,
         archived: ARCHIVED_OPTION
       };
     case "zk":
@@ -460,7 +473,10 @@ function deleteCommandOptions(selector: Exclude<SelectorVariant, { variant: "jou
   switch (selector.variant) {
     case "by-title":
       return {
-        ...DELETE_OPTIONS,
+        title: DELETE_OPTIONS.title,
+        child: CHILD_OPTION,
+        force: DELETE_OPTIONS.force,
+        format: DELETE_OPTIONS.format,
         archived: ARCHIVED_OPTION
       };
     case "zk":
@@ -486,24 +502,21 @@ function selectorOptions(
     case "by-title":
       return {
         title: readCliTitle(args),
-        path: readCliPath(args),
-        archived: readCliBoolean(args, "archived")
+        archived: readCliBoolean(args, "archived"),
+        child: parseList(readCliString(args, "child"))
       };
     case "zk":
       return {
         title: readCliTitle(args),
-        path: readCliPath(args),
         kind: readCliZkKind(args, mode)
       };
     case "journal":
       return {
-        date: readCliString(args, "date"),
-        path: readCliPath(args)
+        date: readCliString(args, "date")
       };
     case "retro":
       return {
         title: readCliTitle(args),
-        path: readCliPath(args),
         date: readCliString(args, "date"),
         archived: readCliBoolean(args, "archived")
       };
@@ -652,15 +665,11 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     description: "Move a daily journal note to Obsidian trash and report incoming links",
     options: {
       date: JOURNAL_DATE_OPTION,
-      path: { value: "<path>", description: "Exact journal note path." },
-      force: { value: "<true|false>", description: "Reserved for consistency with other delete commands." },
       format: FORMAT_OPTION
     },
     text: "journal deleted",
     run: workflowRun("deleteJournal", (args) => ({
-      date: readCliString(args, "date"),
-      path: readCliPath(args),
-      force: readCliBoolean(args, "force") ?? false
+      date: readCliString(args, "date")
     }))
   },
   makeDeleteCommand({
@@ -698,14 +707,12 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     description: "Create a PARA area note",
     options: {
       title: { value: "<title>", description: "Area title." },
-      parent: { value: "<path>", description: "Optional parent area path." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "area created",
     run: workflowRun("createArea", (args) => ({
       title: readCliTitle(args),
-      parentPath: readCliString(args, "parent"),
       open: readCliBoolean(args, "open") ?? false
     }))
   },
@@ -714,7 +721,8 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     description: "Create a PARA resource note and optionally link it from a source note",
     options: {
       title: { value: "<title>", description: "Resource title." },
-      path: { value: "<path>", description: "Source note path to receive the resource link." },
+      source_type: { value: "<project|area|resource|zk>", description: "Optional source note type to link this resource from." },
+      source_title: { value: "<title>", description: "Optional source note title to link this resource from." },
       link: { value: "<true|false>", description: "Whether to add the link to the source note." },
       body: { value: "<markdown>", description: "Optional initial free-form body content." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
@@ -722,11 +730,12 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     },
     text: "resource created",
     run: workflowRun("createResource", (args) => {
-      const sourcePath = readCliPath(args);
+      const sourceTitle = readCliString(args, "source_title");
       return {
         title: readCliTitle(args),
-        sourcePath,
-        linkToSource: readCliBoolean(args, "link") ?? Boolean(sourcePath),
+        sourceType: readCliString(args, "source_type"),
+        sourceTitle,
+        linkToSource: readCliBoolean(args, "link") ?? Boolean(sourceTitle),
         body: readCliString(args, "body"),
         open: readCliBoolean(args, "open") ?? false
       };
@@ -736,15 +745,23 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     command: "para-zk:add-reference",
     description: "Add an existing vault file, wikilink, markdown link, URL, or text to a note's frontmatter reference registry",
     options: {
-      path: { value: "<path>", description: "Source note path that receives the reference." },
-      target: { value: "<path|url|wikilink|markdown-link|text>", description: "Reference target to add." },
+      type: { value: "<project|area|resource|zk|retro|journal>", description: "Type of the note that receives the reference." },
+      title: { value: "<title>", description: "Receiving note title (project/area/resource/zk/retro)." },
+      kind: { value: `<${ZK_KIND_CODE_HELP}>`, description: "Receiving ZK kind when type=zk." },
+      date: { value: "<YYYY-MM-DD>", description: "Receiving note date when type=journal/retro." },
+      child: CHILD_OPTION,
+      target: { value: "<[[wikilink]]|url|markdown-link|text>", description: "Reference target to add. Use [[Title]] to reference a note by name." },
       description: { value: "<text>", description: "Optional per-reference description." },
-      open: { value: "<true|false>", description: "Open the source note in Obsidian." },
+      open: { value: "<true|false>", description: "Open the receiving note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "reference added",
     run: workflowRun("addReference", (args) => ({
-      sourcePath: readCliPath(args),
+      type: readCliString(args, "type"),
+      title: readCliTitle(args),
+      kind: readCliString(args, "kind"),
+      date: readCliString(args, "date"),
+      child: parseList(readCliString(args, "child")),
       target: readRequiredCliString(args, "target"),
       description: readCliString(args, "description"),
       open: readCliBoolean(args, "open") ?? false
@@ -755,7 +772,9 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     description: "Create a child document under a project or area note",
     options: {
       title: { value: "<title>", description: "Subnote title." },
-      path: { value: "<path>", description: "Parent note path." },
+      parent_type: { value: "<project|area>", description: "Parent note type." },
+      parent_title: { value: "<title>", description: "Parent note title." },
+      child: { value: `<["title", ...]>`, description: "Optional: drill from the named parent into a nested child container (JSON list) to create under it." },
       subnote_type: { value: `<${SUBNOTE_TYPE_CODE_HELP}>`, description: "Locale-neutral subnote type code." },
       body: { value: "<markdown>", description: "Optional initial free-form body content." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
@@ -764,7 +783,9 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     text: "subnote created",
     run: workflowRun("createSubnote", (args) => ({
       title: readCliTitle(args),
-      sourcePath: readCliPath(args),
+      parentType: readCliString(args, "parent_type"),
+      parentTitle: readCliString(args, "parent_title"),
+      child: parseList(readCliString(args, "child")),
       subnoteType: readCliSubnoteType(args),
       body: readCliString(args, "body"),
       open: readCliBoolean(args, "open") ?? false
@@ -775,7 +796,8 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     description: "Create a child area under an area note",
     options: {
       title: { value: "<title>", description: "Subarea title." },
-      path: { value: "<path>", description: "Parent area path." },
+      parent_title: { value: "<title>", description: "Parent area title." },
+      child: { value: `<["title", ...]>`, description: "Optional: drill from the named parent area into a nested subarea (JSON list) to create under it." },
       inheritParentTag: { value: "<true|false>", description: "Include parent area tag as well as child tag." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
@@ -783,7 +805,9 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     text: "subarea created",
     run: workflowRun("createSubarea", (args) => ({
       title: readCliTitle(args),
-      sourcePath: readCliPath(args),
+      parentType: "area",
+      parentTitle: readCliString(args, "parent_title"),
+      child: parseList(readCliString(args, "child")),
       inheritParentTag: readCliBoolean(args, "inheritParentTag") ?? true,
       open: readCliBoolean(args, "open") ?? false
     }))
@@ -792,7 +816,8 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     command: "para-zk:create-retro",
     description: "Create a weekly retro note, optionally scoped to a project or area",
     options: {
-      path: { value: "<path>", description: "Project or area note path." },
+      source_type: { value: "<project|area>", description: "Optional scope note type." },
+      source_title: { value: "<title>", description: "Optional scope note title." },
       title: { value: "<title>", description: "Retro title segment." },
       date: { value: "<YYYY-MM-DD>", description: "Date used for ISO week calculation." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
@@ -800,7 +825,8 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     },
     text: "retro created",
     run: workflowRun("createRetro", (args) => ({
-      sourcePath: readCliPath(args),
+      sourceType: readCliString(args, "source_type"),
+      sourceTitle: readCliString(args, "source_title"),
       title: readCliTitle(args),
       date: readCliString(args, "date"),
       open: readCliBoolean(args, "open") ?? false
@@ -850,7 +876,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     command: "para-zk:create-from-resource",
     description: "Create a Source or Permanent ZK note from a resource (resource preserved)",
     options: {
-      path: { value: "<path>", description: "Source resource path." },
+      source_title: { value: "<title>", description: "Source resource title." },
       title: { value: "<title>", description: "New ZK note title." },
       kind: { value: `<${RESOURCE_CREATE_KIND_CODE_HELP}>`, description: "Locale-neutral target ZK kind (source|permanent)." },
       maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
@@ -860,7 +886,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     },
     text: "ZK note created from resource",
     run: workflowRun("createFromResource", (args) => ({
-      sourcePath: readCliPath(args),
+      sourceTitle: readCliString(args, "source_title"),
       title: readCliTitle(args),
       kind: readCliKind(args),
       maturity: readCliString(args, "maturity"),
@@ -872,7 +898,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     command: "para-zk:distill-spark",
     description: "Distill a spark into a permanent note; record it on the spark, or discard the spark",
     options: {
-      path: { value: "<path>", description: "Source spark note path." },
+      source_title: { value: "<title>", description: "Source spark note title." },
       title: { value: "<title>", description: "New permanent note title." },
       maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
       discard: { value: "<true|false>", description: "Discard the spark (move to trash) instead of keeping it marked processed. Default false." },
@@ -882,7 +908,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     },
     text: "spark distilled",
     run: workflowRun("distillSpark", (args) => ({
-      sourcePath: readCliPath(args),
+      sourceTitle: readCliString(args, "source_title"),
       title: readCliTitle(args),
       maturity: readCliString(args, "maturity"),
       discard: readCliBoolean(args, "discard") ?? false,
@@ -894,7 +920,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     command: "para-zk:create-from-source",
     description: "Create a Permanent note from a source note (source preserved)",
     options: {
-      path: { value: "<path>", description: "Source note path." },
+      source_title: { value: "<title>", description: "Source note title." },
       title: { value: "<title>", description: "New permanent note title." },
       maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
       body: { value: "<markdown>", description: "Optional initial free-form body content." },
@@ -903,7 +929,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     },
     text: "permanent created",
     run: workflowRun("createFromSource", (args) => ({
-      sourcePath: readCliPath(args),
+      sourceTitle: readCliString(args, "source_title"),
       title: readCliTitle(args),
       maturity: readCliString(args, "maturity"),
       body: readCliString(args, "body"),
@@ -1279,17 +1305,6 @@ function readCliNewTitle(args: CliArgs): string {
 
 function readCliRenameKind(args: CliArgs): string | undefined {
   return readCliKind(args);
-}
-
-function readCliPath(args: CliArgs): string | undefined {
-  rejectCliAliases(args, {
-    file_path: "path",
-    filePath: "path",
-    source: "path",
-    sourcePath: "path",
-    file: "path"
-  });
-  return readCliString(args, "path");
 }
 
 function readCliCollectionOptions(args: CliArgs): CollectionReadOptions | undefined {

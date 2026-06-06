@@ -12,13 +12,14 @@ describe("create-from-resource", () => {
     await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
     const resource = await cli.run("para-zk:create-resource", {
       title: "Source",
-      path: "PARA/Projects/Alpha/Alpha.md",
+      source_type: "project",
+      source_title: "Alpha",
       link: "true",
       open: "false"
     });
 
     const created = await cli.run("para-zk:create-from-resource", {
-      path: String(resource.path),
+      source_title: "Source",
       title: "Distilled source",
       kind: "source",
       open: "false"
@@ -42,7 +43,7 @@ describe("create-from-source", () => {
     const source = await cli.run("para-zk:create-zk", { title: "Book note", kind: "source", open: "false" });
 
     const created = await cli.run("para-zk:create-from-source", {
-      path: String(source.path),
+      source_title: "Book note",
       title: "Evergreen book note",
       maturity: "refined",
       open: "false"
@@ -67,7 +68,7 @@ describe("distill-spark", () => {
     const spark = await cli.run("para-zk:create-zk", { title: "Spark", kind: "spark", open: "false" });
 
     const distilled = await cli.run("para-zk:distill-spark", {
-      path: String(spark.path),
+      source_title: "Spark",
       title: "Evergreen spark",
       maturity: "evergreen",
       open: "false"
@@ -93,13 +94,13 @@ describe("distill-spark", () => {
   it("cleans the spark's distilled_to when the distilled permanent is deleted", async () => {
     const spark = await cli.run("para-zk:create-zk", { title: "Lingering spark", kind: "spark", open: "false" });
     const distilled = await cli.run("para-zk:distill-spark", {
-      path: String(spark.path),
+      source_title: "Lingering spark",
       title: "Distilled permanent",
       open: "false"
     });
     expect(cli.app.readPath(String(spark.path)) ?? "").toContain(String(distilled.path));
 
-    await cli.run("para-zk:delete-zk", { path: String(distilled.path) });
+    await cli.run("para-zk:delete-zk", { title: "Distilled permanent", kind: "permanent" });
 
     // Deleting the permanent must not leave a dangling distilled_to pointer on the spark.
     const sparkContent = cli.app.readPath(String(spark.path)) ?? "";
@@ -110,7 +111,7 @@ describe("distill-spark", () => {
     const spark = await cli.run("para-zk:create-zk", { title: "Throwaway spark", kind: "spark", open: "false" });
 
     const distilled = await cli.run("para-zk:distill-spark", {
-      path: String(spark.path),
+      source_title: "Throwaway spark",
       title: "Kept permanent",
       discard: "true",
       open: "false"

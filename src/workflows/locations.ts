@@ -330,6 +330,35 @@ export async function resolveRequiredRetro(ctx: WorkflowContext, options: ReadRe
   return file;
 }
 
+// Name-based addressing: resolve a note from a type token + title (no file path).
+// `type` is a user-facing addressing token (project/area/resource/zk/retro/journal),
+// not a stored surface type. zk takes an optional kind; journal/retro take a date.
+export async function resolveRequiredByType(
+  ctx: WorkflowContext,
+  type: string,
+  opts: { title?: string; kind?: string; archived?: boolean; date?: string }
+): Promise<TFile> {
+  if (!type) {
+    throw new Error("a note type is required to address by name (project, area, resource, zk, retro, or journal)");
+  }
+  switch (type) {
+    case "project":
+      return resolveRequiredProject(ctx, { title: opts.title, archived: opts.archived });
+    case "area":
+      return resolveRequiredArea(ctx, { title: opts.title, archived: opts.archived });
+    case "resource":
+      return resolveRequiredResource(ctx, { title: opts.title, archived: opts.archived });
+    case "zk":
+      return resolveRequiredZk(ctx, { title: opts.title, kind: opts.kind });
+    case "retro":
+      return resolveRequiredRetro(ctx, { title: opts.title, date: opts.date, archived: opts.archived });
+    case "journal":
+      return resolveRequiredJournal(ctx, { date: opts.date });
+    default:
+      throw new Error(`cannot address note by type: ${type} (use project, area, resource, zk, retro, or journal)`);
+  }
+}
+
 export function resolveRequiredFile(ctx: WorkflowContext, path: string | undefined, label: string): TFile {
   const file = resolveOptionalFile(ctx, path) ?? ctx.host.getActiveFile();
   if (!file) throw new Error(`${label} is required`);
@@ -586,9 +615,21 @@ function folderStyleChildFolder(file: TFile): string | undefined {
   return parentPath && parentName === file.basename ? parentPath : undefined;
 }
 
-export function findChild(ctx: WorkflowContext, parent: TFile, title: string): TFile | undefined {
+function findChild(ctx: WorkflowContext, parent: TFile, title: string): TFile | undefined {
   const matches = childFiles(ctx, parent).filter((file) => file.basename === title);
   if (matches.length === 1) return matches[0];
   if (matches.length > 1) throw new Error("child title is ambiguous: " + title);
   return undefined;
+}
+
+// Drill from a container into a named child chain (left-to-right), one direct
+// findChild hop per title. Non-transitive childFiles is why nesting must be a chain.
+export function drillToChild(ctx: WorkflowContext, parent: TFile, titles: string[]): TFile {
+  let current = parent;
+  for (const title of titles) {
+    const child = findChild(ctx, current, title);
+    if (!child) throw new Error(`child not found: ${title}`);
+    current = child;
+  }
+  return current;
 }

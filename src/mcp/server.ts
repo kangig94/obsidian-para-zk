@@ -61,9 +61,10 @@ const BASE_MUTATION_PROPERTIES = {
     type: "string",
     description: "Title selector (most types)."
   },
-  path: {
-    type: "string",
-    description: "Exact vault path selector."
+  child: {
+    type: "array",
+    items: { type: "string" },
+    description: "Drill into a named child note (left-to-right) to address it via its container, e.g. [\"Plan\"]."
   },
   date: {
     type: "string",
@@ -75,7 +76,7 @@ const BASE_MUTATION_PROPERTIES = {
   },
   key: {
     type: "string",
-    description: "Section key, e.g. body or children/<title>/body."
+    description: "Section key, e.g. body or frontmatter/status. For a child note, set child=[...] and use the child's own key."
   }
 } as const;
 const REPLACE_INPUT_SCHEMA = {
@@ -341,9 +342,9 @@ function isUpdateToolName(value: string): value is UpdateTool {
 
 function selectorArgs(type: UpdateType, params: UpdateParams): string[] {
   const title = readOptionalString(params, "title");
-  const path = readOptionalString(params, "path");
   const date = readOptionalString(params, "date");
   const archived = readOptionalBoolean(params, "archived");
+  const child = readOptionalStringArray(params, "child");
 
   if (archived !== undefined && !isArchiveAwareUpdateType(type)) {
     throw new Error(`${type} does not support archived selector`);
@@ -352,16 +353,14 @@ function selectorArgs(type: UpdateType, params: UpdateParams): string[] {
   if (type === "journal") {
     const args: string[] = [];
     if (date) args.push(`date=${date}`);
-    if (path) args.push(`path=${path}`);
     return args;
   }
 
-  if (!title && !path) throw new Error(`${type} requires a title or path selector`);
-  const args: string[] = [];
-  if (title) args.push(`title=${title}`);
-  if (path) args.push(`path=${path}`);
+  if (!title) throw new Error(`${type} requires a title selector`);
+  const args: string[] = [`title=${title}`];
   if (type === "retro" && date) args.push(`date=${date}`);
   if (archived !== undefined) args.push(`archived=${archived ? "true" : "false"}`);
+  if (child.length > 0) args.push(`child=${JSON.stringify(child)}`);
   return args;
 }
 
@@ -389,6 +388,15 @@ function readOptionalBoolean(params: UpdateParams, key: string): boolean | undef
   const value = params[key];
   if (typeof value !== "boolean") throw new Error(`${key} must be a boolean`);
   return value;
+}
+
+function readOptionalStringArray(params: UpdateParams, key: string): string[] {
+  if (!Object.prototype.hasOwnProperty.call(params, key)) return [];
+  const value = params[key];
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+    throw new Error(`${key} must be an array of strings`);
+  }
+  return value as string[];
 }
 
 function readOptionalPosition(params: UpdateParams): "end" | "start" {

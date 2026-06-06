@@ -98,13 +98,14 @@ describe("retro", () => {
   it("creates a project retro and reads week_iso without managed task/reference UI", async () => {
     await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
     const retro = await cli.run("para-zk:create-retro", {
-      path: "PARA/Projects/Alpha/Alpha.md",
+      source_type: "project",
+      source_title: "Alpha",
       date: "2026-06-02",
       open: "false"
     });
     expect(retro.created).toBe(true);
 
-    const weekIso = await cli.run("para-zk:read-retro", { path: String(retro.path), key: "frontmatter/week_iso" });
+    const weekIso = await cli.run("para-zk:read-retro", { title: String(retro.path).split("/").pop()!.replace(/\.md$/, ""), key: "frontmatter/week_iso" });
     expect(String(weekIso.value).length).toBeGreaterThan(0);
 
     const content = cli.app.readPath(String(retro.path)) ?? "";
@@ -129,12 +130,13 @@ describe("retro", () => {
 
     try {
       const retro = await cli.run("para-zk:create-retro", {
-        path: "PARA/Projects/Alpha/Alpha.md",
+        source_type: "project",
+        source_title: "Alpha",
         date: "2026-06-02",
         open: "false"
       });
 
-      const project = await cli.run("para-zk:read-retro", { path: String(retro.path), key: "frontmatter/project" });
+      const project = await cli.run("para-zk:read-retro", { title: String(retro.path).split("/").pop()!.replace(/\.md$/, ""), key: "frontmatter/project" });
       expect(project.value).toBe("[[PARA/Projects/Alpha/Alpha.md|Alpha]]");
     } finally {
       cli.app.metadataCache.getFileCache = originalGetFileCache;
@@ -144,7 +146,8 @@ describe("retro", () => {
   it("opens the existing project retro for the same source and week", async () => {
     await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
     const created = await cli.run("para-zk:create-retro", {
-      path: "PARA/Projects/Alpha/Alpha.md",
+      source_type: "project",
+      source_title: "Alpha",
       date: "2026-06-02",
       open: "false"
     });
@@ -155,7 +158,8 @@ describe("retro", () => {
     await cli.app.fileManager.renameFile(original!, "PARA/Retros/2026_W23/Alpha weekly review.md");
 
     const reopened = await cli.run("para-zk:create-retro", {
-      path: "PARA/Projects/Alpha/Alpha.md",
+      source_type: "project",
+      source_title: "Alpha",
       date: "2026-06-02",
       open: "true"
     });
@@ -172,11 +176,12 @@ describe("subarea and child bodies", () => {
     const area = await cli.run("para-zk:create-area", { title: "Ops", open: "false" });
     const subarea = await cli.run("para-zk:create-subarea", {
       title: "Hiring",
-      path: String(area.path),
+      parent_title: "Ops",
       inheritParentTag: "true",
       open: "false"
     });
     expect(subarea.created).toBe(true);
+    expect(cli.app.readPath(String(subarea.path))).toContain("type: subarea");
 
     const children = await cli.run("para-zk:read-area", { title: "Ops", key: "children" });
     expect((children.value as Record<string, { path: string }>).Hiring.path).toBe(subarea.path);
@@ -194,6 +199,42 @@ describe("subarea and child bodies", () => {
     expect(areaSurface.readKeys).not.toContain("children/<title>/<key>");
   });
 
+  it("creates and addresses a nested subarea and a subnote at depth via child drill", async () => {
+    await cli.run("para-zk:create-area", { title: "Ops", open: "false" });
+    const hiring = await cli.run("para-zk:create-subarea", { title: "Hiring", parent_title: "Ops", open: "false" });
+    expect(hiring.path).toBe("PARA/Areas/Ops/Hiring/Hiring.md");
+
+    // A subarea created under a nested subarea: parent is reached by root + child drill.
+    const interviews = await cli.run("para-zk:create-subarea", {
+      title: "Interviews",
+      parent_title: "Ops",
+      child: '["Hiring"]',
+      open: "false"
+    });
+    expect(interviews.ok).toBe(true);
+    expect(interviews.path).toBe("PARA/Areas/Ops/Hiring/Interviews/Interviews.md");
+
+    // A subnote two levels deep, then read its body back through the same drill chain.
+    const plan = await cli.run("para-zk:create-subnote", {
+      title: "Plan",
+      parent_type: "area",
+      parent_title: "Ops",
+      child: '["Hiring", "Interviews"]',
+      subnote_type: "plan",
+      body: "Hire two engineers.",
+      open: "false"
+    });
+    expect(plan.ok).toBe(true);
+    expect(plan.path).toBe("PARA/Areas/Ops/Hiring/Interviews/Plan.md");
+
+    const read = await cli.run("para-zk:read-area", {
+      title: "Ops",
+      child: '["Hiring", "Interviews", "Plan"]',
+      key: "body"
+    });
+    expect(String(read.value)).toContain("Hire two engineers.");
+  });
+
   it("allocates a unique folder-style container for duplicate area titles", async () => {
     await cli.run("para-zk:create-area", { title: "Alpha", open: "false" });
     const duplicate = await cli.run("para-zk:create-area", { title: "Alpha", open: "false" });
@@ -201,7 +242,7 @@ describe("subarea and child bodies", () => {
 
     const subarea = await cli.run("para-zk:create-subarea", {
       title: "Nested",
-      path: "PARA/Areas/Alpha 1/Alpha 1.md",
+      parent_title: "Alpha 1",
       open: "false"
     });
     expect(subarea.path).toBe("PARA/Areas/Alpha 1/Nested/Nested.md");
@@ -219,19 +260,21 @@ describe("subarea and child bodies", () => {
     await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
     await cli.run("para-zk:create-subnote", {
       title: "Notes",
-      path: "PARA/Projects/Alpha/Alpha.md",
+      parent_type: "project",
+      parent_title: "Alpha",
       subnote_type: "free",
       open: "false"
     });
     const append = await cli.run("para-zk:update-project", {
       title: "Alpha",
-      key: "children/Notes/body",
+      child: '["Notes"]',
+      key: "body",
       op: "append",
       value: "Body addition"
     });
     expect(append.changed).toBe(true);
 
-    const read = await cli.run("para-zk:read-project", { title: "Alpha", key: "children/Notes/body" });
+    const read = await cli.run("para-zk:read-project", { title: "Alpha", child: '["Notes"]', key: "body" });
     expect(String(read.value)).toContain("Body addition");
   });
 
@@ -242,7 +285,7 @@ describe("subarea and child bodies", () => {
       body: "First line.\n\nSecond line.",
       open: "false"
     });
-    const zkBody = await cli.run("para-zk:read-zk", { path: String(zk.path), key: "body" });
+    const zkBody = await cli.run("para-zk:read-zk", { title: "Body Spark", kind: "spark", key: "body" });
     expect(String(zkBody.value)).toContain("First line.");
     expect(String(zkBody.value)).toContain("Second line.");
 
@@ -250,12 +293,13 @@ describe("subarea and child bodies", () => {
     await cli.run("para-zk:create-project", { title: "Beta", open: "false" });
     await cli.run("para-zk:create-subnote", {
       title: "Plan",
-      path: "PARA/Projects/Beta/Beta.md",
+      parent_type: "project",
+      parent_title: "Beta",
       subnote_type: "plan",
       body: "Step 1.",
       open: "false"
     });
-    const subBody = await cli.run("para-zk:read-project", { title: "Beta", key: "children/Plan/body" });
+    const subBody = await cli.run("para-zk:read-project", { title: "Beta", child: '["Plan"]', key: "body" });
     expect(String(subBody.value)).toContain("Step 1.");
   });
 });
@@ -289,12 +333,13 @@ describe("managed UI preservation", () => {
 
     await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
     const retro = await cli.run("para-zk:create-retro", {
-      path: "PARA/Projects/Alpha/Alpha.md",
+      source_type: "project",
+      source_title: "Alpha",
       date: "2026-06-02",
       open: "false"
     });
     const retroUpdate = await cli.run("para-zk:update-retro", {
-      path: String(retro.path),
+      title: String(retro.path).split("/").pop()!.replace(/\.md$/, ""),
       key: "retro_summary",
       op: "set",
       value: "Retro summary text"
@@ -333,12 +378,12 @@ describe("resource body updates", () => {
     ].join("\n"));
 
     const exact = await cli.run("para-zk:read-resource", {
-      path: "PARA/Resources/Free Resource.md",
+      title: "Free Resource",
       key: "body"
     });
     expect(exact.value).toBe(body);
 
-    const compact = await cli.run("para-zk:read-resource", { path: "PARA/Resources/Free Resource.md" });
+    const compact = await cli.run("para-zk:read-resource", { title: "Free Resource" });
     expect(compact.body).toEqual({ chars: body.length });
     expect(compact).not.toHaveProperty("overview");
     expect(compact).not.toHaveProperty("untracked");
@@ -446,14 +491,14 @@ describe("resource body updates", () => {
     ].join("\n"));
 
     const read = await cli.run("para-zk:read-zk", {
-      path,
+      title: "Template Destroyed",
       kind: "source",
       key: "body"
     });
     expect(read.value).toBe(body);
 
     const append = await cli.run("para-zk:update-zk", {
-      path,
+      title: "Template Destroyed",
       kind: "source",
       key: "body",
       op: "append",
@@ -462,7 +507,7 @@ describe("resource body updates", () => {
     expect(append.changed).toBe(true);
 
     const roundTrip = await cli.run("para-zk:read-zk", {
-      path,
+      title: "Template Destroyed",
       kind: "source",
       key: "body"
     });
