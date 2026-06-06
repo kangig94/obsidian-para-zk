@@ -39,7 +39,7 @@ function addEmptyTrashButton(plugin: ParaZkPluginContext, container: HTMLElement
     event.preventDefault();
     event.stopPropagation();
     if (!executeCommand(plugin, EMPTY_TRASH_COMMAND_ID)) {
-      new Notice("Trash Explorer is not enabled. Run para-zk:setup installDeps=true.");
+      new Notice("Could not empty trash. Ensure Trash Explorer is enabled (run para-zk:setup installDeps=true).");
     }
   });
 }
@@ -64,6 +64,8 @@ function executeCommand(plugin: ParaZkPluginContext, id: string): boolean {
 
   const executeCommandById = manager.executeCommandById;
   if (typeof executeCommandById !== "function") return false;
-  executeCommandById.call(manager, id);
-  return true;
+  // Respect the return value — Obsidian returns false when the command was found but did
+  // not run, which the caller previously swallowed (always returning true), so a failed
+  // empty-trash click did nothing AND showed no message.
+  return executeCommandById.call(manager, id) !== false;
 }

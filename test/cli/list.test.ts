@@ -54,6 +54,16 @@ describe("list", () => {
     expect((archived.items as Array<{ title: string }>).map((i) => i.title)).toEqual(["Old"]);
   });
 
+  it("excludes managed template files even though they carry a type frontmatter", async () => {
+    await cli.run("para-zk:create-resource", { title: "Real", open: "false" });
+    await cli.app.vault.create("Templates/para-zk/template_resource.md", "---\ntype: resource\n---\n# Template\n");
+
+    const res = await cli.run("para-zk:list", { type: "resource" });
+    const items = res.items as Array<{ title: string; path: string }>;
+    expect(items.map((i) => i.title)).toEqual(["Real"]);
+    expect(items.some((i) => i.path.startsWith("Templates/"))).toBe(false);
+  });
+
   it("lists all PARA-ZK notes when type is omitted", async () => {
     await cli.run("para-zk:create-project", { title: "P", open: "false" });
     await cli.run("para-zk:create-area", { title: "A", open: "false" });

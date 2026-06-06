@@ -295,12 +295,19 @@ Notable changes for PARA-ZK are tracked here.
   subscribes to vault modify/delete/rename events for its host note, matching the
   retro-summary and Dataview renderers.
 - Made the plugin bundle mobile-load-safe: the desktop-only CLI adapter
-  (`src/cli/`) now imports Node modules (`node:fs/promises`, `node:path`) lazily
-  inside its handlers instead of at the top level. The eager top-level imports
-  (used by `attach-file` and the new file-backed `body`/`content`) previously put
-  `require("node:fs")` into `main.js`, which could stop the plugin from loading on
-  Obsidian mobile (iPad/Android) despite `isDesktopOnly: false`. `main.js` now
-  carries no eager Node `require`.
+  (`src/cli/`) now loads Node modules (`node:fs/promises`, `node:path`) lazily inside
+  its handlers instead of importing them at the top level. The eager top-level imports
+  (used by `attach-file` and file-backed `body`) previously put `require("node:fs")`
+  into `main.js`, which could stop the plugin from loading on Obsidian mobile
+  (iPad/Android) despite `isDesktopOnly: false`. `main.js` now carries no eager Node
+  `require`. On desktop the modules load via Electron's `window.require` (a plain
+  dynamic `import()` is rejected by the Electron renderer); a dynamic import is used
+  only off-Electron (the Node test runner).
+- `para-zk:list` no longer returns managed template files: notes under the templates
+  folders are excluded even though the templates carry a `type` frontmatter.
+- The file-explorer "empty trash" action now reports failure instead of silently
+  doing nothing: it respects Obsidian's `executeCommandById` result and shows a Notice
+  when the Trash Explorer command is unavailable or did not run.
 
 ### Removed
 

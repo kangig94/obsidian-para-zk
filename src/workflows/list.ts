@@ -1,4 +1,5 @@
 import { fileFrontmatter, readType } from "../vault/frontmatter";
+import { normalizeVaultPath } from "../vault/paths";
 import type { ListOptions, WorkflowContext } from "./context";
 import { isArchivedFile } from "./locations";
 
@@ -14,6 +15,13 @@ function typeMatcher(type: string | undefined): (stored: string) => boolean {
 
 type ListItem = { title: string; type: string; path: string; archived?: true };
 
+// Managed template files carry a `type` frontmatter (e.g. type: resource) but are not
+// real notes, so they must not surface in the listing. Exclude the templates folders.
+function isUnderAnyFolder(path: string, folders: string[]): boolean {
+  const normalized = normalizeVaultPath(path);
+  return folders.some((folder) => normalized === folder || normalized.startsWith(`${folder}/`));
+}
+
 // Structured enumeration by name/type for LLMs that need to find a note before
 // addressing it. Content search is intentionally left to the host CLI's grep/search.
 export async function listNotes(ctx: WorkflowContext, options: ListOptions = {}): Promise<Record<string, unknown>> {
@@ -21,8 +29,13 @@ export async function listNotes(ctx: WorkflowContext, options: ListOptions = {})
   const query = options.query?.trim().toLowerCase();
   const wantArchived = options.archived === true;
 
+  const templateFolders = [ctx.settings.paths.templatesFolder, ctx.settings.paths.managedTemplatesFolder]
+    .map(normalizeVaultPath)
+    .filter(Boolean);
+
   const all: ListItem[] = [];
   for (const file of ctx.host.getMarkdownFiles()) {
+    if (isUnderAnyFolder(file.path, templateFolders)) continue;
     const type = readType(fileFrontmatter(ctx, file));
     if (!matches(type)) continue;
     if (isArchivedFile(ctx, file) !== wantArchived) continue;
