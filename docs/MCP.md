@@ -15,12 +15,13 @@ PARA-ZK ships a thin MCP server for discovery plus shell-safe body/section edits
 ```
 
 The plugin also bundles an `import-resource` skill (`clients/skills/import-resource/`),
-auto-discovered by Claude Code. Where `describe` advertises the unit commands, the skill
-encodes the procedure for turning a request into clean resource note(s) from any source — a
-local file, a web page, open web research, or synthesis — and any transform (verbatim
-import, translation, research/compilation, multi-note breakdowns): gather, produce clean
-Markdown, **correct/verify**, store via the CLI, and link it — so a caller does not stop at a
-raw, unreviewed dump. (Skills are a Claude Code mechanism; other clients still get the
+discovered by both Claude Code (auto, under the plugin root) and Codex (declared via the
+`skills` field in `.codex-plugin/plugin.json`). Where `describe` advertises the unit
+commands, the skill encodes the procedure for turning a request into clean resource note(s)
+from any source — a local file, a web page, open web research, or synthesis — and any
+transform (verbatim import, translation, research/compilation, multi-note breakdowns):
+gather, produce clean Markdown, **correct/verify**, store via the CLI, and link it — so a
+caller does not stop at a raw, unreviewed dump. (Clients without skill support still get the
 `vault` orientation through `describe`.)
 
 ## Codex CLI

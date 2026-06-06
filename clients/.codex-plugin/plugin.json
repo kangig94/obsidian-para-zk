@@ -10,6 +10,7 @@
   "license": "MIT",
   "keywords": ["obsidian", "para", "zettelkasten"],
   "mcpServers": "./.mcp.codex.json",
+  "skills": "./skills/",
   "interface": {
     "displayName": "PARA-ZK",
     "shortDescription": "Discover and edit a PARA-ZK Obsidian vault via its CLI",

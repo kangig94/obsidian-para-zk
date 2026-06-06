@@ -6,8 +6,9 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
-- Bundled an `import-resource` skill in the Claude Code plugin
-  (`clients/skills/import-resource/`). It encodes a general procedure for turning a request
+- Bundled an `import-resource` skill in the Claude Code and Codex plugins
+  (`clients/skills/import-resource/`; Claude auto-discovers it, Codex declares it via the
+  `skills` field in `.codex-plugin/plugin.json`). It encodes a general procedure for turning a request
   into clean resource note(s) from any source — a local file, a web page, open web research,
   or synthesis — and any transform (verbatim import, translation, research/compilation,
   multi-note breakdowns): gather the material, produce tidy Markdown, run a
