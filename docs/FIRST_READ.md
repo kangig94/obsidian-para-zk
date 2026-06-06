@@ -70,11 +70,11 @@ by `para-zk:describe`.
 
 ## Architecture
 
-Core behavior belongs in `src/workflows.ts`. GUI commands, inline buttons, dashboard
+Core behavior belongs in `src/workflows/` (the canonical workflow layer). GUI commands, inline buttons, dashboard
 action blocks, and native CLI handlers call this workflow layer instead of
 duplicating business logic.
 
-- `src/workflows.ts` — canonical PARA/ZK operations and vault side effects.
+- `src/workflows/` — canonical PARA/ZK operations and vault side effects (create, read, update, rename, delete, promote, references, backlinks, tasks, describe).
 - `src/templates.ts` — managed templates, vault guide, dashboard artifacts.
 - `src/cli/handlers.ts` — LLM-friendly native CLI adapter over workflows.
 - `src/ux/workflow-commands.ts` — human-friendly Obsidian command adapter.
@@ -86,6 +86,7 @@ duplicating business logic.
 - `src/ux/dashboard-actions.ts` / `dashboard-summary.ts` — Home dashboard blocks.
 - `src/runtime/setup.ts` — idempotent vault setup and managed file writes.
 - `src/runtime/dependencies/index.ts` — community-plugin dependency handling.
+- `src/vault/` — Obsidian file/frontmatter/section/path primitives the workflow layer builds on. See `docs/ARCHITECTURE.md` for the full six-layer model.
 
 The architecture lint rejects content-blank modules (`utils.ts`, `shared/`,
 non-`index.ts` re-exports) and enforces layer boundaries: keep core
@@ -162,7 +163,7 @@ Always run `npm run lint` and `npm run build` before considering a change comple
 - Use the disposable `para-zk` vault for destructive and initialization testing; its
   contents are not authoritative.
 - Prefer extending existing workflow functions and adapters over parallel logic. If
-  GUI and CLI drift, move shared behavior down into `workflows.ts` and keep each
+  GUI and CLI drift, move shared behavior down into `src/workflows/` and keep each
   adapter focused on input/output shape.
 - Update [CHANGELOG.md](CHANGELOG.md) for notable behavior, workflow, CLI, template,
   dashboard, or dependency changes.
