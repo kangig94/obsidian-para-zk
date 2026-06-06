@@ -1,7 +1,7 @@
 // CLI harness: drives the same native CLI handlers the smoke test exercises,
 // but against the in-memory MockApp instead of a live Obsidian. It intercepts
 // handler registration, then invokes a command with `format=json` and parses
-// the JSON envelope, so assertions match the live `optsidian raw para-zk:*`
+// the JSON envelope, so assertions match the live `optsidian para-zk:*`
 // payloads (ok / error / fields) one-to-one.
 import { registerNativeCliHandlers } from "../../src/cli/handlers";
 import type { ParaZkPluginContext } from "../../src/plugin-interface";

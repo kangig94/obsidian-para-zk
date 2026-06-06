@@ -6,6 +6,14 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- Bundled an `import-resource` skill in the Claude Code plugin
+  (`clients/skills/import-resource/`). It encodes a general procedure for turning a request
+  into clean resource note(s) from any source — a local file, a web page, open web research,
+  or synthesis — and any transform (verbatim import, translation, research/compilation,
+  multi-note breakdowns): gather the material, produce tidy Markdown, run a
+  correction/verification pass (the step LLMs tend to skip, leaving raw artifacts), store via
+  `create-resource body=@file`, attach figures, and link it. Complements `describe` (which
+  advertises the unit commands).
 - Added a setting to show/hide the file-explorer empty-trash button
   (`showEmptyTrashAction`, on by default), toggled live from the PARA-ZK settings tab.
 - Added a `vault` context field to discovery so a cold automation caller reasons from
@@ -121,6 +129,12 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Changed
 
+- Dropped the redundant `raw` prefix from `para-zk:*` CLI invocations. optsidian
+  delegates `para-zk:*` to Obsidian regardless, so `optsidian para-zk:<command>` is the
+  canonical form; `raw` only matters for forcing Obsidian's version of a command declared
+  by both CLIs, which no `para-zk:*` command is. Updated the `describe`/MCP advertised
+  `invoke`/`schema` strings, the MCP execution argv (`buildUpdateArgs`, describe spawn),
+  the `import-resource` skill, and the docs/CLI examples.
 - The MCP `describe` `install` field now spells out the vault **init** step
   (`para-zk:setup installDeps=true`, which installs the required community
   plugins) after plugin install — previously it only covered installing the

@@ -14,9 +14,9 @@ describe("MCP server pure helpers", () => {
       running: true,
       cli: "optsidian",
       vault: expect.stringContaining("second brain"),
-      invoke: "optsidian raw para-zk:<command> [args...] format=json",
+      invoke: "optsidian para-zk:<command> [args...] format=json",
       surfaceTypes: ["project", "area"],
-      schema: "optsidian raw para-zk:describe type=<surfaceType> format=json",
+      schema: "optsidian para-zk:describe type=<surfaceType> format=json",
       commands: "optsidian --help",
       howto: expect.stringContaining("Locale-neutral"),
       install: expect.stringContaining("plugin:install")
@@ -91,9 +91,9 @@ describe("MCP server pure helpers", () => {
   });
 
   it("documents CLI invocation, schema drill-down, and help commands", () => {
-    expect(invokePattern("optsidian")).toBe("optsidian raw para-zk:<command> [args...] format=json");
+    expect(invokePattern("optsidian")).toBe("optsidian para-zk:<command> [args...] format=json");
     expect(invokePattern("obsidian")).toBe("obsidian para-zk:<command> [args...] format=json");
-    expect(schemaCommand("optsidian")).toBe("optsidian raw para-zk:describe type=<surfaceType> format=json");
+    expect(schemaCommand("optsidian")).toBe("optsidian para-zk:describe type=<surfaceType> format=json");
     expect(schemaCommand("obsidian")).toBe("obsidian para-zk:describe type=<surfaceType> format=json");
     expect(helpCommand("optsidian")).toBe("optsidian --help");
     expect(helpCommand("obsidian")).toBe("obsidian --help");

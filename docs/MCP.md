@@ -14,6 +14,15 @@ PARA-ZK ships a thin MCP server for discovery plus shell-safe body/section edits
 /plugin install para-zk@obsidian-para-zk
 ```
 
+The plugin also bundles an `import-resource` skill (`clients/skills/import-resource/`),
+auto-discovered by Claude Code. Where `describe` advertises the unit commands, the skill
+encodes the procedure for turning a request into clean resource note(s) from any source — a
+local file, a web page, open web research, or synthesis — and any transform (verbatim
+import, translation, research/compilation, multi-note breakdowns): gather, produce clean
+Markdown, **correct/verify**, store via the CLI, and link it — so a caller does not stop at a
+raw, unreviewed dump. (Skills are a Claude Code mechanism; other clients still get the
+`vault` orientation through `describe`.)
+
 ## Codex CLI
 
 Codex has a plugin system like Claude Code. Install the bundled plugin:

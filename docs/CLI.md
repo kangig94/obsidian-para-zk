@@ -13,7 +13,7 @@ Use Obsidian's native CLI directly or through Optsidian passthrough:
 
 ```bash
 obsidian para-zk:describe format=json
-optsidian raw para-zk:describe format=json
+optsidian para-zk:describe format=json
 ```
 
 Use `format=json` for automation. Text output is for humans and may omit fields
@@ -35,7 +35,7 @@ Any command answers `help=true` by returning its own option schema instead of
 running — so you can inspect arguments without first hitting a "required" error:
 
 ```bash
-optsidian raw para-zk:create-area help=true format=json
+optsidian para-zk:create-area help=true format=json
 # → {"ok":true,"command":"para-zk:create-area","description":"...",
 #    "options":[{"name":"title","value":"<title>","description":"Area title."}, ...]}
 ```
@@ -51,7 +51,7 @@ The `body` option on create commands accepts an `@<absolute-path>` value, read f
 disk by the plugin instead of taken inline:
 
 ```bash
-optsidian raw para-zk:create-resource title="Attention Is All You Need" body=@/tmp/note.md
+optsidian para-zk:create-resource title="Attention Is All You Need" body=@/tmp/note.md
 obsidian      para-zk:create-resource title="Attention Is All You Need" body=@/tmp/note.md
 ```
 
@@ -156,8 +156,8 @@ check: if it returns JSON with `ok: true`, Obsidian is running, PARA-ZK is loade
 and the native CLI handler is registered.
 
 ```bash
-optsidian raw para-zk:describe format=json
-optsidian raw para-zk:describe type=project format=json
+optsidian para-zk:describe format=json
+optsidian para-zk:describe type=project format=json
 ```
 
 Important fields:
@@ -201,8 +201,8 @@ Options:
 | `limit` | number or `all` | Maximum items to return (default `50`). |
 
 ```bash
-optsidian raw para-zk:list type=project query=eval format=json
-optsidian raw para-zk:list type=zk limit=all format=json
+optsidian para-zk:list type=project query=eval format=json
+optsidian para-zk:list type=zk limit=all format=json
 ```
 
 Returns `{ count, offset, limit, returned, has_more, items }`; each item is
@@ -267,7 +267,7 @@ unrelated user settings:
 Example:
 
 ```bash
-optsidian raw para-zk:setup installDeps=true locale=ko format=json
+optsidian para-zk:setup installDeps=true locale=ko format=json
 ```
 
 When `locale` is omitted, PARA-ZK defaults to English. Pass `locale=ko` for
@@ -296,7 +296,7 @@ Options:
 Example:
 
 ```bash
-optsidian raw para-zk:create-area title="Software" open=false format=json
+optsidian para-zk:create-area title="Software" open=false format=json
 ```
 
 Side effects:
@@ -340,14 +340,14 @@ frontmatter | summary | goals | tasks | references | backlinks | children
 Examples:
 
 ```bash
-optsidian raw para-zk:read-project title="Model Evaluation" format=json
-optsidian raw para-zk:read-project title="Model Evaluation" key=frontmatter/status format=json
-optsidian raw para-zk:read-project title="Model Evaluation" key=tasks limit=20 format=json
-optsidian raw para-zk:read-project title="Model Evaluation" key=tasks checkbox=/ query="blocked" format=json
-optsidian raw para-zk:read-project title="Model Evaluation" key=references ref_kind=url format=json
-optsidian raw para-zk:read-project title="Model Evaluation" key=backlinks type=project limit=20 format=json
-optsidian raw para-zk:read-project title="Model Evaluation" key=children format=json
-optsidian raw para-zk:read-project title="Model Evaluation" child='["Planning Meeting"]' key=body format=json
+optsidian para-zk:read-project title="Model Evaluation" format=json
+optsidian para-zk:read-project title="Model Evaluation" key=frontmatter/status format=json
+optsidian para-zk:read-project title="Model Evaluation" key=tasks limit=20 format=json
+optsidian para-zk:read-project title="Model Evaluation" key=tasks checkbox=/ query="blocked" format=json
+optsidian para-zk:read-project title="Model Evaluation" key=references ref_kind=url format=json
+optsidian para-zk:read-project title="Model Evaluation" key=backlinks type=project limit=20 format=json
+optsidian para-zk:read-project title="Model Evaluation" key=children format=json
+optsidian para-zk:read-project title="Model Evaluation" child='["Planning Meeting"]' key=body format=json
 ```
 
 Full read responses include `mode: "compact"`. Frontmatter values are inlined
@@ -499,14 +499,14 @@ Type-specific `frontmatter/<key>` reads and writes remain available where
 Examples:
 
 ```bash
-optsidian raw para-zk:read-area title="AI" key=children format=json
-optsidian raw para-zk:read-area title="AI" key=backlinks type=project format=json
-optsidian raw para-zk:read-project title="Finished Project" archived=true key=summary format=json
-optsidian raw para-zk:read-resource title="Source Paper" key=body format=json
-optsidian raw para-zk:read-zk title="Stable Interface Contracts" kind=permanent key=body format=json
-optsidian raw para-zk:read-zk title="Stable Interface Contracts" kind=permanent key=frontmatter/maturity format=json
-optsidian raw para-zk:read-journal date=2026-05-30 key=quick_memo format=json
-optsidian raw para-zk:read-retro title="Retro-General-2026_W22" key=retro_summary format=json
+optsidian para-zk:read-area title="AI" key=children format=json
+optsidian para-zk:read-area title="AI" key=backlinks type=project format=json
+optsidian para-zk:read-project title="Finished Project" archived=true key=summary format=json
+optsidian para-zk:read-resource title="Source Paper" key=body format=json
+optsidian para-zk:read-zk title="Stable Interface Contracts" kind=permanent key=body format=json
+optsidian para-zk:read-zk title="Stable Interface Contracts" kind=permanent key=frontmatter/maturity format=json
+optsidian para-zk:read-journal date=2026-05-30 key=quick_memo format=json
+optsidian para-zk:read-retro title="Retro-General-2026_W22" key=retro_summary format=json
 ```
 
 ### `para-zk:update-project`
@@ -586,17 +586,17 @@ Read-only keys include `children`, `backlinks`, `path`, `title`, `type`, and
 Examples:
 
 ```bash
-optsidian raw para-zk:update-project title="Model Evaluation" key=frontmatter/status op=set value=done format=json
-optsidian raw para-zk:update-project title="Model Evaluation" key=summary op=replace match="old claim" with="new claim" format=json
-optsidian raw para-zk:update-project title="Model Evaluation" key=tasks op=insert value_json='{"name":"Review evaluation set","due":"2026-06-05","priority":"high"}' format=json
-optsidian raw para-zk:update-project title="Model Evaluation" key=references op=insert value_json='{"link":"https://example.com/paper","description":"Reviewed in May","position":0}' format=json
-optsidian raw para-zk:update-project title="Model Evaluation" key=references/0/description op=set value="Important source paper" format=json
-optsidian raw para-zk:update-project title="Model Evaluation" key=references/0/description op=set value_json=null format=json
-optsidian raw para-zk:update-project title="Model Evaluation" key=references/0 op=delete format=json
-optsidian raw para-zk:update-project title="Model Evaluation" key=tasks/a8f3k2m9/checkbox op=set value=x format=json
-optsidian raw para-zk:update-project title="Model Evaluation" key=tasks/a8f3k2m9 op=delete format=json
-optsidian raw para-zk:update-project title="Model Evaluation" child='["Planning Meeting"]' key=body op=append value="Decision: ship the baseline." format=json
-optsidian raw para-zk:update-project title="Model Evaluation" key=frontmatter/status op=set value=archived format=json
+optsidian para-zk:update-project title="Model Evaluation" key=frontmatter/status op=set value=done format=json
+optsidian para-zk:update-project title="Model Evaluation" key=summary op=replace match="old claim" with="new claim" format=json
+optsidian para-zk:update-project title="Model Evaluation" key=tasks op=insert value_json='{"name":"Review evaluation set","due":"2026-06-05","priority":"high"}' format=json
+optsidian para-zk:update-project title="Model Evaluation" key=references op=insert value_json='{"link":"https://example.com/paper","description":"Reviewed in May","position":0}' format=json
+optsidian para-zk:update-project title="Model Evaluation" key=references/0/description op=set value="Important source paper" format=json
+optsidian para-zk:update-project title="Model Evaluation" key=references/0/description op=set value_json=null format=json
+optsidian para-zk:update-project title="Model Evaluation" key=references/0 op=delete format=json
+optsidian para-zk:update-project title="Model Evaluation" key=tasks/a8f3k2m9/checkbox op=set value=x format=json
+optsidian para-zk:update-project title="Model Evaluation" key=tasks/a8f3k2m9 op=delete format=json
+optsidian para-zk:update-project title="Model Evaluation" child='["Planning Meeting"]' key=body op=append value="Decision: ship the baseline." format=json
+optsidian para-zk:update-project title="Model Evaluation" key=frontmatter/status op=set value=archived format=json
 ```
 
 For projects, `key=frontmatter/status op=set value=archived` is a structural
@@ -655,10 +655,10 @@ Options:
 Examples:
 
 ```bash
-optsidian raw para-zk:rename-project title="Model Evaluation" new_title="Model Evaluation 2026" format=json
-optsidian raw para-zk:rename-area title="AI" new_title="Applied AI" format=json
-optsidian raw para-zk:rename-resource title="Source Paper" new_title="Source Paper Notes" format=json
-optsidian raw para-zk:rename-zk title="Stable Interface Contracts" kind=permanent new_title="Stable CLI Contracts" format=json
+optsidian para-zk:rename-project title="Model Evaluation" new_title="Model Evaluation 2026" format=json
+optsidian para-zk:rename-area title="AI" new_title="Applied AI" format=json
+optsidian para-zk:rename-resource title="Source Paper" new_title="Source Paper Notes" format=json
+optsidian para-zk:rename-zk title="Stable Interface Contracts" kind=permanent new_title="Stable CLI Contracts" format=json
 ```
 
 Result fields:
@@ -707,11 +707,11 @@ Options:
 Examples:
 
 ```bash
-optsidian raw para-zk:delete-resource title="Source Paper" format=json
-optsidian raw para-zk:delete-area title="Unused Area" format=json
-optsidian raw para-zk:delete-project title="Prototype" force=true format=json
-optsidian raw para-zk:delete-zk title="Draft idea" kind=spark format=json
-optsidian raw para-zk:delete-journal date=2026-05-30 format=json
+optsidian para-zk:delete-resource title="Source Paper" format=json
+optsidian para-zk:delete-area title="Unused Area" format=json
+optsidian para-zk:delete-project title="Prototype" force=true format=json
+optsidian para-zk:delete-zk title="Draft idea" kind=spark format=json
+optsidian para-zk:delete-journal date=2026-05-30 format=json
 ```
 
 Important result fields:
@@ -742,7 +742,7 @@ Options:
 Example:
 
 ```bash
-optsidian raw para-zk:create-project \
+optsidian para-zk:create-project \
   title="Model Evaluation" \
   area_titles='["AI","Software"]' \
   status=in_progress \
@@ -779,7 +779,7 @@ Options:
 Example:
 
 ```bash
-optsidian raw para-zk:create-resource \
+optsidian para-zk:create-resource \
   title="Source Paper" \
   source_type=project source_title="Model Evaluation" \
   link=true \
@@ -817,13 +817,13 @@ returned `path`/title can be used directly).
 Examples:
 
 ```bash
-optsidian raw para-zk:add-reference \
+optsidian para-zk:add-reference \
   type=resource title="Attention Is All You Need" \
   target="[[Telegram Clone]]" \
   description="Project that applies this" \
   format=json
 
-optsidian raw para-zk:add-reference \
+optsidian para-zk:add-reference \
   type=project title="Model Evaluation" \
   target="https://example.com/paper" \
   description="Source paper" \
@@ -876,7 +876,7 @@ Options:
 Example:
 
 ```bash
-optsidian raw para-zk:create-subnote \
+optsidian para-zk:create-subnote \
   title="Planning Meeting" \
   parent_type=project parent_title="Model Evaluation" \
   subnote_type=meeting \
@@ -906,7 +906,7 @@ Options:
 Example:
 
 ```bash
-optsidian raw para-zk:create-subarea \
+optsidian para-zk:create-subarea \
   title="LLM Tooling" \
   parent_title="AI" \
   inheritParentTag=true \
@@ -930,7 +930,7 @@ Options:
 Example:
 
 ```bash
-optsidian raw para-zk:create-retro \
+optsidian para-zk:create-retro \
   source_type=project source_title="Model Evaluation" \
   date=2026-05-29 \
   format=json
@@ -958,7 +958,7 @@ Options:
 Example:
 
 ```bash
-optsidian raw para-zk:create-zk \
+optsidian para-zk:create-zk \
   title="Stable Interface Contracts" \
   kind=permanent \
   maturity=refined \
@@ -986,7 +986,7 @@ Options:
 Example:
 
 ```bash
-optsidian raw para-zk:capture-journal \
+optsidian para-zk:capture-journal \
   content="Reviewed PARA-ZK CLI contract" \
   date=2026-05-29 \
   time=09:30 \
@@ -1025,7 +1025,7 @@ Options:
 Example:
 
 ```bash
-optsidian raw para-zk:create-from-resource \
+optsidian para-zk:create-from-resource \
   source_title="Source Paper" \
   title="Paper Insight" \
   kind=source \
@@ -1055,7 +1055,7 @@ Options:
 Example:
 
 ```bash
-optsidian raw para-zk:create-from-source \
+optsidian para-zk:create-from-source \
   source_title="Paper Digest" \
   title="Compounding learning" \
   maturity=refined \
@@ -1090,7 +1090,7 @@ Options:
 Example:
 
 ```bash
-optsidian raw para-zk:distill-spark \
+optsidian para-zk:distill-spark \
   source_title="Raw Thought" \
   title="Durable Thought" \
   maturity=evergreen \

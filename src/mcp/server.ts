@@ -28,7 +28,7 @@ const OPTSIDIAN_NOTE = " `optsidian` is an Obsidian-based optimized CLI; run the
 const FALLBACK_HOWTO_OBSIDIAN = "PARA-ZK CLI detected but no running Obsidian vault was reachable (or no obsidian CLI on PATH). Open the vault in Obsidian and ensure the CLI is on PATH, then call this tool again for the live schema.";
 const FALLBACK_HOWTO_OPTSIDIAN = "PARA-ZK CLI detected but no running Obsidian vault was reachable. Launch Obsidian with `optsidian open-gui` (it opens your last-opened vault and waits until the vault is ready), then call this tool again for the live schema. If optsidian is not found, ensure it is on PATH.";
 const REPO_URL = "https://github.com/kangig94/obsidian-para-zk";
-const INSTALL_OPTSIDIAN = `Set up a vault in two steps: (1) install the prebuilt plugin — \`optsidian plugin:install url=${REPO_URL} enable\` (add vault-path=<path> for a non-active vault); (2) initialize the vault — \`optsidian raw para-zk:setup installDeps=true format=json\` (creates the PARA/ZK layout and installs the required community plugins; add locale=ko for Korean).`;
+const INSTALL_OPTSIDIAN = `Set up a vault in two steps: (1) install the prebuilt plugin — \`optsidian plugin:install url=${REPO_URL} enable\` (add vault-path=<path> for a non-active vault); (2) initialize the vault — \`optsidian para-zk:setup installDeps=true format=json\` (creates the PARA/ZK layout and installs the required community plugins; add locale=ko for Korean).`;
 const INSTALL_OBSIDIAN = `Set up a vault in two steps: (1) install the plugin — copy the prebuilt manifest.json, main.js, and styles.css from ${REPO_URL} into <vault>/.obsidian/plugins/para-zk/ and enable PARA-ZK under Settings > Community plugins; (2) initialize the vault — run \`para-zk:setup installDeps=true\` (add locale=ko for Korean).`;
 const DESCRIBE_INPUT_SCHEMA = {
   type: "object",
@@ -149,7 +149,7 @@ export function resolveCliOrder(env: CliEnv): ParaZkCli[] {
 
 export function invokePattern(cli: ParaZkCli): string {
   return cli === "optsidian"
-    ? "optsidian raw para-zk:<command> [args...] format=json"
+    ? "optsidian para-zk:<command> [args...] format=json"
     : "obsidian para-zk:<command> [args...] format=json";
 }
 
@@ -158,7 +158,7 @@ export function helpCommand(cli: ParaZkCli): string {
 }
 
 export function schemaCommand(cli: ParaZkCli): string {
-  const prefix = cli === "optsidian" ? "optsidian raw " : "obsidian ";
+  const prefix = cli === "optsidian" ? "optsidian " : "obsidian ";
   return `${prefix}para-zk:describe type=<surfaceType> format=json`;
 }
 
@@ -178,9 +178,7 @@ export function buildUpdateArgs({ cli, tool, params }: { cli: ParaZkCli; tool: U
   const record = readParams(params);
   const type = readUpdateType(record);
   const config = UPDATE_TYPES[type];
-  const args = cli === "optsidian"
-    ? ["raw", `para-zk:${config.command}`]
-    : [`para-zk:${config.command}`];
+  const args = [`para-zk:${config.command}`];
 
   if (config.kind) args.push(`kind=${config.kind}`);
   args.push(...selectorArgs(type, record));
@@ -256,9 +254,7 @@ type CliAttempt =
   | { kind: "unavailable"; error: string };
 
 async function describeWithCli(cli: ParaZkCli): Promise<CliAttempt> {
-  const args = cli === "optsidian"
-    ? ["raw", "para-zk:describe", "format=json"]
-    : ["para-zk:describe", "format=json"];
+  const args = ["para-zk:describe", "format=json"];
 
   let stdout: string;
   try {

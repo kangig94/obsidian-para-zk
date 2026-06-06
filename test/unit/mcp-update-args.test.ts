@@ -17,7 +17,6 @@ describe("MCP update arg builder", () => {
         new_string: newString
       }
     })).toEqual([
-      "raw",
       "para-zk:update-zk",
       "kind=spark",
       "title=My Note",
@@ -67,7 +66,6 @@ describe("MCP update arg builder", () => {
         content
       }
     })).toEqual([
-      "raw",
       "para-zk:update-area",
       "title=Health",
       `child=${JSON.stringify(["Habits"])}`,
@@ -92,7 +90,6 @@ describe("MCP update arg builder", () => {
       tool: "set",
       params: { type: "area", title: "Ops", child: ["Hiring", "Interviews"], key: "body", content: "x" }
     })).toEqual([
-      "raw",
       "para-zk:update-area",
       "title=Ops",
       `child=${JSON.stringify(["Hiring", "Interviews"])}`,
@@ -153,7 +150,6 @@ describe("MCP update arg builder", () => {
         content: "Today"
       }
     })).toEqual([
-      "raw",
       "para-zk:update-journal",
       "date=2026-06-04",
       "key=body",
@@ -173,7 +169,6 @@ describe("MCP update arg builder", () => {
         content: "Reflection"
       }
     })).toEqual([
-      "raw",
       "para-zk:update-retro",
       "title=Week 23",
       "date=2026-06-04",
