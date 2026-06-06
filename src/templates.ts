@@ -139,7 +139,11 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "tags:",
           `  - ${tags.resource}/${slugPlaceholder}`,
           `created: ${nowPlaceholder}`,
-          "updated:"
+          "updated:",
+          "url:",
+          "first_author:",
+          "license:",
+          "kind:"
         ]),
         paraZkPropsBlock("resource"),
         "{{cursor}}",

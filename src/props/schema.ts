@@ -105,7 +105,17 @@ export function propsSchemaForType(type: PropsViewType, locale: Locale): PropsSc
     },
     resource: {
       type: "resource",
-      rows: [[created, updated]]
+      rows: [
+        [created, updated],
+        [
+          field("url", "url", t.labels.url, "text"),
+          field("first_author", "first_author", t.labels.firstAuthor, "text")
+        ],
+        [
+          field("license", "license", t.labels.license, "text"),
+          field("kind", "kind", t.labels.kind, "text")
+        ]
+      ]
     },
     journal: {
       type: "journal",

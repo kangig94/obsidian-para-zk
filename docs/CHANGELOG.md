@@ -6,6 +6,12 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- Recorded source provenance in the `resource` frontmatter: `url`, `first_author`,
+  `license`, and `kind` (the source's type, e.g. paper/article). They render as editable
+  fields in the resource props block (order: created, updated, url, first_author, license,
+  kind) and are seeded empty in the generated resource template — so an imported resource
+  carries where it came from as structured, queryable frontmatter rather than a free-text
+  section. (`first_author` Korean label: 제1저자; `kind` reuses the existing 종류/Type label.)
 - Bundled an `import-resource` skill in the Claude Code and Codex plugins
   (`clients/skills/import-resource/`; Claude auto-discovers it, Codex declares it via the
   `skills` field in `.codex-plugin/plugin.json`). It encodes a general procedure for turning a request
