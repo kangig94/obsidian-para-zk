@@ -13,7 +13,8 @@ Notable changes for PARA-ZK are tracked here.
   or synthesis — and any transform (verbatim import, translation, research/compilation,
   multi-note breakdowns): gather the material, produce tidy Markdown, run a
   correction/verification pass (the step LLMs tend to skip, leaving raw artifacts), store via
-  `create-resource body=@file`, attach figures, and link it. Complements `describe` (which
+  `create-resource body=@file`, embed figures (web images by URL, local images attached),
+  and link it. Complements `describe` (which
   advertises the unit commands).
 - Added a setting to show/hide the file-explorer empty-trash button
   (`showEmptyTrashAction`, on by default), toggled live from the PARA-ZK settings tab.

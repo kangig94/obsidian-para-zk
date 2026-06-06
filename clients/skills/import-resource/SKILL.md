@@ -45,9 +45,11 @@ command + inputs. Identify the note(s) to link from (area / project / resource).
   (prefer primary/official sources; for papers, arXiv/DOI).
 
 Record provenance for everything (URL, file path, identifier, date, license/permission where
-relevant). Attach raw originals or figures with
-`optsidian para-zk:attach-file source=<abs-path> folder=assets/<slug> format=json` and keep
-the returned `![[…]]` embed.
+relevant). For images:
+- A **web** image → embed it by its source URL with `![alt](https://…)`; Obsidian renders
+  remote images inline, so do **not** download or attach it.
+- A **local** image (from a local-file source) → `optsidian para-zk:attach-file
+  source=<abs-path> folder=assets/<slug> format=json`, then embed the returned `![[…]]`.
 
 ## 4. Produce clean Markdown — never a raw dump
 
@@ -59,8 +61,9 @@ Apply the transform faithfully, and always make the form tidy:
   mark anything uncertain or unverified; do not invent.
 
 Across all of them: real headings (`#`/`##`), valid Markdown tables (no empty cells, no
-equations trapped in cells), math as LaTeX (`$…$`), figures attached + embedded, boilerplate
-dropped. Put a short **Source / provenance** section at the top.
+equations trapped in cells), math as LaTeX (`$…$`), figures embedded (web images by URL,
+local images attached), boilerplate dropped. Put a short **Source / provenance** section at
+the top.
 
 ## 5. Correction & verification pass — DO NOT SKIP
 
