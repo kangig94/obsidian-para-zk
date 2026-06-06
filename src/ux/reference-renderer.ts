@@ -1,6 +1,7 @@
 import {
   AbstractInputSuggest,
   ButtonComponent,
+  MarkdownRenderChild,
   Modal,
   Notice,
   Setting,
@@ -82,12 +83,61 @@ type ReferenceAnchorSuggestion = {
 };
 
 const REFERENCE_GONE_MESSAGE = "reference no longer present — re-render";
+const REFERENCE_RERENDER_DELAY_MS = 120;
 const referenceBlockStates = new WeakMap<HTMLElement, ReferenceBlockState>();
 
 export function registerReferenceRenderers(plugin: ParaZkPluginContext): void {
   plugin.registerMarkdownCodeBlockProcessor("para-zk-references", (source, el, ctx) => {
-    void renderReferenceBlock(plugin, source, el, ctx).catch((error: unknown) => renderReferenceError(el, error));
+    ctx.addChild(new ReferenceBlockRenderChild(plugin, source, el, ctx));
   });
+}
+
+// References render from the host note's frontmatter, so a change made outside this
+// block — add-reference / create-resource from the CLI, MCP, or another view — must
+// re-render it; otherwise the list only refreshed when the note was reopened. Mirrors
+// the vault-event subscription the retro-summary and dataview renderers already use.
+class ReferenceBlockRenderChild extends MarkdownRenderChild {
+  private renderTimer: number | undefined;
+
+  constructor(
+    private readonly plugin: ParaZkPluginContext,
+    private readonly source: string,
+    containerEl: HTMLElement,
+    private readonly ctx: MarkdownPostProcessorContext
+  ) {
+    super(containerEl);
+  }
+
+  onload(): void {
+    void this.render();
+    this.registerEvent(this.plugin.app.vault.on("modify", (file) => this.onVaultFile(file)));
+    this.registerEvent(this.plugin.app.vault.on("delete", (file) => this.onVaultFile(file)));
+    this.registerEvent(this.plugin.app.vault.on("rename", (file, oldPath) => this.onVaultFile(file, oldPath)));
+  }
+
+  onunload(): void {
+    if (this.renderTimer !== undefined) window.clearTimeout(this.renderTimer);
+    this.renderTimer = undefined;
+  }
+
+  private onVaultFile(file: unknown, oldPath?: string): void {
+    if (!(file instanceof TFile)) return;
+    if (file.path !== this.ctx.sourcePath && oldPath !== this.ctx.sourcePath) return;
+    this.scheduleRender();
+  }
+
+  private scheduleRender(): void {
+    if (this.renderTimer !== undefined) window.clearTimeout(this.renderTimer);
+    this.renderTimer = window.setTimeout(() => {
+      this.renderTimer = undefined;
+      void this.render();
+    }, REFERENCE_RERENDER_DELAY_MS);
+  }
+
+  private render(): Promise<void> {
+    return renderReferenceBlock(this.plugin, this.source, this.containerEl, this.ctx)
+      .catch((error: unknown) => renderReferenceError(this.containerEl, error));
+  }
 }
 
 async function renderReferenceBlock(

@@ -272,6 +272,15 @@ Notable changes for PARA-ZK are tracked here.
 - Creating resources and creating ZK notes from resources/sources now write
   frontmatter reference registry entries instead of body reference lines.
 
+### Fixed
+
+- The references block now re-renders live when the host note's frontmatter
+  references change from outside the block — e.g. `add-reference` or
+  `create-resource` run from the CLI/MCP, or an edit in another view. Previously
+  the list only refreshed when the note was closed and reopened. The renderer now
+  subscribes to vault modify/delete/rename events for its host note, matching the
+  retro-summary and Dataview renderers.
+
 ### Removed
 
 - Removed the need for Meta Bind in generated PARA-ZK templates and dashboards.
