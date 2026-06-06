@@ -13,6 +13,7 @@ describe("MCP server pure helpers", () => {
     expect(buildEnvelope({ cli: "optsidian", describe: describePayload })).toEqual({
       running: true,
       cli: "optsidian",
+      vault: expect.stringContaining("second brain"),
       invoke: "optsidian raw para-zk:<command> [args...] format=json",
       surfaceTypes: ["project", "area"],
       schema: "optsidian raw para-zk:describe type=<surfaceType> format=json",
@@ -38,12 +39,21 @@ describe("MCP server pure helpers", () => {
     expect(buildFallback({ cli: "obsidian", reason: "spawn obsidian ENOENT" })).toEqual({
       running: false,
       cli: "obsidian",
+      vault: expect.stringContaining("second brain"),
       invoke: "obsidian para-zk:<command> [args...] format=json",
       commands: "obsidian --help",
       howto: expect.stringContaining("Open the vault in Obsidian"),
       install: expect.stringContaining("manifest.json"),
       reason: "spawn obsidian ENOENT"
     });
+  });
+
+  it("orients a cold caller with the vault's private, non-distribution nature (running + fallback)", () => {
+    const describePayload = { ok: true as const, surfaceTypes: ["project"], collectionFilters: {} };
+    for (const cli of ["optsidian", "obsidian"] as const) {
+      expect(buildEnvelope({ cli, describe: describePayload }).vault).toContain("not redistribution");
+      expect(buildFallback({ cli }).vault).toContain("not redistribution");
+    }
   });
 
   it("omits reason from fallback when none is given", () => {

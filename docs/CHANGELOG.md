@@ -6,6 +6,13 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- Added a `vault` context field to discovery so a cold automation caller reasons from
+  the right premise. `para-zk:describe` and the MCP envelope (both `running` states)
+  now state that the vault is one user's private, local, single-user Obsidian "second
+  brain" — never published or shared — so saving source material (notes, excerpts, or
+  full texts the user is studying) is personal-use storage, not redistribution. The MCP
+  `describe` tool description carries a short form of the same. Prevents reflexive
+  refusals to store content on public-distribution grounds.
 - Added file-backed `body`: create commands' `body` option accepts an
   `@<absolute-path>` value, which the plugin reads from disk instead of taking
   inline. This is the shell-safe way to pass long/multiline markdown (newlines,

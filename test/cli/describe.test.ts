@@ -53,6 +53,9 @@ describe("describe", () => {
     const all = await cli.run("para-zk:describe");
     expect(all.ok).toBe(true);
     expect(all).not.toHaveProperty("surfaces");
+    // Orients a cold caller: the vault is a private, local, single-user store, so saved
+    // content is personal use, not redistribution.
+    expect(String(all.vault)).toContain("not redistribution");
     expect(all.surfaceTypes).toEqual(
       expect.arrayContaining(["project", "area", "resource", "retro", "note"])
     );
