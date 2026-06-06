@@ -51,7 +51,10 @@ or `https://ar5iv.org/abs/<id>`), never the PDF. Fall back to a PDF only when no
 rendering is available.
 
 Record provenance for everything (URL, file path, identifier, date, license/permission where
-relevant). For images:
+relevant). The four core fields go in the resource **frontmatter** at create time (see step 6):
+`url`, `first_author`, `license`, `kind` — `license` as an SPDX identifier (short recognizable
+token like `arXiv` when none fits, never a long sentence), `kind` as a code. Keep any extra detail
+(DOI, version, other URLs, transform note) in a short body provenance section. For images:
 - A **web** image → embed it by its source URL with `![alt](https://…)`; Obsidian renders
   remote images inline, so do **not** download or attach it.
 - A **local** image (from a local-file source) → `optsidian para-zk:attach-file
@@ -68,8 +71,9 @@ Apply the transform faithfully, and always make the form tidy:
 
 Across all of them: real headings (`#`/`##`), valid Markdown tables (no empty cells, no
 equations trapped in cells), math as LaTeX (`$…$`), figures embedded (web images by URL,
-local images attached), boilerplate dropped. Put a short **Source / provenance** section at
-the top.
+local images attached), boilerplate dropped. Provenance lives in the frontmatter (step 6); only
+when there is overflow detail beyond `url`/`first_author`/`license`/`kind` (DOI, version, extra
+URLs, transform note) add a short **Source / provenance** section at the top — otherwise omit it.
 
 ## 5. Correction & verification pass — DO NOT SKIP
 
@@ -81,11 +85,18 @@ this skill.
 ## 6. Store (shell-safe) and link
 
 For each resource, write the cleaned body to a temp file and create it with a file-backed body
-(avoids shell-mangling of long/multiline content; use an absolute path):
+(avoids shell-mangling of long/multiline content; use an absolute path), recording provenance in
+the structured frontmatter:
 
 ```
-optsidian para-zk:create-resource title="<title>" body=@/tmp/<file>.md format=json
+optsidian para-zk:create-resource title="<title>" body=@/tmp/<file>.md \
+  url="<source url>" first_author="<first author>" license="<SPDX id>" kind=<paper|article|book|video|web|code|other> \
+  format=json
 ```
+
+`license` is an SPDX identifier (`MIT`, `Apache-2.0`, `CC-BY-4.0`, `CC-BY-SA-4.0`, `CC0-1.0`, …); when
+no SPDX id fits use a short recognizable token (e.g. `arXiv` for an arXiv-default paper), never a long
+descriptive sentence. `kind` is one of the codes shown. Omit any field you cannot determine — don't guess.
 
 Then link as requested. To make an existing note reference a resource — e.g. "add a ref to the
 AI area":

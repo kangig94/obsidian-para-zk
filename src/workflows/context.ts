@@ -39,6 +39,10 @@ export type CreateResourceOptions = {
   sourceType?: string;
   sourceTitle?: string;
   linkToSource?: boolean;
+  url?: string;
+  firstAuthor?: string;
+  license?: string;
+  kind?: string;
   body?: string;
   open?: boolean;
 };

@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   PRIORITY_CODE_HELP,
   PROJECT_STATUS_CODE_HELP,
+  RESOURCE_KIND_CODE_HELP,
   RESOURCE_KIND_CODES,
   SUBNOTE_TYPE_CODE_HELP,
   parsePriorityCode,
   parseProjectStatusCode,
+  parseResourceKindCode,
   parseSubnoteTypeCode,
   priorityLabel,
   projectStatusLabel,
@@ -20,6 +22,8 @@ describe("code parsing", () => {
     expect(parsePriorityCode("high")).toBe("high");
     expect(parseSubnoteTypeCode("meeting")).toBe("meeting");
     expect(parseSubnoteTypeCode("nope")).toBeUndefined();
+    expect(parseResourceKindCode("paper")).toBe("paper");
+    expect(parseResourceKindCode("nope")).toBeUndefined();
   });
 });
 
@@ -28,6 +32,7 @@ describe("code help strings", () => {
     expect(PROJECT_STATUS_CODE_HELP).toBe("idea|in_progress|paused|done|archived");
     expect(PRIORITY_CODE_HELP).toBe("low|medium|high");
     expect(SUBNOTE_TYPE_CODE_HELP.split("|")).toContain("meeting");
+    expect(RESOURCE_KIND_CODE_HELP).toBe("paper|article|book|video|web|code|other");
   });
 });
 

@@ -20,11 +20,13 @@ import {
   MATURITY_CODE_HELP,
   PRIORITY_CODE_HELP,
   PROJECT_STATUS_CODE_HELP,
+  RESOURCE_KIND_CODE_HELP,
   SUBNOTE_TYPE_CODE_HELP,
   parseEnergyCode,
   parseMaturityCode,
   parsePriorityCode,
   parseProjectStatusCode,
+  parseResourceKindCode,
   parseSubnoteTypeCode
 } from "../vocabulary";
 import { readOptionalCode } from "./code-options";
@@ -639,6 +641,9 @@ function normalizeFrontmatterUpdateValue(type: string, key: string, value: unkno
   }
   if (type === "subnote" && key === "subnote_type") {
     return readOptionalCode(String(value), parseSubnoteTypeCode, "subnote_type", SUBNOTE_TYPE_CODE_HELP);
+  }
+  if (type === "resource" && key === "kind") {
+    return readOptionalCode(String(value), parseResourceKindCode, "kind", RESOURCE_KIND_CODE_HELP);
   }
   if (type === "zk_permanent" && key === "maturity") {
     return readOptionalCode(String(value), parseMaturityCode, "maturity", MATURITY_CODE_HELP);

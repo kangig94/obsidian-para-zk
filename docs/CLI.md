@@ -92,6 +92,12 @@ Resource-create target kind:
 digest | permanent
 ```
 
+Resource kind (source type):
+
+```text
+paper | article | book | video | web | code | other
+```
+
 Maturity:
 
 ```text
@@ -773,8 +779,21 @@ Options:
 | `source_type` | `project`, `area`, `resource`, `zk` | Optional source note type to link this resource from. |
 | `source_title` | string | Optional source note title. |
 | `link` | boolean | Defaults to `true` when `source_title` is provided. |
+| `url` | string | Optional provenance: where the source came from. |
+| `first_author` | string | Optional provenance: the source's first author. |
+| `license` | SPDX id | Optional provenance: SPDX identifier (e.g. `MIT`, `CC-BY-4.0`); when no SPDX id fits, a short recognizable token (e.g. `arXiv`). |
+| `kind` | `paper` \| `article` \| `book` \| `video` \| `web` \| `code` \| `other` | Optional provenance: locale-neutral source kind code. |
 | `body` | markdown | Optional initial free-form body content. |
 | `open` | boolean | Default `false`. |
+
+The four provenance keys are also editable after creation via
+`para-zk:update-resource key=frontmatter/<url|first_author|license|kind>` (and
+surfaced by `para-zk:describe type=resource`); `kind` is validated against the code
+list above. For example:
+
+```bash
+optsidian para-zk:update-resource title="Attention" key=frontmatter/kind op=set value=paper format=json
+```
 
 Example:
 

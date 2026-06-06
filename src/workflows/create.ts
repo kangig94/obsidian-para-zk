@@ -16,10 +16,12 @@ import {
   MATURITY_CODE_HELP,
   PRIORITY_CODE_HELP,
   PROJECT_STATUS_CODE_HELP,
+  RESOURCE_KIND_CODE_HELP,
   SUBNOTE_TYPE_CODE_HELP,
   parseMaturityCode,
   parsePriorityCode,
   parseProjectStatusCode,
+  parseResourceKindCode,
   parseSubnoteTypeCode,
   type MaturityCode
 } from "../vocabulary";
@@ -161,6 +163,7 @@ async function resolveRequiredParent(
 
 export async function createResource(ctx: WorkflowContext, options: CreateResourceOptions): Promise<CreateResourceResult> {
   const title = requireTitle(options.title, "resource title");
+  const kind = readOptionalCode(options.kind, parseResourceKindCode, "kind", RESOURCE_KIND_CODE_HELP);
   const source = await resolveOptionalOrigin(ctx, options);
   const createdAt = localDateTimeSpace();
   const path = await uniqueMarkdownPath(ctx.host, joinVaultPath(ctx.settings.paths.resourcesFolder, `${title}.md`));
@@ -175,6 +178,12 @@ export async function createResource(ctx: WorkflowContext, options: CreateResour
     fm.type = "resource";
     fm.tags = [`${tags.resource}/${slugify(title)}`];
     applyCreatedUpdatedDefaults(fm, createdAt);
+    // Provenance: write only what was provided. url/first_author/license are free text;
+    // kind is already validated to a code (or undefined) by readOptionalCode above.
+    if (options.url?.trim()) fm.url = options.url.trim();
+    if (options.firstAuthor?.trim()) fm.first_author = options.firstAuthor.trim();
+    if (options.license?.trim()) fm.license = options.license.trim();
+    if (kind) fm.kind = kind;
   });
 
   let linkedFromSource = false;

@@ -86,8 +86,9 @@ describe("describe", () => {
   it("describes resource and ZK digest as free-form body surfaces", async () => {
     const resourceResult = await cli.run("para-zk:describe", { type: "resource" });
     const resource = (resourceResult.surfaces as Array<Record<string, unknown>>)[0];
-    expect(resource.readKeys).toEqual(["references", "backlinks", "body"]);
-    expect(resource.writeKeys).toEqual(["references", "body"]);
+    expect(resource.frontmatterKeys).toEqual(["url", "first_author", "license", "kind"]);
+    expect(resource.readKeys).toEqual(["frontmatter", "references", "backlinks", "body"]);
+    expect(resource.writeKeys).toEqual(["frontmatter", "references", "body"]);
     expect(resource.collections).toEqual({
       references: "reference",
       backlinks: "backlink"

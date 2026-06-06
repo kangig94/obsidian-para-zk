@@ -80,7 +80,7 @@ export const AREA_READ_SPEC: ReadSurfaceSpec = {
 };
 
 export const RESOURCE_READ_SPEC: ReadSurfaceSpec = {
-  frontmatter: [],
+  frontmatter: ["url", "first_author", "license", "kind"],
   sections: [
     { key: "references", labelKey: "references", transform: readReferences, collection: "reference" },
     BACKLINK_READ_SECTION
