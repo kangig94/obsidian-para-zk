@@ -174,7 +174,7 @@ function installHowto(cli: ParaZkCli): string {
   return cli === "optsidian" ? INSTALL_OPTSIDIAN : INSTALL_OBSIDIAN;
 }
 
-export function buildUpdateArgs({ cli, tool, params }: { cli: ParaZkCli; tool: UpdateTool; params: unknown }): string[] {
+export function buildUpdateArgs({ tool, params }: { tool: UpdateTool; params: unknown }): string[] {
   const record = readParams(params);
   const type = readUpdateType(record);
   const config = UPDATE_TYPES[type];
@@ -439,7 +439,7 @@ function jsonToolResult(payload: Record<string, unknown>, isError = false): Call
 
 async function callUpdateTool(tool: UpdateTool, params: unknown, env: CliEnv): Promise<CallToolResult> {
   try {
-    buildUpdateArgs({ cli: "optsidian", tool, params });
+    buildUpdateArgs({ tool, params });
   } catch (error) {
     return jsonToolResult({ ok: false, error: errorMessage(error) }, true);
   }
@@ -449,7 +449,7 @@ async function callUpdateTool(tool: UpdateTool, params: unknown, env: CliEnv): P
   let reason = "no CLI attempted";
 
   for (const cli of order) {
-    const args = buildUpdateArgs({ cli, tool, params });
+    const args = buildUpdateArgs({ tool, params });
     const result = await execFileTextResult(cli, args, 15_000);
     const parsed = parseJsonObject(result.stdout, cli);
     if (parsed.kind === "ok") {

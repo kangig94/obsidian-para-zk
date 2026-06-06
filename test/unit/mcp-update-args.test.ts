@@ -7,7 +7,6 @@ describe("MCP update arg builder", () => {
     const newString = "line two\n'quoted' $PATH `next`";
 
     expect(buildUpdateArgs({
-      cli: "optsidian",
       tool: "replace",
       params: {
         type: "zk_spark",
@@ -30,7 +29,6 @@ describe("MCP update arg builder", () => {
 
   it("maps replace_all to all=true and uses the obsidian command shape", () => {
     expect(buildUpdateArgs({
-      cli: "obsidian",
       tool: "replace",
       params: {
         type: "project",
@@ -56,7 +54,6 @@ describe("MCP update arg builder", () => {
     const content = "first line\nsecond line with $ and `backticks`";
 
     expect(buildUpdateArgs({
-      cli: "optsidian",
       tool: "set",
       params: {
         type: "area",
@@ -78,7 +75,6 @@ describe("MCP update arg builder", () => {
 
   it("rejects a child selector that is not an array of strings", () => {
     expect(() => buildUpdateArgs({
-      cli: "optsidian",
       tool: "set",
       params: { type: "area", title: "Health", child: "Habits", key: "body", content: "x" }
     })).toThrow(/child must be an array of strings/);
@@ -86,7 +82,6 @@ describe("MCP update arg builder", () => {
 
   it("emits a child drill as a single JSON-list argv element", () => {
     expect(buildUpdateArgs({
-      cli: "optsidian",
       tool: "set",
       params: { type: "area", title: "Ops", child: ["Hiring", "Interviews"], key: "body", content: "x" }
     })).toEqual([
@@ -102,7 +97,6 @@ describe("MCP update arg builder", () => {
 
   it("builds add args for append and prepend positions", () => {
     expect(buildUpdateArgs({
-      cli: "obsidian",
       tool: "add",
       params: {
         type: "resource",
@@ -120,7 +114,6 @@ describe("MCP update arg builder", () => {
     ]);
 
     expect(buildUpdateArgs({
-      cli: "obsidian",
       tool: "add",
       params: {
         type: "resource",
@@ -141,7 +134,6 @@ describe("MCP update arg builder", () => {
 
   it("maps journal date selectors and retro date pass-through", () => {
     expect(buildUpdateArgs({
-      cli: "optsidian",
       tool: "set",
       params: {
         type: "journal",
@@ -159,7 +151,6 @@ describe("MCP update arg builder", () => {
     ]);
 
     expect(buildUpdateArgs({
-      cli: "optsidian",
       tool: "add",
       params: {
         type: "retro",
@@ -181,31 +172,26 @@ describe("MCP update arg builder", () => {
 
   it("validates missing required mutation fields before spawning", () => {
     expect(() => buildUpdateArgs({
-      cli: "optsidian",
       tool: "replace",
       params: { type: "project", title: "Launch", old_string: "old", new_string: "new" }
     })).toThrow(/key is required/);
 
     expect(() => buildUpdateArgs({
-      cli: "optsidian",
       tool: "replace",
       params: { type: "project", title: "Launch", key: "body", new_string: "new" }
     })).toThrow(/old_string is required/);
 
     expect(() => buildUpdateArgs({
-      cli: "optsidian",
       tool: "set",
       params: { type: "project", title: "Launch", key: "body" }
     })).toThrow(/content is required/);
 
     expect(() => buildUpdateArgs({
-      cli: "optsidian",
       tool: "add",
       params: { type: "project", key: "body", content: "text" }
     })).toThrow(/requires a title selector/);
 
     expect(() => buildUpdateArgs({
-      cli: "optsidian",
       tool: "set",
       params: { title: "Launch", key: "body", content: "text" }
     })).toThrow(/type is required/);
@@ -213,13 +199,11 @@ describe("MCP update arg builder", () => {
 
   it("rejects unknown and empty mutation types", () => {
     expect(() => buildUpdateArgs({
-      cli: "optsidian",
       tool: "set",
       params: { type: "task", title: "Launch", key: "body", content: "text" }
     })).toThrow(/unknown type: task/);
 
     expect(() => buildUpdateArgs({
-      cli: "optsidian",
       tool: "set",
       params: { type: "", title: "Launch", key: "body", content: "text" }
     })).toThrow(/type is required/);
