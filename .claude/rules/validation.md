@@ -8,9 +8,13 @@ paths:
 - Every `addCommand`/`registerEvent`/`registerDomEvent`/`addRibbonIcon`/interval/observer
   is created in `onload()` (or a method it calls), so Obsidian's `register*` auto-cleanup
   applies. Manually-created intervals/observers/listeners have explicit teardown.
-- No Node.js-only APIs (`fs`, `path`, `child_process`, `process`) in plugin code paths —
-  `manifest.json` declares `isDesktopOnly: false`. (The MCP server in `src/mcp/` runs in
-  Node and is exempt.)
+- The plugin bundle must load on mobile (`manifest.json` declares `isDesktopOnly:
+  false`), so `main.js` carries **no eager (top-level) Node import**. GUI, core
+  (`workflows/`, `templates.ts`), vault, and runtime code use no Node-only APIs (`fs`,
+  `path`, `child_process`, `process`) at all. The desktop-only CLI adapter (`src/cli/`)
+  — whose handlers are never registered on mobile — MAY use Node, but only via a lazy
+  `import()` inside an async handler (never a top-level import), so no eager Node
+  `require` lands in `main.js`. (The MCP server in `src/mcp/` runs in Node and is exempt.)
 - Settings load tolerates missing/extra fields: `loadSettings` merges over defaults; a
   vault saved by an older version still loads.
 - Vault writes are non-destructive: `para-zk:setup` stays idempotent; existing

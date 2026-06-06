@@ -45,6 +45,24 @@ MCP) because it rides the same `key=value` parsing. A bare `--help`/`-h` flag is
 honored too when the host forwards it. For the full machine-readable surface
 (types, stable keys, create inputs), `para-zk:describe` remains the index.
 
+### Large body from a file
+
+The `body` option on create commands accepts an `@<absolute-path>` value, read from
+disk by the plugin instead of taken inline:
+
+```bash
+optsidian raw para-zk:create-resource title="Attention Is All You Need" body=@/tmp/note.md
+obsidian      para-zk:create-resource title="Attention Is All You Need" body=@/tmp/note.md
+```
+
+This is the shell-safe way to pass long or multiline markdown (newlines, quotes,
+`$`, backticks survive untouched). The plugin performs the read, so `@file` works
+on the native `obsidian` CLI and through optsidian alike. Use an **absolute path**:
+the read resolves against the Obsidian process working directory, not your shell's.
+Because a leading `@` always means "read this file", a body whose literal text begins
+with `@` must be supplied through a file. Only `body` is file-backed — short fields
+like a journal `content` memo are always literal, so `@mentions` are kept verbatim.
+
 ## Stable Codes
 
 CLI options store locale-neutral codes in frontmatter. The GUI and generated

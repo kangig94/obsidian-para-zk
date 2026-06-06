@@ -1,5 +1,3 @@
-import { readFile as readLocalFile, readdir as readLocalDir, stat as statLocalPath } from "node:fs/promises";
-import { join as joinLocalPath } from "node:path";
 import type { Plugin } from "obsidian";
 import { localePack, normalizeLocale } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
@@ -989,6 +987,41 @@ function withCreateInputs(surface: SurfaceDescription): SurfaceDescription {
   return { ...surface, addressing: { ...surface.addressing, createInputs: commandInputs(create) } };
 }
 
+// The CLI adapter is desktop-only — handlers are never registered on mobile (the host
+// injects registerCliHandler only on desktop) — so it may use Node. Always import lazily
+// inside an async handler, never at the top level, so the plugin bundle carries no eager
+// Node require and still loads on Obsidian mobile (iPad/Android).
+function nodeFs(): Promise<typeof import("node:fs/promises")> {
+  return import("node:fs/promises");
+}
+
+function nodePath(): Promise<typeof import("node:path")> {
+  return import("node:path");
+}
+
+// A create command's body may carry large markdown; an @file value is read from disk so
+// the caller never pushes multiline/quoted content through a shell. Works through any host
+// (native obsidian or optsidian) because the plugin does the read. Pass an absolute path —
+// the read resolves against the Obsidian process working directory, not the caller's
+// shell. Scoped to body only: short fields like a journal `content` memo commonly begin
+// with a literal "@" (mentions), which must not be misread as a file path.
+const FILE_BACKED_OPTIONS = ["body"];
+
+async function resolveFileBackedArgs(args: CliArgs, options: Record<string, CliOptionSpec>): Promise<CliArgs> {
+  let resolved: CliArgs | undefined;
+  for (const key of FILE_BACKED_OPTIONS) {
+    if (!(key in options)) continue;
+    const value = args[key];
+    if (typeof value !== "string" || !value.startsWith("@")) continue;
+    const filePath = value.slice(1);
+    if (!filePath) throw new Error("@file value must include a path");
+    const { readFile } = await nodeFs();
+    resolved ??= { ...args };
+    resolved[key] = await readFile(filePath, "utf8");
+  }
+  return resolved ?? args;
+}
+
 export function registerNativeCliHandlers(plugin: ParaZkPluginContext): void {
   const cliPlugin = plugin as CliCapablePlugin;
   if (!cliPlugin.registerCliHandler) return;
@@ -998,10 +1031,13 @@ export function registerNativeCliHandlers(plugin: ParaZkPluginContext): void {
       command.command,
       command.description,
       command.options,
-      async (args = {}) =>
-        isHelpRequest(args)
-          ? renderCommandHelp(command, args)
-          : withCliErrors(args, command.command, () => command.run(plugin, args), command.text)
+      async (args = {}) => {
+        if (isHelpRequest(args)) return renderCommandHelp(command, args);
+        return withCliErrors(args, command.command, async () => {
+          const resolved = await resolveFileBackedArgs(args, command.options);
+          return command.run(plugin, resolved);
+        }, command.text);
+      }
     );
   }
 }
@@ -1102,11 +1138,12 @@ async function collectAttachmentJobs(
   requestedName: string | undefined,
   recursive: boolean
 ): Promise<{ jobs: AttachmentJob[]; collectionMode: boolean }> {
+  const { stat } = await nodeFs();
   const jobs: AttachmentJob[] = [];
   let collectionMode = sourcePaths.length > 1;
 
   for (const sourcePath of sourcePaths) {
-    const info = await statLocalPath(sourcePath);
+    const info = await stat(sourcePath);
     if (info.isFile()) {
       jobs.push({ sourcePath, targetFolder: folder, requestedName });
       continue;
@@ -1132,12 +1169,14 @@ async function collectDirectoryAttachmentJobs(
   recursive: boolean,
   jobs: AttachmentJob[]
 ): Promise<void> {
+  const { readdir } = await nodeFs();
+  const { join } = await nodePath();
   async function visit(localFolder: string, vaultFolder: string): Promise<void> {
-    const entries = (await readLocalDir(localFolder, { withFileTypes: true }))
+    const entries = (await readdir(localFolder, { withFileTypes: true }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
     for (const entry of entries) {
-      const localPath = joinLocalPath(localFolder, entry.name);
+      const localPath = join(localFolder, entry.name);
       if (entry.isFile()) {
         jobs.push({ sourcePath: localPath, targetFolder: vaultFolder });
         continue;
@@ -1152,7 +1191,8 @@ async function collectDirectoryAttachmentJobs(
 }
 
 async function attachAttachmentJob(plugin: ParaZkPluginContext, job: AttachmentJob): Promise<AttachedFile> {
-  const bytes = await readLocalFile(job.sourcePath);
+  const { readFile } = await nodeFs();
+  const bytes = await readFile(job.sourcePath);
   const filename = attachmentFileName(job.sourcePath, job.requestedName);
   const file = await createUniqueVaultBinary(plugin, job.targetFolder, filename, bytes);
   const link = wikiLink(file.path);

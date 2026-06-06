@@ -14,7 +14,9 @@ server. It ships as both an Obsidian community plugin and a Claude Code / Codex 
 - CLI/MCP values are locale-neutral codes (`status=in_progress`); localized labels are
   rendered only in the GUI and generated Markdown.
 - Never corrupt vault data; `para-zk:setup` is idempotent.
-- `isDesktopOnly: false` — no Node.js-only APIs in plugin code paths (mobile safety).
+- `isDesktopOnly: false` — the plugin bundle must load on mobile: no eager top-level
+  Node imports. GUI/core/vault/runtime use no Node APIs; the desktop-only CLI adapter
+  (`src/cli/`) may use Node but only via lazy `import()` inside handlers (never top-level).
 
 **Key Documentation**:
 - `docs/FIRST_READ.md` - Product intent, GUI/CLI contract, behavioral expectations (read first)

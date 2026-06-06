@@ -31,8 +31,11 @@ model: opus
     BLOCKING:
     - A new listener/interval/observer is registered via a `register*` helper OR has
       explicit teardown — no leak across `plugin:reload`.
-    - No Node.js-only API (`fs`, `path`, `child_process`, `process`, `os`) reaches a
-      plugin code path; `manifest.json` says `isDesktopOnly: false`. (`src/mcp/` is exempt.)
+    - No eager (top-level) Node import lands in the plugin bundle; `manifest.json` says
+      `isDesktopOnly: false`. GUI/core/vault/runtime use no Node-only API (`fs`, `path`,
+      `child_process`, `process`, `os`) at all. The desktop-only CLI adapter (`src/cli/`)
+      may use Node, but only via a lazy `import()` inside an async handler — never a
+      top-level import. (`src/mcp/` is exempt.)
     - `loadSettings` merges loaded data over defaults — a vault saved by an older version
       (missing fields) still loads without crashing.
     - Vault writes are non-destructive: setup stays idempotent; non-managed files are not
@@ -52,7 +55,7 @@ model: opus
     |----|-------|
     | Confirm `addCommand`/`registerEvent`/`registerDomEvent`/`addRibbonIcon` run inside `onload()` (or a method it calls) | Accept a registration in a constructor or a lazily-called path that re-registers on every invocation |
     | For a raw `setInterval`/`new MutationObserver`/`addEventListener`, require `this.register(() => …)` or explicit removal | Trust that "Obsidian cleans it up" for non-`register*` resources |
-    | Flag any `import` of `fs`/`path`/`child_process`/`process` outside `src/mcp/` — breaks mobile | Assume desktop-only because a feature seems desktop-ish |
+    | Flag any **top-level** `import` of `fs`/`path`/`child_process`/`process` in the plugin bundle — breaks mobile load; in `src/cli/` it must be a lazy `import()` inside a handler | Flag a lazy `import()` inside a `src/cli/` async handler — that is the allowed desktop-only pattern |
     | Verify `loadSettings` does `Object.assign({}, DEFAULTS, loaded)` or equivalent | Accept reading `data.json` fields without a default fallback |
     | Check that `para-zk:setup` skips existing non-managed files and gates managed updates on `force` | Approve a write that clobbers user content |
     | Read the actual changed code in `src/main.ts`/`src/ux/`/`src/runtime/` | Infer lifecycle correctness from the diff summary alone |

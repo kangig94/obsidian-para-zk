@@ -6,6 +6,13 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- Added file-backed `body`: create commands' `body` option accepts an
+  `@<absolute-path>` value, which the plugin reads from disk instead of taking
+  inline. This is the shell-safe way to pass long/multiline markdown (newlines,
+  quotes, `$`, backticks survive). Because the plugin performs the read, it works on
+  the native `obsidian` CLI and through optsidian alike — no new MCP tool required.
+  Scoped to `body` only; short fields like a journal `content` memo stay literal so
+  a leading `@` (mentions) is never misread as a path.
 - Added per-command help: any native CLI command answers `help=true` (and a
   forwarded `--help`/`-h`) by returning its own option schema — `{ ok, command,
   description, options }` under `format=json`, or a text listing — instead of
@@ -280,6 +287,13 @@ Notable changes for PARA-ZK are tracked here.
   the list only refreshed when the note was closed and reopened. The renderer now
   subscribes to vault modify/delete/rename events for its host note, matching the
   retro-summary and Dataview renderers.
+- Made the plugin bundle mobile-load-safe: the desktop-only CLI adapter
+  (`src/cli/`) now imports Node modules (`node:fs/promises`, `node:path`) lazily
+  inside its handlers instead of at the top level. The eager top-level imports
+  (used by `attach-file` and the new file-backed `body`/`content`) previously put
+  `require("node:fs")` into `main.js`, which could stop the plugin from loading on
+  Obsidian mobile (iPad/Android) despite `isDesktopOnly: false`. `main.js` now
+  carries no eager Node `require`.
 
 ### Removed
 
