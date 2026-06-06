@@ -60,6 +60,13 @@ describe("MCP server pure helpers", () => {
     expect(buildFallback({ cli: "obsidian" }).install).toContain("manifest.json");
   });
 
+  it("install guidance covers the vault init step (setup), not just plugin install", () => {
+    for (const cli of ["optsidian", "obsidian"] as const) {
+      const install = buildFallback({ cli }).install as string;
+      expect(install).toContain("para-zk:setup installDeps=true");
+    }
+  });
+
   it("explains optsidian only when it is the chosen CLI", () => {
     expect(howtoFor("optsidian")).toContain("Obsidian-based optimized CLI");
     expect(howtoFor("optsidian")).toContain("do not substitute `obsidian`");

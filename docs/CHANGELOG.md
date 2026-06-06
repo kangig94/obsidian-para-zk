@@ -99,6 +99,10 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Changed
 
+- The MCP `describe` `install` field now spells out the vault **init** step
+  (`para-zk:setup installDeps=true`, which installs the required community
+  plugins) after plugin install — previously it only covered installing the
+  plugin, leaving a caller without the finish-setup step.
 - Made the CLI/MCP surface fully **name-based** — no command exposes a vault
   file `path` anymore. Notes are addressed by `title` (project/area/resource),
   `date` (journal/retro), or `title`+`kind` (zk). Existing children are reached

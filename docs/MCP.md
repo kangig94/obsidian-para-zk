@@ -66,7 +66,7 @@ Returns a compact index with the preferred CLI invocation, help command, usage n
 
 When no running vault is reachable (`running: false`), it returns a `reason` and a `howto` for recovery — with `optsidian`, the `howto` points at `optsidian open-gui` to launch the last-opened vault, then retry.
 
-The `install` field is present in both states (the active vault running PARA-ZK does not mean a target vault has it) and adapts to the CLI: with `optsidian` it suggests `optsidian plugin:install url=<repo> enable`; without it, copying the built `manifest.json`/`main.js`/`styles.css` into `<vault>/.obsidian/plugins/para-zk/` per the README.
+The `install` field is present in both states (the active vault running PARA-ZK does not mean a target vault has it) and gives the full two-step setup: (1) install the prebuilt plugin — with `optsidian`, `optsidian plugin:install url=<repo> enable` (add `vault-path=` for a non-active vault); without it, copy the committed `manifest.json`/`main.js`/`styles.css` into `<vault>/.obsidian/plugins/para-zk/` and enable it. (2) initialize the vault — `para-zk:setup installDeps=true` (creates the PARA/ZK layout and installs required community plugins).
 
 ### `replace`
 
