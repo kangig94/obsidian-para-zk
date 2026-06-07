@@ -1,6 +1,7 @@
 import {
   ButtonComponent,
   DropdownComponent,
+  MarkdownRenderChild,
   MarkdownView,
   Notice,
   SuggestModal,
@@ -51,12 +52,65 @@ const propsRerenderStates = new WeakMap<HTMLElement, PropsRerenderState>();
 
 export function registerPropsControlRenderers(plugin: ParaZkPluginContext): void {
   plugin.registerMarkdownCodeBlockProcessor("para-zk-props", (source, el, ctx) => {
-    renderPropsCodeBlock(plugin, source, el, ctx);
+    ctx.addChild(new PropsBlockRenderChild(plugin, source, el, ctx));
   });
 
   plugin.registerMarkdownPostProcessor((el, ctx) => {
     renderInlinePropsInputs(plugin, el, ctx);
   });
+}
+
+const PROPS_RERENDER_DELAY_MS = 120;
+
+// The props grid renders the host note's frontmatter from the metadata cache, so a change
+// made outside this block — an update-resource from the CLI/MCP, Obsidian's own properties
+// editor, or sync — must re-render it; otherwise the panel kept the stale value until the
+// note was closed and reopened (switching source/reading reuses Obsidian's cached render).
+// metadataCache "changed" fires after the frontmatter is reparsed, so the re-read sees the
+// new value — references/retro-summary listen to vault "modify" instead because they read the
+// file fresh, whereas this block reads the cache. Inputs commit on `change` (blur), so the
+// debounced re-render never interrupts active typing, and a programmatic setValue does not
+// re-fire change (no write loop).
+class PropsBlockRenderChild extends MarkdownRenderChild {
+  private renderTimer: number | undefined;
+
+  constructor(
+    private readonly plugin: ParaZkPluginContext,
+    private readonly source: string,
+    containerEl: HTMLElement,
+    private readonly ctx: MarkdownPostProcessorContext
+  ) {
+    super(containerEl);
+  }
+
+  onload(): void {
+    this.render();
+    this.registerEvent(
+      this.plugin.app.metadataCache.on("changed", (file) => this.onMetadataChange(file))
+    );
+  }
+
+  onunload(): void {
+    if (this.renderTimer !== undefined) window.clearTimeout(this.renderTimer);
+    this.renderTimer = undefined;
+  }
+
+  private onMetadataChange(file: TFile): void {
+    if (file.path !== this.ctx.sourcePath) return;
+    this.scheduleRender();
+  }
+
+  private scheduleRender(): void {
+    if (this.renderTimer !== undefined) window.clearTimeout(this.renderTimer);
+    this.renderTimer = window.setTimeout(() => {
+      this.renderTimer = undefined;
+      this.render();
+    }, PROPS_RERENDER_DELAY_MS);
+  }
+
+  private render(): void {
+    renderPropsCodeBlock(this.plugin, this.source, this.containerEl, this.ctx);
+  }
 }
 
 function renderPropsCodeBlock(

@@ -371,6 +371,13 @@ Notable changes for PARA-ZK are tracked here.
   the list only refreshed when the note was closed and reopened. The renderer now
   subscribes to vault modify/delete/rename events for its host note, matching the
   retro-summary and Dataview renderers.
+- The props panel (`para-zk-props`) now re-renders live when the host note's frontmatter
+  changes from outside the block — e.g. `update-resource` from the CLI/MCP, Obsidian's own
+  properties editor, or sync. Previously the rendered controls kept the stale value until the
+  note was closed and reopened (switching source/reading mode reuses Obsidian's cached render).
+  Because the panel reads the metadata cache, the renderer subscribes to `metadataCache`
+  "changed" for its host note — that fires once the new frontmatter is reparsed, so the
+  re-read sees the new value.
 - Made the plugin bundle mobile-load-safe: the desktop-only CLI adapter
   (`src/cli/`) now loads Node modules (`node:fs/promises`, `node:path`) lazily inside
   its handlers instead of importing them at the top level. The eager top-level imports
