@@ -36,7 +36,8 @@ describe("describe", () => {
       "children"
     ]);
     expect(project.writeKeys).toEqual([
-      "frontmatter/{areas|status|priority|start_date|due_date|done_date}=set",
+      "frontmatter/{status|priority|start_date|due_date|done_date}=set",
+      "frontmatter/areas=set|append|prepend|delete",
       "summary=set|append|prepend|replace",
       "goals=set|append|prepend|replace",
       "tasks=insert",

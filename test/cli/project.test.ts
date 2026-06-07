@@ -281,3 +281,69 @@ describe("update-project", () => {
     expect(String(rejected.error)).toContain("read-only");
   });
 });
+
+describe("update-project areas (list frontmatter)", () => {
+  it("adds and removes one area by title without restating the whole list", async () => {
+    await createBaseProject(); // Alpha: areas AI + Software
+    await cli.run("para-zk:create-area", { title: "Photos", open: "false" });
+
+    const added = await cli.run("para-zk:update-project", {
+      title: "Alpha",
+      key: "frontmatter/areas",
+      op: "append",
+      value: "Photos"
+    });
+    expect(added.ok).toBe(true);
+    expect(added.changed).toBe(true);
+
+    const afterAdd = await cli.run("para-zk:read-project", { title: "Alpha", key: "frontmatter/areas" });
+    const links = afterAdd.value as string[];
+    expect(links.length).toBe(3);
+    // the title was resolved to a canonical link, not stored as the bare title
+    expect(links.some((link) => link.includes("|Photos]]"))).toBe(true);
+    expect(links).not.toContain("Photos");
+
+    // append of an already-present area is idempotent
+    const again = await cli.run("para-zk:update-project", {
+      title: "Alpha",
+      key: "frontmatter/areas",
+      op: "append",
+      value: "Photos"
+    });
+    expect(again.changed).toBe(false);
+
+    // remove one by title, leaving the rest
+    const removed = await cli.run("para-zk:update-project", {
+      title: "Alpha",
+      key: "frontmatter/areas",
+      op: "delete",
+      value: "Software"
+    });
+    expect(removed.changed).toBe(true);
+    const afterDelete = await cli.run("para-zk:read-project", { title: "Alpha", key: "frontmatter/areas" });
+    const remaining = afterDelete.value as string[];
+    expect(remaining.length).toBe(2);
+    expect(remaining.some((link) => link.includes("|Software]]"))).toBe(false);
+  });
+
+  it("rejects an unknown area title and a non-list op", async () => {
+    await createBaseProject();
+    const badTitle = await cli.run("para-zk:update-project", {
+      title: "Alpha",
+      key: "frontmatter/areas",
+      op: "append",
+      value: "Nope"
+    });
+    expect(badTitle.ok).toBe(false);
+    expect(String(badTitle.error)).toContain("area not found");
+
+    const badOp = await cli.run("para-zk:update-project", {
+      title: "Alpha",
+      key: "frontmatter/areas",
+      op: "insert",
+      value: "AI"
+    });
+    expect(badOp.ok).toBe(false);
+    expect(String(badOp.error)).toContain("op=set|append|prepend|delete");
+  });
+});

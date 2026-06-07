@@ -1215,7 +1215,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Stable writable key. Valid: frontmatter/{areas|status|priority|start_date|due_date|done_date}=set, summary=set|append|prepend|replace, goals=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set.",
+        "description": "Stable writable key. Valid: frontmatter/{status|priority|start_date|due_date|done_date}=set, frontmatter/areas=set|append|prepend|delete, summary=set|append|prepend|replace, goals=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set.",
         "value": "<map-path>",
       },
       "match": {
@@ -1315,7 +1315,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Stable writable key. Valid: frontmatter/{project|areas|date|week_iso|week_start|week_end}=set, week_progress=set|append|prepend|replace, good=set|append|prepend|replace, improve=set|append|prepend|replace, risks=set|append|prepend|replace, retro_summary=set|append|prepend|replace.",
+        "description": "Stable writable key. Valid: frontmatter/{project|date|week_iso|week_start|week_end}=set, frontmatter/areas=set|append|prepend|delete, week_progress=set|append|prepend|replace, good=set|append|prepend|replace, improve=set|append|prepend|replace, risks=set|append|prepend|replace, retro_summary=set|append|prepend|replace.",
         "value": "<map-path>",
       },
       "match": {

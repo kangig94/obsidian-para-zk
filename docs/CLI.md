@@ -545,9 +545,13 @@ Options:
 | `with` | text | Replacement text for `replace`. Empty is allowed. |
 | `all` | boolean | For `replace`, replace all matches. Without it, multiple matches fail. |
 
-Writable keys are a subset of read keys. `frontmatter/<key>` supports `op=set`
-only and uses Obsidian frontmatter mutation. Section/body keys support
-`set`, `append`, `prepend`, and exact literal `replace`.
+Writable keys are a subset of read keys. A scalar `frontmatter/<key>` supports `op=set`
+only and uses Obsidian frontmatter mutation. A multi-value list frontmatter key — shown in a
+type's `writeKeys` as `…=set|append|prepend|delete`, e.g. a project's `frontmatter/areas` —
+also supports `append`/`prepend` (add one value) and `delete` (remove one), so you can add an
+area without restating the whole list; `areas` accepts an area title (resolved to its canonical
+link) or an existing `[[link]]`. Section/body keys support `set`, `append`, `prepend`, and
+exact literal `replace`.
 For free-form resource, child subnote/note, and ZK prose, use `key=body`; old starter
 headings such as `summary`, `memo`, `insight`, or `limitations` are not writable
 map keys.

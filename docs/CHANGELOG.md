@@ -169,6 +169,12 @@ Notable changes for PARA-ZK are tracked here.
   which the vault manages) are visibly not writable; and `addressVia` for `subnote`/`subarea`/`note`
   now names the parent route (`read-`/`update-`/`delete-project|area` with `child=["title"]`,
   since there is no `update-subnote`). The MCP discovery envelope carries the same `scope`.
+- Multi-value frontmatter list keys now accept add/remove, not just a whole-list `set`. A
+  project's (and retro's) `frontmatter/areas` supports `op=append`/`prepend` (add one value) and
+  `op=delete` (remove one), and resolves an area title to its canonical link (an existing
+  `[[link]]` is kept as-is) — so adding an area to a project is one call, with no hand-built
+  links. Scalar frontmatter keys stay `set`-only and permanent `aliases` stays single-value;
+  describe's per-type `writeKeys` advertise the richer ops (`frontmatter/areas=set|append|prepend|delete`).
 - Workflow result envelopes now report `kind` as a locale-neutral code (`spark`/`digest`/
   `permanent`) instead of the internal display form (`Spark`/`Digest`/`Permanent`), so the
   CLI/MCP output speaks the same vocabulary as the `kind=` input. Affects `create-zk`,

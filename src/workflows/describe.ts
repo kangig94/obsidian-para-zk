@@ -214,9 +214,21 @@ function collectionMap(spec: ReadSurfaceSpec): Record<string, ReadCollectionKind
   return collections;
 }
 
+// Frontmatter keys whose value is a multi-value list supporting add/remove ops
+// (set|append|prepend|delete), unlike scalar keys (set only). resolve: "area" means a value
+// may be given as an area title and is stored as its canonical link. `aliases` is also a list
+// but intentionally single-value, so it is not listed here and stays set-only.
+export const LIST_FRONTMATTER_KEYS: Record<string, { resolve?: "area" }> = {
+  areas: { resolve: "area" }
+};
+
 function writeKeyHints(spec: ReadSurfaceSpec): string[] {
   const keys: string[] = [];
-  if (spec.frontmatter.length > 0) keys.push(`frontmatter/{${spec.frontmatter.join("|")}}=set`);
+  const scalarKeys = spec.frontmatter.filter((key) => !(key in LIST_FRONTMATTER_KEYS));
+  if (scalarKeys.length > 0) keys.push(`frontmatter/{${scalarKeys.join("|")}}=set`);
+  for (const key of spec.frontmatter) {
+    if (key in LIST_FRONTMATTER_KEYS) keys.push(`frontmatter/${key}=set|append|prepend|delete`);
+  }
   for (const section of spec.sections ?? []) {
     if (section.collection === "task") {
       keys.push("tasks=insert", "tasks/<id>=delete", "tasks/<id>/<field>=set");

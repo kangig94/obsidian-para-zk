@@ -48,6 +48,7 @@ import type {
 import {
   AREA_READ_SPEC,
   JOURNAL_READ_SPEC,
+  LIST_FRONTMATTER_KEYS,
   PROJECT_READ_SPEC,
   RESOURCE_READ_SPEC,
   RETRO_READ_SPEC,
@@ -62,9 +63,11 @@ import {
   archivedCounterpartFolder,
   assertVacantPath,
   drillToChild,
+  findAreaByTitle,
   folderStyleContainer,
   isArchivedFile,
   isArchivedPath,
+  linkToFile,
   relativePathUnderRoot,
   resolveRequiredArea,
   resolveRequiredJournal,
@@ -338,7 +341,10 @@ async function updateFrontmatterSurface(
   operation: UpdateOperation,
   options: UpdatePayloadOptions
 ): Promise<TextUpdateResult> {
-  if (operation !== "set") throw new Error("frontmatter keys only support op=set");
+  if (target.frontmatterKey in LIST_FRONTMATTER_KEYS) {
+    return updateFrontmatterListKey(ctx, target, target.frontmatterKey, operation, options);
+  }
+  if (operation !== "set") throw new Error(`frontmatter key '${target.frontmatterKey}' only supports op=set`);
 
   const frontmatter = await readFileFrontmatterFresh(ctx, target.file);
   const type = readType(frontmatter);
@@ -367,6 +373,79 @@ async function updateFrontmatterSurface(
     fromPath: moved.fromPath,
     toPath: moved.toPath
   };
+}
+
+// Multi-value frontmatter lists (e.g. a project's areas) accept add/remove, not just a
+// whole-list set, so a caller can add one item without restating the rest. For an
+// area-resolving key, a value may be an area title (resolved to its canonical link) or an
+// existing [[link]] (kept as-is). Order is preserved and duplicates are collapsed.
+async function updateFrontmatterListKey(
+  ctx: WorkflowContext,
+  target: Extract<WritableSurfaceTarget, { kind: "frontmatter" }>,
+  key: string,
+  operation: UpdateOperation,
+  options: UpdatePayloadOptions
+): Promise<TextUpdateResult> {
+  if (operation === "insert" || operation === "replace") {
+    throw new Error(`frontmatter list key '${key}' supports op=set|append|prepend|delete`);
+  }
+  const frontmatter = await readFileFrontmatterFresh(ctx, target.file);
+  const current = frontmatterStringList(frontmatter[key]);
+  const rawInputs = frontmatterListInputs(options);
+  const inputs = LIST_FRONTMATTER_KEYS[key].resolve === "area"
+    ? resolveAreaListRefs(ctx, rawInputs)
+    : rawInputs;
+  const next = applyFrontmatterListOp(operation, current, inputs);
+  const changed = !frontmatterValuesEqual(current, next);
+  if (changed) {
+    await ctx.host.processFrontMatter(target.file, (fm) => {
+      fm[key] = next;
+    });
+  }
+  return { changed };
+}
+
+function frontmatterStringList(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
+  if (typeof value === "string" && value) return [value];
+  return [];
+}
+
+function frontmatterListInputs(options: UpdatePayloadOptions): string[] {
+  const value = requireUpdateValue(options);
+  const items = Array.isArray(value) ? value : [value];
+  return items.map((item) => {
+    if (typeof item !== "string") throw new Error("list value items must be strings");
+    const trimmed = item.trim();
+    if (!trimmed) throw new Error("list value must not be empty");
+    return trimmed;
+  });
+}
+
+function resolveAreaListRefs(ctx: WorkflowContext, refs: string[]): string[] {
+  return refs.map((ref) => {
+    if (ref.startsWith("[[")) return ref;
+    const area = findAreaByTitle(ctx, ref);
+    if (!area) throw new Error(`area not found: ${ref} (create it with para-zk:create-area, or pass a [[link]])`);
+    return linkToFile(area);
+  });
+}
+
+function applyFrontmatterListOp(operation: UpdateOperation, current: string[], inputs: string[]): string[] {
+  switch (operation) {
+    case "set":
+      return [...new Set(inputs)];
+    case "append":
+      return [...new Set([...current, ...inputs])];
+    case "prepend":
+      return [...new Set([...inputs, ...current])];
+    case "delete": {
+      const remove = new Set(inputs);
+      return current.filter((item) => !remove.has(item));
+    }
+    default:
+      throw new Error("frontmatter list key supports op=set|append|prepend|delete");
+  }
 }
 
 async function updateTextSurface(
