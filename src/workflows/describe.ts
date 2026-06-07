@@ -206,17 +206,6 @@ function compactReadKeys(spec: ReadSurfaceSpec): string[] {
   return keys;
 }
 
-function compactWriteKeys(spec: ReadSurfaceSpec): string[] {
-  const keys: string[] = [];
-  if (spec.frontmatter.length > 0) keys.push("frontmatter");
-  for (const section of spec.sections ?? []) {
-    if (section.collection === "backlink") continue;
-    keys.push(section.key);
-  }
-  if (spec.body) keys.push("body");
-  return keys;
-}
-
 function collectionMap(spec: ReadSurfaceSpec): Record<string, ReadCollectionKind> {
   const collections: Record<string, ReadCollectionKind> = {};
   for (const section of spec.sections ?? []) {
@@ -301,15 +290,15 @@ function addressingForType(type: SurfaceType): SurfaceAddressing {
     case "journal":
       return { addressable: true, selectors: ["date"], create: "para-zk:capture-journal", rename: false };
     case "subnote":
-      return { addressable: false, addressVia: `container type + child=["title"]`, create: "para-zk:create-subnote", rename: true };
+      return { addressable: false, addressVia: `parent project/area + child=["title"]; no update-subnote — read/update/delete it via read-/update-/delete-project|area with that child`, create: "para-zk:create-subnote", rename: true };
     case "subarea":
-      return { addressable: false, addressVia: `container type + child=["title"]`, create: "para-zk:create-subarea", rename: true };
+      return { addressable: false, addressVia: `parent area + child=["title"]; no update-subarea — read/update/delete it via read-/update-/delete-area with that child`, create: "para-zk:create-subarea", rename: true };
     case "zk_spark":
     case "zk_digest":
     case "zk_permanent":
       return { addressable: true, selectors: ["title", "kind"], create: "para-zk:create-zk", rename: true };
     case "note":
-      return { addressable: false, addressVia: `container type + child=["title"]`, rename: true };
+      return { addressable: false, addressVia: `parent project/area + child=["title"]; reach it via read-/update-/delete-project|area with that child`, rename: true };
   }
 }
 
@@ -319,7 +308,10 @@ function describeSurfaceSpec(type: SurfaceType, spec: ReadSurfaceSpec): SurfaceD
     type,
     addressing: addressingForType(type),
     readKeys: compactReadKeys(spec),
-    writeKeys: compactWriteKeys(spec),
+    // writeKeys carry op detail (frontmatter/{...}=set, tasks=insert, ...) so a caller learns
+    // exactly what is mutable, and how, before attempting — the same hints the update-key error
+    // reports. Keys absent here are not writable (e.g. created/updated are vault-managed).
+    writeKeys: writeKeyHints(spec),
     ...(frontmatterKeys.length > 0 ? { frontmatterKeys } : {}),
     collections: collectionMap(spec)
   };

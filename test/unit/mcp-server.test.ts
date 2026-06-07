@@ -14,6 +14,7 @@ describe("MCP server pure helpers", () => {
       running: true,
       cli: "optsidian",
       vault: expect.stringContaining("second brain"),
+      scope: expect.stringContaining("raw file edits"),
       invoke: "optsidian para-zk:<command> [args...] format=json",
       surfaceTypes: ["project", "area"],
       schema: "optsidian para-zk:describe type=<surfaceType> format=json",

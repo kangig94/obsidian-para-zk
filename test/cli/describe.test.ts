@@ -8,7 +8,7 @@ beforeEach(() => {
 });
 
 describe("describe", () => {
-  it("describes a single surface type with compact read and write keys", async () => {
+  it("describes a single surface type with compact read keys and op-detailed write keys", async () => {
     const result = await cli.run("para-zk:describe", { type: "project" });
 
     expect(result.ok).toBe(true);
@@ -36,11 +36,15 @@ describe("describe", () => {
       "children"
     ]);
     expect(project.writeKeys).toEqual([
-      "frontmatter",
-      "summary",
-      "goals",
-      "tasks",
-      "references"
+      "frontmatter/{areas|status|priority|start_date|due_date|done_date}=set",
+      "summary=set|append|prepend|replace",
+      "goals=set|append|prepend|replace",
+      "tasks=insert",
+      "tasks/<id>=delete",
+      "tasks/<id>/<field>=set",
+      "references=insert",
+      "references/<i>=delete",
+      "references/<i>/{link|description}=set"
     ]);
     expect(project.collections).toEqual({
       tasks: "task",
@@ -56,6 +60,10 @@ describe("describe", () => {
     // Orients a cold caller: the vault is a private, local, single-user store, so saved
     // content is personal use, not redistribution.
     expect(String(all.vault)).toContain("not redistribution");
+    // scope sets the boundary: PARA-ZK's typed ops vs raw vault ops left to the host,
+    // and names created/updated as not writable here.
+    expect(String(all.scope)).toContain("optsidian");
+    expect(String(all.scope)).toContain("created");
     expect(all.surfaceTypes).toEqual(
       expect.arrayContaining(["project", "area", "resource", "retro", "note"])
     );
@@ -88,7 +96,13 @@ describe("describe", () => {
     const resource = (resourceResult.surfaces as Array<Record<string, unknown>>)[0];
     expect(resource.frontmatterKeys).toEqual(["url", "first_author", "license", "kind"]);
     expect(resource.readKeys).toEqual(["frontmatter", "references", "backlinks", "body"]);
-    expect(resource.writeKeys).toEqual(["frontmatter", "references", "body"]);
+    expect(resource.writeKeys).toEqual([
+      "frontmatter/{url|first_author|license|kind}=set",
+      "references=insert",
+      "references/<i>=delete",
+      "references/<i>/{link|description}=set",
+      "body=set|append|prepend|replace"
+    ]);
     expect(resource.collections).toEqual({
       references: "reference",
       backlinks: "backlink"
@@ -99,7 +113,13 @@ describe("describe", () => {
     const source = (sourceResult.surfaces as Array<Record<string, unknown>>)[0];
     expect(source.frontmatterKeys).toEqual(["sourceTitle", "url", "first_author", "published"]);
     expect(source.readKeys).toEqual(["frontmatter", "references", "backlinks", "body"]);
-    expect(source.writeKeys).toEqual(["frontmatter", "references", "body"]);
+    expect(source.writeKeys).toEqual([
+      "frontmatter/{sourceTitle|url|first_author|published}=set",
+      "references=insert",
+      "references/<i>=delete",
+      "references/<i>/{link|description}=set",
+      "body=set|append|prepend|replace"
+    ]);
     expect(source.collections).toEqual({
       references: "reference",
       backlinks: "backlink"
@@ -119,6 +139,8 @@ describe("describe", () => {
       const addressing = surface.addressing as { addressable: boolean; addressVia?: string; create: string; createInputs: string[] };
       expect(addressing.addressable).toBe(false);
       expect(addressing.addressVia).toContain("child=");
+      // addressVia teaches that there is no direct update-<type>; reach it through the parent.
+      expect(addressing.addressVia).toContain("no update-");
       expect(addressing.create).toBe(`para-zk:create-${type}`);
       // createInputs come from the real create command's options (no obsidian help needed).
       expect(addressing.createInputs).toEqual(expect.arrayContaining(["title", "parent_title"]));

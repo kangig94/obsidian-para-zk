@@ -160,6 +160,15 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Changed
 
+- `para-zk:describe` is now a more self-sufficient contract so a cold caller learns the
+  boundaries up front instead of by trial-and-error: the top-level output carries a `scope`
+  note (PARA-ZK owns typed PARA/ZK operations; raw file edits, free-form frontmatter, and
+  full-text search route to the host — optsidian); per-type `writeKeys` now spell out each
+  mutable key with its op (e.g. `frontmatter/{…}=set`, `tasks=insert`, `body=set|append|prepend|replace`)
+  — matching the just-in-time update-key error — so keys absent there (notably `created`/`updated`,
+  which the vault manages) are visibly not writable; and `addressVia` for `subnote`/`subarea`/`note`
+  now names the parent route (`read-`/`update-`/`delete-project|area` with `child=["title"]`,
+  since there is no `update-subnote`). The MCP discovery envelope carries the same `scope`.
 - Workflow result envelopes now report `kind` as a locale-neutral code (`spark`/`digest`/
   `permanent`) instead of the internal display form (`Spark`/`Digest`/`Permanent`), so the
   CLI/MCP output speaks the same vocabulary as the `kind=` input. Affects `create-zk`,

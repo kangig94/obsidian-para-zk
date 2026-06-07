@@ -172,6 +172,10 @@ Important fields:
   local, single-user Obsidian "second brain", never published or shared. Saving source
   material (notes, excerpts, full texts the user is studying) is personal-use storage,
   not redistribution — so a caller should not refuse it on public-distribution grounds.
+- `scope` — what PARA-ZK owns (typed PARA/ZK create/read/update/rename/archive of the
+  surface types, addressed by name) versus what to route to the host: raw file edits,
+  free-form frontmatter, and full-text search go to optsidian (`edit`/`apply_patch`/`write`,
+  `grep`/`search`), not PARA-ZK.
 - `surfaceTypes` — addressable/createable note types.
 - `workflows` — named (non-surface) commands with their inputs:
   `capture-journal`, `distill-spark`, `create-from-digest`, `create-from-resource`,
@@ -184,10 +188,16 @@ Important fields:
   - `selectors` — how to address an existing note of this type.
   - `create` — the command that creates it, and `createInputs` — that command's
     arguments (so a caller learns the full create call from `describe` alone).
-  - `addressVia` — for non-addressable types, how to reach existing ones.
+  - `addressVia` — for non-addressable types (`subnote`/`subarea`/`note`), how to reach
+    existing ones: through the parent project/area with `child=["title"]`. There is no
+    `update-subnote`; read/update/delete it via `read-`/`update-`/`delete-project|area`.
 
 `describe type=<t>` is the self-contained contract for one type: address selectors,
-create command + inputs, stable read/write keys, and collections.
+create command + inputs, collections, and read/write keys. `readKeys` are the readable
+keys; `writeKeys` carry each mutable key with its op(s) — e.g. `frontmatter/{…}=set`,
+`tasks=insert`, `references/<i>/{link|description}=set`, `body=set|append|prepend|replace`.
+Keys absent from `writeKeys` are not writable here: `created`/`updated` are vault-managed,
+so set them (and run raw edits/search) through the host (optsidian).
 
 ### `para-zk:list`
 
