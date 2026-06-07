@@ -75,6 +75,15 @@ local images attached), boilerplate dropped. Provenance lives in the frontmatter
 when there is overflow detail beyond `url`/`first_author`/`license`/`kind` (DOI, version, extra
 URLs, transform note) add a short **Source / provenance** section at the top — otherwise omit it.
 
+A source's own reference list or numbered in-text citations (`[1]`, `[2]`, …) stay plain
+text — keep each entry as its own plain line `[1] …`. Never write them as a `- [1]` list
+item: Obsidian renders `- [x]` whose bracket holds a single character (so `- [0]` through
+`- [9]`) as a task checkbox, silently turning a bibliography into a to-do list. These are the
+source's content, not the note's reference registry — do **not** copy them into PARA-ZK
+`references`. That registry holds only the connections the vault owner deliberately curates
+(the area/project it belongs to, related vault notes); leave it to them to register the few
+they want, as `[[wiki]]` links to notes they actually keep.
+
 ## 5. Correction & verification pass — DO NOT SKIP
 
 Re-read each note and repair: conversion artifacts, broken/empty table cells, stray HTML,
