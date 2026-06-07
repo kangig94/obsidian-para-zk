@@ -8,6 +8,9 @@ Notable changes for PARA-ZK are tracked here.
 
 - Inline reference citations in note bodies: an inline code span `` `PZ[n]` `` renders as a
   `[n]` link to the note's n-th registry reference (0-based, matching the CLI's `references/n`).
+  A comma-separated list `` `PZ[1, 2]` `` (spaces optional, e.g. `PZ[1,2]`) renders as
+  `[1, 2]` — each number an independent link, spacing normalized to one space after each comma
+  (academic `[1, 2]` style).
   Works in both reading view (markdown post-processor) and Live Preview (a CM6 editor
   extension), mirroring how the other PZ tokens (`PZ_INPUT[...]`) and the former action
   buttons are written in backticks. In Live Preview the token reveals its raw source for

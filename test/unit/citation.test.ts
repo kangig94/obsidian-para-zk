@@ -1,30 +1,34 @@
 import { describe, expect, it } from "vitest";
-import { parseCitationIndex } from "../../src/ux/citation-renderer";
+import { parseCitationIndices } from "../../src/ux/citation-renderer";
 
-describe("parseCitationIndex", () => {
-  it("returns the 0-based index for a whole-content PZ[n] token", () => {
-    expect(parseCitationIndex("PZ[0]")).toBe(0);
-    expect(parseCitationIndex("PZ[12]")).toBe(12);
+describe("parseCitationIndices", () => {
+  it("returns a single 0-based index for PZ[n]", () => {
+    expect(parseCitationIndices("PZ[0]")).toEqual([0]);
+    expect(parseCitationIndices("PZ[12]")).toEqual([12]);
   });
 
-  it("trims surrounding whitespace", () => {
-    expect(parseCitationIndex("  PZ[3]  ")).toBe(3);
+  it("parses a comma-separated list, with or without spaces", () => {
+    expect(parseCitationIndices("PZ[1,2]")).toEqual([1, 2]);
+    expect(parseCitationIndices("PZ[1, 2]")).toEqual([1, 2]);
+    expect(parseCitationIndices("PZ[0, 3, 5]")).toEqual([0, 3, 5]);
+    expect(parseCitationIndices("PZ[ 1 , 2 ]")).toEqual([1, 2]);
   });
 
-  it("reads leading zeros as the numeric index", () => {
-    expect(parseCitationIndex("PZ[00]")).toBe(0);
-    expect(parseCitationIndex("PZ[007]")).toBe(7);
+  it("trims surrounding whitespace and reads leading zeros numerically", () => {
+    expect(parseCitationIndices("  PZ[00, 07]  ")).toEqual([0, 7]);
   });
 
-  it("only matches when the whole string is the token (not embedded in prose)", () => {
-    expect(parseCitationIndex("see PZ[0]")).toBeUndefined();
-    expect(parseCitationIndex("PZ[0] extra")).toBeUndefined();
+  it("only matches when the whole string is the token", () => {
+    expect(parseCitationIndices("see PZ[0]")).toBeUndefined();
+    expect(parseCitationIndices("PZ[0] extra")).toBeUndefined();
   });
 
   it("rejects malformed forms", () => {
-    expect(parseCitationIndex("PZ[]")).toBeUndefined();
-    expect(parseCitationIndex("PZ[a]")).toBeUndefined();
-    expect(parseCitationIndex("PZ_INPUT[kind]")).toBeUndefined();
-    expect(parseCitationIndex("")).toBeUndefined();
+    expect(parseCitationIndices("PZ[]")).toBeUndefined();
+    expect(parseCitationIndices("PZ[a]")).toBeUndefined();
+    expect(parseCitationIndices("PZ[1,]")).toBeUndefined();
+    expect(parseCitationIndices("PZ[1,,2]")).toBeUndefined();
+    expect(parseCitationIndices("PZ_INPUT[kind]")).toBeUndefined();
+    expect(parseCitationIndices("")).toBeUndefined();
   });
 });

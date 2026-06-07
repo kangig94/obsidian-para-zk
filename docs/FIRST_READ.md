@@ -117,9 +117,10 @@ plugin blocks replace those mechanisms:
 - `para-zk-dashboard-actions` / `para-zk-dashboard-summary` — Home dashboard blocks.
 - `para-zk-tasks` / `para-zk-references` — render the managed task registry and
   frontmatter-backed references inside root notes.
-- `` `PZ[n]` `` — inline body citation (code span): renders as a `[n]` link to the note's
-  n-th registry reference (0-based, matching the CLI's `references/n`), in both reading view
-  and Live Preview.
+- `` `PZ[n]` `` / `` `PZ[1, 2]` `` — inline body citation (code span): renders as `[n]` /
+  `[1, 2]` links to the note's registry references (0-based, matching the CLI's `references/n`;
+  comma-separated for multiple, each number an independent link), in both reading view and
+  Live Preview.
 
 Required community plugins, configured during setup: Dataview (query engine, with
 DataviewJS enabled for dashboards), Tasks (status/metadata syntax), Folder Notes
