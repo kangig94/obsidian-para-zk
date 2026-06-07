@@ -27,7 +27,7 @@ Notable changes for PARA-ZK are tracked here.
   empty in the generated resource template — so an imported resource carries where it came
   from as structured, queryable frontmatter rather than a free-text section. `kind` is a
   fixed dropdown over a small locale-neutral vocabulary (`paper`, `article`, `book`, `video`,
-  `web`, `code`, with `other` as the catch-all) so the field stays consistent and filterable;
+  `web`, `code`, `guide`, with `other` as the catch-all) so the field stays consistent and filterable;
   extend the list when a kind recurs. (`first_author` Korean label: 제1저자; `kind` reuses the
   existing 종류/Type label.) The four keys are now also writable from automation, not just the
   GUI: `create-resource` accepts `url`/`first_author`/`license`/`kind` options, `update-resource`

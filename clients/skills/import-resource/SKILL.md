@@ -99,7 +99,7 @@ the structured frontmatter:
 
 ```
 optsidian para-zk:create-resource title="<title>" body=@/tmp/<file>.md \
-  url="<source url>" first_author="<first author>" license="<SPDX id>" kind=<paper|article|book|video|web|code|other> \
+  url="<source url>" first_author="<first author>" license="<SPDX id>" kind=<paper|article|book|video|web|code|guide|other> \
   format=json
 ```
 

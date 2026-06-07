@@ -25,6 +25,7 @@ export const RESOURCE_KIND_CODES = [
   "video",
   "web",
   "code",
+  "guide",
   "other"
 ] as const;
 
@@ -139,7 +140,8 @@ function resourceKindLabels(locale: Locale): Record<ResourceKindCode, string> {
     video: labels[3] ?? "Video",
     web: labels[4] ?? "Web",
     code: labels[5] ?? "Code",
-    other: labels[6] ?? "Other"
+    guide: labels[6] ?? "Guide",
+    other: labels[7] ?? "Other"
   };
 }
 

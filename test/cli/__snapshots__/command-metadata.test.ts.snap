@@ -238,7 +238,7 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "kind": {
         "description": "Optional provenance: locale-neutral source kind code.",
-        "value": "<paper|article|book|video|web|code|other>",
+        "value": "<paper|article|book|video|web|code|guide|other>",
       },
       "license": {
         "description": "Optional provenance: source license as an SPDX identifier (e.g. MIT, CC-BY-4.0); when no SPDX id fits, a short recognizable token (e.g. arXiv).",

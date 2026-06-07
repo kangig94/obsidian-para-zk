@@ -85,6 +85,7 @@ const ko: LocalePack = {
     "영상",
     "웹",
     "코드",
+    "가이드",
     "기타"
   ],
   energy: {
@@ -352,6 +353,7 @@ const en: LocalePack = {
     "Video",
     "Web",
     "Code",
+    "Guide",
     "Other"
   ],
   energy: {

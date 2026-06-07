@@ -32,7 +32,7 @@ describe("code help strings", () => {
     expect(PROJECT_STATUS_CODE_HELP).toBe("idea|in_progress|paused|done|archived");
     expect(PRIORITY_CODE_HELP).toBe("low|medium|high");
     expect(SUBNOTE_TYPE_CODE_HELP.split("|")).toContain("meeting");
-    expect(RESOURCE_KIND_CODE_HELP).toBe("paper|article|book|video|web|code|other");
+    expect(RESOURCE_KIND_CODE_HELP).toBe("paper|article|book|video|web|code|guide|other");
   });
 });
 

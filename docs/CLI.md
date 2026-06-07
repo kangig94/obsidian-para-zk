@@ -95,7 +95,7 @@ digest | permanent
 Resource kind (source type):
 
 ```text
-paper | article | book | video | web | code | other
+paper | article | book | video | web | code | guide | other
 ```
 
 Maturity:
@@ -782,7 +782,7 @@ Options:
 | `url` | string | Optional provenance: where the source came from. |
 | `first_author` | string | Optional provenance: the source's first author. |
 | `license` | SPDX id | Optional provenance: SPDX identifier (e.g. `MIT`, `CC-BY-4.0`); when no SPDX id fits, a short recognizable token (e.g. `arXiv`). |
-| `kind` | `paper` \| `article` \| `book` \| `video` \| `web` \| `code` \| `other` | Optional provenance: locale-neutral source kind code. |
+| `kind` | `paper` \| `article` \| `book` \| `video` \| `web` \| `code` \| `guide` \| `other` | Optional provenance: locale-neutral source kind code. |
 | `body` | markdown | Optional initial free-form body content. |
 | `open` | boolean | Default `false`. |
 
