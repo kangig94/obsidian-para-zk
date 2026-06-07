@@ -679,7 +679,7 @@ function fileFrontmatter(plugin: ParaZkPluginContext, file: TFile): Frontmatter 
 }
 
 function parseInlineInputToken(value: string): InlineInputToken | undefined {
-  const match = value.trim().match(/^PZK_INPUT\[([A-Za-z0-9_.-]+)\]$/);
+  const match = value.trim().match(/^PZ_INPUT\[([A-Za-z0-9_.-]+)\]$/);
   if (!match) return undefined;
   const [maybeType, maybeField] = match[1].split(".");
   if (maybeField) {

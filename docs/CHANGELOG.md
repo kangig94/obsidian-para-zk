@@ -6,6 +6,15 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- Inline reference citations in note bodies: `PZ[n]` renders (reading view) as a `[n]`
+  link to the note's n-th registry reference (0-based, matching the CLI's `references/n`).
+  note/file/wiki references get native Obsidian behavior — click to open, hover to preview;
+  URLs open externally; plain-text references render as a non-navigable link; an out-of-range
+  index renders as an unresolved marker. Positional by
+  design, so the link's tooltip always shows the resolved target — a reordered registry is
+  visible at a glance. Reading view only for now (Live Preview is a later CM6 phase).
+  The shared reference-link rendering (anchor, hover, open) was extracted to
+  `src/ux/reference-link.ts` and reused by both the references block and citations.
 - Recorded source provenance in the `resource` frontmatter: `url`, `first_author`,
   `license`, and `kind` (the source's type). They render as editable fields in the resource
   props block (order: created, updated, url, first_author, license, kind) and are seeded
@@ -82,12 +91,12 @@ Notable changes for PARA-ZK are tracked here.
 - Added locale-neutral workflow arguments for CLI automation while keeping localized
   labels in the Obsidian GUI.
 - Added native PARA-ZK view toolbar actions, replacing the prior Meta Bind button
-  dependency and the removed `PZK[...]` workflow action token path.
+  dependency and the removed inline workflow action-token path.
 - Added `para-zk-managed`, collapsing generated template UI tails into one
   compact block while preserving native task, reference, and Dataview renderers.
 - Added `para-zk-latest-retro-summary`, replacing the long project-template
   DataviewJS latest-retro callout with a native renderer.
-- Added native PARA-ZK props controls with `para-zk-props` and `PZK_INPUT[...]`,
+- Added native PARA-ZK props controls with `para-zk-props` and `PZ_INPUT[...]`,
   replacing Meta Bind input controls while writing frontmatter directly.
 - Added native PARA-ZK ribbon actions for project, area, resource, ZK, daily
   note, and quick memo workflows, replacing Commander-managed QuickAdd shortcuts.

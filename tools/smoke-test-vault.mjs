@@ -205,6 +205,7 @@ function runLiveScenario() {
   assertTaskBlockRendererRegression(taskProject.path, `Smoke render task ${stamp}`);
   assertDataviewToolbarLayout(taskProject.path);
   assertCreateRetroButtonProjectLink();
+  assertCitationRendering(stamp);
 }
 
 
@@ -348,7 +349,7 @@ function assertVaultTextEventually(path, check) {
 }
 
 function assertNoTemplateDrift(path, text) {
-  assert(!text.includes("PZK["), `${path} contains legacy PZK syntax`);
+  assert(!text.includes("PZ["), `${path} contains an inline PZ[ citation token`);
   assert(!text.includes("dataviewjs"), `${path} contains raw dataviewjs noise`);
   assert(!text.includes("sameLink"), `${path} contains old latest-retro summary helper code`);
   assert(!text.includes("```para-zk-view"), `${path} contains expanded Dataview UI instead of para-zk-managed`);
@@ -421,6 +422,55 @@ function assertDataviewToolbarLayout(path) {
   assertNearlyEqual(snapshot.viewButton.right, snapshot.viewRoot.right, 1, `Dataview button right edge differs from view root: ${JSON.stringify(snapshot)}`);
   assertNearlyEqual(snapshot.viewToolbar.right, snapshot.taskToolbar.right, 1, `Dataview toolbar right edge differs from task toolbar: ${JSON.stringify(snapshot)}`);
   assertNearlyEqual(snapshot.viewToolbar.right, snapshot.referenceToolbar.right, 1, `Dataview toolbar right edge differs from reference toolbar: ${JSON.stringify(snapshot)}`);
+}
+
+function assertCitationRendering(stamp) {
+  const title = `Smoke Cite ${stamp}`;
+  const bodyFile = join(tmpdir(), `para-zk-cite-${stamp}.md`);
+  writeFileSync(bodyFile, [
+    "See PZ[0] and PZ[5] in prose.",
+    "",
+    "```text",
+    "literal PZ[0] inside a code block",
+    "```",
+    ""
+  ].join("\n"));
+  const resource = cliJson("para-zk:create-resource", [`title=${title}`, `body=@${bodyFile}`, "open=false", "format=json"]);
+  assertCreated(resource, "citation resource");
+  const ref = cliJson("para-zk:add-reference", ["type=resource", `title=${title}`, "target=https://example.com/cite-a", "open=false", "format=json"]);
+  assert(ref.ok === true && ref.added === true, "citation reference setup failed");
+
+  const snapshot = guiJson(`(async () => {
+    const path = ${JSON.stringify(resource.path)};
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const leaf = app.workspace.getLeaf(false);
+    await leaf.setViewState({ type: "markdown", state: { file: path, mode: "preview" }, active: true });
+    let cite = null;
+    for (let index = 0; index < 50; index += 1) {
+      cite = leaf.view.containerEl.querySelector("a.para-zk-citation");
+      if (cite) break;
+      await sleep(100);
+    }
+    const root = leaf.view.containerEl;
+    const unresolved = root.querySelector(".para-zk-citation.is-unresolved");
+    const codeText = Array.from(root.querySelectorAll("pre, code")).map((el) => el.textContent).join(" ");
+    const codeAnchor = root.querySelector("pre .para-zk-citation, code .para-zk-citation");
+    console.log(JSON.stringify({
+      citeText: cite ? cite.textContent : null,
+      citeHref: cite ? cite.getAttribute("href") : null,
+      unresolvedText: unresolved ? unresolved.textContent : null,
+      codeHasLiteral: codeText.includes("PZ[0]"),
+      codeHasAnchor: Boolean(codeAnchor)
+    }));
+  })()`);
+
+  assert(snapshot.citeText === "[0]", `inline citation [0] not rendered: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.citeHref === "https://example.com/cite-a", `citation href is not the resolved reference: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.unresolvedText === "[5]", `out-of-range PZ[5] not rendered as unresolved: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.codeHasLiteral === true, `literal PZ[0] inside a code block was altered: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.codeHasAnchor === false, `citation incorrectly rendered inside a code block: ${JSON.stringify(snapshot)}`);
+
+  rmSync(bodyFile, { force: true });
 }
 
 function assertRenameAreaLinkRewrite() {

@@ -16,7 +16,7 @@ describe("managed templates", () => {
     const templates = [project, area, resource, journal, retro, subnote, spark, source, permanent];
 
     for (const content of templates) {
-      expect(content).not.toContain("PZK[");
+      expect(content).not.toContain("PZ[");
     }
 
     expect(project).not.toContain("dataviewjs");

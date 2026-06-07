@@ -1041,3 +1041,18 @@
     border-top: 1px solid var(--background-modifier-border);
   }
 }
+
+.para-zk-citation {
+  color: var(--link-color);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.para-zk-citation:hover {
+  text-decoration: underline;
+}
+
+.para-zk-citation.is-unresolved {
+  color: var(--text-error);
+  cursor: help;
+}

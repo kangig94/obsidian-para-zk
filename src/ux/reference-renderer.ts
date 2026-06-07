@@ -19,7 +19,6 @@ import {
   insertReferenceItem,
   isExternalReference,
   parseWikiLink,
-  pathBasenameWithoutExtension,
   readReferenceItemsFresh,
   reorderReferenceItems,
   splitObsidianSubpath,
@@ -43,6 +42,7 @@ import {
   type RegistryDragOptions
 } from "./registry-block";
 import { parseCodeBlockKeyValues } from "./code-block-args";
+import { referenceTargetHint, referenceTitle, renderReferenceAnchor } from "./reference-link";
 
 type ReferenceBlockArgs = {
   root: "current" | string;
@@ -327,23 +327,12 @@ function renderReferenceRow(
     } : undefined,
     renderBody: (row) => {
       const body = row.createDiv({ cls: "para-zk-reference-body" });
-      const link = body.createEl("a", {
+      renderReferenceAnchor(plugin, body, item.reference, {
+        text: referenceTitle(item.reference),
+        title: referenceTargetHint(item.reference),
         cls: "para-zk-reference-link",
-        text: referenceTitle(item.reference)
-      });
-      link.setAttr("href", referenceHref(item.reference));
-      link.setAttr("title", referenceTargetHint(item.reference));
-      attachReferenceLinkBehavior(plugin, link, item.reference, body, options.ctx.sourcePath);
-      link.addEventListener("click", (event) => {
-        event.preventDefault();
-        void openReferenceLink(
-          plugin,
-          item.reference,
-          options.ctx.sourcePath,
-          event.ctrlKey || event.metaKey || event.button === 1
-        ).catch((error: unknown) => {
-          new Notice(registryErrorMessage(error));
-        });
+        hoverParent: body,
+        sourcePath: options.ctx.sourcePath
       });
       const description = item.reference.description;
       if (description) {
@@ -891,69 +880,6 @@ class ReferenceAnchorSuggest extends AbstractInputSuggest<ReferenceAnchorSuggest
     this.onSelectAnchor(suggestion);
     this.close();
   }
-}
-
-async function openReferenceLink(
-  plugin: ParaZkPluginContext,
-  reference: ReferenceRead,
-  sourcePath: string,
-  newLeaf = false
-): Promise<void> {
-  if (isExternalReference(reference.link)) {
-    window.open(reference.link, "_blank", "noopener");
-    return;
-  }
-  await plugin.app.workspace.openLinkText(referenceOpenText(reference), sourcePath, newLeaf);
-}
-
-function attachReferenceLinkBehavior(
-  plugin: ParaZkPluginContext,
-  link: HTMLAnchorElement,
-  reference: ReferenceRead,
-  hoverParent: HTMLElement,
-  sourcePath: string
-): void {
-  if (!isInternalReference(reference)) return;
-
-  const linktext = referenceOpenText(reference);
-  link.addClass("internal-link");
-  link.setAttr("href", linktext);
-  link.setAttr("data-href", linktext);
-  link.addEventListener("mouseover", (event) => {
-    plugin.app.workspace.trigger("hover-link", {
-      event,
-      source: "para-zk-references",
-      hoverParent,
-      targetEl: link,
-      linktext,
-      sourcePath
-    });
-  });
-}
-
-function isInternalReference(reference: ReferenceRead): boolean {
-  return reference.kind === "note" || reference.kind === "file" || reference.kind === "wiki";
-}
-
-function referenceHref(reference: ReferenceRead): string {
-  return isExternalReference(reference.link) ? reference.link : "#";
-}
-
-function referenceOpenText(reference: ReferenceRead): string {
-  return parseWikiLink(reference.link)?.target ?? reference.link;
-}
-
-function referenceTargetHint(reference: ReferenceRead): string {
-  return reference.path ?? reference.target ?? reference.link;
-}
-
-function referenceTitle(reference: ReferenceRead): string {
-  if (reference.kind === "url") return reference.target ?? reference.link;
-  if (reference.kind === "text") return reference.link;
-
-  const target = reference.path ?? reference.target ?? parseWikiLink(reference.link)?.target ?? reference.link;
-  const base = splitObsidianSubpath(target).base;
-  return pathBasenameWithoutExtension(base) || target;
 }
 
 function normalizeReferenceAnchor(anchor: string): string {

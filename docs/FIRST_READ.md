@@ -113,10 +113,12 @@ plugin blocks replace those mechanisms:
 - `para-zk-managed` — generated template UI tails in one compact block.
 - `para-zk-view` — relationship Dataview queries with matching workflow buttons.
 - `para-zk-latest-retro-summary` — project-summary widget (replaces a DataviewJS callout).
-- `para-zk-props` / `PZK_INPUT[...]` — frontmatter input controls (replace Meta Bind).
+- `para-zk-props` / `PZ_INPUT[...]` — frontmatter input controls (replace Meta Bind).
 - `para-zk-dashboard-actions` / `para-zk-dashboard-summary` — Home dashboard blocks.
 - `para-zk-tasks` / `para-zk-references` — render the managed task registry and
   frontmatter-backed references inside root notes.
+- `PZ[n]` — inline body citation: renders (reading view) as a `[n]` link to the note's
+  n-th registry reference (0-based, matching the CLI's `references/n`).
 
 Required community plugins, configured during setup: Dataview (query engine, with
 DataviewJS enabled for dashboards), Tasks (status/metadata syntax), Folder Notes

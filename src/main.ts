@@ -2,6 +2,7 @@ import { Plugin } from "obsidian";
 import { registerNativeCliHandlers } from "./cli/handlers";
 import { loadSettings as loadRuntimeSettings, saveSettings as saveRuntimeSettings } from "./runtime/settings";
 import { DEFAULT_SETTINGS, type SetupOptions, type SetupResult, type ParaZkSettings } from "./types";
+import { registerCitationRenderers } from "./ux/citation-renderer";
 import { registerDashboardActionRenderers } from "./ux/dashboard-actions";
 import { registerDashboardSummaryRenderers } from "./ux/dashboard-summary";
 import { registerDataviewViewRenderers } from "./ux/dataview-views";
@@ -36,6 +37,7 @@ export default class ParaZkPlugin extends Plugin {
     registerPropsControlRenderers(this);
     registerTaskRenderers(this);
     registerReferenceRenderers(this);
+    registerCitationRenderers(this);
     registerManagedSectionRenderers(this);
 
     this.addSettingTab(new ParaZkSettingTab(this));

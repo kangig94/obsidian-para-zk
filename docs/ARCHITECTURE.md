@@ -87,7 +87,7 @@ blocks replace them, each with a renderer registered in `onload()`:
 |-------|------|
 | `para-zk-managed` | Generated template UI tails (one compact block) |
 | `para-zk-view` | Relationship Dataview queries + matching workflow buttons |
-| `para-zk-props` / `PZK_INPUT[...]` | Frontmatter input controls (replaces Meta Bind) |
+| `para-zk-props` / `PZ_INPUT[...]` | Frontmatter input controls (replaces Meta Bind) |
 | `para-zk-tasks` / `para-zk-references` | Render the managed task registry / frontmatter references |
 | `para-zk-dashboard-actions` / `para-zk-dashboard-summary` | Home dashboard blocks |
 | `para-zk-latest-retro-summary` | Project latest-retro summary widget |
