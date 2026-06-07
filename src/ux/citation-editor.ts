@@ -7,7 +7,7 @@ import {
   type EditorView,
   type ViewUpdate
 } from "@codemirror/view";
-import { TFile, editorInfoField } from "obsidian";
+import { TFile, editorInfoField, editorLivePreviewField } from "obsidian";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import type { ReferenceRead } from "../workflows";
 import { buildCitationElement, resolveReferences } from "./citation-renderer";
@@ -50,8 +50,18 @@ export function createCitationEditorExtension(plugin: ParaZkPluginContext): Exte
   }
 
   const tokenRe = /`PZ\[(\d+)\]`/g;
+
+  // Reveal the raw `` `PZ[n]` `` source (skip the widget) when the cursor/selection is
+  // strictly inside the token, so the user can edit it — matching native Live Preview
+  // behavior for links/code. Touching the outer edges keeps the widget rendered.
+  const selectionInside = (view: EditorView, from: number, to: number): boolean =>
+    view.state.selection.ranges.some((range) => range.from < to && range.to > from);
+
   const buildDecorations = (view: EditorView): DecorationSet => {
     const builder = new RangeSetBuilder<Decoration>();
+    // Only decorate in Live Preview; source mode shows raw markdown.
+    if (!view.state.field(editorLivePreviewField)) return builder.finish();
+
     const file = view.state.field(editorInfoField, false)?.file;
     const sourcePath = file?.path ?? "";
     const references = file instanceof TFile ? resolveReferences(plugin, file) : [];
@@ -60,12 +70,10 @@ export function createCitationEditorExtension(plugin: ParaZkPluginContext): Exte
       const text = view.state.doc.sliceString(range.from, range.to);
       tokenRe.lastIndex = 0;
       for (let match = tokenRe.exec(text); match; match = tokenRe.exec(text)) {
-        const index = Number(match[1]);
-        builder.add(
-          range.from + match.index,
-          range.from + match.index + match[0].length,
-          Decoration.replace({ widget: new CitationWidget(index, references[index], sourcePath) })
-        );
+        const from = range.from + match.index;
+        const to = from + match[0].length;
+        if (selectionInside(view, from, to)) continue;
+        builder.add(from, to, Decoration.replace({ widget: new CitationWidget(Number(match[1]), references[Number(match[1])], sourcePath) }));
       }
     }
     return builder.finish();
@@ -79,7 +87,8 @@ export function createCitationEditorExtension(plugin: ParaZkPluginContext): Exte
     }
 
     update(update: ViewUpdate): void {
-      if (update.docChanged || update.viewportChanged) {
+      // selectionSet: re-evaluate so the token reveals/hides as the cursor moves in/out.
+      if (update.docChanged || update.viewportChanged || update.selectionSet) {
         this.decorations = buildDecorations(update.view);
       }
     }

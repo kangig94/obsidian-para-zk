@@ -10,7 +10,9 @@ Notable changes for PARA-ZK are tracked here.
   `[n]` link to the note's n-th registry reference (0-based, matching the CLI's `references/n`).
   Works in both reading view (markdown post-processor) and Live Preview (a CM6 editor
   extension), mirroring how the other PZ tokens (`PZ_INPUT[...]`) and the former action
-  buttons are written in backticks. note/file/wiki references get native Obsidian behavior —
+  buttons are written in backticks. In Live Preview the token reveals its raw source for
+  editing when the cursor is inside it and renders as `[n]` otherwise; source (raw) mode
+  leaves it untouched. note/file/wiki references get native Obsidian behavior —
   click to open, hover to preview; URLs open externally; plain-text references render as a
   non-navigable link; an out-of-range index renders as an unresolved marker. Positional by
   design, so the link's tooltip always shows the resolved target — a reordered registry is
