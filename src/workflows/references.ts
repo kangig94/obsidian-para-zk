@@ -119,6 +119,17 @@ export async function readReferenceItemsFresh(ctx: WorkflowContext, file: TFile)
     .map((item) => deriveReferenceRead(ctx, file, item));
 }
 
+// Synchronous variant for renderers that already hold the note's cached frontmatter
+// (markdown post-processors, CM6 decorations) — those run in a sync context and cannot
+// await a fresh file read. Throws on a malformed `references` value; callers degrade.
+export function readReferenceItemsFromFrontmatter(
+  ctx: WorkflowContext,
+  file: TFile,
+  frontmatter: Frontmatter
+): ReferenceRead[] {
+  return referenceItemsFromFrontmatter(frontmatter).map((item) => deriveReferenceRead(ctx, file, item));
+}
+
 export async function insertReferenceItem(
   ctx: WorkflowContext,
   file: TFile,

@@ -6,15 +6,16 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
-- Inline reference citations in note bodies: `PZ[n]` renders (reading view) as a `[n]`
-  link to the note's n-th registry reference (0-based, matching the CLI's `references/n`).
-  note/file/wiki references get native Obsidian behavior — click to open, hover to preview;
-  URLs open externally; plain-text references render as a non-navigable link; an out-of-range
-  index renders as an unresolved marker. Positional by
+- Inline reference citations in note bodies: an inline code span `` `PZ[n]` `` renders as a
+  `[n]` link to the note's n-th registry reference (0-based, matching the CLI's `references/n`).
+  Works in both reading view (markdown post-processor) and Live Preview (a CM6 editor
+  extension), mirroring how the other PZ tokens (`PZ_INPUT[...]`) and the former action
+  buttons are written in backticks. note/file/wiki references get native Obsidian behavior —
+  click to open, hover to preview; URLs open externally; plain-text references render as a
+  non-navigable link; an out-of-range index renders as an unresolved marker. Positional by
   design, so the link's tooltip always shows the resolved target — a reordered registry is
-  visible at a glance. Reading view only for now (Live Preview is a later CM6 phase).
-  The shared reference-link rendering (anchor, hover, open) was extracted to
-  `src/ux/reference-link.ts` and reused by both the references block and citations.
+  visible at a glance. The shared reference-link rendering (anchor, hover, open) was extracted
+  to `src/ux/reference-link.ts` and reused by both the references block and citations.
 - Recorded source provenance in the `resource` frontmatter: `url`, `first_author`,
   `license`, and `kind` (the source's type). They render as editable fields in the resource
   props block (order: created, updated, url, first_author, license, kind) and are seeded

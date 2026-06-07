@@ -43,6 +43,7 @@ export {
   parseWikiLink,
   pathBasenameWithoutExtension,
   readReferenceItemsFresh,
+  readReferenceItemsFromFrontmatter,
   reorderReferenceItems,
   splitObsidianSubpath,
   updateReferenceItem

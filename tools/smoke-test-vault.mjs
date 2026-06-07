@@ -428,10 +428,10 @@ function assertCitationRendering(stamp) {
   const title = `Smoke Cite ${stamp}`;
   const bodyFile = join(tmpdir(), `para-zk-cite-${stamp}.md`);
   writeFileSync(bodyFile, [
-    "See PZ[0] and PZ[5] in prose.",
+    "inline citation `PZ[0]` and out-of-range `PZ[5]`.",
     "",
     "```text",
-    "literal PZ[0] inside a code block",
+    "literal PZ[0] in a fenced code block",
     "```",
     ""
   ].join("\n"));
@@ -440,35 +440,49 @@ function assertCitationRendering(stamp) {
   const ref = cliJson("para-zk:add-reference", ["type=resource", `title=${title}`, "target=https://example.com/cite-a", "open=false", "format=json"]);
   assert(ref.ok === true && ref.added === true, "citation reference setup failed");
 
+  // Reading view uses a markdown post-processor; Live Preview (source mode) uses the CM6
+  // editor extension. Both must render `` `PZ[0]` `` as a [0] link, mark out-of-range
+  // `` `PZ[5]` `` unresolved, and leave a fenced code block's literal PZ[0] untouched.
   const snapshot = guiJson(`(async () => {
     const path = ${JSON.stringify(resource.path)};
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     const leaf = app.workspace.getLeaf(false);
-    await leaf.setViewState({ type: "markdown", state: { file: path, mode: "preview" }, active: true });
-    let cite = null;
-    for (let index = 0; index < 50; index += 1) {
-      cite = leaf.view.containerEl.querySelector("a.para-zk-citation");
-      if (cite) break;
-      await sleep(100);
-    }
-    const root = leaf.view.containerEl;
-    const unresolved = root.querySelector(".para-zk-citation.is-unresolved");
-    const codeText = Array.from(root.querySelectorAll("pre, code")).map((el) => el.textContent).join(" ");
-    const codeAnchor = root.querySelector("pre .para-zk-citation, code .para-zk-citation");
-    console.log(JSON.stringify({
-      citeText: cite ? cite.textContent : null,
-      citeHref: cite ? cite.getAttribute("href") : null,
-      unresolvedText: unresolved ? unresolved.textContent : null,
-      codeHasLiteral: codeText.includes("PZ[0]"),
-      codeHasAnchor: Boolean(codeAnchor)
-    }));
+    const probe = async (mode) => {
+      await leaf.setViewState({ type: "markdown", state: { file: path, mode }, active: true });
+      let cite = null;
+      for (let index = 0; index < 50; index += 1) {
+        cite = leaf.view.containerEl.querySelector("a.para-zk-citation");
+        if (cite) break;
+        await sleep(100);
+      }
+      await sleep(300);
+      // containerEl holds BOTH the reading and CM6 editor trees (visibility toggles by
+      // mode), so scope to the active subtree before counting.
+      const subtree = leaf.view.containerEl.querySelector(
+        mode === "preview" ? ".markdown-reading-view" : ".markdown-source-view"
+      ) || leaf.view.containerEl;
+      const active = subtree.querySelector("a.para-zk-citation");
+      const unresolved = subtree.querySelector(".para-zk-citation.is-unresolved");
+      return {
+        cite: active ? active.textContent : null,
+        href: active ? (active.getAttribute("data-href") || active.getAttribute("href")) : null,
+        unresolved: unresolved ? unresolved.textContent : null,
+        // Only the two backticked tokens cite; the fenced block's bare PZ[0] must not.
+        count: subtree.querySelectorAll(".para-zk-citation").length
+      };
+    };
+    const preview = await probe("preview");
+    const source = await probe("source");
+    console.log(JSON.stringify({ preview, source }));
   })()`);
 
-  assert(snapshot.citeText === "[0]", `inline citation [0] not rendered: ${JSON.stringify(snapshot)}`);
-  assert(snapshot.citeHref === "https://example.com/cite-a", `citation href is not the resolved reference: ${JSON.stringify(snapshot)}`);
-  assert(snapshot.unresolvedText === "[5]", `out-of-range PZ[5] not rendered as unresolved: ${JSON.stringify(snapshot)}`);
-  assert(snapshot.codeHasLiteral === true, `literal PZ[0] inside a code block was altered: ${JSON.stringify(snapshot)}`);
-  assert(snapshot.codeHasAnchor === false, `citation incorrectly rendered inside a code block: ${JSON.stringify(snapshot)}`);
+  for (const mode of ["preview", "source"]) {
+    const s = snapshot[mode];
+    assert(s.cite === "[0]", `citation [0] not rendered in ${mode}: ${JSON.stringify(snapshot)}`);
+    assert(s.href === "https://example.com/cite-a", `citation href wrong in ${mode}: ${JSON.stringify(snapshot)}`);
+    assert(s.unresolved === "[5]", `out-of-range PZ[5] not unresolved in ${mode}: ${JSON.stringify(snapshot)}`);
+    assert(s.count === 2, `expected exactly 2 citations (fenced bare PZ[0] must not render) in ${mode}: ${JSON.stringify(snapshot)}`);
+  }
 
   rmSync(bodyFile, { force: true });
 }
