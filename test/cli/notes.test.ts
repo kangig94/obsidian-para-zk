@@ -191,17 +191,28 @@ describe("retro", () => {
 describe("subarea and child bodies", () => {
   it("creates a subarea under an area and reads it as a child", async () => {
     const area = await cli.run("para-zk:create-area", { title: "Ops", open: "false" });
-    const subarea = await cli.run("para-zk:create-subarea", {
+    const subarea = await cli.run("para-zk:create-area", {
       title: "Hiring",
       parent_title: "Ops",
-      inheritParentTag: "true",
+      inherit_parent_tag: "true",
       open: "false"
     });
     expect(subarea.created).toBe(true);
-    expect(cli.app.readPath(String(subarea.path))).toContain("type: subarea");
+    expect(cli.app.readPath(String(subarea.path))).toContain("type: area");
 
     const children = await cli.run("para-zk:read-area", { title: "Ops", key: "children" });
-    expect((children.value as Record<string, { path: string }>).Hiring.path).toBe(subarea.path);
+    const hiringChild = (children.value as Record<string, { path: string; type: string }>).Hiring;
+    expect(hiringChild.path).toBe(subarea.path);
+    // The child index reports the stored type — a nested area is `area`, not the dropped `subarea`.
+    expect(hiringChild.type).toBe("area");
+
+    // The nested area stores type=area (so type=area filters catch it) but is reached only
+    // through its parent: a bare-title area lookup resolves root areas only (parent empty),
+    // keeping name-based addressing unambiguous.
+    expect(cli.app.readPath(String(subarea.path))).not.toContain("type: subarea");
+    const byBareTitle = await cli.run("para-zk:read-area", { title: "Hiring" });
+    expect(byBareTitle.ok).toBe(false);
+    expect(String(byBareTitle.error)).toContain("area not found");
 
     const described = await cli.run("para-zk:describe", { type: "area" });
     const areaSurface = (described.surfaces as Array<{ type: string; readKeys: string[] }>)[0];
@@ -218,11 +229,11 @@ describe("subarea and child bodies", () => {
 
   it("creates and addresses a nested subarea and a subnote at depth via child drill", async () => {
     await cli.run("para-zk:create-area", { title: "Ops", open: "false" });
-    const hiring = await cli.run("para-zk:create-subarea", { title: "Hiring", parent_title: "Ops", open: "false" });
+    const hiring = await cli.run("para-zk:create-area", { title: "Hiring", parent_title: "Ops", open: "false" });
     expect(hiring.path).toBe("PARA/Areas/Ops/Hiring/Hiring.md");
 
-    // A subarea created under a nested subarea: parent is reached by root + child drill.
-    const interviews = await cli.run("para-zk:create-subarea", {
+    // A nested area created under a nested area: parent is reached by root + child drill.
+    const interviews = await cli.run("para-zk:create-area", {
       title: "Interviews",
       parent_title: "Ops",
       child: '["Hiring"]',
@@ -252,12 +263,70 @@ describe("subarea and child bodies", () => {
     expect(String(read.value)).toContain("Hire two engineers.");
   });
 
+  it("nests areas to arbitrary depth with uniform type, drill addressing, and child views", async () => {
+    await cli.run("para-zk:create-area", { title: "AI", open: "false" });
+    const gen = await cli.run("para-zk:create-area", { title: "Generation", parent_title: "AI", open: "false" });
+    expect(gen.path).toBe("PARA/Areas/AI/Generation/Generation.md");
+    const vision = await cli.run("para-zk:create-area", { title: "Vision", parent_title: "AI", child: '["Generation"]', open: "false" });
+    expect(vision.path).toBe("PARA/Areas/AI/Generation/Vision/Vision.md");
+    const llm = await cli.run("para-zk:create-area", { title: "LLM", parent_title: "AI", child: '["Generation"]', open: "false" });
+    expect(llm.path).toBe("PARA/Areas/AI/Generation/LLM/LLM.md");
+
+    // Every level stores type=area, so type=area filters and the area managed UI apply uniformly.
+    for (const path of [gen.path, vision.path, llm.path]) {
+      const content = cli.app.readPath(String(path)) ?? "";
+      expect(content).toContain("type: area");
+      expect(content).not.toContain("type: subarea");
+    }
+
+    // Reached only by drilling from the root; a bare-title lookup of a nested area fails.
+    const deep = await cli.run("para-zk:read-area", { title: "AI", child: '["Generation", "Vision"]', key: "frontmatter/parent" });
+    expect(deep.ok).toBe(true);
+    expect(String(deep.value)).toContain("Generation");
+    expect((await cli.run("para-zk:read-area", { title: "Vision" })).ok).toBe(false);
+
+    // The parent's child-area view lists its area children at that level.
+    const view = await cli.run("para-zk:read-area", { title: "AI", child: '["Generation"]', key: "children" });
+    const kids = view.value as Record<string, { path: string; type: string }>;
+    expect(kids.Vision.path).toBe(vision.path);
+    expect(kids.LLM.path).toBe(llm.path);
+    expect(kids.Vision.type).toBe("area");
+    expect(kids.LLM.type).toBe("area");
+
+    // The inherited tag namespace reflects the full path at depth (AI/Generation/Vision).
+    expect(cli.app.readPath(String(vision.path)) ?? "").toContain("generation/vision");
+  });
+
+  it("inherit_parent_tag=false stores only the child namespace, not the parent's tag", async () => {
+    await cli.run("para-zk:create-area", { title: "Ops", open: "false" });
+    const solo = await cli.run("para-zk:create-area", {
+      title: "Solo",
+      parent_title: "Ops",
+      inherit_parent_tag: "false",
+      open: "false"
+    });
+    const content = cli.app.readPath(String(solo.path)) ?? "";
+    expect(content).toMatch(/ops\/solo/); // child namespace present (locale-neutral slug chain)
+    expect(content).not.toMatch(/\/ops\s*$/m); // the parent's own tag (…/ops) is not inherited
+  });
+
+  it("deletes a nested area along with its parent's folder-style container", async () => {
+    await cli.run("para-zk:create-area", { title: "Ops", open: "false" });
+    const nested = await cli.run("para-zk:create-area", { title: "Hiring", parent_title: "Ops", open: "false" });
+    expect(cli.app.readPath(String(nested.path))).toBeDefined();
+
+    const deleted = await cli.run("para-zk:delete-area", { title: "Ops", force: "true" });
+    expect(deleted.ok).toBe(true);
+    expect(cli.app.readPath("PARA/Areas/Ops/Ops.md")).toBeUndefined();
+    expect(cli.app.readPath(String(nested.path))).toBeUndefined();
+  });
+
   it("allocates a unique folder-style container for duplicate area titles", async () => {
     await cli.run("para-zk:create-area", { title: "Alpha", open: "false" });
     const duplicate = await cli.run("para-zk:create-area", { title: "Alpha", open: "false" });
     expect(duplicate.path).toBe("PARA/Areas/Alpha 1/Alpha 1.md");
 
-    const subarea = await cli.run("para-zk:create-subarea", {
+    const subarea = await cli.run("para-zk:create-area", {
       title: "Nested",
       parent_title: "Alpha 1",
       open: "false"

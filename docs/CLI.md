@@ -21,7 +21,7 @@ that JSON includes.
 
 Notes are addressed **by name, never by file path** — the CLI never exposes a
 `path` option. Address a note by its `title` (project/area/resource), `date`
-(journal/retro), or `title`+`kind` (zk). An existing child note (subnote/subarea)
+(journal/retro), or `title`+`kind` (zk). An existing child note (subnote or nested area)
 is reached through its container plus a `child=["<title>", ...]` drill (left to
 right). New children name their parent with `parent_type`+`parent_title`; ZK
 notes derived from an origin name it with `source_title` (and `source_type` where
@@ -184,11 +184,11 @@ Important fields:
 - `collectionFilters`
 - `surfaces` when `type` is provided. Each surface carries an `addressing` facet:
   - `addressable` — whether the type is reached directly (`true`) or only through a
-    container + `child=` (`false`, e.g. `subnote`/`subarea`).
+    container + `child=` (`false`, e.g. `subnote`, or a nested area — which keeps `type: area` but is reached only via its parent + `child=`).
   - `selectors` — how to address an existing note of this type.
   - `create` — the command that creates it, and `createInputs` — that command's
     arguments (so a caller learns the full create call from `describe` alone).
-  - `addressVia` — for non-addressable types (`subnote`/`subarea`/`note`), how to reach
+  - `addressVia` — for non-addressable types (`subnote`/`note`), how to reach
     existing ones: through the parent project/area with `child=["title"]`. There is no
     `update-subnote`; read/update/delete it via `read-`/`update-`/`delete-project|area`.
 
@@ -210,7 +210,7 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `type` | `project`, `area`, `subarea`, `resource`, `zk`, `retro`, `journal`, `subnote` | Optional. Omit to list all PARA-ZK notes. `zk` spans all stored ZK kinds. |
+| `type` | `project`, `area`, `resource`, `zk`, `retro`, `journal`, `subnote` | Optional. Omit to list all PARA-ZK notes. `zk` spans all stored ZK kinds. `area` includes nested areas. |
 | `archived` | boolean | `true` lists archived notes; default lists active notes. |
 | `query` | string | Optional case-insensitive title substring filter. |
 | `offset` | number | Zero-based item offset (default `0`). |
@@ -307,22 +307,30 @@ Options:
 | Option | Values | Notes |
 | --- | --- | --- |
 | `title` | string | Required. |
+| `parent_title` | string | Optional. Parent area title; nest this area under it (its `parent` link, not a distinct type). |
+| `child` | JSON list | Optional. With `parent_title`, drill into a nested area to nest under it. |
+| `inherit_parent_tag` | boolean | When nested, include the parent area tag too. Default `true`. |
 | `open` | boolean | Default `false`. |
 
 Example:
 
 ```bash
 optsidian para-zk:create-area title="Software" open=false format=json
+optsidian para-zk:create-area title="Robot" parent_title="AI" format=json
 ```
 
 Side effects:
 
-- Creates `PARA/Areas/<title>/<title>.md`.
-- Sets `type: area`.
-- Sets a localized area tag.
+- Creates `PARA/Areas/<title>/<title>.md` (root), or inside the parent area's folder when `parent_title` is given.
+- Sets `type: area` (nested areas store `type: area` too; the `parent` link is the only distinction).
+- Sets a localized area tag (nested: the parent's namespace plus the child level).
 
-To nest an area under another area, use `para-zk:create-subarea` (it creates the
-folder-style child). A root area has no parent.
+To nest an area under another area, pass `parent_title` (and `child=` to nest deeper);
+the area is placed in the parent's folder with an inherited tag and a `parent` link. A
+nested area is an ordinary `area` (same stored type) that simply has a parent — there is
+no separate "subarea" type, so `type=area` filters catch it and it renders the area UI. A
+root area has no parent; bare-title area lookups resolve root areas only, so reach a nested
+area via its parent + `child=["title"]`.
 
 ### `para-zk:read-project`
 
@@ -667,7 +675,7 @@ Options:
 | Option | Values | Notes |
 | --- | --- | --- |
 | `title` | string | Current note title. |
-| `child` | JSON list | `rename-project`/`rename-area` only. Drill into a nested child (subnote/subarea) to rename it instead of the container, e.g. `["Hiring","Interviews"]`. |
+| `child` | JSON list | `rename-project`/`rename-area` only. Drill into a nested child (subnote or nested area) to rename it instead of the container, e.g. `["Hiring","Interviews"]`. |
 | `new_title` | string | Required new note title. Aliases such as `newTitle` are rejected. |
 | `archived` | boolean | PARA rename commands only; same title lookup behavior as reads. |
 | `kind` | ZK kind code | `rename-zk` only; narrows title lookup. |
@@ -718,7 +726,7 @@ Options:
 | Option | Values | Notes |
 | --- | --- | --- |
 | `title` | string | Current note title. |
-| `child` | JSON list | `delete-project`/`delete-area` only. Drill into a nested child (subnote/subarea) to delete it instead of the container. |
+| `child` | JSON list | `delete-project`/`delete-area` only. Drill into a nested child (subnote or nested area) to delete it instead of the container. |
 | `archived` | boolean | PARA delete commands only; same title lookup behavior as reads. |
 | `kind` | ZK kind code | `delete-zk` only; narrows title lookup. |
 | `date` | `YYYY-MM-DD` | `delete-journal` and `delete-retro` only. |
@@ -921,30 +929,6 @@ Side effects:
 - Creates the note in the parent folder.
 - Converts a single-note parent into folder-style layout if needed.
 - Sets `parent` to the parent note link.
-
-### `para-zk:create-subarea`
-
-Creates a child area under an area note.
-
-Options:
-
-| Option | Values | Notes |
-| --- | --- | --- |
-| `title` | string | Required. |
-| `parent_title` | string | Parent area title. |
-| `child` | JSON list | Optional. Drill from the named parent area into a nested subarea to create under it. |
-| `inheritParentTag` | boolean | Defaults to `true`. |
-| `open` | boolean | Default `false`. |
-
-Example:
-
-```bash
-optsidian para-zk:create-subarea \
-  title="LLM Tooling" \
-  parent_title="AI" \
-  inheritParentTag=true \
-  format=json
-```
 
 ### `para-zk:create-retro`
 

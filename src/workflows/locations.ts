@@ -403,6 +403,7 @@ function findAreaByTitleForRead(ctx: WorkflowContext, title: string, archived: b
     title,
     folders,
     type: "area",
+    requireRootArea: true,
     label: "area"
   });
 }
@@ -489,14 +490,19 @@ function findUniqueNoteByTitle(
     folders: string[];
     type?: string;
     typePrefix?: string;
+    requireRootArea?: boolean;
     label: string;
   }
 ): TFile | undefined {
   const files = ctx.host.getMarkdownFiles().filter((file) => {
-    const type = readType(fileFrontmatter(ctx, file));
+    const frontmatter = fileFrontmatter(ctx, file);
+    const type = readType(frontmatter);
     return options.folders.some((folder) => isInFolder(file, folder))
       && (!options.type || type === options.type)
-      && (!options.typePrefix || type.startsWith(options.typePrefix));
+      && (!options.typePrefix || type.startsWith(options.typePrefix))
+      // A nested area has a `parent`; bare-title area lookup must resolve only root areas
+      // so name-based addressing stays unambiguous (nested areas are reached via child=).
+      && (!options.requireRootArea || frontmatterLinks(frontmatter.parent).length === 0);
   });
   const exactMatches = files.filter((file) => file.basename === options.title);
   if (exactMatches.length === 1) return exactMatches[0];
@@ -547,6 +553,7 @@ export function findAreaByTitle(ctx: WorkflowContext, title: string): TFile | un
     title,
     folders: [ctx.settings.paths.areasFolder],
     type: "area",
+    requireRootArea: true,
     label: "area"
   });
 }

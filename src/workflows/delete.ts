@@ -98,7 +98,7 @@ async function deleteDomainNote(
 
 function deleteContainer(ctx: WorkflowContext, file: TFile): TAbstractFile {
   const type = readType(fileFrontmatter(ctx, file));
-  if (type !== "project" && type !== "area" && type !== "subarea") return file;
+  if (type !== "project" && type !== "area") return file;
   return folderStyleContainer(file) ?? file;
 }
 

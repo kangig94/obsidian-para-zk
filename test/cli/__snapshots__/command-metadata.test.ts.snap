@@ -106,15 +106,27 @@ exports[`native CLI command metadata is stable 1`] = `
   },
   {
     "command": "para-zk:create-area",
-    "description": "Create a PARA area note",
+    "description": "Create a PARA area note, optionally nested under a parent area",
     "options": {
+      "child": {
+        "description": "Optional: with parent_title, drill into a nested area to nest under it.",
+        "value": "<["title", ...]>",
+      },
       "format": {
         "description": "Output format (default: text).",
         "value": "<text|json>",
       },
+      "inherit_parent_tag": {
+        "description": "When nested, include the parent area tag as well as the child tag (default true).",
+        "value": "<true|false>",
+      },
       "open": {
         "description": "Open the created note in Obsidian.",
         "value": "<true|false>",
+      },
+      "parent_title": {
+        "description": "Optional parent area title; nest this area under it (its parent link, not a distinct type).",
+        "value": "<title>",
       },
       "title": {
         "description": "Area title.",
@@ -296,36 +308,6 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "title": {
         "description": "Retro title segment.",
-        "value": "<title>",
-      },
-    },
-  },
-  {
-    "command": "para-zk:create-subarea",
-    "description": "Create a child area under an area note",
-    "options": {
-      "child": {
-        "description": "Optional: drill from the named parent area into a nested subarea (JSON list) to create under it.",
-        "value": "<["title", ...]>",
-      },
-      "format": {
-        "description": "Output format (default: text).",
-        "value": "<text|json>",
-      },
-      "inheritParentTag": {
-        "description": "Include parent area tag as well as child tag.",
-        "value": "<true|false>",
-      },
-      "open": {
-        "description": "Open the created note in Obsidian.",
-        "value": "<true|false>",
-      },
-      "parent_title": {
-        "description": "Parent area title.",
-        "value": "<title>",
-      },
-      "title": {
-        "description": "Subarea title.",
         "value": "<title>",
       },
     },
@@ -548,7 +530,7 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "type": {
         "description": "Optional surface type. Omit to describe all supported surfaces.",
-        "value": "<project|area|subarea|resource|journal|retro|subnote|zk_spark|zk_digest|zk_permanent|note>",
+        "value": "<project|area|resource|journal|retro|subnote|zk_spark|zk_digest|zk_permanent|note>",
       },
     },
   },
@@ -612,7 +594,7 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "type": {
         "description": "Optional note-type filter. Omit to list all PARA-ZK notes; zk spans all ZK kinds.",
-        "value": "<project|area|subarea|resource|zk|retro|journal|subnote>",
+        "value": "<project|area|resource|zk|retro|journal|subnote>",
       },
     },
   },

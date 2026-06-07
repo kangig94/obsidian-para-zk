@@ -160,13 +160,23 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Changed
 
+- Collapsed the `subarea` stored type back into `area`. A nested area is now an ordinary
+  `area` that simply has a `parent` (the sole root/nested discriminator), so it renders the
+  area template and managed UI, is caught by `type=area` filters/search, and behaves
+  identically to a top-level area — fixing that a nested area previously rendered an empty
+  managed block and was excluded from area queries. Create one with
+  `para-zk:create-area parent_title=<parent>` (`child=` to nest deeper); the `create-subarea`
+  CLI command is removed and the GUI "create subarea" affordance now calls create-area with
+  the active area as its parent. Name-based addressing is preserved — a bare-title area lookup
+  resolves only root areas (gated on an empty `parent`, not a separate type), and nested areas
+  are reached via `child=["title"]`. `describe` no longer lists a `subarea` surface type.
 - `para-zk:describe` is now a more self-sufficient contract so a cold caller learns the
   boundaries up front instead of by trial-and-error: the top-level output carries a `scope`
   note (PARA-ZK owns typed PARA/ZK operations; raw file edits, free-form frontmatter, and
   full-text search route to the host — optsidian); per-type `writeKeys` now spell out each
   mutable key with its op (e.g. `frontmatter/{…}=set`, `tasks=insert`, `body=set|append|prepend|replace`)
   — matching the just-in-time update-key error — so keys absent there (notably `created`/`updated`,
-  which the vault manages) are visibly not writable; and `addressVia` for `subnote`/`subarea`/`note`
+  which the vault manages) are visibly not writable; and `addressVia` for `subnote`/`note`
   now names the parent route (`read-`/`update-`/`delete-project|area` with `child=["title"]`,
   since there is no `update-subnote`). The MCP discovery envelope carries the same `scope`.
 - Multi-value frontmatter list keys now accept add/remove, not just a whole-list `set`. A
@@ -222,9 +232,10 @@ Notable changes for PARA-ZK are tracked here.
   Removed-path aliases (`path`, `file_path`, `sourcePath`, …) are now rejected
   with a direct error instead of being silently ignored. `attach-file` keeps its
   filesystem `source`/`sources` (external file import, not note addressing).
-- Renamed stored child types for finder correctness: child documents
-  `doc` → **`subnote`**, child areas `type: area` → **`subarea`** (so the area
-  finder resolves only root areas). The `children` map is now a read-only index;
+- Renamed the stored child document type `doc` → **`subnote`** for finder
+  correctness. (Child areas were briefly typed `subarea` for the same reason, since
+  collapsed back to `area` — see "Collapsed the `subarea` stored type" above.) The
+  `children` map is now a read-only index;
   read/edit a child via `child=` rather than a `children/<title>/<key>` key.
 - `describe` now reports an `addressing` facet per type (`addressable`,
   `selectors`, `addressVia`, `create` command, `rename`) so an LLM can learn how
@@ -376,6 +387,9 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Fixed
 
+- A nested area three or more levels deep now inherits the full tag namespace
+  (`area/ai/generation/vision`) instead of a flattened one (`area/ai/vision`): the
+  inherited namespace is taken from the parent's deepest area tag, not its shallowest.
 - `para-zk:setup` now also adds the managed templates subfolder (`Templates/para-zk`)
   to Obsidian's excluded-files (`userIgnoreFilters`). Those filters are not recursive,
   so excluding `Templates/` did not hide the nested managed-templates folder from search

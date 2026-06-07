@@ -30,14 +30,13 @@ import { escapeRegExp, slugify, uniqueStrings } from "../text";
 import { readOptionalCode } from "./code-options";
 import type {
   CreateAreaOptions,
+  CreateAreaResult,
   CreateProjectOptions,
   CreateProjectResult,
   CreateResourceOptions,
   CreateResourceResult,
   CreateRetroOptions,
   CreateRetroResult,
-  CreateSubareaOptions,
-  CreateSubareaResult,
   CreateSubnoteOptions,
   CreateSubnoteResult,
   CreateZkOptions,
@@ -115,27 +114,73 @@ export async function createProject(ctx: WorkflowContext, options: CreateProject
   };
 }
 
-export async function createArea(ctx: WorkflowContext, options: CreateAreaOptions): Promise<NoteResult> {
+export async function createArea(ctx: WorkflowContext, options: CreateAreaOptions): Promise<CreateAreaResult> {
   const title = requireTitle(options.title, "area title");
-  const target = uniqueFolderStyleMarkdownPath(ctx, ctx.settings.paths.areasFolder, title);
-  await ensureFolder(ctx.host, target.folder);
-
   const createdAt = localDateTimeSpace();
-  const file = await createMarkdownFile(ctx, "area", target.path, {
-    created: createdAt,
-    slug: slugify(target.title),
-    cursor: ""
-  });
-
   const tags = localePack(ctx.settings.locale).tags;
+
+  // A nested area (a parent is given) is an ordinary area that merely has a parent — same
+  // stored type, template, and behavior — placed in the parent's folder with an inherited
+  // tag namespace and a `parent` link. A root area (no parent) is the unnested form. The
+  // `parent` link, not a separate type, is what distinguishes the two everywhere else. The
+  // two branches differ only in path strategy and frontmatter; ensureAreaNote is shared.
+  if (options.parentTitle === undefined && options.sourcePath === undefined) {
+    const target = uniqueFolderStyleMarkdownPath(ctx, ctx.settings.paths.areasFolder, title);
+    await ensureFolder(ctx.host, target.folder);
+    const { file } = await ensureAreaNote(ctx, target.path, slugify(target.title), createdAt);
+    await ctx.host.processFrontMatter(file, (fm) => {
+      fm.type = "area";
+      fm.tags = [`${tags.area}/${slugify(target.title)}`];
+      applyCreatedUpdatedDefaults(fm, createdAt);
+    });
+    await openIfRequested(ctx, file, options.open);
+    return noteResult(file, true, options.open);
+  }
+
+  const parent = await ensureFolderStyleParent(ctx, await resolveRequiredParent(ctx, options, "area"));
+  const childFolder = joinVaultPath(parent.childFolder, title);
+  await ensureFolder(ctx.host, childFolder);
+  const { file, created } = await ensureAreaNote(ctx, joinVaultPath(childFolder, `${title}.md`), slugify(title), createdAt);
+
+  const parentTags = frontmatterLinks(parseFrontmatterFromContent(await ctx.host.read(parent.file)).tags)
+    .filter((tag) => tag.startsWith(`${tags.area}/`));
+  // The parent's own namespace is its deepest area tag — the chain gains a level per nesting,
+  // so the longest is the parent's own. The shallowest would drop intermediate levels (e.g.
+  // area/ai/vision instead of area/ai/generation/vision for a 3rd-level area).
+  const parentNamespace = parentTags.reduce(
+    (deepest, tag) => (tag.length > deepest.length ? tag : deepest),
+    `${tags.area}/${slugify(parent.file.basename)}`
+  );
+  const childNamespace = `${parentNamespace}/${slugify(title)}`;
   await ctx.host.processFrontMatter(file, (fm) => {
     fm.type = "area";
-    fm.tags = [`${tags.area}/${slugify(target.title)}`];
+    fm.parent = linkToFile(parent.file);
+    fm.tags = options.inheritParentTag === false
+      ? [childNamespace]
+      : Array.from(new Set([parentNamespace, childNamespace]));
     applyCreatedUpdatedDefaults(fm, createdAt);
   });
 
   await openIfRequested(ctx, file, options.open);
-  return noteResult(file, true, options.open);
+  return {
+    ...noteResult(file, created, options.open),
+    parentPath: parent.file.path
+  };
+}
+
+// Get the area note at `path`, or create it from the area template; reports whether it was
+// newly created. Shared by createArea's root (unique path) and nested (deterministic path)
+// branches so they differ only in path strategy and the frontmatter they then write.
+async function ensureAreaNote(
+  ctx: WorkflowContext,
+  path: string,
+  slug: string,
+  createdAt: string
+): Promise<{ file: TFile; created: boolean }> {
+  const existing = ctx.host.getFile(path);
+  if (existing) return { file: existing, created: false };
+  const file = await createMarkdownFile(ctx, "area", path, { created: createdAt, slug, cursor: "" });
+  return { file, created: true };
 }
 
 // Origin/parent addressing: prefer an explicit sourcePath (GUI/active note),
@@ -155,7 +200,7 @@ async function resolveRequiredParent(
   defaultType?: string
 ): Promise<TFile> {
   if (opts.sourcePath) return resolveRequiredFile(ctx, opts.sourcePath, "parent note");
-  // Root container by name, then drill to a nested parent (areas/subareas nest
+  // Root container by name, then drill to a nested parent (areas nest
   // arbitrarily) so a child can be created at any depth.
   const root = await resolveRequiredByType(ctx, opts.parentType ?? defaultType ?? "", { title: opts.parentTitle });
   return opts.child && opts.child.length > 0 ? drillToChild(ctx, root, opts.child) : root;
@@ -233,47 +278,6 @@ export async function createSubnote(ctx: WorkflowContext, options: CreateSubnote
   } else {
     created = false;
   }
-
-  await openIfRequested(ctx, file, options.open);
-  return {
-    ...noteResult(file, created, options.open),
-    parentPath: parent.file.path
-  };
-}
-
-export async function createSubarea(ctx: WorkflowContext, options: CreateSubareaOptions): Promise<CreateSubareaResult> {
-  const title = requireTitle(options.title, "subarea title");
-  const parent = await ensureFolderStyleParent(ctx, await resolveRequiredParent(ctx, options, "area"));
-  const subareaFolder = joinVaultPath(parent.childFolder, title);
-  await ensureFolder(ctx.host, subareaFolder);
-
-  const createdAt = localDateTimeSpace();
-  const path = joinVaultPath(subareaFolder, `${title}.md`);
-  let created = true;
-  let file = ctx.host.getFile(path);
-  if (!file) {
-    file = await createMarkdownFile(ctx, "area", path, {
-      created: createdAt,
-      slug: slugify(title),
-      cursor: ""
-    });
-  } else {
-    created = false;
-  }
-
-  const tags = localePack(ctx.settings.locale).tags;
-  const parentFrontmatter = parseFrontmatterFromContent(await ctx.host.read(parent.file));
-  const parentTags = frontmatterLinks(parentFrontmatter.tags);
-  const parentNamespace = parentTags.find((tag) => tag.startsWith(`${tags.area}/`)) ?? `${tags.area}/${slugify(parent.file.basename)}`;
-  const childNamespace = `${parentNamespace}/${slugify(title)}`;
-  await ctx.host.processFrontMatter(file, (fm) => {
-    fm.type = "subarea";
-    fm.parent = linkToFile(parent.file);
-    fm.tags = options.inheritParentTag === false
-      ? [childNamespace]
-      : Array.from(new Set([parentNamespace, childNamespace]));
-    applyCreatedUpdatedDefaults(fm, createdAt);
-  });
 
   await openIfRequested(ctx, file, options.open);
   return {

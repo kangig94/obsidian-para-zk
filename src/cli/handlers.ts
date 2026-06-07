@@ -123,7 +123,6 @@ type WorkflowFunctionName =
   | "createProject"
   | "createResource"
   | "createRetro"
-  | "createSubarea"
   | "createSubnote"
   | "createZk"
   | "deleteArea"
@@ -560,7 +559,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     command: "para-zk:list",
     description: "List PARA-ZK notes by type with optional filters (structured enumeration by name/frontmatter). For content/full-text search, use `optsidian grep` or `optsidian search`.",
     options: {
-      type: { value: "<project|area|subarea|resource|zk|retro|journal|subnote>", description: "Optional note-type filter. Omit to list all PARA-ZK notes; zk spans all ZK kinds." },
+      type: { value: "<project|area|resource|zk|retro|journal|subnote>", description: "Optional note-type filter. Omit to list all PARA-ZK notes; zk spans all ZK kinds." },
       archived: { value: "<true|false>", description: "true lists archived notes; default lists active notes." },
       query: { value: "<text>", description: "Optional case-insensitive title substring filter." },
       offset: { value: "<number>", description: "Zero-based item offset (default: 0)." },
@@ -727,15 +726,21 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
   },
   {
     command: "para-zk:create-area",
-    description: "Create a PARA area note",
+    description: "Create a PARA area note, optionally nested under a parent area",
     options: {
       title: { value: "<title>", description: "Area title." },
+      parent_title: { value: "<title>", description: "Optional parent area title; nest this area under it (its parent link, not a distinct type)." },
+      child: { value: `<["title", ...]>`, description: "Optional: with parent_title, drill into a nested area to nest under it." },
+      inherit_parent_tag: { value: "<true|false>", description: "When nested, include the parent area tag as well as the child tag (default true)." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "area created",
     run: workflowRun("createArea", (args) => ({
       title: readCliTitle(args),
+      parentTitle: readCliString(args, "parent_title"),
+      child: parseList(readCliString(args, "child")),
+      inheritParentTag: readCliBoolean(args, "inherit_parent_tag") ?? true,
       open: readCliBoolean(args, "open") ?? false
     }))
   },
@@ -819,27 +824,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       child: parseList(readCliString(args, "child")),
       subnoteType: readCliSubnoteType(args),
       body: readCliString(args, "body"),
-      open: readCliBoolean(args, "open") ?? false
-    }))
-  },
-  {
-    command: "para-zk:create-subarea",
-    description: "Create a child area under an area note",
-    options: {
-      title: { value: "<title>", description: "Subarea title." },
-      parent_title: { value: "<title>", description: "Parent area title." },
-      child: { value: `<["title", ...]>`, description: "Optional: drill from the named parent area into a nested subarea (JSON list) to create under it." },
-      inheritParentTag: { value: "<true|false>", description: "Include parent area tag as well as child tag." },
-      open: { value: "<true|false>", description: "Open the created note in Obsidian." },
-      format: { value: "<text|json>", description: "Output format (default: text)." }
-    },
-    text: "subarea created",
-    run: workflowRun("createSubarea", (args) => ({
-      title: readCliTitle(args),
-      parentType: "area",
-      parentTitle: readCliString(args, "parent_title"),
-      child: parseList(readCliString(args, "child")),
-      inheritParentTag: readCliBoolean(args, "inheritParentTag") ?? true,
       open: readCliBoolean(args, "open") ?? false
     }))
   },
@@ -978,7 +962,7 @@ const VAULT_CONTEXT = "Obsidian is a local-first, single-user personal knowledge
 // Sets the operator's expectation of what this CLI does and does not own, so it does not
 // bang on PARA-ZK for raw vault operations it deliberately leaves to the host. Kept verbatim
 // in sync with the MCP server's SCOPE_NOTE.
-const SCOPE_NOTE = "PARA-ZK owns typed PARA/ZK operations — create/read/update/rename/archive of the surface types above, addressed by name (subnotes/subareas via their parent + child). It does not do raw file edits, free-form frontmatter, or full-text search; for those use your host's file/search tools (e.g. optsidian edit/apply_patch/write, optsidian grep/search). Per type, the mutable keys are in its writeKeys; keys absent there are not writable here — notably created/updated, which the vault maintains automatically.";
+const SCOPE_NOTE = "PARA-ZK owns typed PARA/ZK operations — create/read/update/rename/archive of the surface types above, addressed by name (subnotes and nested areas via their parent + child). It does not do raw file edits, free-form frontmatter, or full-text search; for those use your host's file/search tools (e.g. optsidian edit/apply_patch/write, optsidian grep/search). Per type, the mutable keys are in its writeKeys; keys absent there are not writable here — notably created/updated, which the vault maintains automatically.";
 
 // Discoverability: derive create/workflow inputs from the real command option
 // specs so `describe` is self-contained (a caller never needs `obsidian help`).

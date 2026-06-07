@@ -115,8 +115,12 @@ async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: 
       return title ? workflows.createSubnote(ctx, { title, sourcePath: activePath, open: true }) : undefined;
     }
     case "create-subarea": {
+      if (!activePath) {
+        new Notice(`PARA-ZK: ${localePack(plugin.settings.locale).messages.createSubareaNeedsActiveArea}`);
+        return undefined;
+      }
       const title = await prompt(plugin, labels.createSubareaCommandName, labels.promptSubareaTitle);
-      return title ? workflows.createSubarea(ctx, { title, sourcePath: activePath, inheritParentTag: true, open: true }) : undefined;
+      return title ? workflows.createArea(ctx, { title, sourcePath: activePath, inheritParentTag: true, open: true }) : undefined;
     }
     case "create-retro":
       return workflows.createRetro(ctx, { sourcePath: activePath, open: true });

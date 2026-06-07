@@ -298,6 +298,7 @@ const ko: LocalePack = {
   },
   messages: {
     setupReady: "PARA-ZK vault 구성 완료",
+    createSubareaNeedsActiveArea: "하위 영역을 만들려면 상위 영역 노트를 먼저 여세요.",
     statusReady: "PARA-ZK plugin loaded",
     commandComplete: "완료",
     commandCancelled: "취소됨",
@@ -566,6 +567,7 @@ const en: LocalePack = {
   },
   messages: {
     setupReady: "PARA-ZK vault set up",
+    createSubareaNeedsActiveArea: "Open a parent area note first to create a subarea.",
     statusReady: "PARA-ZK plugin loaded",
     commandComplete: "Done",
     commandCancelled: "Cancelled",

@@ -30,6 +30,10 @@ export type ProjectAreaResult = {
 
 export type CreateAreaOptions = {
   title: string;
+  sourcePath?: string;
+  parentTitle?: string;
+  child?: string[];
+  inheritParentTag?: boolean;
   open?: boolean;
 };
 
@@ -70,15 +74,6 @@ export type CreateSubnoteOptions = {
   open?: boolean;
 };
 
-export type CreateSubareaOptions = {
-  title: string;
-  sourcePath?: string;
-  parentType?: string;
-  parentTitle?: string;
-  child?: string[];
-  inheritParentTag?: boolean;
-  open?: boolean;
-};
 
 export type CreateRetroOptions = {
   sourcePath?: string;
@@ -402,7 +397,7 @@ export type BacklinkRead = {
 export type CreateProjectResult = NoteResult & { areas?: ProjectAreaResult[] };
 export type CreateResourceResult = NoteResult & { sourcePath?: string; linkedFromSource: boolean };
 export type CreateSubnoteResult = NoteResult & { parentPath: string };
-export type CreateSubareaResult = NoteResult & { parentPath: string };
+export type CreateAreaResult = NoteResult & { parentPath?: string };
 export type CreateRetroResult = NoteResult & { sourcePath?: string; weekIso: string };
 export type CreateZkResult = NoteResult & { kind: ZkKindCode };
 export type OpenJournalResult = NoteResult & { date: string; energy: string };

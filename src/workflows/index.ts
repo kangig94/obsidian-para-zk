@@ -11,7 +11,6 @@ export {
   createProject,
   createResource,
   createRetro,
-  createSubarea,
   createSubnote,
   createZk
 } from "./create";

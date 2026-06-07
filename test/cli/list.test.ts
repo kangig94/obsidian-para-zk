@@ -21,6 +21,16 @@ describe("list", () => {
     expect(items.every((i) => typeof i.path === "string")).toBe(true);
   });
 
+  it("includes nested areas in `list type=area` (nested areas store type=area)", async () => {
+    await cli.run("para-zk:create-area", { title: "AI", open: "false" });
+    await cli.run("para-zk:create-area", { title: "Vision", parent_title: "AI", open: "false" });
+
+    const res = await cli.run("para-zk:list", { type: "area" });
+    const items = res.items as Array<{ title: string; type: string }>;
+    expect(items.map((i) => i.title).sort()).toEqual(["AI", "Vision"]);
+    expect(items.every((i) => i.type === "area")).toBe(true);
+  });
+
   it("treats zk as the family spanning all stored ZK kinds", async () => {
     await cli.run("para-zk:create-zk", { title: "S", kind: "spark", open: "false" });
     await cli.run("para-zk:create-zk", { title: "P", kind: "permanent", open: "false" });

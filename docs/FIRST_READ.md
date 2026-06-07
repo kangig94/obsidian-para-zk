@@ -63,7 +63,7 @@ template sections as stable keys such as `summary` or `quick_memo`; section read
 include lower-level subheadings inside that section, such as a Decision-1
 subsection, and section writes use a split guard so an inserted heading cannot
 accidentally create a sibling section.
-Free-form types (`resource`, child `doc`, fallback `note`, and `zk_*`) expose
+Free-form types (`resource`, child `subnote`, fallback `note`, and `zk_*`) expose
 prose as one `body` key for the whole editable Markdown body before the managed
 tail. Literal `set`, `append`, `prepend`, and `replace` edits target that body;
 H1 headings are allowed there, and there are no enforced prose-section keys.

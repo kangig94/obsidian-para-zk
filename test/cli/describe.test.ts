@@ -133,22 +133,31 @@ describe("describe", () => {
     ]));
   });
 
-  it("marks subnote/subarea as create-able but not directly addressable", async () => {
-    for (const type of ["subnote", "subarea"]) {
-      const result = await cli.run("para-zk:describe", { type });
-      const surface = (result.surfaces as Array<Record<string, unknown>>)[0];
-      const addressing = surface.addressing as { addressable: boolean; addressVia?: string; create: string; createInputs: string[] };
-      expect(addressing.addressable).toBe(false);
-      expect(addressing.addressVia).toContain("child=");
-      // addressVia teaches that there is no direct update-<type>; reach it through the parent.
-      expect(addressing.addressVia).toContain("no update-");
-      expect(addressing.create).toBe(`para-zk:create-${type}`);
-      // createInputs come from the real create command's options (no obsidian help needed).
-      expect(addressing.createInputs).toEqual(expect.arrayContaining(["title", "parent_title"]));
-    }
-    const subnote = (await cli.run("para-zk:describe", { type: "subnote" })).surfaces as Array<Record<string, unknown>>;
-    expect((subnote[0].addressing as { createInputs: string[] }).createInputs).toEqual(
-      expect.arrayContaining(["subnote_type", "body"])
-    );
+  it("marks subnote as create-able but not directly addressable, and advertises area nesting", async () => {
+    const result = await cli.run("para-zk:describe", { type: "subnote" });
+    const subnote = (result.surfaces as Array<Record<string, unknown>>)[0];
+    const addressing = subnote.addressing as { addressable: boolean; addressVia?: string; create: string; createInputs: string[] };
+    expect(addressing.addressable).toBe(false);
+    expect(addressing.addressVia).toContain("child=");
+    // addressVia teaches that there is no direct update-subnote; reach it through the parent.
+    expect(addressing.addressVia).toContain("no update-");
+    expect(addressing.create).toBe("para-zk:create-subnote");
+    // createInputs come from the real create command's options (no obsidian help needed).
+    expect(addressing.createInputs).toEqual(expect.arrayContaining(["title", "parent_title", "subnote_type", "body"]));
+
+    // A nested area is not a distinct type — it is an `area` created with a parent. The
+    // `area` surface stays directly addressable and advertises nesting via create-area's
+    // parent_title input + the child= selector, so a cold caller discovers it from describe.
+    const area = (await cli.run("para-zk:describe", { type: "area" })).surfaces as Array<Record<string, unknown>>;
+    const areaAddressing = area[0].addressing as { addressable: boolean; create: string; createInputs: string[]; selectors?: string[] };
+    expect(areaAddressing.addressable).toBe(true);
+    expect(areaAddressing.create).toBe("para-zk:create-area");
+    expect(areaAddressing.createInputs).toEqual(expect.arrayContaining(["title", "parent_title"]));
+    expect(areaAddressing.selectors).toEqual(expect.arrayContaining(["child"]));
+
+    // `subarea` is no longer a stored/surface type.
+    const bad = await cli.run("para-zk:describe", { type: "subarea" });
+    expect(bad.ok).toBe(false);
+    expect(String(bad.error)).toContain("unknown surface type");
   });
 });

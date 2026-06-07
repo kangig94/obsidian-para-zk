@@ -61,7 +61,7 @@ mapping, not core changes.**
 |--------|----------------|
 | `index.ts` | Barrel — public workflow API surface |
 | `context.ts` | `WorkflowContext`/`WorkflowHost` + option/result types (imported everywhere) |
-| `create.ts` | Create project/area/resource/subnote/subarea/retro/ZK; template instantiation |
+| `create.ts` | Create project/area (nested via `parent_title`)/resource/subnote/retro/ZK; template instantiation |
 | `read.ts` | Surface reads (sections, frontmatter, collections, backlinks) |
 | `update.ts` | Section/frontmatter/task mutations with the split guard |
 | `rename.ts` | Folder-style renames + wikilink rewrites |

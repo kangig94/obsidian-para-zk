@@ -43,7 +43,6 @@ const BACKLINK_READ_SECTION: ReadSectionSpec = {
 const SURFACE_TYPES = [
   "project",
   "area",
-  "subarea",
   "resource",
   "journal",
   "retro",
@@ -159,7 +158,6 @@ const NOTE_READ_SPEC: ReadSurfaceSpec = {
 export function specForType(type: string): ReadSurfaceSpec {
   if (type === "project") return PROJECT_READ_SPEC;
   if (type === "area") return AREA_READ_SPEC;
-  if (type === "subarea") return AREA_READ_SPEC;
   if (type === "resource") return RESOURCE_READ_SPEC;
   if (type === "journal") return JOURNAL_READ_SPEC;
   if (type === "retro") return RETRO_READ_SPEC;
@@ -303,8 +301,6 @@ function addressingForType(type: SurfaceType): SurfaceAddressing {
       return { addressable: true, selectors: ["date"], create: "para-zk:capture-journal", rename: false };
     case "subnote":
       return { addressable: false, addressVia: `parent project/area + child=["title"]; no update-subnote — read/update/delete it via read-/update-/delete-project|area with that child`, create: "para-zk:create-subnote", rename: true };
-    case "subarea":
-      return { addressable: false, addressVia: `parent area + child=["title"]; no update-subarea — read/update/delete it via read-/update-/delete-area with that child`, create: "para-zk:create-subarea", rename: true };
     case "zk_spark":
     case "zk_digest":
     case "zk_permanent":

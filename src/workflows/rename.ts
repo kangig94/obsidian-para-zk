@@ -50,7 +50,7 @@ export async function renameZk(ctx: WorkflowContext, options: RenameZkOptions): 
   );
 }
 
-// A child reached via child= can be a flat subnote or a folder-style subarea;
+// A child reached via child= can be a flat subnote or a folder-style nested area;
 // dispatch by the resolved note's stored type.
 async function renameChildTarget(
   ctx: WorkflowContext,
@@ -60,7 +60,7 @@ async function renameChildTarget(
 ): Promise<RenameResult> {
   const file = drillToChild(ctx, container, child);
   const type = readType(fileFrontmatter(ctx, file));
-  if (type === "project" || type === "area" || type === "subarea") {
+  if (type === "project" || type === "area") {
     return renameFolderStyleNote(ctx, file, newTitle, type === "project" ? "project" : "area");
   }
   return renameFlatNote(ctx, file, newTitle, type === "resource" ? "resource" : "knowledge");
