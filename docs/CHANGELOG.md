@@ -387,6 +387,9 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Fixed
 
+- A nested area's props panel now labels its `parent` field "Parent area" (ko 상위 영역)
+  instead of the ambiguous "Area", making clear it shows the containing area. Root areas
+  (no parent) hide the field as before.
 - A nested area three or more levels deep now inherits the full tag namespace
   (`area/ai/generation/vision`) instead of a flattened one (`area/ai/vision`): the
   inherited namespace is taken from the parent's deepest area tag, not its shallowest.

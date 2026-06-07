@@ -103,7 +103,7 @@ export function propsSchemaForType(type: PropsViewType, locale: Locale): PropsSc
       type: "area",
       rows: [
         [created, updated],
-        [displayField("parent", "parent", t.labels.area)]
+        [displayField("parent", "parent", t.labels.parentArea)]
       ]
     },
     resource: {
