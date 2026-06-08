@@ -150,7 +150,7 @@ function renderPropsCodeBlock(
 
   const schema = propsSchemaForType(type, plugin.settings.locale);
   const body = renderPropsShell(plugin, schema, el, sourcePath);
-  renderPropsGrid(plugin, schema, body, sourcePath);
+  renderPropsGrid(plugin, schema, body, sourcePath, el);
 }
 
 function renderInlinePropsInputs(plugin: ParaZkPluginContext, el: HTMLElement, ctx: MarkdownPostProcessorContext): void {
@@ -172,9 +172,9 @@ function renderInlinePropsInputs(plugin: ParaZkPluginContext, el: HTMLElement, c
     const container = document.createElement("span");
     container.addClass("para-zk-inline-input");
     const rerender = latestPropsRerender(container, () => {
-      renderSingleField(plugin, schema, field, container, ctx.sourcePath);
+      renderSingleField(plugin, schema, field, container, ctx.sourcePath, container);
     });
-    renderFieldControl(plugin, field, frontmatter, container, ctx.sourcePath, rerender);
+    renderFieldControl(plugin, field, frontmatter, container, ctx.sourcePath, container, rerender);
     codeEl.replaceWith(container);
   }
 }
@@ -183,7 +183,8 @@ function renderPropsGrid(
   plugin: ParaZkPluginContext,
   schema: PropsSchema,
   container: HTMLElement,
-  sourcePath?: string
+  sourcePath: string | undefined,
+  blockEl: HTMLElement
 ): void {
   const file = sourceFile(plugin, sourcePath);
   const frontmatter = file ? fileFrontmatter(plugin, file) : {};
@@ -198,7 +199,7 @@ function renderPropsGrid(
     if (visibleFields.length === 0) continue;
     const rowEl = container.createDiv({ cls: "para-zk-block__row" });
     for (const field of visibleFields) {
-      renderField(plugin, schema, field, frontmatter, rowEl, sourcePath);
+      renderField(plugin, schema, field, frontmatter, rowEl, sourcePath, blockEl);
     }
   }
 }
@@ -214,11 +215,12 @@ function renderPropsShell(
   return renderBlockShell(container, {
     kind: "props",
     renderLead: leadField
-      ? (lead) => renderPropsLeadField(plugin, schema, leadField, lead, sourcePath)
+      ? (lead) => renderPropsLeadField(plugin, schema, leadField, lead, sourcePath, container)
       : undefined,
     renderActions: (actions) => {
       renderPropsModeButton(plugin, actions, {
         sourcePath,
+        blockEl: container,
         label: labelValue(labels.edit, "Edit"),
         icon: "pencil",
         variant: "edit-mode",
@@ -226,6 +228,7 @@ function renderPropsShell(
       });
       renderPropsModeButton(plugin, actions, {
         sourcePath,
+        blockEl: container,
         label: labelValue(labels.view, "Read"),
         icon: "eye",
         variant: "read-mode",
@@ -240,10 +243,11 @@ function renderPropsLeadField(
   schema: PropsSchema,
   field: PropsField,
   container: HTMLElement,
-  sourcePath?: string
+  sourcePath: string | undefined,
+  blockEl: HTMLElement
 ): void {
   container.addClass("para-zk-block__lead--props");
-  renderSingleField(plugin, schema, field, container, sourcePath);
+  renderSingleField(plugin, schema, field, container, sourcePath, blockEl);
 }
 
 function renderPropsModeButton(
@@ -251,6 +255,7 @@ function renderPropsModeButton(
   container: HTMLElement,
   options: {
     sourcePath?: string;
+    blockEl: HTMLElement;
     label: string;
     icon: string;
     variant: string;
@@ -264,7 +269,7 @@ function renderPropsModeButton(
     onClick: async (button) => {
       button.disabled = true;
       try {
-        await focusMarkdownMode(plugin, options.sourcePath, options.mode);
+        await focusMarkdownMode(plugin, options.sourcePath, options.blockEl, options.mode);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         new Notice(`PARA-ZK: ${message}`);
@@ -289,16 +294,17 @@ function renderField(
   field: PropsField,
   frontmatter: Frontmatter,
   rowEl: HTMLElement,
-  sourcePath?: string
+  sourcePath: string | undefined,
+  blockEl: HTMLElement
 ): void {
   const fieldEl = rowEl.createDiv({ cls: "para-zk-block__field" });
   fieldEl.createDiv({ cls: "para-zk-block__label", text: field.label });
   const controlEl = fieldEl.createDiv({ cls: "para-zk-block__control" });
   const gridEl = rowEl.parentElement ?? rowEl;
   const rerender = latestPropsRerender(gridEl, () => {
-    renderPropsGrid(plugin, schema, gridEl, sourcePath);
+    renderPropsGrid(plugin, schema, gridEl, sourcePath, blockEl);
   });
-  renderFieldControl(plugin, field, frontmatter, controlEl, sourcePath, rerender);
+  renderFieldControl(plugin, field, frontmatter, controlEl, sourcePath, blockEl, rerender);
 }
 
 function renderSingleField(
@@ -306,16 +312,17 @@ function renderSingleField(
   schema: PropsSchema,
   field: PropsField,
   container: HTMLElement,
-  sourcePath?: string
+  sourcePath: string | undefined,
+  blockEl: HTMLElement = container
 ): void {
   const file = sourceFile(plugin, sourcePath);
   const frontmatter = file ? fileFrontmatter(plugin, file) : {};
   container.empty();
   const rerender = latestPropsRerender(container, () => {
-    renderSingleField(plugin, schema, field, container, sourcePath);
+    renderSingleField(plugin, schema, field, container, sourcePath, blockEl);
   });
   const resolvedField = findPropsField(schema, field.id) ?? field;
-  renderFieldControl(plugin, resolvedField, frontmatter, container, sourcePath, rerender);
+  renderFieldControl(plugin, resolvedField, frontmatter, container, sourcePath, blockEl, rerender);
   labelSingleFieldControl(container, resolvedField.label);
 }
 
@@ -332,26 +339,27 @@ function renderFieldControl(
   frontmatter: Frontmatter,
   container: HTMLElement,
   sourcePath: string | undefined,
+  blockEl: HTMLElement,
   rerender: PropsRerender
 ): void {
   switch (field.control) {
     case "text":
-      renderTextInput(plugin, field, frontmatter, container, sourcePath);
+      renderTextInput(plugin, field, frontmatter, container, sourcePath, blockEl);
       return;
     case "text-list":
-      renderTextInput(plugin, field, frontmatter, container, sourcePath, { list: true });
+      renderTextInput(plugin, field, frontmatter, container, sourcePath, blockEl, { list: true });
       return;
     case "date":
-      renderDateInput(plugin, field, frontmatter, container, sourcePath, "date");
+      renderDateInput(plugin, field, frontmatter, container, sourcePath, blockEl, "date");
       return;
     case "datetime":
-      renderDateInput(plugin, field, frontmatter, container, sourcePath, "datetime-local");
+      renderDateInput(plugin, field, frontmatter, container, sourcePath, blockEl, "datetime-local");
       return;
     case "select":
-      renderSelectInput(plugin, field, frontmatter, container, sourcePath);
+      renderSelectInput(plugin, field, frontmatter, container, sourcePath, blockEl);
       return;
     case "area-list":
-      renderAreaListInput(plugin, field, frontmatter, container, sourcePath, rerender);
+      renderAreaListInput(plugin, field, frontmatter, container, sourcePath, blockEl, rerender);
       return;
     case "display":
       renderDisplayValue(plugin, field, frontmatter, container, sourcePath);
@@ -364,7 +372,8 @@ function renderTextInput(
   field: PropsField,
   frontmatter: Frontmatter,
   container: HTMLElement,
-  sourcePath?: string,
+  sourcePath: string | undefined,
+  blockEl: HTMLElement,
   options: { list?: boolean } = {}
 ): void {
   const input = new TextComponent(container);
@@ -380,7 +389,7 @@ function renderTextInput(
     // typed value but stores it as a one-item YAML list, the form Obsidian resolves
     // for links/quick-switcher. Empty clears it to an empty list.
     const value = options.list ? singleItemList(raw) : raw;
-    void writeFrontmatterValue(plugin, sourcePath, field.key, value);
+    void writeFrontmatterValue(plugin, sourcePath, blockEl, field.key, value);
   });
 }
 
@@ -390,6 +399,7 @@ function renderDateInput(
   frontmatter: Frontmatter,
   container: HTMLElement,
   sourcePath: string | undefined,
+  blockEl: HTMLElement,
   type: "date" | "datetime-local"
 ): void {
   const input = new TextComponent(container);
@@ -404,7 +414,7 @@ function renderDateInput(
     if (!field.key) return;
     let value = input.getValue();
     if (type === "datetime-local") value = fromDateTimeInputValue(value);
-    void writeFrontmatterValue(plugin, sourcePath, field.key, value);
+    void writeFrontmatterValue(plugin, sourcePath, blockEl, field.key, value);
   });
 }
 
@@ -413,7 +423,8 @@ function renderSelectInput(
   field: PropsField,
   frontmatter: Frontmatter,
   container: HTMLElement,
-  sourcePath?: string
+  sourcePath: string | undefined,
+  blockEl: HTMLElement
 ): void {
   const select = new DropdownComponent(container);
   select.selectEl.addClass("para-zk-block__select");
@@ -433,7 +444,7 @@ function renderSelectInput(
   select.setValue(selected ?? rawValue);
 
   select.onChange((value) => {
-    if (field.key) void writeFrontmatterValue(plugin, sourcePath, field.key, value);
+    if (field.key) void writeFrontmatterValue(plugin, sourcePath, blockEl, field.key, value);
   });
 }
 
@@ -443,6 +454,7 @@ function renderAreaListInput(
   frontmatter: Frontmatter,
   container: HTMLElement,
   sourcePath: string | undefined,
+  blockEl: HTMLElement,
   rerender: PropsRerender
 ): void {
   const key = field.key;
@@ -466,7 +478,7 @@ function renderAreaListInput(
       .setDisabled(!key || !sourcePath)
       .onClick(async () => {
         if (!key) return;
-        await writeFrontmatterValue(plugin, sourcePath, key, values.filter((_, itemIndex) => itemIndex !== index));
+        await writeFrontmatterValue(plugin, sourcePath, blockEl, key, values.filter((_, itemIndex) => itemIndex !== index));
         rerender(50);
       });
   }
@@ -486,7 +498,7 @@ function renderAreaListInput(
         return;
       }
       new AreaSuggestModal(plugin.app, suggestions, async (area) => {
-        await writeFrontmatterValue(plugin, sourcePath, key, [...values, area.link]);
+        await writeFrontmatterValue(plugin, sourcePath, blockEl, key, [...values, area.link]);
         rerender(50);
       }).open();
     });
@@ -548,9 +560,10 @@ function renderInternalLink(
 async function focusMarkdownMode(
   plugin: ParaZkPluginContext,
   sourcePath: string | undefined,
+  blockEl: HTMLElement,
   mode: "source" | "preview"
 ): Promise<void> {
-  const file = sourceFile(plugin, sourcePath);
+  const file = resolveBlockFile(plugin, sourcePath, blockEl);
   if (!file) throw new Error("current note not found");
 
   const leaf = findMarkdownLeafForPath(plugin, file.path) ?? plugin.app.workspace.getLeaf(false);
@@ -648,10 +661,11 @@ function parseDisplayLink(value: string): { target: string; label: string } | un
 async function writeFrontmatterValue(
   plugin: ParaZkPluginContext,
   sourcePath: string | undefined,
+  blockEl: HTMLElement,
   key: string,
   value: string | string[]
 ): Promise<void> {
-  const file = sourceFile(plugin, sourcePath);
+  const file = resolveBlockFile(plugin, sourcePath, blockEl);
   if (!file) {
     new Notice("PARA-ZK: current note not found");
     return;
@@ -770,6 +784,22 @@ class AreaSuggestModal extends SuggestModal<AreaSuggestion> {
 function sourceFile(plugin: ParaZkPluginContext, sourcePath: string | undefined): TFile | undefined {
   if (!sourcePath) return undefined;
   const file = plugin.app.vault.getFileByPath(sourcePath);
+  return file instanceof TFile ? file : undefined;
+}
+
+function resolveBlockFile(
+  plugin: ParaZkPluginContext,
+  sourcePath: string | undefined,
+  blockEl: HTMLElement
+): TFile | undefined {
+  const direct = sourceFile(plugin, sourcePath);
+  if (direct) return direct;
+
+  // When an inline title edit blurs during a props click, Obsidian may retarget the
+  // owning markdown leaf before the vault rename event reaches this render child.
+  const leaf = plugin.app.workspace.getLeavesOfType("markdown")
+    .find((leaf) => leaf.view instanceof MarkdownView && leaf.view.containerEl.contains(blockEl));
+  const file = leaf?.view instanceof MarkdownView ? leaf.view.file : undefined;
   return file instanceof TFile ? file : undefined;
 }
 
