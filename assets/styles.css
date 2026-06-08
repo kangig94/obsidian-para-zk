@@ -59,11 +59,17 @@ body.para-zk-width-active .markdown-preview-view {
  * instead of the line width, so the variables above never reach them — pin the embed
  * itself to the width. Live preview wraps it in .cm-embed-block; reading view wraps it
  * in a .markdown-preview-sizer child div.
+ *
+ * Cap at the theme's readable max-width (not 100%) and center: when the slider value
+ * exceeds the pane, a bare max-width:100% lets the box fill the pane and, combined with
+ * a theme margin, overflow one side. --max-width / --content-margin (Minimal) reproduce
+ * the body's own clamp-and-center; the fallbacks keep vanilla (no --max-width) full-width.
  */
 body.para-zk-width-active .markdown-source-view .cm-embed-block[class*="cm-lang-para-zk-"],
 body.para-zk-width-active .markdown-preview-view .markdown-preview-sizer > div:has(> [class*="block-language-para-zk-"]) {
   width: var(--para-zk-editor-width) !important;
-  max-width: 100% !important;
+  max-width: var(--max-width, 100%) !important;
+  margin-inline: var(--content-margin, auto) !important;
 }
 
 .workspace-ribbon .para-zk-ribbon-action,
