@@ -36,7 +36,7 @@ running — so you can inspect arguments without first hitting a "required" erro
 
 ```bash
 optsidian para-zk:create-area help=true format=json
-# → {"ok":true,"command":"para-zk:create-area","description":"...",
+# → {"ok":true,"description":"...",
 #    "options":[{"name":"title","value":"<title>","description":"Area title."}, ...]}
 ```
 
@@ -45,14 +45,16 @@ MCP) because it rides the same `key=value` parsing. A bare `--help`/`-h` flag is
 honored too when the host forwards it. For the full machine-readable surface
 (types, stable keys, create inputs), `para-zk:describe` remains the index.
 
-### Large body from a file
+### Large text from a file
 
-The `body` option on create commands accepts an `@<absolute-path>` value, read from
-disk by the plugin instead of taken inline:
+The `body` option on create commands and the `value` option on update commands
+accept an `@<absolute-path>` value, read from disk by the plugin instead of
+taken inline:
 
 ```bash
 optsidian para-zk:create-resource title="Attention Is All You Need" body=@/tmp/note.md
 obsidian      para-zk:create-resource title="Attention Is All You Need" body=@/tmp/note.md
+optsidian para-zk:update-project title="Model Evaluation" child='["Planning Meeting"]' key=body op=set value=@/tmp/body.md
 ```
 
 This is the shell-safe way to pass long or multiline markdown (newlines, quotes,
@@ -125,7 +127,6 @@ Successful workflow commands return JSON like:
 ```json
 {
   "ok": true,
-  "command": "para-zk:create-project",
   "path": "PARA/Projects/Example/Example.md",
   "title": "Example",
   "created": true,
@@ -145,7 +146,6 @@ Errors return JSON like:
 ```json
 {
   "ok": false,
-  "command": "para-zk:create-project",
   "error": "status must be one of: idea|in_progress|paused|done|archived (received: active)"
 }
 ```

@@ -44,12 +44,20 @@ type NativeCliCommand = {
 
 const ZK_KEY_TYPES = ["zk_spark", "zk_digest", "zk_permanent"];
 
-function readKeyOption(type: string): CliOptionSpec {
-  return { value: "<map-path>", description: `Optional stable read key. Valid: ${surfaceReadKeys(type).join(", ")}.` };
+function readKeyOption(type: string, childAware = false): CliOptionSpec {
+  const childNote = childAware ? ` With child=["title"], valid keys are the child note's type instead; see para-zk:describe.` : "";
+  return {
+    value: "<map-path>",
+    description: `Optional stable read key. Valid: ${surfaceReadKeys(type).join(", ")}.${childNote}`
+  };
 }
 
-function writeKeyOption(type: string): CliOptionSpec {
-  return { value: "<map-path>", description: `Stable writable key. Valid: ${surfaceWriteKeys(type).join(", ")}.` };
+function writeKeyOption(type: string, childAware = false): CliOptionSpec {
+  const childNote = childAware ? ` With child=["title"], valid keys are the child note's type instead; see para-zk:describe.` : "";
+  return {
+    value: "<map-path>",
+    description: `Stable writable key. Valid: ${surfaceWriteKeys(type).join(", ")}.${childNote}`
+  };
 }
 
 function zkKeyOption(keysFor: (type: string) => string[], verb: string): CliOptionSpec {
@@ -340,7 +348,7 @@ function makeParaReadCommand(config: ParaNoteCommandConfig): NativeCliCommand {
   return makeReadCommand({
     command: `para-zk:read-${config.type}`,
     description: `Read ${config.article} ${config.type} note's stable PARA-ZK surface, optionally by map key`,
-    options: readCommandOptions({ variant: "by-title", label: config.label }, readKeyOption(config.type)),
+    options: readCommandOptions({ variant: "by-title", label: config.label }, readKeyOption(config.type, true)),
     text: `${config.type} read`,
     workflow: config.readWorkflow,
     selector: { variant: "by-title", label: config.label }
@@ -351,7 +359,7 @@ function makeParaUpdateCommand(config: ParaNoteCommandConfig): NativeCliCommand 
   return makeUpdateCommand({
     command: `para-zk:update-${config.type}`,
     description: `Update ${config.article} ${config.type} note's stable PARA-ZK surface by map key`,
-    options: updateCommandOptions({ variant: "by-title", label: config.label }, writeKeyOption(config.type)),
+    options: updateCommandOptions({ variant: "by-title", label: config.label }, writeKeyOption(config.type, true)),
     text: `${config.type} updated`,
     workflow: config.updateWorkflow,
     selector: { variant: "by-title", label: config.label }
@@ -1022,13 +1030,14 @@ function nodePath(): Promise<typeof import("node:path")> {
   return loadNodeModule("node:path");
 }
 
-// A create command's body may carry large markdown; an @file value is read from disk so
-// the caller never pushes multiline/quoted content through a shell. Works through any host
-// (native obsidian or optsidian) because the plugin does the read. Pass an absolute path —
-// the read resolves against the Obsidian process working directory, not the caller's
-// shell. Scoped to body only: short fields like a journal `content` memo commonly begin
-// with a literal "@" (mentions), which must not be misread as a file path.
-const FILE_BACKED_OPTIONS = ["body"];
+// Create body and update value may carry large markdown; an @file value is read from
+// disk so the caller never pushes multiline/quoted content through a shell. Works
+// through any host (native obsidian or optsidian) because the plugin does the read.
+// Pass an absolute path — the read resolves against the Obsidian process working
+// directory, not the caller's shell. Scoped to declared body/value options: short
+// fields like a journal `content` memo commonly begin with a literal "@" (mentions),
+// which must not be misread as a file path.
+const FILE_BACKED_OPTIONS = ["body", "value"];
 
 async function resolveFileBackedArgs(args: CliArgs, options: Record<string, CliOptionSpec>): Promise<CliArgs> {
   let resolved: CliArgs | undefined;
@@ -1056,7 +1065,7 @@ export function registerNativeCliHandlers(plugin: ParaZkPluginContext): void {
       command.options,
       async (args = {}) => {
         if (isHelpRequest(args)) return renderCommandHelp(command, args);
-        return withCliErrors(args, command.command, async () => {
+        return withCliErrors(args, async () => {
           const resolved = await resolveFileBackedArgs(args, command.options);
           return command.run(plugin, resolved);
         }, command.text);
@@ -1088,7 +1097,7 @@ function renderCommandHelp(command: NativeCliCommand, args: CliArgs): string {
     description: spec.description
   }));
   if (readCliString(args, "format") === "json") {
-    return JSON.stringify({ ok: true, command: command.command, description: command.description, options });
+    return JSON.stringify({ ok: true, description: command.description, options });
   }
   const lines = [command.command, `  ${command.description}`, "", "Options:"];
   for (const { name, value, description } of options) {
@@ -1100,7 +1109,6 @@ function renderCommandHelp(command: NativeCliCommand, args: CliArgs): string {
 
 async function withCliErrors(
   args: CliArgs,
-  command: string,
   fn: () => Promise<Record<string, unknown>>,
   text: string
 ): Promise<string> {
@@ -1108,14 +1116,12 @@ async function withCliErrors(
     const payload = await fn();
     return renderCli(args, {
       ...payload,
-      ok: true,
-      command
+      ok: true
     }, text);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return renderCli(args, {
       ok: false,
-      command,
       error: message
     }, `error: ${message}`);
   }
@@ -1514,6 +1520,7 @@ function readCliUpdateOptions(args: CliArgs): {
   rejectCliAliases(args, {
     operation: "op",
     valueJson: "value_json",
+    body: "value",
     content: "value",
     text: "value",
     replacement: "with"

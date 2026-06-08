@@ -46,8 +46,7 @@ GUI and CLI share the same canonical workflow logic but not the same input surfa
 - **CLI** handlers are for LLMs and automation: richer than the GUI, accepting
   explicit paths, dates, status/priority/maturity codes, subnote types, links, and
   flags so an LLM can satisfy a request in one call. Output is token-efficient JSON
-  with stable fields (`ok`, `command`, `path`, `created`, `archived`, `warnings`,
-  `error`).
+  with stable fields (`ok`, `path`, `created`, `archived`, `warnings`, `error`).
 
 "GUI and CLI behave the same" means they call the same core workflow functions and
 produce the same vault side effects — not that the CLI copies GUI prompts.

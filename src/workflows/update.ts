@@ -58,7 +58,8 @@ import {
   specForType,
   type ReadSectionSpec,
   type ReadSurfaceSpec,
-  unknownUpdateKeyError
+  unknownUpdateKeyError,
+  writeKeyOperations
 } from "./describe";
 import {
   archivedCounterpartFolder,
@@ -176,8 +177,10 @@ async function updateSurface(
     spec = specForType(await readFileTypeFresh(ctx, file));
   }
   const key = requireUpdateKey(options.key);
-  const operation = parseUpdateOperation(options.operation);
   const target = await resolveWritableSurfaceTarget(ctx, file, spec, key, key);
+  const shape = resolveTargetUpdateShape(spec, key, target, options.operation);
+  requireTargetUpdateValue(target, key, shape.allowedOps, shape.operation, options);
+  const operation = shape.operation;
   let result: TextUpdateResult;
   switch (target.kind) {
     case "frontmatter":
@@ -671,6 +674,87 @@ function requireUpdateKey(value: string | undefined): string {
   const key = value?.trim() ?? "";
   if (!key) throw new Error("key is required");
   return key;
+}
+
+function resolveTargetUpdateShape(
+  spec: ReadSurfaceSpec,
+  key: string,
+  target: WritableSurfaceTarget,
+  value: string | undefined
+): { operation: UpdateOperation; allowedOps: UpdateOperation[] } {
+  const allowedOps = allowedUpdateOperations(spec, key);
+  if (!value?.trim()) {
+    throw new Error(updateShapeMessage(key, target, allowedOps));
+  }
+  const operation = parseUpdateOperation(value);
+  if (!allowedOps.includes(operation)) {
+    throw new Error(updateShapeMessage(key, target, allowedOps));
+  }
+  return { operation, allowedOps };
+}
+
+function allowedUpdateOperations(spec: ReadSurfaceSpec, key: string): UpdateOperation[] {
+  const operations = writeKeyOperations(spec, key);
+  if (!operations) throw unknownUpdateKeyError(spec, key);
+  return operations.map((operation) => parseUpdateOperation(operation));
+}
+
+function requireTargetUpdateValue(
+  target: WritableSurfaceTarget,
+  key: string,
+  allowedOps: UpdateOperation[],
+  operation: UpdateOperation,
+  options: UpdatePayloadOptions
+): void {
+  if (!targetOperationRequiresValue(target, operation)) return;
+  if (hasOwn(options, "value")) return;
+  throw new Error(updateShapeMessage(key, target, allowedOps));
+}
+
+function updateShapeMessage(key: string, target: WritableSurfaceTarget, allowedOps: UpdateOperation[]): string {
+  const operationPrompt = allowedOps.length === 1 ? `op=${allowedOps[0]}` : "op=<one>";
+  return `${updateKeySubject(key)} accepts op=${allowedOps.join("|")}; provide ${operationPrompt}${valuePrompt(target, allowedOps)}.`;
+}
+
+function updateKeySubject(key: string): string {
+  return key === "body" ? "key=body" : key;
+}
+
+function valuePrompt(target: WritableSurfaceTarget, allowedOps: UpdateOperation[]): string {
+  if (!allowedOps.some((operation) => targetOperationRequiresValue(target, operation))) return "";
+  switch (target.kind) {
+    case "frontmatter":
+      return ` and value=${frontmatterValuePlaceholder(target.frontmatterKey)}`;
+    case "text":
+      return " and value=<text> (read a file with value=@path)";
+    case "taskCollection":
+    case "referenceCollection":
+      return " and value_json=<json>";
+    case "taskItem":
+    case "referenceItem":
+      return target.field ? " and value=<text>" : "";
+  }
+}
+
+function frontmatterValuePlaceholder(key: string): string {
+  if (["status", "priority", "energy", "subnote_type", "kind", "maturity"].includes(key)) return "<code>";
+  if (key === "processed") return "<boolean>";
+  return "<text>";
+}
+
+function targetOperationRequiresValue(target: WritableSurfaceTarget, operation: UpdateOperation): boolean {
+  switch (target.kind) {
+    case "frontmatter":
+      return true;
+    case "text":
+      return operation === "set" || operation === "append" || operation === "prepend";
+    case "taskCollection":
+    case "referenceCollection":
+      return operation === "insert";
+    case "taskItem":
+    case "referenceItem":
+      return Boolean(target.field) && operation === "set";
+  }
 }
 
 function parseUpdateOperation(value: string | undefined): UpdateOperation {

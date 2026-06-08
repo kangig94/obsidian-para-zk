@@ -242,6 +242,31 @@ function writeKeyHints(spec: ReadSurfaceSpec): string[] {
   return keys;
 }
 
+export function writeKeyOperations(spec: ReadSurfaceSpec, key: string): string[] | undefined {
+  for (const hint of writeKeyHints(spec)) {
+    const split = hint.indexOf("=");
+    if (split === -1) continue;
+    const pattern = hint.slice(0, split);
+    if (writeKeyPatternMatches(pattern, key)) return hint.slice(split + 1).split("|");
+  }
+  return undefined;
+}
+
+function writeKeyPatternMatches(pattern: string, key: string): boolean {
+  const patternParts = keyParts(pattern);
+  const keyPath = keyParts(key);
+  if (patternParts.length !== keyPath.length) return false;
+  return patternParts.every((part, index) => writeKeyPartMatches(part, keyPath[index]));
+}
+
+function writeKeyPartMatches(pattern: string, value: string): boolean {
+  if (pattern.startsWith("<") && pattern.endsWith(">")) return value.length > 0;
+  if (pattern.startsWith("{") && pattern.endsWith("}")) {
+    return pattern.slice(1, -1).split("|").includes(value);
+  }
+  return pattern === value;
+}
+
 export function unknownReadKeyError(spec: ReadSurfaceSpec, key: string): Error {
   return new Error(`unknown read key: ${key} (valid: ${readKeyHints(spec).join(", ")})`);
 }

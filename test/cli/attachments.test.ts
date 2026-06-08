@@ -25,7 +25,6 @@ describe("attach-file", () => {
 
     expect(result).toMatchObject({
       ok: true,
-      command: "para-zk:attach-file",
       path: "assets/Capture Image.PNG",
       name: "Capture Image.PNG",
       kind: "image",
@@ -106,7 +105,6 @@ describe("attach-file", () => {
 
     expect(result).toMatchObject({
       ok: true,
-      command: "para-zk:attach-file",
       count: 2
     });
     const files = result.files as Array<Record<string, unknown>>;
@@ -125,7 +123,6 @@ describe("attach-file", () => {
 
     expect(result).toMatchObject({
       ok: true,
-      command: "para-zk:attach-file",
       count: 2
     });
     const files = result.files as Array<Record<string, unknown>>;

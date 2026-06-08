@@ -299,6 +299,88 @@ describe("update-project", () => {
     expect(String(rejected.error)).toContain("Use op instead of operation");
   });
 
+  it("explains valid body operations when op is missing", async () => {
+    await createBaseProject();
+    await cli.run("para-zk:create-subnote", {
+      title: "Plan",
+      parent_type: "project",
+      parent_title: "Alpha",
+      subnote_type: "plan",
+      open: "false"
+    });
+
+    const rejected = await cli.run("para-zk:update-project", {
+      title: "Alpha",
+      child: '["Plan"]',
+      key: "body"
+    });
+
+    expect(rejected.ok).toBe(false);
+    expect(String(rejected.error)).toContain("key=body accepts op=set|append|prepend|replace");
+    expect(String(rejected.error)).toContain("provide op=<one> and value=<text>");
+    expect(String(rejected.error)).toContain("value=@path");
+  });
+
+  it("explains the value requirement for body set updates", async () => {
+    await createBaseProject();
+    await cli.run("para-zk:create-subnote", {
+      title: "Plan",
+      parent_type: "project",
+      parent_title: "Alpha",
+      subnote_type: "plan",
+      open: "false"
+    });
+
+    const rejected = await cli.run("para-zk:update-project", {
+      title: "Alpha",
+      child: '["Plan"]',
+      key: "body",
+      op: "set"
+    });
+
+    expect(rejected.ok).toBe(false);
+    expect(String(rejected.error)).toContain("key=body accepts op=set|append|prepend|replace");
+    expect(String(rejected.error)).toContain("value=<text>");
+    expect(String(rejected.error)).toContain("value=@path");
+  });
+
+  it("rejects body as an update value alias", async () => {
+    await createBaseProject();
+    const rejected = await cli.run("para-zk:update-project", {
+      title: "Alpha",
+      key: "summary",
+      op: "set",
+      body: "Draft"
+    });
+
+    expect(rejected.ok).toBe(false);
+    expect(String(rejected.error)).toContain("Use value instead of body");
+  });
+
+  it("sets a child note body", async () => {
+    await createBaseProject();
+    await cli.run("para-zk:create-subnote", {
+      title: "Plan",
+      parent_type: "project",
+      parent_title: "Alpha",
+      subnote_type: "plan",
+      open: "false"
+    });
+
+    const update = await cli.run("para-zk:update-project", {
+      title: "Alpha",
+      child: '["Plan"]',
+      key: "body",
+      op: "set",
+      value: "Replacement body"
+    });
+
+    expect(update.ok).toBe(true);
+    expect(update.changed).toBe(true);
+    const read = await cli.run("para-zk:read-project", { title: "Alpha", child: '["Plan"]', key: "body" });
+    expect(String(read.value)).toBe("Replacement body");
+  });
+
   it("rejects updates to the read-only children map", async () => {
     await createBaseProject();
     const rejected = await cli.run("para-zk:update-project", {

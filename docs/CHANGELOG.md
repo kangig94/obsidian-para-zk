@@ -73,15 +73,16 @@ Notable changes for PARA-ZK are tracked here.
   full texts the user is studying) is personal-use storage, not redistribution. The MCP
   `describe` tool description carries a short form of the same. Prevents reflexive
   refusals to store content on public-distribution grounds.
-- Added file-backed `body`: create commands' `body` option accepts an
-  `@<absolute-path>` value, which the plugin reads from disk instead of taking
-  inline. This is the shell-safe way to pass long/multiline markdown (newlines,
-  quotes, `$`, backticks survive). Because the plugin performs the read, it works on
-  the native `obsidian` CLI and through optsidian alike — no new MCP tool required.
-  Scoped to `body` only; short fields like a journal `content` memo stay literal so
-  a leading `@` (mentions) is never misread as a path.
+- Added file-backed text args: create commands' `body` option and update
+  commands' `value` option accept an `@<absolute-path>` value, which the plugin
+  reads from disk instead of taking inline. This is the shell-safe way to pass
+  long/multiline markdown (newlines, quotes, `$`, backticks survive). Because the
+  plugin performs the read, it works on the native `obsidian` CLI and through
+  optsidian alike — no new MCP tool required. Scoped to declared `body`/`value`
+  options; short fields like a journal `content` memo stay literal so a leading
+  `@` (mentions) is never misread as a path.
 - Added per-command help: any native CLI command answers `help=true` (and a
-  forwarded `--help`/`-h`) by returning its own option schema — `{ ok, command,
+  forwarded `--help`/`-h`) by returning its own option schema — `{ ok,
   description, options }` under `format=json`, or a text listing — instead of
   running and failing on a missing required argument. Works uniformly across
   optsidian, native obsidian, and MCP since it rides the shared `key=value`
@@ -179,6 +180,13 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Changed
 
+- Removed the invoked `command` field from JSON execution-result envelopes and
+  per-command JSON help. Command names remain in the registered command catalog,
+  `describe` workflow metadata, and text help headers.
+- Update-command write-shape errors now resolve the target key first, then report
+  that key's allowed ops and required value argument. `update-* body=...` is
+  rejected as the legacy alias for `value=...`, while create commands still accept
+  `body=...`.
 - Unified the props/tasks/references/view custom UI renderers behind one shared
   `para-zk-block` shell (`src/ux/block-shell.ts`) and renamed their DOM/CSS structure to a
   single BEM-style `para-zk-block` / `--<kind>` / `__<part>` vocabulary — collapsing four

@@ -12,7 +12,7 @@ describe("describe", () => {
     const result = await cli.run("para-zk:describe", { type: "project" });
 
     expect(result.ok).toBe(true);
-    expect(result.command).toBe("para-zk:describe");
+    expect(result).not.toHaveProperty("command");
     expect(result).not.toHaveProperty("pluginId");
     expect(result).not.toHaveProperty("locale");
     expect(result).not.toHaveProperty("types");

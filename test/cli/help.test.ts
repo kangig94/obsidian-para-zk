@@ -12,7 +12,7 @@ describe("per-command help", () => {
     const help = await cli.run("para-zk:create-area", { help: "true" });
 
     expect(help.ok).toBe(true);
-    expect(help.command).toBe("para-zk:create-area");
+    expect(help).not.toHaveProperty("command");
     expect(String(help.description)).toContain("area");
 
     const options = help.options as Array<{ name: string; value: string | null; description: string }>;
@@ -27,7 +27,7 @@ describe("per-command help", () => {
     const help = await cli.run("para-zk:create-area", { "--help": true });
 
     expect(help.ok).toBe(true);
-    expect(help.command).toBe("para-zk:create-area");
+    expect(help).not.toHaveProperty("command");
     expect((help.options as unknown[]).length).toBeGreaterThan(0);
   });
 

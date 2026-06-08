@@ -30,6 +30,33 @@ describe("file-backed body/content (@file)", () => {
     expect(content).toContain("- bullet");
   });
 
+  it("reads update value from an @file for child body replacement", async () => {
+    const file = join(tempDir, "update-body.md");
+    const body = "# Plan\n\nLine with $VAR, `backticks`, \"quotes\" and 'apostrophes'.\n";
+    await writeFile(file, body);
+
+    await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
+    await cli.run("para-zk:create-subnote", {
+      title: "Plan",
+      parent_type: "project",
+      parent_title: "Alpha",
+      subnote_type: "plan",
+      open: "false"
+    });
+
+    const updated = await cli.run("para-zk:update-project", {
+      title: "Alpha",
+      child: '["Plan"]',
+      key: "body",
+      op: "set",
+      value: `@${file}`
+    });
+    expect(updated.changed).toBe(true);
+
+    const read = await cli.run("para-zk:read-project", { title: "Alpha", child: '["Plan"]', key: "body" });
+    expect(String(read.value)).toContain("Line with $VAR, `backticks`, \"quotes\" and 'apostrophes'.");
+  });
+
   it("passes a literal (non-@) body through unchanged", async () => {
     const created = await cli.run("para-zk:create-resource", { title: "Inline", body: "just text", open: "false" });
     expect(created.created).toBe(true);

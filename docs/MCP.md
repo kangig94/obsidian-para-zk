@@ -160,4 +160,6 @@ source of truth for each type's read/write keys and collections.
 
 The mutation tools receive JSON params and invoke `optsidian` or `obsidian` with `execFile(file, argsArray)`. Content is passed as single argv elements such as `value=<raw content>` or `with=<raw content>`, not interpolated into a shell command.
 
+CLI JSON results use the same compact envelope as the native commands: `ok` plus result fields such as `path`, or `ok: false` plus `error`. They do not echo the invoked command name.
+
 Only body/section edits are exposed through MCP mutation tools. Frontmatter updates, task insertion/deletion, and other mutation commands remain available through the CLI returned by `describe`.
