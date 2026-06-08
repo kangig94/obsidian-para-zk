@@ -54,6 +54,31 @@ describe("zk notes", () => {
     expect(url.value).toBe("https://example.com/ddim");
   });
 
+  it("normalizes permanent aliases updates to a one-item list", async () => {
+    const permanent = await cli.run("para-zk:create-zk", {
+      title: "Aliased Permanent",
+      kind: "permanent",
+      open: "false"
+    });
+    expect(permanent.created).toBe(true);
+
+    const update = await cli.run("para-zk:update-zk", {
+      title: "Aliased Permanent",
+      kind: "permanent",
+      key: "frontmatter/aliases",
+      op: "set",
+      value: "Foo"
+    });
+    expect(update.changed).toBe(true);
+
+    const read = await cli.run("para-zk:read-zk", {
+      title: "Aliased Permanent",
+      kind: "permanent",
+      key: "frontmatter/aliases"
+    });
+    expect(read.value).toEqual(["Foo"]);
+  });
+
   it("renames and deletes a permanent note", async () => {
     await cli.run("para-zk:create-zk", { title: "Old idea", kind: "permanent", maturity: "draft", open: "false" });
     const renamed = await cli.run("para-zk:rename-zk", { title: "Old idea", kind: "permanent", new_title: "New idea" });

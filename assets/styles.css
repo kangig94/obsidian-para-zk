@@ -192,11 +192,33 @@
 
 .para-zk-block__lead {
   display: flex;
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 2px;
   margin-right: auto;
   min-width: 0;
+}
+
+.para-zk-block__lead > .para-zk-block__input {
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
+  box-sizing: border-box;
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  min-height: 28px;
+  max-width: 360px;
+  width: 100%;
+}
+
+.para-zk-block__lead > .para-zk-block__input::placeholder {
+  color: var(--text-faint);
+  opacity: 1;
+}
+
+.para-zk-block__lead > .para-zk-block__input:focus {
+  background: var(--background-primary);
+  border-color: var(--background-modifier-border);
 }
 
 .para-zk-block__title {
@@ -216,10 +238,11 @@
 .para-zk-block__actions {
   align-items: center;
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   flex-wrap: wrap;
   gap: 6px;
   justify-content: flex-end;
+  margin-left: auto;
   min-width: 0;
 }
 
@@ -595,6 +618,7 @@
 
   .para-zk-block__actions {
     justify-content: flex-start;
+    margin-left: 0;
   }
 
   .para-zk-block__grid > .para-zk-block__row {

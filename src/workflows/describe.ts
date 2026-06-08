@@ -56,7 +56,7 @@ const SURFACE_TYPES = [
 type SurfaceType = typeof SURFACE_TYPES[number];
 
 export const PROJECT_READ_SPEC: ReadSurfaceSpec = {
-  frontmatter: ["areas", "status", "priority", "start_date", "due_date", "done_date"],
+  frontmatter: ["aliases", "areas", "status", "priority", "start_date", "due_date", "done_date"],
   sections: [
     { key: "summary", labelKey: "summary", skipManagedPrelude: true, transform: stripProjectSummaryManagedBlock },
     { key: "goals", labelKey: "goals" },
@@ -79,7 +79,7 @@ export const AREA_READ_SPEC: ReadSurfaceSpec = {
 };
 
 export const RESOURCE_READ_SPEC: ReadSurfaceSpec = {
-  frontmatter: ["url", "first_author", "license", "kind"],
+  frontmatter: ["aliases", "url", "first_author", "license", "kind"],
   sections: [
     { key: "references", labelKey: "references", transform: readReferences, collection: "reference" },
     BACKLINK_READ_SECTION

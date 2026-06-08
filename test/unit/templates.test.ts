@@ -21,7 +21,9 @@ describe("managed templates", () => {
 
     expect(project).not.toContain("dataviewjs");
     expect(project).not.toContain("sameLink");
+    expect(project).toContain("updated:\naliases:\nareas:");
     expect(project).toContain("# Summary\n```para-zk-latest-retro-summary\n```\n{{cursor}}");
+    expect(resource).toContain("updated:\naliases:\nurl:");
     expect(resource).toContain("```para-zk-props\ntype: resource\n```\n{{cursor}}\n\n```para-zk-managed");
     expect(resource).not.toContain("# Overview");
     expect(resource).not.toContain("# Body");

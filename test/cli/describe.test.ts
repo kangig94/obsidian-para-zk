@@ -25,7 +25,7 @@ describe("describe", () => {
     expect((project.addressing as { create: string }).create).toBe("para-zk:create-project");
     expect(project).not.toHaveProperty("body");
     expect(project).not.toHaveProperty("children");
-    expect(project.frontmatterKeys).toEqual(expect.arrayContaining(["status", "priority"]));
+    expect(project.frontmatterKeys).toEqual(expect.arrayContaining(["aliases", "status", "priority"]));
     expect(project.readKeys).toEqual([
       "frontmatter",
       "summary",
@@ -36,7 +36,7 @@ describe("describe", () => {
       "children"
     ]);
     expect(project.writeKeys).toEqual([
-      "frontmatter/{status|priority|start_date|due_date|done_date}=set",
+      "frontmatter/{aliases|status|priority|start_date|due_date|done_date}=set",
       "frontmatter/areas=set|append|prepend|delete",
       "summary=set|append|prepend|replace",
       "goals=set|append|prepend|replace",
@@ -95,10 +95,10 @@ describe("describe", () => {
   it("describes resource and ZK digest as free-form body surfaces", async () => {
     const resourceResult = await cli.run("para-zk:describe", { type: "resource" });
     const resource = (resourceResult.surfaces as Array<Record<string, unknown>>)[0];
-    expect(resource.frontmatterKeys).toEqual(["url", "first_author", "license", "kind"]);
+    expect(resource.frontmatterKeys).toEqual(["aliases", "url", "first_author", "license", "kind"]);
     expect(resource.readKeys).toEqual(["frontmatter", "references", "backlinks", "body"]);
     expect(resource.writeKeys).toEqual([
-      "frontmatter/{url|first_author|license|kind}=set",
+      "frontmatter/{aliases|url|first_author|license|kind}=set",
       "references=insert",
       "references/<i>=delete",
       "references/<i>/{link|description}=set",

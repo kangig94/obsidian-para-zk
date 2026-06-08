@@ -22,8 +22,8 @@ const runLocale = resolveRunLocale(args.locale);
 // labels are covered separately by guiLocaleExpectations; these mirror the
 // template section headings and managed-toolbar titles that differ by locale.
 const LOCALIZED = {
-  en: { summary: "Summary", goals: "Goals", retroSummary: "Retro summary (required)", references: "References", subnotes: "Subnotes", createRetro: "Create retro", updated: "Updated" },
-  ko: { summary: "요약", goals: "목표", retroSummary: "회고 요약 (필수)", references: "참고 자료", subnotes: "서브노트", createRetro: "새 회고 만들기", updated: "수정" }
+  en: { summary: "Summary", goals: "Goals", retroSummary: "Retro summary (required)", references: "References", subnotes: "Subnotes", createRetro: "Create retro", updated: "Updated", aliases: "Aliases" },
+  ko: { summary: "요약", goals: "목표", retroSummary: "회고 요약 (필수)", references: "참고 자료", subnotes: "서브노트", createRetro: "새 회고 만들기", updated: "수정", aliases: "별칭" }
 };
 const L = LOCALIZED[runLocale];
 const requiredDependencyIds = [
@@ -195,6 +195,7 @@ function runLiveScenario() {
   ]);
   assertCreated(taskProject, "task render project");
   assertGeneratedNoteTemplateShape(taskProject.path, "project");
+  assertPropsHeaderAliasInput(taskProject.path);
   cliJson("para-zk:update-project", [
     `title=Smoke Task Render ${stamp}`,
     "key=tasks",
@@ -774,6 +775,63 @@ function assertTaskBlockRendererRegression(path, taskName) {
       && snapshot.actions?.some((classes) => classes.includes("is-delete")),
     `task block renderer did not render edit/delete actions: ${JSON.stringify(snapshot.actions)}`
   );
+}
+
+function assertPropsHeaderAliasInput(path) {
+  const snapshot = guiJson(`(async () => {
+    const path = ${JSON.stringify(path)};
+    const label = ${JSON.stringify(L.aliases)};
+    const file = app.vault.getFileByPath(path);
+    if (!file) throw new Error("props header project not found: " + path);
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const leaf = app.workspace.getLeaf(false);
+    await leaf.setViewState({ type: "markdown", state: { file: path, mode: "preview" }, active: true });
+
+    let block = null;
+    let input = null;
+    let rows = [];
+    let fieldCounts = [];
+    let gridAliasInputs = 0;
+    for (let index = 0; index < 50; index += 1) {
+      block = leaf.view.containerEl.querySelector(".para-zk-block--props");
+      input = block?.querySelector(".para-zk-block__lead input.para-zk-block__input") ?? null;
+      const grid = block?.querySelector(".para-zk-block__grid") ?? null;
+      rows = grid ? Array.from(grid.children).filter((item) => item.classList.contains("para-zk-block__row")) : [];
+      fieldCounts = rows.map((row) => Array.from(row.children).filter((item) => item.classList.contains("para-zk-block__field")).length);
+      gridAliasInputs = grid ? Array.from(grid.querySelectorAll("input.para-zk-block__input"))
+        .filter((item) => item.getAttribute("aria-label") === label).length : 0;
+      if (block && input && rows.length === 3 && fieldCounts.every((count) => count === 2)) break;
+      await sleep(100);
+    }
+
+    console.log(JSON.stringify({
+      ok: true,
+      hasBlock: Boolean(block),
+      hasLead: Boolean(block?.querySelector(".para-zk-block__lead")),
+      hasAliasInput: Boolean(input),
+      inputDisabled: input?.disabled ?? null,
+      placeholder: input?.getAttribute("placeholder") ?? "",
+      ariaLabel: input?.getAttribute("aria-label") ?? "",
+      rowCount: rows.length,
+      fieldCounts,
+      gridFieldCount: fieldCounts.reduce((total, count) => total + count, 0),
+      gridAliasInputs
+    }));
+  })()`);
+
+  assert(snapshot.hasBlock === true, "props block did not render for project");
+  assert(snapshot.hasLead === true, "props block did not render a lead header");
+  assert(snapshot.hasAliasInput === true, "props block lead did not render aliases input");
+  assert(snapshot.inputDisabled === false, "props aliases input should be editable");
+  assert(snapshot.placeholder === L.aliases, `props aliases placeholder mismatch: ${snapshot.placeholder}`);
+  assert(snapshot.ariaLabel === L.aliases, `props aliases aria-label mismatch: ${snapshot.ariaLabel}`);
+  assert(snapshot.rowCount === 3, `props grid row count changed: ${JSON.stringify(snapshot)}`);
+  assert(
+    Array.isArray(snapshot.fieldCounts) && snapshot.fieldCounts.every((count) => count === 2),
+    `props grid should stay 2x3 with aliases header-only: ${JSON.stringify(snapshot)}`
+  );
+  assert(snapshot.gridFieldCount === 6, `props grid field count changed: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.gridAliasInputs === 0, "props aliases input should render in the header, not the grid");
 }
 
 function assertCreateRetroButtonProjectLink() {

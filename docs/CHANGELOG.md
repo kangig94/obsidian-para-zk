@@ -6,6 +6,16 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- Added an editable **alias** (call-name) to project, resource, and ZK permanent notes, rendered
+  in the props block's toolbar header (the shell `__lead` slot) so the attribute grid stays
+  balanced (project/resource remain 2×3; zk_permanent's existing alias moved out of the grid into
+  the header). Backed by Obsidian's native `aliases` frontmatter — a single value stored as a
+  one-item list — so `[[alias]]` links, the quick switcher, and search resolve the note by its
+  call-name without touching the filename or breaking links. Editable as a single text field in
+  the header, and read/writable from automation: `update-project`/`update-resource`/`update-zk`
+  accept `key=frontmatter/aliases` (a bare `value=` or a `value_json` list both normalize to the
+  same single-item list the GUI writes; more than one value is rejected), `read-*` reads it, and
+  `para-zk:describe` advertises it.
 - Inline reference citations in note bodies: an inline code span `` `PZ[n]` `` renders as a
   `[n]` link to the note's n-th registry reference (0-based, matching the CLI's `references/n`).
   A comma-separated list `` `PZ[1, 2]` `` (spaces optional, e.g. `PZ[1,2]`) renders as

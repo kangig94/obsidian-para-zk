@@ -280,6 +280,45 @@ describe("update-project", () => {
     expect(rejected.ok).toBe(false);
     expect(String(rejected.error)).toContain("read-only");
   });
+
+  it("updates aliases frontmatter", async () => {
+    await createBaseProject();
+    const update = await cli.run("para-zk:update-project", {
+      title: "Alpha",
+      key: "frontmatter/aliases",
+      op: "set",
+      value_json: JSON.stringify([" Alpha Alias ", ""])
+    });
+    expect(update.changed).toBe(true);
+
+    const read = await cli.run("para-zk:read-project", { title: "Alpha", key: "frontmatter/aliases" });
+    expect(read.value).toEqual(["Alpha Alias"]);
+  });
+
+  it("normalizes scalar aliases updates to a one-item list and clears blank values", async () => {
+    await createBaseProject();
+    const update = await cli.run("para-zk:update-project", {
+      title: "Alpha",
+      key: "frontmatter/aliases",
+      op: "set",
+      value: "Alpha Alias"
+    });
+    expect(update.changed).toBe(true);
+
+    const read = await cli.run("para-zk:read-project", { title: "Alpha", key: "frontmatter/aliases" });
+    expect(read.value).toEqual(["Alpha Alias"]);
+
+    const clear = await cli.run("para-zk:update-project", {
+      title: "Alpha",
+      key: "frontmatter/aliases",
+      op: "set",
+      value: ""
+    });
+    expect(clear.changed).toBe(true);
+
+    const cleared = await cli.run("para-zk:read-project", { title: "Alpha", key: "frontmatter/aliases" });
+    expect(cleared.value).toEqual([]);
+  });
 });
 
 describe("update-project areas (list frontmatter)", () => {

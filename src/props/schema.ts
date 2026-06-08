@@ -60,6 +60,7 @@ export type PropsField = {
 
 export type PropsSchema = {
   type: PropsViewType;
+  lead?: PropsField;
   rows: PropsField[][];
 };
 
@@ -78,12 +79,14 @@ export function inferPropsViewType(frontmatter: Record<string, unknown> | undefi
 
 export function propsSchemaForType(type: PropsViewType, locale: Locale): PropsSchema {
   const t = localePack(locale);
+  const aliases = field("aliases", "aliases", t.labels.aliases, "text-list");
   const created = field("created", "created", t.labels.created, "datetime");
   const updated = field("updated", "updated", t.labels.updated, "datetime");
 
   const schemas: Record<PropsViewType, PropsSchema> = {
     project: {
       type: "project",
+      lead: aliases,
       rows: [
         [
           field("areas", "areas", t.labels.area, "area-list"),
@@ -108,6 +111,7 @@ export function propsSchemaForType(type: PropsViewType, locale: Locale): PropsSc
     },
     resource: {
       type: "resource",
+      lead: aliases,
       rows: [
         [created, updated],
         [
@@ -169,12 +173,10 @@ export function propsSchemaForType(type: PropsViewType, locale: Locale): PropsSc
     },
     zk_permanent: {
       type: "zk_permanent",
+      lead: aliases,
       rows: [
         [created, updated],
-        [
-          selectField("maturity", "maturity", t.labels.status, maturityOptions(locale)),
-          field("aliases", "aliases", t.labels.aliases, "text-list")
-        ]
+        [selectField("maturity", "maturity", t.labels.status, maturityOptions(locale))]
       ]
     }
   };
@@ -183,7 +185,8 @@ export function propsSchemaForType(type: PropsViewType, locale: Locale): PropsSc
 }
 
 export function findPropsField(schema: PropsSchema, id: string): PropsField | undefined {
-  return schema.rows.flat().find((field) => field.id === id || field.key === id);
+  const fields = schema.lead ? [schema.lead, ...schema.rows.flat()] : schema.rows.flat();
+  return fields.find((field) => field.id === id || field.key === id);
 }
 
 function field(id: string, key: string, label: string, control: PropsFieldControl): PropsField {

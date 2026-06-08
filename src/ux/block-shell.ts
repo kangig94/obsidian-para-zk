@@ -4,6 +4,8 @@ type BlockShellOptions = {
   kind: string;
   title?: string;
   summary?: string;
+  /** Called after any title/summary text; callers pass either text OR renderLead, not both. */
+  renderLead?: (lead: HTMLElement) => void;
   renderActions?: (actions: HTMLElement) => void;
 };
 
@@ -34,7 +36,7 @@ export function renderBlockShell(el: HTMLElement, options: BlockShellOptions): B
 
   const titleText = options.title?.trim();
   const summaryText = options.summary?.trim();
-  const hasLead = Boolean(titleText || summaryText);
+  const hasLead = Boolean(titleText || summaryText || options.renderLead);
   const hasActions = Boolean(options.renderActions);
   let toolbar: HTMLElement | undefined;
   let summaryEl: HTMLElement | undefined;
@@ -47,6 +49,7 @@ export function renderBlockShell(el: HTMLElement, options: BlockShellOptions): B
       if (summaryText) {
         summaryEl = lead.createDiv({ cls: "para-zk-block__summary", text: summaryText });
       }
+      options.renderLead?.(lead);
     }
     if (hasActions) {
       const actions = toolbar.createDiv({ cls: "para-zk-block__actions" });

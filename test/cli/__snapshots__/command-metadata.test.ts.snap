@@ -743,7 +743,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{areas|status|priority|start_date|due_date|done_date}, summary, goals, tasks, tasks/<id>, tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, children.",
+        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{aliases|areas|status|priority|start_date|due_date|done_date}, summary, goals, tasks, tasks/<id>, tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, children.",
         "value": "<map-path>",
       },
       "limit": {
@@ -805,7 +805,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{url|first_author|license|kind}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body.",
+        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{aliases|url|first_author|license|kind}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body.",
         "value": "<map-path>",
       },
       "limit": {
@@ -1197,7 +1197,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Stable writable key. Valid: frontmatter/{status|priority|start_date|due_date|done_date}=set, frontmatter/areas=set|append|prepend|delete, summary=set|append|prepend|replace, goals=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set.",
+        "description": "Stable writable key. Valid: frontmatter/{aliases|status|priority|start_date|due_date|done_date}=set, frontmatter/areas=set|append|prepend|delete, summary=set|append|prepend|replace, goals=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set.",
         "value": "<map-path>",
       },
       "match": {
@@ -1247,7 +1247,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Stable writable key. Valid: frontmatter/{url|first_author|license|kind}=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace.",
+        "description": "Stable writable key. Valid: frontmatter/{aliases|url|first_author|license|kind}=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace.",
         "value": "<map-path>",
       },
       "match": {

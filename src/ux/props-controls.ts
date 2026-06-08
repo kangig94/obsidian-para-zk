@@ -135,8 +135,9 @@ function renderPropsCodeBlock(
     return;
   }
 
-  const body = renderPropsShell(plugin, el, ctx.sourcePath);
-  renderPropsGrid(plugin, propsSchemaForType(type, plugin.settings.locale), body, ctx.sourcePath);
+  const schema = propsSchemaForType(type, plugin.settings.locale);
+  const body = renderPropsShell(plugin, schema, el, ctx.sourcePath);
+  renderPropsGrid(plugin, schema, body, ctx.sourcePath);
 }
 
 function renderInlinePropsInputs(plugin: ParaZkPluginContext, el: HTMLElement, ctx: MarkdownPostProcessorContext): void {
@@ -189,10 +190,19 @@ function renderPropsGrid(
   }
 }
 
-function renderPropsShell(plugin: ParaZkPluginContext, container: HTMLElement, sourcePath?: string): HTMLElement {
+function renderPropsShell(
+  plugin: ParaZkPluginContext,
+  schema: PropsSchema,
+  container: HTMLElement,
+  sourcePath?: string
+): HTMLElement {
   const labels = localePack(plugin.settings.locale).labels;
+  const leadField = schema.lead;
   return renderBlockShell(container, {
     kind: "props",
+    renderLead: leadField
+      ? (lead) => renderPropsLeadField(plugin, schema, leadField, lead, sourcePath)
+      : undefined,
     renderActions: (actions) => {
       renderPropsModeButton(plugin, actions, {
         sourcePath,
@@ -210,6 +220,17 @@ function renderPropsShell(plugin: ParaZkPluginContext, container: HTMLElement, s
       });
     }
   }).body;
+}
+
+function renderPropsLeadField(
+  plugin: ParaZkPluginContext,
+  schema: PropsSchema,
+  field: PropsField,
+  container: HTMLElement,
+  sourcePath?: string
+): void {
+  container.addClass("para-zk-block__lead--props");
+  renderSingleField(plugin, schema, field, container, sourcePath);
 }
 
 function renderPropsModeButton(
@@ -280,7 +301,16 @@ function renderSingleField(
   const rerender = latestPropsRerender(container, () => {
     renderSingleField(plugin, schema, field, container, sourcePath);
   });
-  renderFieldControl(plugin, findPropsField(schema, field.id) ?? field, frontmatter, container, sourcePath, rerender);
+  const resolvedField = findPropsField(schema, field.id) ?? field;
+  renderFieldControl(plugin, resolvedField, frontmatter, container, sourcePath, rerender);
+  labelSingleFieldControl(container, resolvedField.label);
+}
+
+function labelSingleFieldControl(container: HTMLElement, label: string): void {
+  const input = container.querySelector<HTMLInputElement>("input.para-zk-block__input");
+  if (!input) return;
+  input.placeholder = label;
+  input.setAttribute("aria-label", label);
 }
 
 function renderFieldControl(

@@ -72,6 +72,45 @@ describe("resource provenance frontmatter", () => {
     expect(read.value).toBe("Ada Lovelace");
   });
 
+  it("updates aliases frontmatter", async () => {
+    await cli.run("para-zk:create-resource", { title: "Aliased", open: "false" });
+    const update = await cli.run("para-zk:update-resource", {
+      title: "Aliased",
+      key: "frontmatter/aliases",
+      op: "set",
+      value_json: JSON.stringify([" Resource Alias ", ""])
+    });
+    expect(update.changed).toBe(true);
+
+    const read = await cli.run("para-zk:read-resource", { title: "Aliased", key: "frontmatter/aliases" });
+    expect(read.value).toEqual(["Resource Alias"]);
+  });
+
+  it("normalizes scalar aliases updates to a one-item list and clears empty lists", async () => {
+    await cli.run("para-zk:create-resource", { title: "Aliased", open: "false" });
+    const update = await cli.run("para-zk:update-resource", {
+      title: "Aliased",
+      key: "frontmatter/aliases",
+      op: "set",
+      value: "Resource Alias"
+    });
+    expect(update.changed).toBe(true);
+
+    const read = await cli.run("para-zk:read-resource", { title: "Aliased", key: "frontmatter/aliases" });
+    expect(read.value).toEqual(["Resource Alias"]);
+
+    const clear = await cli.run("para-zk:update-resource", {
+      title: "Aliased",
+      key: "frontmatter/aliases",
+      op: "set",
+      value_json: JSON.stringify([])
+    });
+    expect(clear.changed).toBe(true);
+
+    const cleared = await cli.run("para-zk:read-resource", { title: "Aliased", key: "frontmatter/aliases" });
+    expect(cleared.value).toEqual([]);
+  });
+
   it("rejects an unknown resource frontmatter key", async () => {
     await cli.run("para-zk:create-resource", { title: "Doc3", open: "false" });
     const read = await cli.run("para-zk:read-resource", { title: "Doc3", key: "frontmatter/authors" });

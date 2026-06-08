@@ -470,7 +470,8 @@ Important fields:
 
 - `archived`: true when the selected note is under `PARA/Archives`.
 - `frontmatter`: editable project fields only, such as `status`, `priority`,
-  `areas`, `start_date`, `due_date`, and `done_date`.
+  `aliases`, `areas`, `start_date`, `due_date`, and `done_date`. `aliases`
+  is stored as a single-item list for one canonical value.
 - `tasks`: structured project task collection. Item keys are task ids.
   `checkbox` is the literal status character from `[ ]`, `[x]`, `[-]`, `[/]`,
   and other Tasks-compatible statuses.
@@ -808,10 +809,11 @@ Options:
 | `body` | markdown | Optional initial free-form body content. |
 | `open` | boolean | Default `false`. |
 
-The four provenance keys are also editable after creation via
-`para-zk:update-resource key=frontmatter/<url|first_author|license|kind>` (and
-surfaced by `para-zk:describe type=resource`); `kind` is validated against the code
-list above. For example:
+The four provenance keys and `aliases` are also editable after creation via
+`para-zk:update-resource key=frontmatter/<aliases|url|first_author|license|kind>`
+(and surfaced by `para-zk:describe type=resource`); `kind` is validated against
+the code list above. `aliases` is stored as a single-item list for one canonical
+value. For example:
 
 ```bash
 optsidian para-zk:update-resource title="Attention" key=frontmatter/kind op=set value=paper format=json
