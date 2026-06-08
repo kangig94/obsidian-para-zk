@@ -2,6 +2,9 @@ import type { Plugin } from "obsidian";
 import { normalizeLocale } from "../i18n";
 import {
   DEFAULT_SETTINGS,
+  EDITOR_LINE_WIDTH_MAX,
+  EDITOR_LINE_WIDTH_MIN,
+  EDITOR_LINE_WIDTH_STEP,
   type ManagedFileState,
   type ParaZkSettings
 } from "../types";
@@ -16,7 +19,7 @@ export async function saveSettings(plugin: Plugin, settings: ParaZkSettings): Pr
   await plugin.saveData(settings);
 }
 
-function mergeSettings(loaded: unknown): ParaZkSettings {
+export function mergeSettings(loaded: unknown): ParaZkSettings {
   const data = isRecord(loaded) ? loaded : {};
   const paths = readPaths(data.paths);
   return {
@@ -27,9 +30,25 @@ function mergeSettings(loaded: unknown): ParaZkSettings {
     showEmptyTrashAction: typeof data.showEmptyTrashAction === "boolean"
       ? data.showEmptyTrashAction
       : DEFAULT_SETTINGS.showEmptyTrashAction,
+    editorWidthSliderEnabled: typeof data.editorWidthSliderEnabled === "boolean"
+      ? data.editorWidthSliderEnabled
+      : DEFAULT_SETTINGS.editorWidthSliderEnabled,
+    editorLineWidth: readEditorLineWidth(data.editorLineWidth),
     setupAt: typeof data.setupAt === "string" ? data.setupAt : undefined,
     managedFiles: readManagedFiles(data.managedFiles)
   };
+}
+
+function readEditorLineWidth(value: unknown): number {
+  if (
+    typeof value !== "number"
+    || !Number.isFinite(value)
+    || value < EDITOR_LINE_WIDTH_MIN
+    || value > EDITOR_LINE_WIDTH_MAX
+  ) {
+    return DEFAULT_SETTINGS.editorLineWidth;
+  }
+  return Math.round(value / EDITOR_LINE_WIDTH_STEP) * EDITOR_LINE_WIDTH_STEP;
 }
 
 function readLayoutFolders(value: unknown, paths: ParaZkSettings["paths"]): string[] {

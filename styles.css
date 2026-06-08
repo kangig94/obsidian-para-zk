@@ -13,6 +13,27 @@
   cursor: pointer;
 }
 
+.para-zk-width-slider {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.para-zk-width-slider__input {
+  height: 16px;
+  margin: 0;
+  min-width: 90px;
+  width: 110px;
+}
+
+.para-zk-width-slider__label {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1;
+  min-width: 42px;
+  text-align: right;
+}
+
 .workspace-ribbon .para-zk-ribbon-action,
 .workspace-ribbon .para-zk-ribbon-action svg {
   color: var(--para-zk-ribbon-color, var(--icon-color));

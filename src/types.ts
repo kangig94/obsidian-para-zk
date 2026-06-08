@@ -35,6 +35,8 @@ export type ParaZkSettings = {
   layoutFolders: string[];
   locale: Locale;
   showEmptyTrashAction: boolean;
+  editorWidthSliderEnabled: boolean;
+  editorLineWidth: number;
   setupAt?: string;
   managedFiles: Record<string, ManagedFileState>;
 };
@@ -140,10 +142,16 @@ const DEFAULT_LAYOUT_FOLDERS = [
   "assets"
 ];
 
+export const EDITOR_LINE_WIDTH_MIN = 600;
+export const EDITOR_LINE_WIDTH_MAX = 1600;
+export const EDITOR_LINE_WIDTH_STEP = 20;
+
 export const DEFAULT_SETTINGS: ParaZkSettings = {
   paths: DEFAULT_PATHS,
   layoutFolders: DEFAULT_LAYOUT_FOLDERS,
   locale: "en",
   showEmptyTrashAction: true,
+  editorWidthSliderEnabled: true,
+  editorLineWidth: 700,
   managedFiles: {}
 };

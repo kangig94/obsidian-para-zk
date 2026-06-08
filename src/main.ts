@@ -7,6 +7,7 @@ import { registerCitationRenderers } from "./ux/citation-renderer";
 import { registerDashboardActionRenderers } from "./ux/dashboard-actions";
 import { registerDashboardSummaryRenderers } from "./ux/dashboard-summary";
 import { registerDataviewViewRenderers } from "./ux/dataview-views";
+import { registerEditorWidthControl } from "./ux/editor-width";
 import { registerExplorerActions } from "./ux/explorer-actions";
 import { registerLatestRetroSummaryRenderers } from "./ux/latest-retro-summary";
 import { refreshRegisteredLocaleLabels } from "./ux/locale-labels";
@@ -29,6 +30,7 @@ export default class ParaZkPlugin extends Plugin {
 
     registerStatusAndInitCommands(this);
     registerWorkflowCommands(this);
+    registerEditorWidthControl(this);
     registerRibbonActions(this);
     registerExplorerActions(this);
     registerDashboardActionRenderers(this);

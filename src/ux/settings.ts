@@ -3,6 +3,7 @@ import { localePack, normalizeLocale } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import type { SetupOptions, SetupResult } from "../types";
 import { normalizeVaultPath } from "../vault/paths";
+import { refreshEditorWidthControl } from "./editor-width";
 import { refreshExplorerActions } from "./explorer-actions";
 import { refreshRegisteredLocaleLabels } from "./locale-labels";
 
@@ -72,6 +73,19 @@ export class ParaZkSettingTab extends PluginSettingTab {
             this.plugin.settings.showEmptyTrashAction = value;
             await this.plugin.saveSettings();
             refreshExplorerActions(this.plugin);
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(labels.settingsEditorWidthSlider)
+      .setDesc(labels.settingsEditorWidthSliderDesc)
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.editorWidthSliderEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.editorWidthSliderEnabled = value;
+            await this.plugin.saveSettings();
+            refreshEditorWidthControl(this.plugin);
           });
       });
 
