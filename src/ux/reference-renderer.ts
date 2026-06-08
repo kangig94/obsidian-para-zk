@@ -14,6 +14,7 @@ import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { workflowContext } from "../vault/host";
 import {
+  canonicalWikiLink,
   createResource,
   deleteReferenceItem,
   insertReferenceItem,
@@ -84,6 +85,11 @@ type ReferenceAnchorSuggestion = {
   line: number;
   level?: number;
   searchText: string;
+};
+
+type ReferenceTargetSuggestion = {
+  file: TFile;
+  alias?: string;
 };
 
 const REFERENCE_GONE_MESSAGE = "reference no longer present — re-render";
@@ -491,7 +497,15 @@ function buildReferenceLinkInput(target: string, anchor: string): string {
   if (isExternalReference(trimmedTarget)) return trimmedTarget;
 
   const normalizedAnchor = normalizeReferenceAnchor(anchor);
-  return normalizedAnchor ? `[[${trimmedTarget}#${normalizedAnchor}]]` : `[[${trimmedTarget}]]`;
+  const wiki = parseWikiLink(trimmedTarget);
+  if (wiki) {
+    // Target may arrive pre-wrapped from file suggestions; unwrap before applying anchor changes.
+    const split = splitObsidianSubpath(wiki.target);
+    const nextTarget = normalizedAnchor ? `${split.base}#${normalizedAnchor}` : wiki.target;
+    return canonicalWikiLink(nextTarget, wiki.alias);
+  }
+
+  return canonicalWikiLink(normalizedAnchor ? `${trimmedTarget}#${normalizedAnchor}` : trimmedTarget);
 }
 
 function referenceEditValue(reference: ReferenceRead): ReferenceEditValue {
@@ -572,7 +586,7 @@ class ReferenceEditModal extends Modal {
         text.inputEl.addClass("para-zk-reference-edit-target");
         this.targetInputEl = text.inputEl;
         this.targetSuggest = new ReferenceTargetSuggest(this.plugin, text.inputEl, (file) => {
-          this.value.target = file.path;
+          this.value.target = text.inputEl.value || file.path;
           void this.refreshAnchorSuggestions();
         });
       });
@@ -736,14 +750,14 @@ class ReferenceEditModal extends Modal {
   }
 
   private resolveAnchorTargetFile(targetValue: string): TFile | undefined {
-    const target = targetValue.trim();
+    const target = parseWikiLink(targetValue.trim())?.target ?? targetValue.trim();
     if (!target || isExternalReference(target)) return undefined;
 
     const linked = this.plugin.app.metadataCache.getFirstLinkpathDest(target, this.sourcePath);
     if (linked instanceof TFile) return linked;
 
     if (!looksLikeVaultPath(target)) return undefined;
-    const file = this.plugin.app.vault.getAbstractFileByPath(target.replace(/\\/g, "/"));
+    const file = this.plugin.app.vault.getAbstractFileByPath(splitObsidianSubpath(target).base.replace(/\\/g, "/"));
     return file instanceof TFile ? file : undefined;
   }
 
@@ -800,7 +814,7 @@ class ReferenceEditModal extends Modal {
   }
 }
 
-class ReferenceTargetSuggest extends AbstractInputSuggest<TFile> {
+class ReferenceTargetSuggest extends AbstractInputSuggest<ReferenceTargetSuggestion> {
   constructor(
     private readonly plugin: ParaZkPluginContext,
     inputEl: HTMLInputElement,
@@ -810,26 +824,62 @@ class ReferenceTargetSuggest extends AbstractInputSuggest<TFile> {
     this.limit = 20;
   }
 
-  protected getSuggestions(query: string): TFile[] {
+  protected getSuggestions(query: string): ReferenceTargetSuggestion[] {
     const normalized = query.trim().toLocaleLowerCase();
     if (!normalized) return [];
     const files = this.plugin.app.vault.getFiles();
-    const matches = files.filter((file) => file.path.toLocaleLowerCase().includes(normalized)
-      || file.basename.toLocaleLowerCase().includes(normalized));
-    return matches.slice(0, 20);
+    const matches = new Map<string, ReferenceTargetSuggestion>();
+    for (const file of files) {
+      const alias = this.matchingAlias(file, normalized);
+      const pathMatches = file.path.toLocaleLowerCase().includes(normalized)
+        || file.basename.toLocaleLowerCase().includes(normalized);
+      if (!pathMatches && !alias) continue;
+
+      const suggestion: ReferenceTargetSuggestion = {
+        file,
+        ...(alias ? { alias } : {})
+      };
+      const existing = matches.get(file.path);
+      if (!existing || (!existing.alias && suggestion.alias)) {
+        matches.set(file.path, suggestion);
+      }
+    }
+    return Array.from(matches.values()).slice(0, 20);
   }
 
-  renderSuggestion(file: TFile, el: HTMLElement): void {
+  renderSuggestion(suggestion: ReferenceTargetSuggestion, el: HTMLElement): void {
     el.addClass("para-zk-reference-suggestion");
+    const { file, alias } = suggestion;
     el.createDiv({ cls: "para-zk-reference-suggestion-title", text: file.basename });
     el.createDiv({ cls: "para-zk-reference-suggestion-path", text: file.path });
+    if (alias) {
+      const labels = localePack(this.plugin.settings.locale).labels;
+      el.createDiv({
+        cls: "para-zk-reference-suggestion-detail",
+        text: `${labelValue(labels.aliases, "Aliases")}: ${alias}`
+      });
+    }
   }
 
-  selectSuggestion(file: TFile, _evt: MouseEvent | KeyboardEvent): void {
-    this.setValue(file.path);
+  selectSuggestion(suggestion: ReferenceTargetSuggestion, _evt: MouseEvent | KeyboardEvent): void {
+    const { file, alias } = suggestion;
+    this.setValue(alias ? canonicalWikiLink(file.path, alias) : file.path);
     this.onSelectFile(file);
     this.close();
   }
+
+  private matchingAlias(file: TFile, normalizedQuery: string): string | undefined {
+    return frontmatterAliases(this.plugin.app.metadataCache.getFileCache(file)?.frontmatter?.aliases)
+      .find((alias) => alias.toLocaleLowerCase().includes(normalizedQuery));
+  }
+}
+
+function frontmatterAliases(value: unknown): string[] {
+  const values = Array.isArray(value) ? value : [value];
+  return values
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
 }
 
 class ReferenceAnchorSuggest extends AbstractInputSuggest<ReferenceAnchorSuggestion> {

@@ -95,7 +95,11 @@ export function referenceTitle(reference: ReferenceRead): string {
   if (reference.kind === "url") return reference.target ?? reference.link;
   if (reference.kind === "text") return reference.link;
 
-  const target = reference.path ?? reference.target ?? parseWikiLink(reference.link)?.target ?? reference.link;
+  const wiki = parseWikiLink(reference.link);
+  const alias = wiki?.alias?.trim();
+  if (alias) return alias;
+
+  const target = reference.path ?? reference.target ?? wiki?.target ?? reference.link;
   const base = splitObsidianSubpath(target).base;
   return pathBasenameWithoutExtension(base) || target;
 }

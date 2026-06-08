@@ -595,7 +595,9 @@ Reference insert values accept `link`, optional `description`, and
 optional 0-based `position`. Insert returns `index`, `link`, `changed`, and
 `added`. If the canonical `link` already exists, insert is a no-op: requested
 `position` is ignored and the existing `index` and `link` are returned with
-`changed: false` and `added: false`.
+`changed: false` and `added: false`. Wikilinks may include Obsidian display
+text, for example `[[Note Path|PMG]]`; the target is resolved to the real vault
+file while `PMG` is preserved as the displayed link text.
 
 Update one stored reference field with `key=references/<i>/<field> op=set`.
 Writable fields are `link` and `description`. Setting `link` keeps the item
@@ -762,11 +764,17 @@ Options:
 | Option | Values | Notes |
 | --- | --- | --- |
 | `title` | string | Required. |
+| `alias` | string or one-item string list | Optional single short Obsidian alias. Stored as a one-item `aliases` frontmatter list (`aliases:\n  - X`). Rejects more than one value. Canonical create arg is `alias`. |
 | `areas` | JSON array or comma list | Store area links in frontmatter. |
 | `area_titles` | JSON array or comma list | Reuse or create areas by title, then store links in frontmatter. |
 | `status` | project status code | Defaults to `idea`. |
 | `priority` | priority code | Defaults to `low`. |
 | `open` | boolean | Default `false`. |
+
+Alias naming is intentionally split: project, resource, and ZK create commands
+take the singular `alias` input, while reading or updating an existing note uses
+`key=frontmatter/aliases` because Obsidian's stored frontmatter key is literally
+`aliases`.
 
 Example:
 
@@ -799,6 +807,7 @@ Options:
 | Option | Values | Notes |
 | --- | --- | --- |
 | `title` | string | Required. |
+| `alias` | string or one-item string list | Optional single short Obsidian alias. Stored as a one-item `aliases` frontmatter list (`aliases:\n  - X`). Rejects more than one value. Canonical create arg is `alias`. |
 | `source_type` | `project`, `area`, `resource`, `zk` | Optional source note type to link this resource from. |
 | `source_title` | string | Optional source note title. |
 | `link` | boolean | Defaults to `true` when `source_title` is provided. |
@@ -843,8 +852,8 @@ Options:
 
 The receiving note is addressed **by name** (like every other command). The
 `target` references another note by name too — use `[[Title]]`, which Obsidian
-resolves by basename, so you never need a full path (and a just-created note's
-returned `path`/title can be used directly).
+resolves by basename or alias, so you never need a full path (and a just-created
+note's returned `path`/title can be used directly).
 
 | Option | Values | Notes |
 | --- | --- | --- |
@@ -853,7 +862,7 @@ returned `path`/title can be used directly).
 | `kind` | `spark`, `digest`, `permanent` | Receiving ZK kind when `type=zk`. |
 | `date` | YYYY-MM-DD | Receiving note date when `type=journal`/`retro`. |
 | `child` | JSON list | Optional. Drill into a nested child of the receiving container. |
-| `target` | `[[wikilink]]`, URL, markdown link, or text | Required. `[[Title]]` is resolved by basename to a vault note. URLs are stored directly. Markdown-link and wikilink aliases are input syntax only and are dropped. |
+| `target` | `[[wikilink]]`, URL, markdown link, or text | Required. `[[Title]]` is resolved by basename or Obsidian alias to a vault note. `[[Title|PMG]]` stores the resolved target with `PMG` as display text. URLs are stored directly. Markdown-link text is input syntax only and is dropped. |
 | `description` | string | Optional per-reference description. |
 | `open` | boolean | Default `false`. |
 
@@ -884,13 +893,13 @@ Important fields:
 `link` already exists, the command returns that existing index with
 `added: false` and does not rewrite the stored description.
 
-Canonical stored links are label-free: vault note/file targets are stored as
-`[[path]]` or `[[path#subpath]]`, URLs are stored as raw URLs, unresolved
-wikilinks are stored as normalized `[[target]]`, and plain non-link text remains
-text. Input aliases such as `[[Note|alias]]` and markdown text such as
-`[text](url)` are dropped; the displayed title is always the target filename or
-URL, and `description` is set only when explicitly supplied. `kind`, `path`, and
-`target` are derived on read and never stored. The
+Canonical stored links are vault note/file wikilinks such as `[[path]]`,
+`[[path#subpath]]`, or `[[path|alias]]` when Obsidian display text is supplied;
+URLs are stored as raw URLs, unresolved wikilinks are stored as normalized
+`[[target]]` or `[[target|alias]]`, and plain non-link text remains text.
+Markdown text such as `[text](url)` is dropped; wikilink display text such as
+`[[Note|alias]]` is preserved. `description` is set only when explicitly
+supplied. `kind`, `path`, and `target` are derived on read and never stored. The
 accepted read kinds are `url`, `note`, `file`, `wiki`, and `text`; `markdown` is
 not a stored or derived kind.
 
@@ -969,6 +978,7 @@ Options:
 | Option | Values | Notes |
 | --- | --- | --- |
 | `title` | string | Required. |
+| `alias` | string or one-item string list | Optional single short Obsidian alias. Stored as a one-item `aliases` frontmatter list (`aliases:\n  - X`). Rejects more than one value. Canonical create arg is `alias`. |
 | `kind` | ZK kind code | Defaults to `spark`. |
 | `maturity` | maturity code | Used for permanent notes. Defaults to `draft`. |
 | `body` | markdown | Optional initial free-form body content. |

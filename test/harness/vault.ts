@@ -106,12 +106,8 @@ export class MockApp {
       if (content === undefined) return null;
       return { frontmatter: parsedFrontmatter(content) };
     },
-    getFirstLinkpathDest: (linkpath: string, _sourcePath: string): TFile | null => {
-      const direct = this.fileObjs.get(linkpath) ?? this.fileObjs.get(`${linkpath}.md`);
-      if (direct) return direct;
-      const target = baseName(linkpath).replace(/\.md$/i, "");
-      return [...this.fileObjs.values()].find((file) => file.basename === target) ?? null;
-    },
+    getFirstLinkpathDest: (linkpath: string, _sourcePath: string): TFile | null =>
+      this.resolveLinkpathDest(linkpath),
     resolvedLinks: {} as Record<string, Record<string, number>>
   };
 
@@ -237,6 +233,22 @@ export class MockApp {
     const dot = file.name.lastIndexOf(".");
     file.basename = dot === -1 ? file.name : file.name.slice(0, dot);
     file.extension = dot === -1 ? "" : file.name.slice(dot + 1);
+  }
+
+  private resolveLinkpathDest(linkpath: string): TFile | null {
+    const direct = this.fileObjs.get(linkpath) ?? this.fileObjs.get(`${linkpath}.md`);
+    if (direct) return direct;
+
+    const target = baseName(linkpath).replace(/\.md$/i, "");
+    return [...this.fileObjs.values()].find((file) =>
+      file.basename === target || this.fileAliases(file).includes(target)) ?? null;
+  }
+
+  private fileAliases(file: TFile): string[] {
+    const aliases = parsedFrontmatter(this.contents.get(file.path) ?? "")?.aliases;
+    const values = Array.isArray(aliases) ? aliases : [aliases];
+    return values.filter((alias): alias is string => typeof alias === "string" && alias.trim().length > 0)
+      .map((alias) => alias.trim());
   }
 
   private rewire(): void {

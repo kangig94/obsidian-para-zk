@@ -21,8 +21,10 @@ describe("describe", () => {
     expect(surfaces).toHaveLength(1);
     const project = surfaces[0];
     expect(project.type).toBe("project");
-    expect((project.addressing as { addressable: boolean; create: string }).addressable).toBe(true);
-    expect((project.addressing as { create: string }).create).toBe("para-zk:create-project");
+    const addressing = project.addressing as { addressable: boolean; create: string; createInputs: string[] };
+    expect(addressing.addressable).toBe(true);
+    expect(addressing.create).toBe("para-zk:create-project");
+    expect(addressing.createInputs).toEqual(expect.arrayContaining(["title", "alias"]));
     expect(project).not.toHaveProperty("body");
     expect(project).not.toHaveProperty("children");
     expect(project.frontmatterKeys).toEqual(expect.arrayContaining(["aliases", "status", "priority"]));
@@ -95,6 +97,8 @@ describe("describe", () => {
   it("describes resource and ZK digest as free-form body surfaces", async () => {
     const resourceResult = await cli.run("para-zk:describe", { type: "resource" });
     const resource = (resourceResult.surfaces as Array<Record<string, unknown>>)[0];
+    const resourceAddressing = resource.addressing as { createInputs: string[] };
+    expect(resourceAddressing.createInputs).toEqual(expect.arrayContaining(["title", "alias"]));
     expect(resource.frontmatterKeys).toEqual(["aliases", "url", "first_author", "license", "kind"]);
     expect(resource.readKeys).toEqual(["frontmatter", "references", "backlinks", "body"]);
     expect(resource.writeKeys).toEqual([
@@ -112,6 +116,8 @@ describe("describe", () => {
 
     const sourceResult = await cli.run("para-zk:describe", { type: "zk_digest" });
     const source = (sourceResult.surfaces as Array<Record<string, unknown>>)[0];
+    const sourceAddressing = source.addressing as { createInputs: string[] };
+    expect(sourceAddressing.createInputs).toEqual(expect.arrayContaining(["title", "alias", "kind"]));
     expect(source.frontmatterKeys).toEqual(["sourceTitle", "url", "first_author", "published"]);
     expect(source.readKeys).toEqual(["frontmatter", "references", "backlinks", "body"]);
     expect(source.writeKeys).toEqual([
@@ -131,6 +137,16 @@ describe("describe", () => {
       "insight",
       "evidence"
     ]));
+
+    const permanentResult = await cli.run("para-zk:describe", { type: "zk_permanent" });
+    const permanent = (permanentResult.surfaces as Array<Record<string, unknown>>)[0];
+    const permanentAddressing = permanent.addressing as { createInputs: string[] };
+    expect(permanentAddressing.createInputs).toEqual(expect.arrayContaining(["title", "alias", "kind"]));
+
+    const sparkResult = await cli.run("para-zk:describe", { type: "zk_spark" });
+    const spark = (sparkResult.surfaces as Array<Record<string, unknown>>)[0];
+    const sparkAddressing = spark.addressing as { createInputs: string[] };
+    expect(sparkAddressing.createInputs).toEqual(expect.arrayContaining(["title", "alias", "kind"]));
   });
 
   it("marks subnote as create-able but not directly addressable, and advertises area nesting", async () => {

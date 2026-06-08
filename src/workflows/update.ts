@@ -1,6 +1,6 @@
 import { TFile } from "obsidian";
 import { hasOwn, isRecord } from "../records";
-import { singleItemList } from "../text";
+import { normalizeAliasList } from "../text";
 import {
   editableBodyRange,
   findSectionContentTargetByHeading,
@@ -711,7 +711,7 @@ function requireReplacementText(options: UpdatePayloadOptions): string {
 
 function normalizeFrontmatterUpdateValue(type: string, key: string, value: unknown): unknown {
   if (key === "aliases") {
-    return normalizeAliasesUpdateValue(value);
+    return normalizeAliasList(value);
   }
   if (type === "project" && key === "status") {
     return readOptionalCode(String(value), parseProjectStatusCode, "status", PROJECT_STATUS_CODE_HELP);
@@ -739,19 +739,6 @@ function normalizeFrontmatterUpdateValue(type: string, key: string, value: unkno
     throw new Error("processed must be a boolean");
   }
   return value;
-}
-
-function normalizeAliasesUpdateValue(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    const aliases = value.map((item) => {
-      if (typeof item !== "string") throw new Error("aliases value items must be strings");
-      return item.trim();
-    }).filter(Boolean);
-    if (aliases.length > 1) throw new Error("aliases supports one value");
-    return aliases;
-  }
-  if (typeof value !== "string") throw new Error("aliases value must be a string or string array");
-  return singleItemList(value);
 }
 
 function projectStatusMovePlan(

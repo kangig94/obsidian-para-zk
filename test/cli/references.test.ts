@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createCliHarness, type CliHarness } from "../harness/cli";
+import { referenceTitle } from "../../src/ux/reference-link";
+import type { ReferenceRead } from "../../src/workflows";
 
 let cli: CliHarness;
 
@@ -64,6 +66,76 @@ describe("add-reference", () => {
     expect(items.find((i) => i.link === `[[${targetPath}#${heading}]]`)?.path).toBe(targetPath);
     expect(items.find((i) => i.link === `[[${targetPath}#^smoke-block]]`)?.path).toBe(targetPath);
     expect(value.count).toBe(2);
+  });
+
+  it("preserves wikilink alias display text and dedupes by resolved file", async () => {
+    await cli.run("para-zk:create-resource", { title: "Alias Demo P2", alias: "PMG", open: "false" });
+    const targetPath = "PARA/Resources/Alias Demo P2.md";
+
+    const ref = await cli.run("para-zk:add-reference", {
+      type: "project",
+      title: "Alpha",
+      target: `[[${targetPath}|PMG]]`,
+      open: "false"
+    });
+    expect(ref.added).toBe(true);
+    expect(ref.link).toBe(`[[${targetPath}|PMG]]`);
+
+    const duplicate = await cli.run("para-zk:add-reference", {
+      type: "project",
+      title: "Alpha",
+      target: "[[PMG]]",
+      open: "false"
+    });
+    expect(duplicate.added).toBe(false);
+    expect(duplicate.index).toBe(ref.index);
+    expect(duplicate.link).toBe(`[[${targetPath}|PMG]]`);
+
+    const read = await cli.run("para-zk:read-project", { title: "Alpha", key: "references", limit: "all" });
+    const value = read.value as { count: number; items?: Record<string, ReferenceRead> };
+    const items = Object.values(value.items ?? {});
+    expect(value.count).toBe(1);
+    expect(items[0]).toMatchObject({
+      link: `[[${targetPath}|PMG]]`,
+      kind: "note",
+      path: targetPath
+    });
+    expect(referenceTitle(items[0])).toBe("PMG");
+  });
+
+  it("dedupes a later aliased link against an earlier bare alias reference", async () => {
+    await cli.run("para-zk:create-resource", { title: "Alias Demo P2", alias: "PMG", open: "false" });
+    const targetPath = "PARA/Resources/Alias Demo P2.md";
+
+    const bareAlias = await cli.run("para-zk:add-reference", {
+      type: "project",
+      title: "Alpha",
+      target: "[[PMG]]",
+      open: "false"
+    });
+    expect(bareAlias.added).toBe(true);
+    // Adding the bare alias first resolves to the file and stores the canonical path without alias display.
+    expect(bareAlias.link).toBe(`[[${targetPath}]]`);
+
+    const duplicate = await cli.run("para-zk:add-reference", {
+      type: "project",
+      title: "Alpha",
+      target: `[[${targetPath}|PMG]]`,
+      open: "false"
+    });
+    expect(duplicate.added).toBe(false);
+    expect(duplicate.index).toBe(bareAlias.index);
+    expect(duplicate.link).toBe(`[[${targetPath}]]`);
+
+    const read = await cli.run("para-zk:read-project", { title: "Alpha", key: "references", limit: "all" });
+    const value = read.value as { count: number; items?: Record<string, ReferenceRead> };
+    const items = Object.values(value.items ?? {});
+    expect(value.count).toBe(1);
+    expect(items[0]).toMatchObject({
+      link: `[[${targetPath}]]`,
+      kind: "note",
+      path: targetPath
+    });
   });
 
   it("treats a duplicate URL as a no-op returning the existing index", async () => {

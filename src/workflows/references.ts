@@ -64,8 +64,9 @@ function referenceTargetWithSubpath(base: string, subpath: string): string {
   return `${base}${subpath}`;
 }
 
-function canonicalWikiLink(target: string): string {
-  return `[[${target}]]`;
+export function canonicalWikiLink(target: string, alias?: string): string {
+  const display = alias?.trim();
+  return display ? `[[${target}|${display}]]` : `[[${target}]]`;
 }
 
 export function isExternalReference(value: string): boolean {
@@ -112,6 +113,7 @@ type NormalizedReferenceItem = {
 type ParsedReferenceTarget = {
   syntax: "wiki" | "markdown" | "url" | "raw";
   target: string;
+  alias?: string;
 };
 
 export async function readReferenceItemsFresh(ctx: WorkflowContext, file: TFile): Promise<ReferenceRead[]> {
@@ -150,7 +152,7 @@ export async function insertReferenceItem(
     return {
       changed: false,
       index: duplicateIndex,
-      link: item.link,
+      link: items[duplicateIndex].link,
       added: false
     };
   }
@@ -444,12 +446,12 @@ function canonicalizeReferenceTarget(
     const resolved = resolveWikiReferenceFile(ctx, source, parsed.target);
     if (resolved) {
       return {
-        link: canonicalWikiLink(referenceTargetWithSubpath(resolved.file.path, resolved.subpath)),
+        link: canonicalWikiLink(referenceTargetWithSubpath(resolved.file.path, resolved.subpath), parsed.alias),
         targetPath: resolved.file.path
       };
     }
     return {
-      link: canonicalWikiLink(normalizedReferenceTargetWithSubpath(parsed.target))
+      link: canonicalWikiLink(normalizedReferenceTargetWithSubpath(parsed.target), parsed.alias)
     };
   }
 
@@ -482,7 +484,8 @@ function parseReferenceTargetInput(value: string): ParsedReferenceTarget {
   if (wiki) {
     return {
       syntax: "wiki",
-      target: wiki.target
+      target: wiki.target,
+      ...(wiki.alias !== undefined ? { alias: wiki.alias } : {})
     };
   }
 

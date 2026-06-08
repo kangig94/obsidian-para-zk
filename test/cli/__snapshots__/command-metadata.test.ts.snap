@@ -202,6 +202,10 @@ exports[`native CLI command metadata is stable 1`] = `
     "command": "para-zk:create-project",
     "description": "Create a PARA project note",
     "options": {
+      "alias": {
+        "description": "Optional single Obsidian alias to store in frontmatter.",
+        "value": "<text>",
+      },
       "area_titles": {
         "description": "Area titles to reuse or create and link.",
         "value": "<json|comma-list>",
@@ -236,6 +240,10 @@ exports[`native CLI command metadata is stable 1`] = `
     "command": "para-zk:create-resource",
     "description": "Create a PARA resource note and optionally link it from a source note",
     "options": {
+      "alias": {
+        "description": "Optional single Obsidian alias to store in frontmatter.",
+        "value": "<text>",
+      },
       "body": {
         "description": "Optional initial free-form body content.",
         "value": "<markdown>",
@@ -354,6 +362,10 @@ exports[`native CLI command metadata is stable 1`] = `
     "command": "para-zk:create-zk",
     "description": "Create a ZK note",
     "options": {
+      "alias": {
+        "description": "Optional single Obsidian alias to store in frontmatter.",
+        "value": "<text>",
+      },
       "body": {
         "description": "Optional initial free-form body content.",
         "value": "<markdown>",

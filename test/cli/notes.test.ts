@@ -79,6 +79,63 @@ describe("zk notes", () => {
     expect(read.value).toEqual(["Foo"]);
   });
 
+  it("sets a single permanent alias at create time and leaves omitted aliases empty", async () => {
+    const aliased = await cli.run("para-zk:create-zk", {
+      title: "Permanent Alias",
+      kind: "permanent",
+      alias: "PMG",
+      open: "false"
+    });
+    expect(aliased.created).toBe(true);
+
+    const read = await cli.run("para-zk:read-zk", {
+      title: "Permanent Alias",
+      kind: "permanent",
+      key: "frontmatter/aliases"
+    });
+    expect(read.value).toEqual(["PMG"]);
+    expect(cli.app.readPath("ZK/Permanent/Permanent Alias.md")).toContain("aliases:\n  - PMG");
+
+    await cli.run("para-zk:create-zk", {
+      title: "No Permanent Alias",
+      kind: "permanent",
+      open: "false"
+    });
+    const omitted = await cli.run("para-zk:read-zk", {
+      title: "No Permanent Alias",
+      kind: "permanent",
+      key: "frontmatter/aliases"
+    });
+    expect(omitted.value).toBeNull();
+
+    await cli.run("para-zk:create-zk", {
+      title: "Blank Permanent Alias",
+      kind: "permanent",
+      alias: "",
+      open: "false"
+    });
+    const blank = await cli.run("para-zk:read-zk", {
+      title: "Blank Permanent Alias",
+      kind: "permanent",
+      key: "frontmatter/aliases"
+    });
+    expect(blank.value).toBeNull();
+  });
+
+  it("stores a create-time alias for digest notes", async () => {
+    const digest = await cli.run("para-zk:create-zk", {
+      title: "Digest Alias",
+      kind: "digest",
+      alias: "DGA",
+      open: "false"
+    });
+    expect(digest.created).toBe(true);
+
+    const read = await cli.run("para-zk:read-zk", { title: "Digest Alias", kind: "digest" });
+    expect(read.ok).toBe(true);
+    expect(cli.app.readPath("ZK/Digest/Digest Alias.md")).toContain("aliases:\n  - DGA");
+  });
+
   it("renames and deletes a permanent note", async () => {
     await cli.run("para-zk:create-zk", { title: "Old idea", kind: "permanent", maturity: "draft", open: "false" });
     const renamed = await cli.run("para-zk:rename-zk", { title: "Old idea", kind: "permanent", new_title: "New idea" });

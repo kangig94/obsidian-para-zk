@@ -36,6 +36,7 @@ export { listNotes } from "./list";
 export { captureJournal, openJournal, distillSpark, createFromDigest, createFromResource } from "./promote";
 export {
   addReference,
+  canonicalWikiLink,
   deleteReferenceItem,
   insertReferenceItem,
   isExternalReference,

@@ -16,6 +16,9 @@ describe("canonical CLI argument aliases", () => {
     { label: "path (removed)", command: "para-zk:read-project", args: { title: "Alpha", path: "PARA/Projects/Alpha/Alpha.md" }, message: "path is not supported" },
     { label: "sourcePath (removed)", command: "para-zk:create-subnote", args: { title: "X", sourcePath: "PARA/Projects/Alpha/Alpha.md" }, message: "sourcePath is not supported" },
     { label: "areaTitles", command: "para-zk:create-project", args: { title: "Alias Project", areaTitles: JSON.stringify(["A"]) }, message: "Use area_titles instead of areaTitles" },
+    { label: "aliases", command: "para-zk:create-project", args: { title: "Alias Project", aliases: "PMG" }, message: "Use alias instead of aliases" },
+    { label: "alias_list", command: "para-zk:create-resource", args: { title: "Alias Resource", alias_list: "PMG" }, message: "Use alias instead of alias_list" },
+    { label: "aliasList", command: "para-zk:create-zk", args: { title: "Alias ZK", kind: "permanent", aliasList: "PMG" }, message: "Use alias instead of aliasList" },
     { label: "subnoteType", command: "para-zk:create-subnote", args: { title: "X", subnoteType: "meeting" }, message: "Use subnote_type instead of subnoteType" },
     { label: "type", command: "para-zk:create-zk", args: { title: "Alias ZK", type: "permanent" }, message: "Use kind instead of type" },
     { label: "memo", command: "para-zk:capture-journal", args: { memo: "Alias memo" }, message: "Use content instead of memo" },
@@ -27,6 +30,24 @@ describe("canonical CLI argument aliases", () => {
       const rejected = await cli.run(command, args);
       expect(rejected.ok).toBe(false);
       expect(String(rejected.error)).toContain(message);
+    });
+  }
+
+  const multipleAliasCases: Array<{ command: string; args: Record<string, unknown> }> = [
+    { command: "para-zk:create-project", args: { title: "Multiple Alias Project" } },
+    { command: "para-zk:create-resource", args: { title: "Multiple Alias Resource" } },
+    { command: "para-zk:create-zk", args: { title: "Multiple Alias ZK", kind: "permanent" } }
+  ];
+
+  for (const { command, args } of multipleAliasCases) {
+    it(`rejects multiple aliases for ${command}`, async () => {
+      const rejected = await cli.run(command, {
+        ...args,
+        alias: ["One", "Two"],
+        open: "false"
+      });
+      expect(rejected.ok).toBe(false);
+      expect(String(rejected.error)).toContain("aliases supports one value");
     });
   }
 });

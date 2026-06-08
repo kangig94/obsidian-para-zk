@@ -20,6 +20,19 @@ export function singleItemList(value: string): string[] {
   return trimmed ? [trimmed] : [];
 }
 
+export function normalizeAliasList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    const aliases = value.map((item) => {
+      if (typeof item !== "string") throw new Error("aliases value items must be strings");
+      return item.trim();
+    }).filter(Boolean);
+    if (aliases.length > 1) throw new Error("aliases supports one value");
+    return aliases;
+  }
+  if (typeof value !== "string") throw new Error("aliases value must be a string or string array");
+  return singleItemList(value);
+}
+
 // Coerce an unknown frontmatter value into a string list, then append the
 // (already-transformed) additions that are non-empty and not already present.
 export function appendUniqueStrings(current: unknown, additions: string[]): string[] {

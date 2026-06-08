@@ -26,7 +26,7 @@ import {
   type MaturityCode
 } from "../vocabulary";
 import { ZK_KIND_CODE_HELP, parseZkKind, zkKindCode } from "../zk/kinds";
-import { escapeRegExp, slugify, uniqueStrings } from "../text";
+import { escapeRegExp, singleItemList, slugify, uniqueStrings } from "../text";
 import { readOptionalCode } from "./code-options";
 import type {
   CreateAreaOptions,
@@ -100,6 +100,7 @@ export async function createProject(ctx: WorkflowContext, options: CreateProject
   const tags = localePack(ctx.settings.locale).tags;
   await ctx.host.processFrontMatter(file, (fm) => {
     fm.type = "project";
+    applyAlias(fm, options.alias);
     if (areaLinks.length > 0) fm.areas = areaLinks;
     fm.status = fm.status ?? status;
     fm.priority = fm.priority ?? priority;
@@ -221,6 +222,7 @@ export async function createResource(ctx: WorkflowContext, options: CreateResour
   const tags = localePack(ctx.settings.locale).tags;
   await ctx.host.processFrontMatter(file, (fm) => {
     fm.type = "resource";
+    applyAlias(fm, options.alias);
     fm.tags = [`${tags.resource}/${slugify(title)}`];
     applyCreatedUpdatedDefaults(fm, createdAt);
     // Provenance: write only what was provided. url/first_author/license are free text;
@@ -375,7 +377,7 @@ export async function createZk(ctx: WorkflowContext, options: CreateZkOptions): 
   const folder = folderForZkKind(ctx.settings, kind);
   await ensureFolder(ctx.host, folder);
   const path = await uniqueMarkdownPath(ctx.host, joinVaultPath(folder, `${title}.md`));
-  const file = await createZkFile(ctx, kind, path, title, { maturityCode });
+  const file = await createZkFile(ctx, kind, path, title, { maturityCode, alias: options.alias });
 
   await applyBody(ctx, file, options.body);
   await openIfRequested(ctx, file, options.open);
@@ -390,7 +392,7 @@ export async function createZkFile(
   kind: ZkKind,
   path: string,
   title: string,
-  options: { maturityCode?: MaturityCode } = {}
+  options: { maturityCode?: MaturityCode; alias?: string } = {}
 ): Promise<TFile> {
   const createdAt = localDateTimeSpace();
   let templateName: TemplateName = "zk_permanent";
@@ -410,6 +412,7 @@ export async function createZkFile(
   const tags = localePack(ctx.settings.locale).tags;
   await ctx.host.processFrontMatter(file, (fm) => {
     fm.type = `zk_${kind.toLowerCase()}`;
+    applyAlias(fm, options.alias);
     fm.tags = [`${tags.knowledge}/${slugify(title)}`];
     applyCreatedUpdatedDefaults(fm, createdAt);
     if (kind === "Spark" && fm.processed === undefined) fm.processed = false;
@@ -428,6 +431,12 @@ export async function createMarkdownFile(
   const template = await readTemplate(ctx, templateName);
   const content = applyTemplateVariables(template, variables);
   return ctx.host.create(path, content);
+}
+
+function applyAlias(frontmatter: Record<string, unknown>, alias: string | undefined): void {
+  if (alias === undefined) return;
+  const aliases = singleItemList(alias);
+  if (aliases.length > 0) frontmatter.aliases = aliases;
 }
 
 async function readTemplate(ctx: WorkflowContext, templateName: TemplateName): Promise<string> {

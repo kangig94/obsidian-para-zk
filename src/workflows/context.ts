@@ -14,6 +14,7 @@ export type TemplateVariables = Record<string, string | undefined>;
 
 export type CreateProjectOptions = {
   title: string;
+  alias?: string;
   areas?: string[];
   areaTitles?: string[];
   status?: string;
@@ -39,6 +40,7 @@ export type CreateAreaOptions = {
 
 export type CreateResourceOptions = {
   title: string;
+  alias?: string;
   sourcePath?: string;
   sourceType?: string;
   sourceTitle?: string;
@@ -86,6 +88,7 @@ export type CreateRetroOptions = {
 
 export type CreateZkOptions = {
   title: string;
+  alias?: string;
   kind?: string;
   maturity?: string;
   body?: string;

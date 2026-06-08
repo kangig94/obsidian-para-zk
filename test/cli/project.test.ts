@@ -58,6 +58,36 @@ describe("create-project", () => {
     expect(subnoteContent.endsWith("\n\n")).toBe(false);
   });
 
+  it("sets a single alias at create time and leaves omitted aliases empty", async () => {
+    const aliased = await cli.run("para-zk:create-project", {
+      title: "Project Alias",
+      alias: "PMG",
+      open: "false"
+    });
+    expect(aliased.created).toBe(true);
+
+    const read = await cli.run("para-zk:read-project", {
+      title: "Project Alias",
+      key: "frontmatter/aliases"
+    });
+    expect(read.value).toEqual(["PMG"]);
+    expect(cli.app.readPath("PARA/Projects/Project Alias/Project Alias.md")).toContain("aliases:\n  - PMG");
+
+    await cli.run("para-zk:create-project", { title: "No Project Alias", open: "false" });
+    const omitted = await cli.run("para-zk:read-project", {
+      title: "No Project Alias",
+      key: "frontmatter/aliases"
+    });
+    expect(omitted.value).toBeNull();
+
+    await cli.run("para-zk:create-project", { title: "Blank Project Alias", alias: "", open: "false" });
+    const blank = await cli.run("para-zk:read-project", {
+      title: "Blank Project Alias",
+      key: "frontmatter/aliases"
+    });
+    expect(blank.value).toBeNull();
+  });
+
   it("allocates a unique folder-style container for duplicate titles", async () => {
     await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
     const duplicate = await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });

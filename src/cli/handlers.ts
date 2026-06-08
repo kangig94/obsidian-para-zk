@@ -1,6 +1,7 @@
 import type { Plugin } from "obsidian";
 import { localePack, normalizeLocale } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
+import { normalizeAliasList } from "../text";
 import type { CliArgs, CliOptionSpec } from "../types";
 import {
   ENERGY_CODE_HELP,
@@ -177,6 +178,7 @@ type ParaNoteCommandConfig = {
 };
 
 const FORMAT_OPTION: CliOptionSpec = { value: "<text|json>", description: "Output format (default: text)." };
+const ALIAS_OPTION: CliOptionSpec = { value: "<text>", description: "Optional single Obsidian alias to store in frontmatter." };
 const CHILD_OPTION: CliOptionSpec = {
   value: `<["title", ...]>`,
   description: "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly."
@@ -707,6 +709,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     description: "Create a PARA project note",
     options: {
       title: { value: "<title>", description: "Project title." },
+      alias: ALIAS_OPTION,
       areas: { value: "<json|comma-list>", description: "Area links to store in frontmatter." },
       area_titles: { value: "<json|comma-list>", description: "Area titles to reuse or create and link." },
       status: { value: `<${PROJECT_STATUS_CODE_HELP}>`, description: "Locale-neutral project status code." },
@@ -717,6 +720,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     text: "project created",
     run: workflowRun("createProject", (args) => ({
       title: readCliTitle(args),
+      alias: readCliAlias(args),
       areas: parseList(readCliString(args, "areas")),
       areaTitles: parseList(readCliAreaTitles(args)),
       status: readCliString(args, "status"),
@@ -749,6 +753,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     description: "Create a PARA resource note and optionally link it from a source note",
     options: {
       title: { value: "<title>", description: "Resource title." },
+      alias: ALIAS_OPTION,
       source_type: { value: "<project|area|resource|zk>", description: "Optional source note type to link this resource from." },
       source_title: { value: "<title>", description: "Optional source note title to link this resource from." },
       link: { value: "<true|false>", description: "Whether to add the link to the source note." },
@@ -765,6 +770,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       const sourceTitle = readCliString(args, "source_title");
       return {
         title: readCliTitle(args),
+        alias: readCliAlias(args),
         sourceType: readCliString(args, "source_type"),
         sourceTitle,
         linkToSource: readCliBoolean(args, "link") ?? Boolean(sourceTitle),
@@ -852,6 +858,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     description: "Create a ZK note",
     options: {
       title: { value: "<title>", description: "ZK note title." },
+      alias: ALIAS_OPTION,
       kind: { value: `<${ZK_KIND_CODE_HELP}>`, description: "Locale-neutral ZK note kind." },
       maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
       body: { value: "<markdown>", description: "Optional initial free-form body content." },
@@ -861,6 +868,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     text: "ZK note created",
     run: workflowRun("createZk", (args) => ({
       title: readCliTitle(args),
+      alias: readCliAlias(args),
       kind: readCliKind(args),
       maturity: readCliString(args, "maturity"),
       body: readCliString(args, "body"),
@@ -1422,6 +1430,17 @@ function readCliReadZkKind(args: CliArgs): string | undefined {
 function readCliAreaTitles(args: CliArgs): string | undefined {
   rejectCliAliases(args, { areaTitles: "area_titles" });
   return readCliString(args, "area_titles");
+}
+
+function readCliAlias(args: CliArgs): string | undefined {
+  rejectCliAliases(args, {
+    aliases: "alias",
+    alias_list: "alias",
+    aliasList: "alias"
+  });
+  if (!Object.prototype.hasOwnProperty.call(args, "alias")) return undefined;
+  const list = normalizeAliasList(args.alias);
+  return list[0];
 }
 
 function readCliSubnoteType(args: CliArgs): string | undefined {

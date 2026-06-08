@@ -29,6 +29,36 @@ describe("resource provenance frontmatter", () => {
     expect(kind.value).toBe("paper");
   });
 
+  it("sets a single alias at create time and leaves omitted aliases empty", async () => {
+    const aliased = await cli.run("para-zk:create-resource", {
+      title: "Resource Alias",
+      alias: ["PMG"],
+      open: "false"
+    });
+    expect(aliased.created).toBe(true);
+
+    const read = await cli.run("para-zk:read-resource", {
+      title: "Resource Alias",
+      key: "frontmatter/aliases"
+    });
+    expect(read.value).toEqual(["PMG"]);
+    expect(cli.app.readPath("PARA/Resources/Resource Alias.md")).toContain("aliases:\n  - PMG");
+
+    await cli.run("para-zk:create-resource", { title: "No Resource Alias", open: "false" });
+    const omitted = await cli.run("para-zk:read-resource", {
+      title: "No Resource Alias",
+      key: "frontmatter/aliases"
+    });
+    expect(omitted.value).toBeNull();
+
+    await cli.run("para-zk:create-resource", { title: "Blank Resource Alias", alias: "", open: "false" });
+    const blank = await cli.run("para-zk:read-resource", {
+      title: "Blank Resource Alias",
+      key: "frontmatter/aliases"
+    });
+    expect(blank.value).toBeNull();
+  });
+
   it("rejects an unknown kind code at create time, naming the valid codes", async () => {
     const result = await cli.run("para-zk:create-resource", { title: "Bad kind", kind: "journal", open: "false" });
     expect(result.ok).toBe(false);
