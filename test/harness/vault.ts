@@ -240,15 +240,7 @@ export class MockApp {
     if (direct) return direct;
 
     const target = baseName(linkpath).replace(/\.md$/i, "");
-    return [...this.fileObjs.values()].find((file) =>
-      file.basename === target || this.fileAliases(file).includes(target)) ?? null;
-  }
-
-  private fileAliases(file: TFile): string[] {
-    const aliases = parsedFrontmatter(this.contents.get(file.path) ?? "")?.aliases;
-    const values = Array.isArray(aliases) ? aliases : [aliases];
-    return values.filter((alias): alias is string => typeof alias === "string" && alias.trim().length > 0)
-      .map((alias) => alias.trim());
+    return [...this.fileObjs.values()].find((file) => file.basename === target) ?? null;
   }
 
   private rewire(): void {

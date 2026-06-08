@@ -450,9 +450,9 @@ function canonicalizeReferenceTarget(
         targetPath: resolved.file.path
       };
     }
-    return {
-      link: canonicalWikiLink(normalizedReferenceTargetWithSubpath(parsed.target), parsed.alias)
-    };
+    throw new Error(
+      `reference target must resolve to an existing vault note: ${parsed.target} (an alias alone is ambiguous - pick the note from the suggester or use its path)`
+    );
   }
 
   if (parsed.syntax === "markdown") {

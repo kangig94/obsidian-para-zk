@@ -84,7 +84,7 @@ describe("add-reference", () => {
     const duplicate = await cli.run("para-zk:add-reference", {
       type: "project",
       title: "Alpha",
-      target: "[[PMG]]",
+      target: targetPath,
       open: "false"
     });
     expect(duplicate.added).toBe(false);
@@ -103,39 +103,22 @@ describe("add-reference", () => {
     expect(referenceTitle(items[0])).toBe("PMG");
   });
 
-  it("dedupes a later aliased link against an earlier bare alias reference", async () => {
+  it("rejects a bare wikilink alias that does not resolve by path or basename", async () => {
     await cli.run("para-zk:create-resource", { title: "Alias Demo P2", alias: "PMG", open: "false" });
-    const targetPath = "PARA/Resources/Alias Demo P2.md";
 
-    const bareAlias = await cli.run("para-zk:add-reference", {
+    const rejected = await cli.run("para-zk:add-reference", {
       type: "project",
       title: "Alpha",
       target: "[[PMG]]",
       open: "false"
     });
-    expect(bareAlias.added).toBe(true);
-    // Adding the bare alias first resolves to the file and stores the canonical path without alias display.
-    expect(bareAlias.link).toBe(`[[${targetPath}]]`);
-
-    const duplicate = await cli.run("para-zk:add-reference", {
-      type: "project",
-      title: "Alpha",
-      target: `[[${targetPath}|PMG]]`,
-      open: "false"
-    });
-    expect(duplicate.added).toBe(false);
-    expect(duplicate.index).toBe(bareAlias.index);
-    expect(duplicate.link).toBe(`[[${targetPath}]]`);
+    expect(rejected.ok).toBe(false);
+    expect(String(rejected.error)).toContain("reference target must resolve to an existing vault note: PMG");
+    expect(String(rejected.error)).toContain("alias alone is ambiguous");
 
     const read = await cli.run("para-zk:read-project", { title: "Alpha", key: "references", limit: "all" });
     const value = read.value as { count: number; items?: Record<string, ReferenceRead> };
-    const items = Object.values(value.items ?? {});
-    expect(value.count).toBe(1);
-    expect(items[0]).toMatchObject({
-      link: `[[${targetPath}]]`,
-      kind: "note",
-      path: targetPath
-    });
+    expect(value.count).toBe(0);
   });
 
   it("treats a duplicate URL as a no-op returning the existing index", async () => {
