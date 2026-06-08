@@ -72,7 +72,7 @@ Build the bundle with `npm run build` before registering it.
 
 ### `describe`
 
-Returns a compact index with the preferred CLI invocation, help command, usage notes, and an `install` string describing how to install PARA-ZK into a vault. The envelope also carries `vault` in both running states — orienting context for a cold caller: the store is one user's private, local, single-user Obsidian "second brain", never published or shared, so saving source material into it is personal-use storage, not redistribution (a caller should not refuse content on public-distribution grounds). When a running PARA-ZK vault is reachable (`running: true`), it also returns a `scope` note (what PARA-ZK owns — typed PARA/ZK operations — versus raw file edits, free-form frontmatter, and full-text search, which route to the host), the supported surface types, the named `workflows` (non-surface commands such as `add-reference`, `capture-journal`, `distill-spark`, `create-from-*`, `attach-file`, each with their inputs), and the `schema` drill-down command. Use `schema` (`para-zk:describe type=<t>`) to fetch a type's address selectors, `create` command + `createInputs`, and read/write keys (`writeKeys` carry each mutable key with its op; keys absent there, e.g. `created`/`updated`, are vault-managed) — enough to drive the vault by name without any separate help lookup.
+Returns a compact index with the preferred CLI invocation, help command, usage notes, and an `install` string describing how to install PARA-ZK into a vault. The envelope also carries `vault` in both running states — orienting context for a cold caller: the store is one user's private, local, single-user Obsidian "second brain", never published or shared, so saving source material into it is personal-use storage, not redistribution (a caller should not refuse content on public-distribution grounds). When a running PARA-ZK vault is reachable (`running: true`), it also returns a `scope` note (what PARA-ZK owns — typed PARA/ZK operations — versus raw file edits, free-form frontmatter, and full-text search, which route to the host), the supported surface types, the named `workflows` (non-surface commands such as `create-child`, `read-child`, `update-child`, `rename-child`, `delete-child`, `add-reference`, `capture-journal`, `distill-spark`, `create-from-*`, `attach-file`, each with their inputs), and the `schema` drill-down command. Use `schema` (`para-zk:describe type=<t>`) to fetch a type's address selectors, `create` command + `createInputs`, and read/write keys (`writeKeys` carry each mutable key with its op; keys absent there, e.g. `created`/`updated`, are vault-managed) — enough to drive the vault by name without any separate help lookup.
 
 When no running vault is reachable (`running: false`), it returns a `reason` and a `howto` for recovery — with `optsidian`, the `howto` points at `optsidian open-gui` to launch the last-opened vault, then retry.
 
@@ -148,7 +148,14 @@ Required: `type`, `key`, `content`, and a valid selector for the type. `position
 | `zk_digest` | `update-zk` | `title` | `kind=digest` |
 | `zk_permanent` | `update-zk` | `title` | `kind=permanent` |
 
-Child subnote/note bodies are edited through their container by passing `child: ["<Child Title>"]` (a JSON list, left to right) plus the child's own `key` (e.g. `body`).
+The MCP mutation tools keep a convenient `child: ["<Child Title>", ...]` parameter for LLM callers. When `child` is omitted, the server invokes the direct `update-*` command above. When `child` is present for `type=project` or `type=area`, the server routes internally to `para-zk:update-child`:
+
+```text
+type=area title="AI" child=["Generation","Vision"]
+→ para-zk:update-child root_type=area root_title="AI" relpath=["Generation"] title="Vision"
+```
+
+The `key` is the addressed child's own key (for example `body` for subnotes/fallback notes or `overview` for nested areas). Child updates on non-project/area roots are rejected because the public CLI child family requires `root_type=project|area`.
 
 Structured types (`project`, `area`, `journal`, `retro`) use template section
 keys. Free-form types (`resource`, `zk_spark`, `zk_digest`,

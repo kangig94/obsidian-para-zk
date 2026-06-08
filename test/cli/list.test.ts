@@ -23,7 +23,7 @@ describe("list", () => {
 
   it("includes nested areas in `list type=area` (nested areas store type=area)", async () => {
     await cli.run("para-zk:create-area", { title: "AI", open: "false" });
-    await cli.run("para-zk:create-area", { title: "Vision", parent_title: "AI", open: "false" });
+    await cli.run("para-zk:create-child", { type: "area", root_type: "area", root_title: "AI", title: "Vision", open: "false" });
 
     const res = await cli.run("para-zk:list", { type: "area" });
     const items = res.items as Array<{ title: string; type: string }>;

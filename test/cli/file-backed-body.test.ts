@@ -36,24 +36,26 @@ describe("file-backed body/content (@file)", () => {
     await writeFile(file, body);
 
     await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
-    await cli.run("para-zk:create-subnote", {
+    await cli.run("para-zk:create-child", {
+      type: "subnote",
       title: "Plan",
-      parent_type: "project",
-      parent_title: "Alpha",
+      root_type: "project",
+      root_title: "Alpha",
       subnote_type: "plan",
       open: "false"
     });
 
-    const updated = await cli.run("para-zk:update-project", {
-      title: "Alpha",
-      child: '["Plan"]',
+    const updated = await cli.run("para-zk:update-child", {
+      root_type: "project",
+      root_title: "Alpha",
+      title: "Plan",
       key: "body",
       op: "set",
       value: `@${file}`
     });
     expect(updated.changed).toBe(true);
 
-    const read = await cli.run("para-zk:read-project", { title: "Alpha", child: '["Plan"]', key: "body" });
+    const read = await cli.run("para-zk:read-child", { root_type: "project", root_title: "Alpha", title: "Plan", key: "body" });
     expect(String(read.value)).toContain("Line with $VAR, `backticks`, \"quotes\" and 'apostrophes'.");
   });
 

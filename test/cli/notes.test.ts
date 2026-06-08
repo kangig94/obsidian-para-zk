@@ -273,9 +273,11 @@ describe("retro", () => {
 describe("subarea and child bodies", () => {
   it("creates a subarea under an area and reads it as a child", async () => {
     const area = await cli.run("para-zk:create-area", { title: "Ops", open: "false" });
-    const subarea = await cli.run("para-zk:create-area", {
+    const subarea = await cli.run("para-zk:create-child", {
+      type: "area",
       title: "Hiring",
-      parent_title: "Ops",
+      root_type: "area",
+      root_title: "Ops",
       inherit_parent_tag: "true",
       open: "false"
     });
@@ -311,25 +313,28 @@ describe("subarea and child bodies", () => {
 
   it("creates and addresses a nested subarea and a subnote at depth via child drill", async () => {
     await cli.run("para-zk:create-area", { title: "Ops", open: "false" });
-    const hiring = await cli.run("para-zk:create-area", { title: "Hiring", parent_title: "Ops", open: "false" });
+    const hiring = await cli.run("para-zk:create-child", { type: "area", root_type: "area", root_title: "Ops", title: "Hiring", open: "false" });
     expect(hiring.path).toBe("PARA/Areas/Ops/Hiring/Hiring.md");
 
     // A nested area created under a nested area: parent is reached by root + child drill.
-    const interviews = await cli.run("para-zk:create-area", {
+    const interviews = await cli.run("para-zk:create-child", {
+      type: "area",
       title: "Interviews",
-      parent_title: "Ops",
-      child: '["Hiring"]',
+      root_type: "area",
+      root_title: "Ops",
+      relpath: '["Hiring"]',
       open: "false"
     });
     expect(interviews.ok).toBe(true);
     expect(interviews.path).toBe("PARA/Areas/Ops/Hiring/Interviews/Interviews.md");
 
     // A subnote two levels deep, then read its body back through the same drill chain.
-    const plan = await cli.run("para-zk:create-subnote", {
+    const plan = await cli.run("para-zk:create-child", {
+      type: "subnote",
       title: "Plan",
-      parent_type: "area",
-      parent_title: "Ops",
-      child: '["Hiring", "Interviews"]',
+      root_type: "area",
+      root_title: "Ops",
+      relpath: '["Hiring", "Interviews"]',
       subnote_type: "plan",
       body: "Hire two engineers.",
       open: "false"
@@ -337,9 +342,11 @@ describe("subarea and child bodies", () => {
     expect(plan.ok).toBe(true);
     expect(plan.path).toBe("PARA/Areas/Ops/Hiring/Interviews/Plan.md");
 
-    const read = await cli.run("para-zk:read-area", {
-      title: "Ops",
-      child: '["Hiring", "Interviews", "Plan"]',
+    const read = await cli.run("para-zk:read-child", {
+      root_type: "area",
+      root_title: "Ops",
+      relpath: '["Hiring", "Interviews"]',
+      title: "Plan",
       key: "body"
     });
     expect(String(read.value)).toContain("Hire two engineers.");
@@ -347,11 +354,11 @@ describe("subarea and child bodies", () => {
 
   it("nests areas to arbitrary depth with uniform type, drill addressing, and child views", async () => {
     await cli.run("para-zk:create-area", { title: "AI", open: "false" });
-    const gen = await cli.run("para-zk:create-area", { title: "Generation", parent_title: "AI", open: "false" });
+    const gen = await cli.run("para-zk:create-child", { type: "area", root_type: "area", root_title: "AI", title: "Generation", open: "false" });
     expect(gen.path).toBe("PARA/Areas/AI/Generation/Generation.md");
-    const vision = await cli.run("para-zk:create-area", { title: "Vision", parent_title: "AI", child: '["Generation"]', open: "false" });
+    const vision = await cli.run("para-zk:create-child", { type: "area", root_type: "area", root_title: "AI", relpath: '["Generation"]', title: "Vision", open: "false" });
     expect(vision.path).toBe("PARA/Areas/AI/Generation/Vision/Vision.md");
-    const llm = await cli.run("para-zk:create-area", { title: "LLM", parent_title: "AI", child: '["Generation"]', open: "false" });
+    const llm = await cli.run("para-zk:create-child", { type: "area", root_type: "area", root_title: "AI", relpath: '["Generation"]', title: "LLM", open: "false" });
     expect(llm.path).toBe("PARA/Areas/AI/Generation/LLM/LLM.md");
 
     // Every level stores type=area, so type=area filters and the area managed UI apply uniformly.
@@ -362,13 +369,13 @@ describe("subarea and child bodies", () => {
     }
 
     // Reached only by drilling from the root; a bare-title lookup of a nested area fails.
-    const deep = await cli.run("para-zk:read-area", { title: "AI", child: '["Generation", "Vision"]', key: "frontmatter/parent" });
+    const deep = await cli.run("para-zk:read-child", { root_type: "area", root_title: "AI", relpath: '["Generation"]', title: "Vision", key: "frontmatter/parent" });
     expect(deep.ok).toBe(true);
     expect(String(deep.value)).toContain("Generation");
     expect((await cli.run("para-zk:read-area", { title: "Vision" })).ok).toBe(false);
 
     // The parent's child-area view lists its area children at that level.
-    const view = await cli.run("para-zk:read-area", { title: "AI", child: '["Generation"]', key: "children" });
+    const view = await cli.run("para-zk:read-child", { root_type: "area", root_title: "AI", title: "Generation", key: "children" });
     const kids = view.value as Record<string, { path: string; type: string }>;
     expect(kids.Vision.path).toBe(vision.path);
     expect(kids.LLM.path).toBe(llm.path);
@@ -381,9 +388,11 @@ describe("subarea and child bodies", () => {
 
   it("inherit_parent_tag=false stores only the child namespace, not the parent's tag", async () => {
     await cli.run("para-zk:create-area", { title: "Ops", open: "false" });
-    const solo = await cli.run("para-zk:create-area", {
+    const solo = await cli.run("para-zk:create-child", {
+      type: "area",
       title: "Solo",
-      parent_title: "Ops",
+      root_type: "area",
+      root_title: "Ops",
       inherit_parent_tag: "false",
       open: "false"
     });
@@ -394,7 +403,7 @@ describe("subarea and child bodies", () => {
 
   it("deletes a nested area along with its parent's folder-style container", async () => {
     await cli.run("para-zk:create-area", { title: "Ops", open: "false" });
-    const nested = await cli.run("para-zk:create-area", { title: "Hiring", parent_title: "Ops", open: "false" });
+    const nested = await cli.run("para-zk:create-child", { type: "area", root_type: "area", root_title: "Ops", title: "Hiring", open: "false" });
     expect(cli.app.readPath(String(nested.path))).toBeDefined();
 
     const deleted = await cli.run("para-zk:delete-area", { title: "Ops", force: "true" });
@@ -408,9 +417,11 @@ describe("subarea and child bodies", () => {
     const duplicate = await cli.run("para-zk:create-area", { title: "Alpha", open: "false" });
     expect(duplicate.path).toBe("PARA/Areas/Alpha 1/Alpha 1.md");
 
-    const subarea = await cli.run("para-zk:create-area", {
+    const subarea = await cli.run("para-zk:create-child", {
+      type: "area",
       title: "Nested",
-      parent_title: "Alpha 1",
+      root_type: "area",
+      root_title: "Alpha 1",
       open: "false"
     });
     expect(subarea.path).toBe("PARA/Areas/Alpha 1/Nested/Nested.md");
@@ -426,23 +437,25 @@ describe("subarea and child bodies", () => {
 
   it("appends to and reads a subnote body", async () => {
     await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
-    await cli.run("para-zk:create-subnote", {
+    await cli.run("para-zk:create-child", {
+      type: "subnote",
       title: "Notes",
-      parent_type: "project",
-      parent_title: "Alpha",
+      root_type: "project",
+      root_title: "Alpha",
       subnote_type: "free",
       open: "false"
     });
-    const append = await cli.run("para-zk:update-project", {
-      title: "Alpha",
-      child: '["Notes"]',
+    const append = await cli.run("para-zk:update-child", {
+      root_type: "project",
+      root_title: "Alpha",
+      title: "Notes",
       key: "body",
       op: "append",
       value: "Body addition"
     });
     expect(append.changed).toBe(true);
 
-    const read = await cli.run("para-zk:read-project", { title: "Alpha", child: '["Notes"]', key: "body" });
+    const read = await cli.run("para-zk:read-child", { root_type: "project", root_title: "Alpha", title: "Notes", key: "body" });
     expect(String(read.value)).toContain("Body addition");
   });
 
@@ -459,15 +472,16 @@ describe("subarea and child bodies", () => {
 
     // Subnote body via the inline arg is reachable through the parent's children key.
     await cli.run("para-zk:create-project", { title: "Beta", open: "false" });
-    await cli.run("para-zk:create-subnote", {
+    await cli.run("para-zk:create-child", {
+      type: "subnote",
       title: "Plan",
-      parent_type: "project",
-      parent_title: "Beta",
+      root_type: "project",
+      root_title: "Beta",
       subnote_type: "plan",
       body: "Step 1.",
       open: "false"
     });
-    const subBody = await cli.run("para-zk:read-project", { title: "Beta", child: '["Plan"]', key: "body" });
+    const subBody = await cli.run("para-zk:read-child", { root_type: "project", root_title: "Beta", title: "Plan", key: "body" });
     expect(String(subBody.value)).toContain("Step 1.");
   });
 });

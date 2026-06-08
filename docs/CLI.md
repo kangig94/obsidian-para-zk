@@ -20,14 +20,19 @@ Use `format=json` for automation. Text output is for humans and may omit fields
 that JSON includes.
 
 Notes are addressed **by name, never by file path** — the CLI never exposes a
-`path` option. Address a note by its `title` (project/area/resource), `date`
-(journal/retro), or `title`+`kind` (zk). An existing child note (subnote or nested area)
-is reached through its container plus a `child=["<title>", ...]` drill (left to
-right). New children name their parent with `parent_type`+`parent_title`; ZK
-notes derived from an origin name it with `source_title` (and `source_type` where
-the origin type is ambiguous, e.g. scoped retro / resource link). Each concept
-uses exactly one option name: `title`, `kind`, `area_titles`, `subnote_type`,
-`content`, `child`, `parent_type`, `parent_title`, `source_type`, `source_title`.
+`path` option. Directly-addressable notes use their own selectors: `title`
+(project/root area/resource), `date` (journal/retro), or `title`+`kind` (zk).
+Child notes (subnotes, fallback notes, and nested areas) use the dedicated
+`*-child` commands with `root_type` (`project` or `area`), `root_title`,
+optional `relpath` (ancestor chain from the root to the immediate parent), and
+`title` (the child itself). The full drill path is `[...relpath, title]`.
+ZK notes derived from an origin name it with `source_title` (and `source_type`
+where the origin type is ambiguous, e.g. scoped retro / resource link). Each
+concept uses exactly one option name: `title`, `kind`, `area_titles`,
+`subnote_type`, `content`, `root_type`, `root_title`, `relpath`, `source_type`,
+`source_title`. `child` remains only where the receiving note is normally
+top-level but may optionally be a child, such as `add-reference` and the MCP
+mutation tools.
 
 ### Discovering a command's arguments
 
@@ -54,7 +59,7 @@ taken inline:
 ```bash
 optsidian para-zk:create-resource title="Attention Is All You Need" body=@/tmp/note.md
 obsidian      para-zk:create-resource title="Attention Is All You Need" body=@/tmp/note.md
-optsidian para-zk:update-project title="Model Evaluation" child='["Planning Meeting"]' key=body op=set value=@/tmp/body.md
+optsidian para-zk:update-child root_type=project root_title="Model Evaluation" title="Planning Meeting" key=body op=set value=@/tmp/body.md
 ```
 
 This is the shell-safe way to pass long or multiline markdown (newlines, quotes,
@@ -178,19 +183,21 @@ Important fields:
   `grep`/`search`), not PARA-ZK.
 - `surfaceTypes` — addressable/createable note types.
 - `workflows` — named (non-surface) commands with their inputs:
+  `create-child`, `read-child`, `update-child`, `rename-child`, `delete-child`,
   `capture-journal`, `distill-spark`, `create-from-digest`, `create-from-resource`,
   `add-reference`, `attach-file`. This is how you discover those commands and args
   without a separate help lookup.
 - `collectionFilters`
 - `surfaces` when `type` is provided. Each surface carries an `addressing` facet:
-  - `addressable` — whether the type is reached directly (`true`) or only through a
-    container + `child=` (`false`, e.g. `subnote`, or a nested area — which keeps `type: area` but is reached only via its parent + `child=`).
+  - `addressable` — whether the type is reached directly (`true`) or only through
+    the `*-child` commands (`false`, e.g. `subnote` or fallback `note`). Nested
+    areas keep `type: area`; root areas are direct, nested areas use
+    `root_type=area root_title=<root> relpath=<ancestors> title=<child>`.
   - `selectors` — how to address an existing note of this type.
   - `create` — the command that creates it, and `createInputs` — that command's
     arguments (so a caller learns the full create call from `describe` alone).
-  - `addressVia` — for non-addressable types (`subnote`/`note`), how to reach
-    existing ones: through the parent project/area with `child=["title"]`. There is no
-    `update-subnote`; read/update/delete it via `read-`/`update-`/`delete-project|area`.
+  - `addressVia` — for non-addressable types (`subnote`/`note`) and nested
+    areas, how to reach existing ones with the `*-child` commands.
 
 `describe type=<t>` is the self-contained contract for one type: address selectors,
 create command + inputs, collections, and read/write keys. `readKeys` are the readable
@@ -300,37 +307,68 @@ Important fields:
 
 ### `para-zk:create-area`
 
-Creates a folder-style area note.
+Creates a root folder-style area note.
 
 Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
 | `title` | string | Required. |
-| `parent_title` | string | Optional. Parent area title; nest this area under it (its `parent` link, not a distinct type). |
-| `child` | JSON list | Optional. With `parent_title`, drill into a nested area to nest under it. |
-| `inherit_parent_tag` | boolean | When nested, include the parent area tag too. Default `true`. |
 | `open` | boolean | Default `false`. |
 
 Example:
 
 ```bash
 optsidian para-zk:create-area title="Software" open=false format=json
-optsidian para-zk:create-area title="Robot" parent_title="AI" format=json
 ```
 
 Side effects:
 
-- Creates `PARA/Areas/<title>/<title>.md` (root), or inside the parent area's folder when `parent_title` is given.
-- Sets `type: area` (nested areas store `type: area` too; the `parent` link is the only distinction).
-- Sets a localized area tag (nested: the parent's namespace plus the child level).
+- Creates `PARA/Areas/<title>/<title>.md`.
+- Sets `type: area`.
+- Sets a localized root area tag.
 
-To nest an area under another area, pass `parent_title` (and `child=` to nest deeper);
-the area is placed in the parent's folder with an inherited tag and a `parent` link. A
-nested area is an ordinary `area` (same stored type) that simply has a parent — there is
-no separate "subarea" type, so `type=area` filters catch it and it renders the area UI. A
-root area has no parent; bare-title area lookups resolve root areas only, so reach a nested
-area via its parent + `child=["title"]`.
+Root areas have no parent; bare-title area lookups resolve root areas only. Create
+or address nested areas with the `*-child` commands.
+
+### `para-zk:create-child`
+
+Creates a child under a project or root area. `relpath` is the ancestor chain
+from the root to the immediate parent; omit it to create directly under the root.
+`title` is the new child.
+
+Options:
+
+| Option | Values | Notes |
+| --- | --- | --- |
+| `type` | `subnote` or `area` | Required. `type=area` requires `root_type=area`; `type=subnote` allows project or area roots. |
+| `root_type` | `project` or `area` | Required directly-addressable root ancestor type. |
+| `root_title` | string | Required directly-addressable root ancestor title. |
+| `relpath` | JSON list | Optional ancestor chain from root to immediate parent. Empty or omitted means directly under the root. |
+| `title` | string | Required child title. Full drill path is `[...relpath, title]`. |
+| `subnote_type` | subnote type code | `type=subnote` only. Defaults to `free`. |
+| `body` | markdown | `type=subnote` only. Optional initial free-form body content. Accepts `@<absolute-path>`. |
+| `inherit_parent_tag` | boolean | `type=area` only. Include the parent area tag too. Default `true`. |
+| `open` | boolean | Default `false`. |
+
+Examples:
+
+```bash
+optsidian para-zk:create-child \
+  type=subnote root_type=project root_title="Model Evaluation" \
+  title="Planning Meeting" subnote_type=meeting format=json
+
+optsidian para-zk:create-child \
+  type=area root_type=area root_title="AI" \
+  relpath='["Generation"]' title="Vision" format=json
+```
+
+Side effects:
+
+- `type=subnote` creates the note in the parent folder, converts a single-note
+  parent into folder-style layout if needed, and sets `parent` to the parent note link.
+- `type=area` creates a nested folder-style area inside the addressed parent
+  area. Nested areas store `type: area` too; the `parent` link is the distinction.
 
 ### `para-zk:read-project`
 
@@ -371,7 +409,8 @@ optsidian para-zk:read-project title="Model Evaluation" key=tasks checkbox=/ que
 optsidian para-zk:read-project title="Model Evaluation" key=references ref_kind=url format=json
 optsidian para-zk:read-project title="Model Evaluation" key=backlinks type=project limit=20 format=json
 optsidian para-zk:read-project title="Model Evaluation" key=children format=json
-optsidian para-zk:read-project title="Model Evaluation" child='["Planning Meeting"]' key=body format=json
+optsidian para-zk:read-child root_type=project root_title="Model Evaluation" title="Planning Meeting" key=body format=json
+optsidian para-zk:read-child root_type=area root_title="AI" relpath='["Generation"]' title="Vision" key=overview format=json
 ```
 
 Full read responses include `mode: "compact"`. Frontmatter values are inlined
@@ -387,8 +426,8 @@ Use a `key` read when you need to distinguish an explicitly empty section from
 an omitted one. Key reads include `mode: "exact"`.
 
 `children` is a **read-only index** keyed by child note title. To read or edit a
-child, address the container and drill with `child=["<title>", ...]` (left to
-right; the index basenames are exactly the `child=` values). Child entries
+child, use `para-zk:read-child`/`update-child`/`rename-child`/`delete-child` with
+the root ancestor plus `relpath` and `title`. Child entries
 include only the selector and type information needed for that follow-up:
 
 ```json
@@ -404,8 +443,8 @@ include only the selector and type information needed for that follow-up:
 ```
 
 Subnote and fallback NOTE children also expose read-only backlinks through
-`child=["<title>"] key=backlinks` for paged collection reads and
-`child=["<title>"] key=backlinks/<i>` for a single item.
+`para-zk:read-child ... key=backlinks` for paged collection reads and
+`para-zk:read-child ... key=backlinks/<i>` for a single item.
 
 Task, reference, and backlink surfaces are structured collections rather than raw Markdown.
 Full compact reads return only `count`; collection items are omitted by design.
@@ -481,8 +520,8 @@ Important fields:
 - `backlinks`: read-only inbound resolved-link collection. Items expose the
   source note `link`, `path`, `title`, and `type`; use `type=` to filter by
   source note type.
-- `children`: read-only child-note index; read or edit a child by drilling from
-  the container with `child=["<title>", ...]`.
+- `children`: read-only child-note index; read or edit a child with the `*-child`
+  commands using `root_type/root_title/relpath/title`.
 - `value`: present when `key` is provided.
 
 The same map-path read algorithm is used by the other domain read commands. The
@@ -525,6 +564,7 @@ Examples:
 
 ```bash
 optsidian para-zk:read-area title="AI" key=children format=json
+optsidian para-zk:read-child root_type=area root_title="AI" title="Generation" key=children format=json
 optsidian para-zk:read-area title="AI" key=backlinks type=project format=json
 optsidian para-zk:read-project title="Finished Project" archived=true key=summary format=json
 optsidian para-zk:read-resource title="Source Paper" key=body format=json
@@ -546,7 +586,7 @@ Options:
 | --- | --- | --- |
 | `title` | string | Project title. |
 | `archived` | boolean | Same title lookup behavior as `read-project`. |
-| `key` | writable map path | Required. Examples: `frontmatter/status`, `summary`, `body`. Drill into a child with `child=["<title>"]` and use the child's own key. |
+| `key` | writable map path | Required. Examples: `frontmatter/status`, `summary`, `body`. Use `para-zk:update-child` for a child; the key is the child's own key. |
 | `op` | `set`, `insert`, `append`, `prepend`, `replace`, `delete` | Required update operation. |
 | `value` | text | Required for scalar `set`, `append`, and `prepend`. |
 | `value_json` | JSON | Structured value for frontmatter updates and task/reference inserts. |
@@ -626,7 +666,8 @@ optsidian para-zk:update-project title="Model Evaluation" key=references/0/descr
 optsidian para-zk:update-project title="Model Evaluation" key=references/0 op=delete format=json
 optsidian para-zk:update-project title="Model Evaluation" key=tasks/a8f3k2m9/checkbox op=set value=x format=json
 optsidian para-zk:update-project title="Model Evaluation" key=tasks/a8f3k2m9 op=delete format=json
-optsidian para-zk:update-project title="Model Evaluation" child='["Planning Meeting"]' key=body op=append value="Decision: ship the baseline." format=json
+optsidian para-zk:update-child root_type=project root_title="Model Evaluation" title="Planning Meeting" key=body op=append value="Decision: ship the baseline." format=json
+optsidian para-zk:update-child root_type=area root_title="AI" relpath='["Generation"]' title="Vision" key=overview op=set value=@/tmp/vision.md format=json
 optsidian para-zk:update-project title="Model Evaluation" key=frontmatter/status op=set value=archived format=json
 ```
 
@@ -637,8 +678,7 @@ non-archived status restores it to `PARA/Projects`.
 
 Result fields:
 
-- `path`: the actual file that was updated. With `child=[...]`, this is the
-  resolved child note path.
+- `path`: the actual file that was updated.
 - `key`: the original requested key.
 - `operation`: the applied operation.
 - `changed`: false when the requested `set` value already matched.
@@ -652,11 +692,21 @@ The same update algorithm is used by the other domain update commands:
 
 | Command | Selector | Notes |
 | --- | --- | --- |
-| `para-zk:update-area` | `title` | Supports area surface keys; drill into children with `child=[...]`. |
+| `para-zk:update-area` | `title` | Supports root area surface keys. |
 | `para-zk:update-resource` | `title` | Uses free-form `body`, `references`, and frontmatter keys. |
 | `para-zk:update-zk` | `title` plus optional `kind` | Uses free-form `body`, `references`, and type-specific frontmatter keys. |
 | `para-zk:update-journal` | `date` | Supports journal surface keys such as `quick_memo` and `tasks`. |
 | `para-zk:update-retro` | `title` plus optional `date` | Supports retro surface keys such as `tasks`. |
+
+Use `para-zk:update-child` for child notes:
+
+| Option | Values | Notes |
+| --- | --- | --- |
+| `root_type` | `project` or `area` | Required directly-addressable root ancestor type. |
+| `root_title` | string | Required root ancestor title. |
+| `relpath` | JSON list | Optional ancestor chain to the immediate parent. |
+| `title` | string | Required child title. |
+| `key`/`op`/`value`/`value_json`/`match`/`with`/`all` | same as update commands | The `key` is the addressed child's key. |
 
 ### Rename Commands
 
@@ -672,22 +722,26 @@ retros are left in place.
 | `para-zk:rename-area` | `title`; optional `archived` | Renames the folder-style area folder and main note. Child areas move with the folder; default area-scoped retros and area tag namespaces are updated without dropping inherited parent tags. |
 | `para-zk:rename-resource` | `title`; optional `archived` | Renames the resource note file in place. |
 | `para-zk:rename-zk` | `title` plus optional `kind` | Renames the selected ZK note file in place. |
+| `para-zk:rename-child` | `root_type` + `root_title` + optional `relpath` + `title` | Renames a subnote, fallback note, or nested area. `new_title` renames the addressed child. |
 
 Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
 | `title` | string | Current note title. |
-| `child` | JSON list | `rename-project`/`rename-area` only. Drill into a nested child (subnote or nested area) to rename it instead of the container, e.g. `["Hiring","Interviews"]`. |
 | `new_title` | string | Required new note title. Aliases such as `newTitle` are rejected. |
 | `archived` | boolean | PARA rename commands only; same title lookup behavior as reads. |
 | `kind` | ZK kind code | `rename-zk` only; narrows title lookup. |
+
+`rename-child` uses `root_type`, `root_title`, optional `relpath`, `title`, and
+`new_title` instead of the parent command selectors.
 
 Examples:
 
 ```bash
 optsidian para-zk:rename-project title="Model Evaluation" new_title="Model Evaluation 2026" format=json
 optsidian para-zk:rename-area title="AI" new_title="Applied AI" format=json
+optsidian para-zk:rename-child root_type=area root_title="AI" relpath='["Generation"]' title="Vision" new_title="Computer Vision" format=json
 optsidian para-zk:rename-resource title="Source Paper" new_title="Source Paper Notes" format=json
 optsidian para-zk:rename-zk title="Stable Interface Contracts" kind=permanent new_title="Stable CLI Contracts" format=json
 ```
@@ -723,23 +777,27 @@ needed. PARA-ZK only cleans relationships it owns directly:
 | `para-zk:delete-zk` | `title` plus optional `kind` | Deletes the selected ZK note and removes matching frontmatter reference items. |
 | `para-zk:delete-journal` | `date` | Deletes a daily journal note. |
 | `para-zk:delete-retro` | `title` plus optional `date` | Deletes a retro note. |
+| `para-zk:delete-child` | `root_type` + `root_title` + optional `relpath` + `title` | Deletes a subnote, fallback note, or nested area. |
 
 Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
 | `title` | string | Current note title. |
-| `child` | JSON list | `delete-project`/`delete-area` only. Drill into a nested child (subnote or nested area) to delete it instead of the container. |
 | `archived` | boolean | PARA delete commands only; same title lookup behavior as reads. |
 | `kind` | ZK kind code | `delete-zk` only; narrows title lookup. |
 | `date` | `YYYY-MM-DD` | `delete-journal` and `delete-retro` only. |
 | `force` | boolean | Required when a folder-style project or area contains child files. |
+
+`delete-child` uses `root_type`, `root_title`, optional `relpath`, `title`, and
+optional `force` instead of the parent command selectors.
 
 Examples:
 
 ```bash
 optsidian para-zk:delete-resource title="Source Paper" format=json
 optsidian para-zk:delete-area title="Unused Area" format=json
+optsidian para-zk:delete-child root_type=project root_title="Model Evaluation" title="Planning Meeting" format=json
 optsidian para-zk:delete-project title="Prototype" force=true format=json
 optsidian para-zk:delete-zk title="Draft idea" kind=spark format=json
 optsidian para-zk:delete-journal date=2026-05-30 format=json
@@ -908,38 +966,6 @@ when they should behave as links. A frontmatter entry such as
 `references: ["folder/note.md"]` is read as `kind: "text"` and does not produce
 a backlink. Path-to-wikilink canonicalization runs only through write paths such
 as `add-reference` and `update ... key=references op=insert`.
-
-### `para-zk:create-subnote`
-
-Creates a child document under a project or area note.
-
-Options:
-
-| Option | Values | Notes |
-| --- | --- | --- |
-| `title` | string | Required. |
-| `parent_type` | `project`, `area` | Parent note type. |
-| `parent_title` | string | Parent note title. |
-| `child` | JSON list | Optional. Drill from the named parent into a nested child container to create under it, e.g. `["Hiring","Interviews"]`. |
-| `subnote_type` | subnote type code | Defaults to `free`. |
-| `body` | markdown | Optional initial free-form body content. |
-| `open` | boolean | Default `false`. |
-
-Example:
-
-```bash
-optsidian para-zk:create-subnote \
-  title="Planning Meeting" \
-  parent_type=project parent_title="Model Evaluation" \
-  subnote_type=meeting \
-  format=json
-```
-
-Side effects:
-
-- Creates the note in the parent folder.
-- Converts a single-note parent into folder-style layout if needed.
-- Sets `parent` to the parent note link.
 
 ### `para-zk:create-retro`
 

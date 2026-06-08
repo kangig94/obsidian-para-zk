@@ -62,6 +62,11 @@ template sections as stable keys such as `summary` or `quick_memo`; section read
 include lower-level subheadings inside that section, such as a Decision-1
 subsection, and section writes use a split guard so an inserted heading cannot
 accidentally create a sibling section.
+Directly-addressable notes use their own selectors (`title`, `date`, `kind`).
+Child notes — subnotes, fallback notes, and nested areas — use the dedicated
+`create/read/update/rename/delete-child` CLI family with `root_type`,
+`root_title`, optional `relpath` (ancestor chain to the immediate parent), and
+`title` (the child). Parent CRUD commands do not accept `child=`.
 Free-form types (`resource`, child `subnote`, fallback `note`, and `zk_*`) expose
 prose as one `body` key for the whole editable Markdown body before the managed
 tail. Literal `set`, `append`, `prepend`, and `replace` edits target that body;

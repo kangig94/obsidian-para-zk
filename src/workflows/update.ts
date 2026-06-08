@@ -236,7 +236,7 @@ async function resolveWritableSurfaceTarget(
 
   if (parts[0] === "children") {
     if (!spec.children) throw unknownUpdateKeyError(spec, originalKey);
-    throw new Error(`children is a read-only index; use child=["<title>"] to address a child`);
+    throw new Error("children is a read-only index; use para-zk:update-child root_type/root_title/relpath/title to address a child");
   }
 
   if (parts[0] === "frontmatter") {

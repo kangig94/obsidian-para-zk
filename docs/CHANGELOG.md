@@ -4,6 +4,21 @@ Notable changes for PARA-ZK are tracked here.
 
 ## 0.0.1 - In development
 
+### Breaking
+
+- Restructured child-note CLI addressing into a dedicated `*-child` family.
+  Parent CRUD commands (`read/update/delete/rename-project|area|resource`) now
+  address only directly-addressable notes and reject `child=` with a migration
+  hint. Child notes (subnotes, fallback notes, and nested areas) use
+  `root_type` (`project|area`) + `root_title` + optional `relpath` (ancestor
+  chain to the immediate parent) + `title`; for example:
+  `para-zk:update-child root_type=area root_title="AI" relpath='["Generation"]' title="Vision" key=overview op=set ...`.
+  `para-zk:create-subnote` was removed; use
+  `para-zk:create-child type=subnote ...`. `para-zk:create-area` now creates
+  root areas only; nested areas use `para-zk:create-child type=area
+  root_type=area ...`. The MCP mutation tools keep their `child` parameter for
+  LLM ergonomics and route child updates internally to `update-child`.
+
 ### Added
 
 - Added a status-bar **editor-width slider** that widens the readable note width globally (sets
@@ -213,11 +228,12 @@ Notable changes for PARA-ZK are tracked here.
   area template and managed UI, is caught by `type=area` filters/search, and behaves
   identically to a top-level area — fixing that a nested area previously rendered an empty
   managed block and was excluded from area queries. Create one with
-  `para-zk:create-area parent_title=<parent>` (`child=` to nest deeper); the `create-subarea`
-  CLI command is removed and the GUI "create subarea" affordance now calls create-area with
-  the active area as its parent. Name-based addressing is preserved — a bare-title area lookup
-  resolves only root areas (gated on an empty `parent`, not a separate type), and nested areas
-  are reached via `child=["title"]`. `describe` no longer lists a `subarea` surface type.
+  `para-zk:create-child type=area root_type=area root_title=<root>` plus optional `relpath`;
+  the `create-subarea` CLI command is removed and the GUI "create subarea" affordance still
+  creates an area with the active area as its parent. Name-based addressing is preserved — a
+  bare-title area lookup resolves only root areas (gated on an empty `parent`, not a separate
+  type), and nested areas are reached via the `*-child` commands. `describe` no longer lists a
+  `subarea` surface type.
 - `para-zk:describe` is now a more self-sufficient contract so a cold caller learns the
   boundaries up front instead of by trial-and-error: the top-level output carries a `scope`
   note (PARA-ZK owns typed PARA/ZK operations; raw file edits, free-form frontmatter, and
@@ -225,8 +241,8 @@ Notable changes for PARA-ZK are tracked here.
   mutable key with its op (e.g. `frontmatter/{…}=set`, `tasks=insert`, `body=set|append|prepend|replace`)
   — matching the just-in-time update-key error — so keys absent there (notably `created`/`updated`,
   which the vault manages) are visibly not writable; and `addressVia` for `subnote`/`note`
-  now names the parent route (`read-`/`update-`/`delete-project|area` with `child=["title"]`,
-  since there is no `update-subnote`). The MCP discovery envelope carries the same `scope`.
+  now names the `*-child` route (`root_type/root_title/relpath/title`, with
+  `update-child` for writes). The MCP discovery envelope carries the same `scope`.
 - Multi-value frontmatter list keys now accept add/remove, not just a whole-list `set`. A
   project's (and retro's) `frontmatter/areas` supports `op=append`/`prepend` (add one value) and
   `op=delete` (remove one), and resolves an area title to its canonical link (an existing
@@ -271,10 +287,8 @@ Notable changes for PARA-ZK are tracked here.
   plugin, leaving a caller without the finish-setup step.
 - Made the CLI/MCP surface fully **name-based** — no command exposes a vault
   file `path` anymore. Notes are addressed by `title` (project/area/resource),
-  `date` (journal/retro), or `title`+`kind` (zk). Existing children are reached
-  through their container with a single list-valued `child=["a","b"]` drill;
-  new children name their parent with `parent_type`+`parent_title` (+ optional
-  `child=` to nest at any depth); transforms/scoped-retro/resource links name
+  `date` (journal/retro), or `title`+`kind` (zk). Child notes use the dedicated
+  `*-child` commands with `root_type`/`root_title`/`relpath`/`title`; transforms/scoped-retro/resource links name
   their origin with `source_type`/`source_title`; `add-reference` addresses the
   receiving note by `type`+`title` and its target by `[[Title]]` wikilink.
   Removed-path aliases (`path`, `file_path`, `sourcePath`, …) are now rejected
@@ -283,8 +297,8 @@ Notable changes for PARA-ZK are tracked here.
 - Renamed the stored child document type `doc` → **`subnote`** for finder
   correctness. (Child areas were briefly typed `subarea` for the same reason, since
   collapsed back to `area` — see "Collapsed the `subarea` stored type" above.) The
-  `children` map is now a read-only index;
-  read/edit a child via `child=` rather than a `children/<title>/<key>` key.
+  `children` map is now a read-only index; read/edit a child via the `*-child`
+  commands rather than a `children/<title>/<key>` key.
 - `describe` now reports an `addressing` facet per type (`addressable`,
   `selectors`, `addressVia`, `create` command, `rename`) so an LLM can learn how
   to reach and create each type before acting. `delete-journal` dropped its

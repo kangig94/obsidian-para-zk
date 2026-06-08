@@ -50,7 +50,7 @@ export async function renameZk(ctx: WorkflowContext, options: RenameZkOptions): 
   );
 }
 
-// A child reached via child= can be a flat subnote or a folder-style nested area;
+// A child reached via the *-child CLI family can be a flat subnote or a folder-style nested area;
 // dispatch by the resolved note's stored type.
 async function renameChildTarget(
   ctx: WorkflowContext,

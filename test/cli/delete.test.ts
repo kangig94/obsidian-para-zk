@@ -10,10 +10,11 @@ beforeEach(() => {
 describe("delete-project", () => {
   it("requires force=true when the folder holds child files", async () => {
     await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
-    await cli.run("para-zk:create-subnote", {
+    await cli.run("para-zk:create-child", {
+      type: "subnote",
       title: "Child",
-      parent_type: "project",
-      parent_title: "Alpha",
+      root_type: "project",
+      root_title: "Alpha",
       subnote_type: "free",
       open: "false"
     });
@@ -25,10 +26,11 @@ describe("delete-project", () => {
 
   it("trashes the folder via core APIs with force=true", async () => {
     await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
-    await cli.run("para-zk:create-subnote", {
+    await cli.run("para-zk:create-child", {
+      type: "subnote",
       title: "Child",
-      parent_type: "project",
-      parent_title: "Alpha",
+      root_type: "project",
+      root_title: "Alpha",
       subnote_type: "free",
       open: "false"
     });
@@ -43,16 +45,17 @@ describe("delete-project", () => {
 
   it("deletes a child subnote via child drill, leaving the container", async () => {
     await cli.run("para-zk:create-project", { title: "Host", open: "false" });
-    await cli.run("para-zk:create-subnote", {
+    await cli.run("para-zk:create-child", {
+      type: "subnote",
       title: "Scratch",
-      parent_type: "project",
-      parent_title: "Host",
+      root_type: "project",
+      root_title: "Host",
       subnote_type: "free",
       open: "false"
     });
     expect(cli.app.readPath("PARA/Projects/Host/Scratch.md")).toBeDefined();
 
-    const deleted = await cli.run("para-zk:delete-project", { title: "Host", child: '["Scratch"]' });
+    const deleted = await cli.run("para-zk:delete-child", { root_type: "project", root_title: "Host", title: "Scratch" });
     expect(deleted.ok).toBe(true);
     expect(cli.app.readPath("PARA/Projects/Host/Scratch.md")).toBeUndefined();
     expect(cli.app.readPath("PARA/Projects/Host/Host.md")).toBeDefined();

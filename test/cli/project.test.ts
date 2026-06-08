@@ -45,10 +45,11 @@ describe("create-project", () => {
     expect(content).not.toContain("```\n\n\n# Goals");
     expect(content.endsWith("\n\n")).toBe(false);
 
-    const subnote = await cli.run("para-zk:create-subnote", {
+    const subnote = await cli.run("para-zk:create-child", {
+      type: "subnote",
       title: "Template Child",
-      parent_type: "project",
-      parent_title: "Template Shape",
+      root_type: "project",
+      root_title: "Template Shape",
       open: "false"
     });
     expect(subnote.ok).toBe(true);
@@ -93,10 +94,11 @@ describe("create-project", () => {
     const duplicate = await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
     expect(duplicate.path).toBe("PARA/Projects/Alpha 1/Alpha 1.md");
 
-    const child = await cli.run("para-zk:create-subnote", {
+    const child = await cli.run("para-zk:create-child", {
+      type: "subnote",
       title: "Child",
-      parent_type: "project",
-      parent_title: "Alpha 1",
+      root_type: "project",
+      root_title: "Alpha 1",
       open: "false"
     });
     expect(child.path).toBe("PARA/Projects/Alpha 1/Child.md");
@@ -114,10 +116,11 @@ describe("create-project", () => {
 describe("read-project", () => {
   it("exposes stable frontmatter, children, and compact metadata", async () => {
     await createBaseProject();
-    await cli.run("para-zk:create-subnote", {
+    await cli.run("para-zk:create-child", {
+      type: "subnote",
       title: "Kickoff",
-      parent_type: "project",
-      parent_title: "Alpha",
+      root_type: "project",
+      root_title: "Alpha",
       subnote_type: "meeting",
       open: "false"
     });
@@ -186,16 +189,18 @@ describe("read-project", () => {
 
   it("reads a child frontmatter key by path", async () => {
     await createBaseProject();
-    await cli.run("para-zk:create-subnote", {
+    await cli.run("para-zk:create-child", {
+      type: "subnote",
       title: "Kickoff",
-      parent_type: "project",
-      parent_title: "Alpha",
+      root_type: "project",
+      root_title: "Alpha",
       subnote_type: "meeting",
       open: "false"
     });
-    const type = await cli.run("para-zk:read-project", {
-      title: "Alpha",
-      child: '["Kickoff"]',
+    const type = await cli.run("para-zk:read-child", {
+      root_type: "project",
+      root_title: "Alpha",
+      title: "Kickoff",
       key: "frontmatter/subnote_type"
     });
     expect(type.value).toBe("meeting");
@@ -233,9 +238,10 @@ describe("read-project", () => {
     expect(children.Child.path).toBe("PARA/Projects/Child.md");
     expect(children.Beta).toBeUndefined();
 
-    const rejected = await cli.run("para-zk:read-project", {
-      title: "Alpha",
-      child: '["Beta"]',
+    const rejected = await cli.run("para-zk:read-child", {
+      root_type: "project",
+      root_title: "Alpha",
+      title: "Beta",
       key: "summary"
     });
     expect(rejected.ok).toBe(false);
@@ -301,17 +307,19 @@ describe("update-project", () => {
 
   it("explains valid body operations when op is missing", async () => {
     await createBaseProject();
-    await cli.run("para-zk:create-subnote", {
+    await cli.run("para-zk:create-child", {
+      type: "subnote",
       title: "Plan",
-      parent_type: "project",
-      parent_title: "Alpha",
+      root_type: "project",
+      root_title: "Alpha",
       subnote_type: "plan",
       open: "false"
     });
 
-    const rejected = await cli.run("para-zk:update-project", {
-      title: "Alpha",
-      child: '["Plan"]',
+    const rejected = await cli.run("para-zk:update-child", {
+      root_type: "project",
+      root_title: "Alpha",
+      title: "Plan",
       key: "body"
     });
 
@@ -323,17 +331,19 @@ describe("update-project", () => {
 
   it("explains the value requirement for body set updates", async () => {
     await createBaseProject();
-    await cli.run("para-zk:create-subnote", {
+    await cli.run("para-zk:create-child", {
+      type: "subnote",
       title: "Plan",
-      parent_type: "project",
-      parent_title: "Alpha",
+      root_type: "project",
+      root_title: "Alpha",
       subnote_type: "plan",
       open: "false"
     });
 
-    const rejected = await cli.run("para-zk:update-project", {
-      title: "Alpha",
-      child: '["Plan"]',
+    const rejected = await cli.run("para-zk:update-child", {
+      root_type: "project",
+      root_title: "Alpha",
+      title: "Plan",
       key: "body",
       op: "set"
     });
@@ -359,17 +369,19 @@ describe("update-project", () => {
 
   it("sets a child note body", async () => {
     await createBaseProject();
-    await cli.run("para-zk:create-subnote", {
+    await cli.run("para-zk:create-child", {
+      type: "subnote",
       title: "Plan",
-      parent_type: "project",
-      parent_title: "Alpha",
+      root_type: "project",
+      root_title: "Alpha",
       subnote_type: "plan",
       open: "false"
     });
 
-    const update = await cli.run("para-zk:update-project", {
-      title: "Alpha",
-      child: '["Plan"]',
+    const update = await cli.run("para-zk:update-child", {
+      root_type: "project",
+      root_title: "Alpha",
+      title: "Plan",
       key: "body",
       op: "set",
       value: "Replacement body"
@@ -377,7 +389,7 @@ describe("update-project", () => {
 
     expect(update.ok).toBe(true);
     expect(update.changed).toBe(true);
-    const read = await cli.run("para-zk:read-project", { title: "Alpha", child: '["Plan"]', key: "body" });
+    const read = await cli.run("para-zk:read-child", { root_type: "project", root_title: "Alpha", title: "Plan", key: "body" });
     expect(String(read.value)).toBe("Replacement body");
   });
 

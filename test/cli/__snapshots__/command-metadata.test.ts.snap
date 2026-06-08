@@ -7,7 +7,7 @@ exports[`native CLI command metadata is stable 1`] = `
     "description": "Add an existing vault file, wikilink, markdown link, URL, or text to a note's frontmatter reference registry",
     "options": {
       "child": {
-        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
+        "description": "Optional drill into a named child note (JSON list, left-to-right). Kept only where the receiver is a normally top-level note, such as add-reference.",
         "value": "<["title", ...]>",
       },
       "date": {
@@ -106,31 +106,65 @@ exports[`native CLI command metadata is stable 1`] = `
   },
   {
     "command": "para-zk:create-area",
-    "description": "Create a PARA area note, optionally nested under a parent area",
+    "description": "Create a root PARA area note",
     "options": {
-      "child": {
-        "description": "Optional: with parent_title, drill into a nested area to nest under it.",
-        "value": "<["title", ...]>",
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "open": {
+        "description": "Open the created note in Obsidian.",
+        "value": "<true|false>",
+      },
+      "title": {
+        "description": "Area title.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:create-child",
+    "description": "Create a child note under a project or root area. relpath is the ancestor chain to the immediate parent; title is the new child.",
+    "options": {
+      "body": {
+        "description": "type=subnote only. Optional initial free-form body content.",
+        "value": "<markdown>",
       },
       "format": {
         "description": "Output format (default: text).",
         "value": "<text|json>",
       },
       "inherit_parent_tag": {
-        "description": "When nested, include the parent area tag as well as the child tag (default true).",
+        "description": "type=area only. Include the parent area tag as well as the child tag (default true).",
         "value": "<true|false>",
       },
       "open": {
         "description": "Open the created note in Obsidian.",
         "value": "<true|false>",
       },
-      "parent_title": {
-        "description": "Optional parent area title; nest this area under it (its parent link, not a distinct type).",
+      "relpath": {
+        "description": "Optional ancestor chain from the root to the immediate parent. Empty or omitted means directly under the root.",
+        "value": "<["title", ...]>",
+      },
+      "root_title": {
+        "description": "Directly-addressable root ancestor title.",
         "value": "<title>",
       },
+      "root_type": {
+        "description": "Directly-addressable root ancestor type. Must be project or area.",
+        "value": "<project|area>",
+      },
+      "subnote_type": {
+        "description": "type=subnote only. Locale-neutral subnote type code.",
+        "value": "<free|checklist|todo|plan|research|meeting|decision|guide|risk|idea|settlement>",
+      },
       "title": {
-        "description": "Area title.",
+        "description": "Child title. The full child drill path is [...relpath, title].",
         "value": "<title>",
+      },
+      "type": {
+        "description": "Child type to create. type=area requires root_type=area; type=subnote allows root_type=project or area.",
+        "value": "<subnote|area>",
       },
     },
   },
@@ -321,44 +355,6 @@ exports[`native CLI command metadata is stable 1`] = `
     },
   },
   {
-    "command": "para-zk:create-subnote",
-    "description": "Create a child document under a project or area note",
-    "options": {
-      "body": {
-        "description": "Optional initial free-form body content.",
-        "value": "<markdown>",
-      },
-      "child": {
-        "description": "Optional: drill from the named parent into a nested child container (JSON list) to create under it.",
-        "value": "<["title", ...]>",
-      },
-      "format": {
-        "description": "Output format (default: text).",
-        "value": "<text|json>",
-      },
-      "open": {
-        "description": "Open the created note in Obsidian.",
-        "value": "<true|false>",
-      },
-      "parent_title": {
-        "description": "Parent note title.",
-        "value": "<title>",
-      },
-      "parent_type": {
-        "description": "Parent note type.",
-        "value": "<project|area>",
-      },
-      "subnote_type": {
-        "description": "Locale-neutral subnote type code.",
-        "value": "<free|checklist|todo|plan|research|meeting|decision|guide|risk|idea|settlement>",
-      },
-      "title": {
-        "description": "Subnote title.",
-        "value": "<title>",
-      },
-    },
-  },
-  {
     "command": "para-zk:create-zk",
     "description": "Create a ZK note",
     "options": {
@@ -400,10 +396,6 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
         "value": "<true|false>",
       },
-      "child": {
-        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
-        "value": "<["title", ...]>",
-      },
       "force": {
         "description": "Required when deleting a folder-style note that contains child files.",
         "value": "<true|false>",
@@ -414,6 +406,40 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "title": {
         "description": "Current note title.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:delete-child",
+    "description": "Delete a child note under a project or root area. relpath is the ancestor chain to the immediate parent; title is the child.",
+    "options": {
+      "archived": {
+        "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
+        "value": "<true|false>",
+      },
+      "force": {
+        "description": "Required when deleting a folder-style note that contains child files.",
+        "value": "<true|false>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "relpath": {
+        "description": "Optional ancestor chain from the root to the immediate parent. Empty or omitted means directly under the root.",
+        "value": "<["title", ...]>",
+      },
+      "root_title": {
+        "description": "Directly-addressable root ancestor title.",
+        "value": "<title>",
+      },
+      "root_type": {
+        "description": "Directly-addressable root ancestor type. Must be project or area.",
+        "value": "<project|area>",
+      },
+      "title": {
+        "description": "Child title. The full child drill path is [...relpath, title].",
         "value": "<title>",
       },
     },
@@ -440,10 +466,6 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
         "value": "<true|false>",
       },
-      "child": {
-        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
-        "value": "<["title", ...]>",
-      },
       "force": {
         "description": "Required when deleting a folder-style note that contains child files.",
         "value": "<true|false>",
@@ -465,10 +487,6 @@ exports[`native CLI command metadata is stable 1`] = `
       "archived": {
         "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
         "value": "<true|false>",
-      },
-      "child": {
-        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
-        "value": "<["title", ...]>",
       },
       "force": {
         "description": "Required when deleting a folder-style note that contains child files.",
@@ -622,10 +640,6 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Task collection reads only: checkbox status character. Use space/blank/todo/open for [ ].",
         "value": "<status>",
       },
-      "child": {
-        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
-        "value": "<["title", ...]>",
-      },
       "due_after": {
         "description": "Task collection reads only: include tasks due on or after this date.",
         "value": "<YYYY-MM-DD>",
@@ -639,7 +653,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{parent}, overview, tasks, tasks/<id>, tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, children. With child=["title"], valid keys are the child note's type instead; see para-zk:describe.",
+        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{parent}, overview, tasks, tasks/<id>, tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, children.",
         "value": "<map-path>",
       },
       "limit": {
@@ -664,6 +678,76 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "title": {
         "description": "Area title.",
+        "value": "<title>",
+      },
+      "type": {
+        "description": "Backlink collection reads only: filter source notes by frontmatter type.",
+        "value": "<note-type>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:read-child",
+    "description": "Read a child note under a project or root area. relpath is the ancestor chain to the immediate parent; title is the child.",
+    "options": {
+      "archived": {
+        "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
+        "value": "<true|false>",
+      },
+      "checkbox": {
+        "description": "Task collection reads only: checkbox status character. Use space/blank/todo/open for [ ].",
+        "value": "<status>",
+      },
+      "due_after": {
+        "description": "Task collection reads only: include tasks due on or after this date.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "due_before": {
+        "description": "Task collection reads only: include tasks due on or before this date.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "key": {
+        "description": "Optional stable read key on the addressed child. The key is the child's key; valid keys depend on the resolved child type (subnote, note, or nested area).",
+        "value": "<map-path>",
+      },
+      "limit": {
+        "description": "Collection key reads only: maximum items to return (default: 50).",
+        "value": "<number|all>",
+      },
+      "offset": {
+        "description": "Collection key reads only: zero-based item offset (default: 0).",
+        "value": "<number>",
+      },
+      "priority": {
+        "description": "Task collection reads only: parsed Tasks priority such as high or medium.",
+        "value": "<priority>",
+      },
+      "query": {
+        "description": "Collection key reads only: case-insensitive item text filter.",
+        "value": "<text>",
+      },
+      "ref_kind": {
+        "description": "Reference collection reads only: filter references by kind.",
+        "value": "<url|note|file|wiki|text>",
+      },
+      "relpath": {
+        "description": "Optional ancestor chain from the root to the immediate parent. Empty or omitted means directly under the root.",
+        "value": "<["title", ...]>",
+      },
+      "root_title": {
+        "description": "Directly-addressable root ancestor title.",
+        "value": "<title>",
+      },
+      "root_type": {
+        "description": "Directly-addressable root ancestor type. Must be project or area.",
+        "value": "<project|area>",
+      },
+      "title": {
+        "description": "Child title. The full child drill path is [...relpath, title].",
         "value": "<title>",
       },
       "type": {
@@ -738,10 +822,6 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Task collection reads only: checkbox status character. Use space/blank/todo/open for [ ].",
         "value": "<status>",
       },
-      "child": {
-        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
-        "value": "<["title", ...]>",
-      },
       "due_after": {
         "description": "Task collection reads only: include tasks due on or after this date.",
         "value": "<YYYY-MM-DD>",
@@ -755,7 +835,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{aliases|areas|status|priority|start_date|due_date|done_date}, summary, goals, tasks, tasks/<id>, tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, children. With child=["title"], valid keys are the child note's type instead; see para-zk:describe.",
+        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{aliases|areas|status|priority|start_date|due_date|done_date}, summary, goals, tasks, tasks/<id>, tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, children.",
         "value": "<map-path>",
       },
       "limit": {
@@ -800,10 +880,6 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Task collection reads only: checkbox status character. Use space/blank/todo/open for [ ].",
         "value": "<status>",
       },
-      "child": {
-        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
-        "value": "<["title", ...]>",
-      },
       "due_after": {
         "description": "Task collection reads only: include tasks due on or after this date.",
         "value": "<YYYY-MM-DD>",
@@ -817,7 +893,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{aliases|url|first_author|license|kind}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body. With child=["title"], valid keys are the child note's type instead; see para-zk:describe.",
+        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{aliases|url|first_author|license|kind}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body.",
         "value": "<map-path>",
       },
       "limit": {
@@ -978,10 +1054,6 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
         "value": "<true|false>",
       },
-      "child": {
-        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
-        "value": "<["title", ...]>",
-      },
       "format": {
         "description": "Output format (default: text).",
         "value": "<text|json>",
@@ -997,16 +1069,46 @@ exports[`native CLI command metadata is stable 1`] = `
     },
   },
   {
+    "command": "para-zk:rename-child",
+    "description": "Rename a child note under a project or root area. relpath is the ancestor chain to the immediate parent; title is the child being renamed.",
+    "options": {
+      "archived": {
+        "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
+        "value": "<true|false>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "new_title": {
+        "description": "New note title.",
+        "value": "<title>",
+      },
+      "relpath": {
+        "description": "Optional ancestor chain from the root to the immediate parent. Empty or omitted means directly under the root.",
+        "value": "<["title", ...]>",
+      },
+      "root_title": {
+        "description": "Directly-addressable root ancestor title.",
+        "value": "<title>",
+      },
+      "root_type": {
+        "description": "Directly-addressable root ancestor type. Must be project or area.",
+        "value": "<project|area>",
+      },
+      "title": {
+        "description": "Child title. The full child drill path is [...relpath, title].",
+        "value": "<title>",
+      },
+    },
+  },
+  {
     "command": "para-zk:rename-project",
     "description": "Rename a project note, including its folder-style parent folder",
     "options": {
       "archived": {
         "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
         "value": "<true|false>",
-      },
-      "child": {
-        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
-        "value": "<["title", ...]>",
       },
       "format": {
         "description": "Output format (default: text).",
@@ -1029,10 +1131,6 @@ exports[`native CLI command metadata is stable 1`] = `
       "archived": {
         "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
         "value": "<true|false>",
-      },
-      "child": {
-        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
-        "value": "<["title", ...]>",
       },
       "format": {
         "description": "Output format (default: text).",
@@ -1108,16 +1206,12 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
         "value": "<true|false>",
       },
-      "child": {
-        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
-        "value": "<["title", ...]>",
-      },
       "format": {
         "description": "Output format (default: text).",
         "value": "<text|json>",
       },
       "key": {
-        "description": "Stable writable key. Valid: frontmatter/{parent}=set, overview=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set. With child=["title"], valid keys are the child note's type instead; see para-zk:describe.",
+        "description": "Stable writable key. Valid: frontmatter/{parent}=set, overview=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set.",
         "value": "<map-path>",
       },
       "match": {
@@ -1130,6 +1224,64 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "title": {
         "description": "Area title.",
+        "value": "<title>",
+      },
+      "value": {
+        "description": "Text value for scalar set, append, or prepend operations.",
+        "value": "<text>",
+      },
+      "value_json": {
+        "description": "Structured value for frontmatter updates and task inserts.",
+        "value": "<json>",
+      },
+      "with": {
+        "description": "Replacement text for op=replace.",
+        "value": "<text>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:update-child",
+    "description": "Update a child note under a project or root area. relpath is the ancestor chain to the immediate parent; title is the child.",
+    "options": {
+      "all": {
+        "description": "For op=replace, replace all matches instead of requiring a single match.",
+        "value": "<true|false>",
+      },
+      "archived": {
+        "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
+        "value": "<true|false>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "key": {
+        "description": "Stable writable key on the addressed child. The key is the child's key; valid keys depend on the resolved child type (subnote, note, or nested area).",
+        "value": "<map-path>",
+      },
+      "match": {
+        "description": "Exact text to match inside the selected key for op=replace.",
+        "value": "<text>",
+      },
+      "op": {
+        "description": "Update operation.",
+        "value": "<set|insert|append|prepend|replace|delete>",
+      },
+      "relpath": {
+        "description": "Optional ancestor chain from the root to the immediate parent. Empty or omitted means directly under the root.",
+        "value": "<["title", ...]>",
+      },
+      "root_title": {
+        "description": "Directly-addressable root ancestor title.",
+        "value": "<title>",
+      },
+      "root_type": {
+        "description": "Directly-addressable root ancestor type. Must be project or area.",
+        "value": "<project|area>",
+      },
+      "title": {
+        "description": "Child title. The full child drill path is [...relpath, title].",
         "value": "<title>",
       },
       "value": {
@@ -1200,16 +1352,12 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
         "value": "<true|false>",
       },
-      "child": {
-        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
-        "value": "<["title", ...]>",
-      },
       "format": {
         "description": "Output format (default: text).",
         "value": "<text|json>",
       },
       "key": {
-        "description": "Stable writable key. Valid: frontmatter/{aliases|status|priority|start_date|due_date|done_date}=set, frontmatter/areas=set|append|prepend|delete, summary=set|append|prepend|replace, goals=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set. With child=["title"], valid keys are the child note's type instead; see para-zk:describe.",
+        "description": "Stable writable key. Valid: frontmatter/{aliases|status|priority|start_date|due_date|done_date}=set, frontmatter/areas=set|append|prepend|delete, summary=set|append|prepend|replace, goals=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set.",
         "value": "<map-path>",
       },
       "match": {
@@ -1250,16 +1398,12 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy.",
         "value": "<true|false>",
       },
-      "child": {
-        "description": "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly.",
-        "value": "<["title", ...]>",
-      },
       "format": {
         "description": "Output format (default: text).",
         "value": "<text|json>",
       },
       "key": {
-        "description": "Stable writable key. Valid: frontmatter/{aliases|url|first_author|license|kind}=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace. With child=["title"], valid keys are the child note's type instead; see para-zk:describe.",
+        "description": "Stable writable key. Valid: frontmatter/{aliases|url|first_author|license|kind}=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace.",
         "value": "<map-path>",
       },
       "match": {

@@ -39,13 +39,14 @@ type NativeCliCommand = {
   description: string;
   options: Record<string, CliOptionSpec>;
   text: string;
+  preResolve?: (args: CliArgs) => void;
   run: (plugin: ParaZkPluginContext, args: CliArgs) => Promise<Record<string, unknown>>;
 };
 
 const ZK_KEY_TYPES = ["zk_spark", "zk_digest", "zk_permanent"];
 
 function readKeyOption(type: string, childAware = false): CliOptionSpec {
-  const childNote = childAware ? ` With child=["title"], valid keys are the child note's type instead; see para-zk:describe.` : "";
+  const childNote = childAware ? " On child commands, the key belongs to the addressed child; see para-zk:describe for that child's type." : "";
   return {
     value: "<map-path>",
     description: `Optional stable read key. Valid: ${surfaceReadKeys(type).join(", ")}.${childNote}`
@@ -53,7 +54,7 @@ function readKeyOption(type: string, childAware = false): CliOptionSpec {
 }
 
 function writeKeyOption(type: string, childAware = false): CliOptionSpec {
-  const childNote = childAware ? ` With child=["title"], valid keys are the child note's type instead; see para-zk:describe.` : "";
+  const childNote = childAware ? " On child commands, the key belongs to the addressed child; see para-zk:describe for that child's type." : "";
   return {
     value: "<map-path>",
     description: `Stable writable key. Valid: ${surfaceWriteKeys(type).join(", ")}.${childNote}`
@@ -185,11 +186,22 @@ type ParaNoteCommandConfig = {
   renameDescription: string;
 };
 
+type ChildRootType = "project" | "area";
+
+type ChildAddress = {
+  rootType: ChildRootType;
+  rootTitle: string;
+  archived?: boolean;
+  relpath: string[];
+  title: string;
+  child: string[];
+};
+
 const FORMAT_OPTION: CliOptionSpec = { value: "<text|json>", description: "Output format (default: text)." };
 const ALIAS_OPTION: CliOptionSpec = { value: "<text>", description: "Optional single Obsidian alias to store in frontmatter." };
 const CHILD_OPTION: CliOptionSpec = {
   value: `<["title", ...]>`,
-  description: "Drill into a named child note (JSON list, left-to-right). Existing children are addressed via their container, not directly."
+  description: "Optional drill into a named child note (JSON list, left-to-right). Kept only where the receiver is a normally top-level note, such as add-reference."
 };
 const ARCHIVED_OPTION: CliOptionSpec = {
   value: "<true|false>",
@@ -198,6 +210,23 @@ const ARCHIVED_OPTION: CliOptionSpec = {
 const ZK_KIND_FILTER_OPTION: CliOptionSpec = { value: `<${ZK_KIND_CODE_HELP}>`, description: "Optional ZK kind filter." };
 const JOURNAL_DATE_OPTION: CliOptionSpec = { value: "<YYYY-MM-DD>", description: "Journal date. Defaults to today." };
 const RETRO_DATE_OPTION: CliOptionSpec = { value: "<YYYY-MM-DD>", description: "Optional date used to narrow the ISO week folder." };
+const CHILD_READ_KEY_OPTION: CliOptionSpec = {
+  value: "<map-path>",
+  description: "Optional stable read key on the addressed child. The key is the child's key; valid keys depend on the resolved child type (subnote, note, or nested area)."
+};
+const CHILD_WRITE_KEY_OPTION: CliOptionSpec = {
+  value: "<map-path>",
+  description: "Stable writable key on the addressed child. The key is the child's key; valid keys depend on the resolved child type (subnote, note, or nested area)."
+};
+const CHILD_ADDRESS_OPTIONS: Record<string, CliOptionSpec> = {
+  root_type: { value: "<project|area>", description: "Directly-addressable root ancestor type. Must be project or area." },
+  root_title: { value: "<title>", description: "Directly-addressable root ancestor title." },
+  relpath: { value: `<["title", ...]>`, description: "Optional ancestor chain from the root to the immediate parent. Empty or omitted means directly under the root." },
+  title: { value: "<title>", description: "Child title. The full child drill path is [...relpath, title]." }
+};
+const CHILD_COMMANDS_HINT = "para-zk:read-child|update-child|delete-child|rename-child";
+const CRUD_CHILD_MIGRATION_ERROR = `child= is not accepted here — address a child note with ${CHILD_COMMANDS_HINT} (root_type/root_title/relpath/title)`;
+const CREATE_AREA_CHILD_MIGRATION_ERROR = "parent_title, parentTitle, and child are not accepted by para-zk:create-area — create a nested area with para-zk:create-child type=area root_type=area root_title=<root> relpath=<ancestors> title=<child>";
 
 const PARA_NOTE_COMMANDS: ParaNoteCommandConfig[] = [
   {
@@ -246,8 +275,25 @@ const PATH_ALIASES = ["path", "file_path", "filePath", "sourcePath", "source", "
 function rejectPathAliases(args: CliArgs): void {
   for (const alias of PATH_ALIASES) {
     if (Object.prototype.hasOwnProperty.call(args, alias)) {
-      throw new Error(`${alias} is not supported — address notes by name (title/date, plus parent_*/source_*/child for relations)`);
+      throw new Error(`${alias} is not supported — address notes by name (title/date, plus root_type/root_title/relpath/title for child notes and source_* for origins)`);
     }
+  }
+}
+
+function rejectChildOnCrudCommands(args: CliArgs): void {
+  if (Object.prototype.hasOwnProperty.call(args, "child")) {
+    throw new Error(CRUD_CHILD_MIGRATION_ERROR);
+  }
+}
+
+function rejectCreateAreaChildArgs(args: CliArgs): void {
+  for (const key of ["parent_title", "parentTitle", "child"]) {
+    if (Object.prototype.hasOwnProperty.call(args, key)) {
+      throw new Error(CREATE_AREA_CHILD_MIGRATION_ERROR);
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(args, "inherit_parent_tag")) {
+    throw new Error("inherit_parent_tag is not accepted by para-zk:create-area — pass it to para-zk:create-child type=area");
   }
 }
 
@@ -348,7 +394,7 @@ function makeParaReadCommand(config: ParaNoteCommandConfig): NativeCliCommand {
   return makeReadCommand({
     command: `para-zk:read-${config.type}`,
     description: `Read ${config.article} ${config.type} note's stable PARA-ZK surface, optionally by map key`,
-    options: readCommandOptions({ variant: "by-title", label: config.label }, readKeyOption(config.type, true)),
+    options: readCommandOptions({ variant: "by-title", label: config.label }, readKeyOption(config.type)),
     text: `${config.type} read`,
     workflow: config.readWorkflow,
     selector: { variant: "by-title", label: config.label }
@@ -359,7 +405,7 @@ function makeParaUpdateCommand(config: ParaNoteCommandConfig): NativeCliCommand 
   return makeUpdateCommand({
     command: `para-zk:update-${config.type}`,
     description: `Update ${config.article} ${config.type} note's stable PARA-ZK surface by map key`,
-    options: updateCommandOptions({ variant: "by-title", label: config.label }, writeKeyOption(config.type, true)),
+    options: updateCommandOptions({ variant: "by-title", label: config.label }, writeKeyOption(config.type)),
     text: `${config.type} updated`,
     workflow: config.updateWorkflow,
     selector: { variant: "by-title", label: config.label }
@@ -394,7 +440,6 @@ function readCommandOptions(selector: SelectorVariant, key: CliOptionSpec): Reco
       return {
         title: { value: "<title>", description: `${selector.label} title.` },
         archived: ARCHIVED_OPTION,
-        child: CHILD_OPTION,
         key,
         ...READ_COLLECTION_OPTIONS,
         format: FORMAT_OPTION
@@ -432,7 +477,6 @@ function updateCommandOptions(selector: SelectorVariant, key: CliOptionSpec): Re
       return {
         title: { value: "<title>", description: `${selector.label} title.` },
         archived: ARCHIVED_OPTION,
-        child: CHILD_OPTION,
         key,
         ...UPDATE_OPTIONS
       };
@@ -465,7 +509,6 @@ function renameCommandOptions(selector: Extract<SelectorVariant, { variant: "by-
     case "by-title":
       return {
         title: RENAME_OPTIONS.title,
-        child: CHILD_OPTION,
         new_title: RENAME_OPTIONS.new_title,
         format: RENAME_OPTIONS.format,
         archived: ARCHIVED_OPTION
@@ -483,7 +526,6 @@ function deleteCommandOptions(selector: Exclude<SelectorVariant, { variant: "jou
     case "by-title":
       return {
         title: DELETE_OPTIONS.title,
-        child: CHILD_OPTION,
         force: DELETE_OPTIONS.force,
         format: DELETE_OPTIONS.format,
         archived: ARCHIVED_OPTION
@@ -509,10 +551,10 @@ function selectorOptions(
 ): Record<string, unknown> {
   switch (selector.variant) {
     case "by-title":
+      rejectChildOnCrudCommands(args);
       return {
         title: readCliTitle(args),
-        archived: readCliBoolean(args, "archived"),
-        child: parseList(readCliString(args, "child"))
+        archived: readCliBoolean(args, "archived")
       };
     case "zk":
       return {
@@ -536,6 +578,126 @@ function readCliZkKind(args: CliArgs, mode: WorkflowOptionMode): string | undefi
   if (mode === "read") return readCliReadZkKind(args);
   if (mode === "rename") return readCliRenameKind(args);
   return readCliKind(args);
+}
+
+function childWorkflowRun(
+  workflowByRoot: Record<ChildRootType, WorkflowFunctionName>,
+  readOptions: (args: CliArgs, address: ChildAddress) => Record<string, unknown>
+): NativeCliCommand["run"] {
+  return async (plugin, args) => {
+    rejectPathAliases(args);
+    const address = readCliChildAddress(args);
+    const workflows = await loadWorkflows() as Record<WorkflowFunctionName, WorkflowRunFunction>;
+    const result = await workflows[workflowByRoot[address.rootType]](workflowContext(plugin), readOptions(args, address));
+    return { ...result };
+  };
+}
+
+function readCliChildAddress(args: CliArgs): ChildAddress {
+  rejectCliAliases(args, {
+    rootType: "root_type",
+    rootTitle: "root_title",
+    relPath: "relpath",
+    name: "title"
+  });
+  rejectChildAddressMigrationArgs(args);
+  const rootType = readCliRootType(args);
+  const rootTitle = readRequiredCliString(args, "root_title");
+  const archived = readCliBoolean(args, "archived");
+  const relpath = parseList(readCliString(args, "relpath"));
+  const title = readRequiredCliString(args, "title");
+  return {
+    rootType,
+    rootTitle,
+    archived,
+    relpath,
+    title,
+    child: [...relpath, title]
+  };
+}
+
+function rejectChildAddressMigrationArgs(args: CliArgs): void {
+  if (Object.prototype.hasOwnProperty.call(args, "parent_type")) {
+    throw new Error("parent_type is not accepted here — use root_type");
+  }
+  if (Object.prototype.hasOwnProperty.call(args, "parentType")) {
+    throw new Error("parentType is not accepted here — use root_type");
+  }
+  if (Object.prototype.hasOwnProperty.call(args, "parent_title")) {
+    throw new Error("parent_title is not accepted here — use root_title");
+  }
+  if (Object.prototype.hasOwnProperty.call(args, "parentTitle")) {
+    throw new Error("parentTitle is not accepted here — use root_title");
+  }
+  if (Object.prototype.hasOwnProperty.call(args, "child")) {
+    throw new Error("child= is not accepted on *-child commands — use relpath for the ancestor chain to the immediate parent and title for the addressed child");
+  }
+}
+
+function readCliRootType(args: CliArgs): ChildRootType {
+  const rootType = readRequiredCliString(args, "root_type");
+  if (rootType === "project" || rootType === "area") return rootType;
+  throw new Error("root_type must be project or area");
+}
+
+function readCliChildCreateType(args: CliArgs): "subnote" | "area" {
+  rejectCliAliases(args, { childType: "type", child_type: "type" });
+  const type = readRequiredCliString(args, "type");
+  if (type === "subnote" || type === "area") return type;
+  throw new Error("type must be subnote or area");
+}
+
+function rejectArgsForChildCreateType(args: CliArgs, type: "subnote" | "area"): void {
+  rejectCliAliases(args, {
+    subnoteType: "subnote_type",
+    inheritParentTag: "inherit_parent_tag"
+  });
+  if (Object.prototype.hasOwnProperty.call(args, "archived")) {
+    throw new Error("archived is not accepted by para-zk:create-child — create child notes under an active root");
+  }
+  if (type === "subnote") {
+    if (Object.prototype.hasOwnProperty.call(args, "inherit_parent_tag")) {
+      throw new Error("inherit_parent_tag is only valid with type=area");
+    }
+    return;
+  }
+  for (const key of ["subnote_type", "body"]) {
+    if (Object.prototype.hasOwnProperty.call(args, key)) {
+      throw new Error(`${key} is only valid with type=subnote`);
+    }
+  }
+}
+
+async function createChild(plugin: ParaZkPluginContext, args: CliArgs): Promise<Record<string, unknown>> {
+  rejectPathAliases(args);
+  const address = readCliChildAddress(args);
+  const type = readCliChildCreateType(args);
+  rejectArgsForChildCreateType(args, type);
+  const workflows = await loadWorkflows() as Record<WorkflowFunctionName, WorkflowRunFunction>;
+  if (type === "area") {
+    if (address.rootType !== "area") {
+      throw new Error("type=area requires root_type=area; nested areas can only be created under areas");
+    }
+    const result = await workflows.createArea(workflowContext(plugin), {
+      title: address.title,
+      parentTitle: address.rootTitle,
+      child: address.relpath,
+      inheritParentTag: readCliBoolean(args, "inherit_parent_tag") ?? true,
+      open: readCliBoolean(args, "open") ?? false
+    });
+    return { ...result };
+  }
+
+  const result = await workflows.createSubnote(workflowContext(plugin), {
+    title: address.title,
+    parentType: address.rootType,
+    parentTitle: address.rootTitle,
+    child: address.relpath,
+    subnoteType: readCliSubnoteType(args),
+    body: readCliString(args, "body"),
+    open: readCliBoolean(args, "open") ?? false
+  });
+  return { ...result };
 }
 
 const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
@@ -713,6 +875,95 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     selector: { variant: "retro" }
   }),
   {
+    command: "para-zk:read-child",
+    description: "Read a child note under a project or root area. relpath is the ancestor chain to the immediate parent; title is the child.",
+    options: {
+      ...CHILD_ADDRESS_OPTIONS,
+      archived: ARCHIVED_OPTION,
+      key: CHILD_READ_KEY_OPTION,
+      ...READ_COLLECTION_OPTIONS,
+      format: FORMAT_OPTION
+    },
+    text: "child read",
+    run: childWorkflowRun({ project: "readProject", area: "readArea" }, (args, address) => ({
+      title: address.rootTitle,
+      archived: address.archived,
+      child: address.child,
+      key: readCliString(args, "key"),
+      collection: readCliCollectionOptions(args)
+    }))
+  },
+  {
+    command: "para-zk:update-child",
+    description: "Update a child note under a project or root area. relpath is the ancestor chain to the immediate parent; title is the child.",
+    options: {
+      ...CHILD_ADDRESS_OPTIONS,
+      archived: ARCHIVED_OPTION,
+      key: CHILD_WRITE_KEY_OPTION,
+      ...UPDATE_OPTIONS
+    },
+    text: "child updated",
+    run: childWorkflowRun({ project: "updateProject", area: "updateArea" }, (args, address) => ({
+      title: address.rootTitle,
+      archived: address.archived,
+      child: address.child,
+      ...readCliUpdateOptions(args)
+    }))
+  },
+  {
+    command: "para-zk:delete-child",
+    description: "Delete a child note under a project or root area. relpath is the ancestor chain to the immediate parent; title is the child.",
+    options: {
+      ...CHILD_ADDRESS_OPTIONS,
+      archived: ARCHIVED_OPTION,
+      force: DELETE_OPTIONS.force,
+      format: FORMAT_OPTION
+    },
+    text: "child deleted",
+    run: childWorkflowRun({ project: "deleteProject", area: "deleteArea" }, (args, address) => ({
+      title: address.rootTitle,
+      archived: address.archived,
+      child: address.child,
+      force: readCliBoolean(args, "force") ?? false
+    }))
+  },
+  {
+    command: "para-zk:rename-child",
+    description: "Rename a child note under a project or root area. relpath is the ancestor chain to the immediate parent; title is the child being renamed.",
+    options: {
+      ...CHILD_ADDRESS_OPTIONS,
+      archived: ARCHIVED_OPTION,
+      new_title: RENAME_OPTIONS.new_title,
+      format: FORMAT_OPTION
+    },
+    text: "child renamed",
+    run: childWorkflowRun({ project: "renameProject", area: "renameArea" }, (args, address) => ({
+      title: address.rootTitle,
+      archived: address.archived,
+      child: address.child,
+      newTitle: readCliNewTitle(args)
+    }))
+  },
+  {
+    command: "para-zk:create-child",
+    description: "Create a child note under a project or root area. relpath is the ancestor chain to the immediate parent; title is the new child.",
+    options: {
+      type: { value: "<subnote|area>", description: "Child type to create. type=area requires root_type=area; type=subnote allows root_type=project or area." },
+      ...CHILD_ADDRESS_OPTIONS,
+      subnote_type: { value: `<${SUBNOTE_TYPE_CODE_HELP}>`, description: "type=subnote only. Locale-neutral subnote type code." },
+      body: { value: "<markdown>", description: "type=subnote only. Optional initial free-form body content." },
+      inherit_parent_tag: { value: "<true|false>", description: "type=area only. Include the parent area tag as well as the child tag (default true)." },
+      open: { value: "<true|false>", description: "Open the created note in Obsidian." },
+      format: FORMAT_OPTION
+    },
+    text: "child created",
+    preResolve: (args) => {
+      const type = readCliChildCreateType(args);
+      rejectArgsForChildCreateType(args, type);
+    },
+    run: createChild
+  },
+  {
     command: "para-zk:create-project",
     description: "Create a PARA project note",
     options: {
@@ -738,23 +989,20 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
   },
   {
     command: "para-zk:create-area",
-    description: "Create a PARA area note, optionally nested under a parent area",
+    description: "Create a root PARA area note",
     options: {
       title: { value: "<title>", description: "Area title." },
-      parent_title: { value: "<title>", description: "Optional parent area title; nest this area under it (its parent link, not a distinct type)." },
-      child: { value: `<["title", ...]>`, description: "Optional: with parent_title, drill into a nested area to nest under it." },
-      inherit_parent_tag: { value: "<true|false>", description: "When nested, include the parent area tag as well as the child tag (default true)." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "area created",
-    run: workflowRun("createArea", (args) => ({
-      title: readCliTitle(args),
-      parentTitle: readCliString(args, "parent_title"),
-      child: parseList(readCliString(args, "child")),
-      inheritParentTag: readCliBoolean(args, "inherit_parent_tag") ?? true,
-      open: readCliBoolean(args, "open") ?? false
-    }))
+    run: workflowRun("createArea", (args) => {
+      rejectCreateAreaChildArgs(args);
+      return {
+        title: readCliTitle(args),
+        open: readCliBoolean(args, "open") ?? false
+      };
+    })
   },
   {
     command: "para-zk:create-resource",
@@ -814,30 +1062,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       child: parseList(readCliString(args, "child")),
       target: readRequiredCliString(args, "target"),
       description: readCliString(args, "description"),
-      open: readCliBoolean(args, "open") ?? false
-    }))
-  },
-  {
-    command: "para-zk:create-subnote",
-    description: "Create a child document under a project or area note",
-    options: {
-      title: { value: "<title>", description: "Subnote title." },
-      parent_type: { value: "<project|area>", description: "Parent note type." },
-      parent_title: { value: "<title>", description: "Parent note title." },
-      child: { value: `<["title", ...]>`, description: "Optional: drill from the named parent into a nested child container (JSON list) to create under it." },
-      subnote_type: { value: `<${SUBNOTE_TYPE_CODE_HELP}>`, description: "Locale-neutral subnote type code." },
-      body: { value: "<markdown>", description: "Optional initial free-form body content." },
-      open: { value: "<true|false>", description: "Open the created note in Obsidian." },
-      format: { value: "<text|json>", description: "Output format (default: text)." }
-    },
-    text: "subnote created",
-    run: workflowRun("createSubnote", (args) => ({
-      title: readCliTitle(args),
-      parentType: readCliString(args, "parent_type"),
-      parentTitle: readCliString(args, "parent_title"),
-      child: parseList(readCliString(args, "child")),
-      subnoteType: readCliSubnoteType(args),
-      body: readCliString(args, "body"),
       open: readCliBoolean(args, "open") ?? false
     }))
   },
@@ -978,7 +1202,7 @@ const VAULT_CONTEXT = "Obsidian is a local-first, single-user personal knowledge
 // Sets the operator's expectation of what this CLI does and does not own, so it does not
 // bang on PARA-ZK for raw vault operations it deliberately leaves to the host. Kept verbatim
 // in sync with the MCP server's SCOPE_NOTE.
-const SCOPE_NOTE = "PARA-ZK owns typed PARA/ZK operations — create/read/update/rename/archive of the surface types above, addressed by name (subnotes and nested areas via their parent + child). It does not do raw file edits, free-form frontmatter, or full-text search; for those use your host's file/search tools (e.g. optsidian edit/apply_patch/write, optsidian grep/search). Per type, the mutable keys are in its writeKeys; keys absent there are not writable here — notably created/updated, which the vault maintains automatically.";
+const SCOPE_NOTE = "PARA-ZK owns typed PARA/ZK operations — create/read/update/rename/archive of the surface types above, addressed by name; child notes (subnotes, fallback notes, and nested areas) are addressed with the *-child commands using root_type/root_title/relpath/title. It does not rename, move, or copy files on disk, do raw file edits, free-form frontmatter, or full-text search; for those use your host's file/search tools (e.g. optsidian rename/move/copy, optsidian edit/apply_patch/write, optsidian grep/search). Per type, the mutable keys are in its writeKeys; keys absent there are not writable here — notably created/updated, which the vault maintains automatically.";
 
 // Discoverability: derive create/workflow inputs from the real command option
 // specs so `describe` is self-contained (a caller never needs `obsidian help`).
@@ -986,6 +1210,11 @@ const SCOPE_NOTE = "PARA-ZK owns typed PARA/ZK operations — create/read/update
 const UNIVERSAL_OPTIONS = new Set(["open", "format"]);
 const NAMED_WORKFLOW_COMMANDS = [
   "para-zk:list",
+  "para-zk:create-child",
+  "para-zk:read-child",
+  "para-zk:update-child",
+  "para-zk:rename-child",
+  "para-zk:delete-child",
   "para-zk:capture-journal",
   "para-zk:distill-spark",
   "para-zk:create-from-digest",
@@ -1066,6 +1295,7 @@ export function registerNativeCliHandlers(plugin: ParaZkPluginContext): void {
       async (args = {}) => {
         if (isHelpRequest(args)) return renderCommandHelp(command, args);
         return withCliErrors(args, async () => {
+          command.preResolve?.(args);
           const resolved = await resolveFileBackedArgs(args, command.options);
           return command.run(plugin, resolved);
         }, command.text);
@@ -1451,8 +1681,7 @@ function readCliAlias(args: CliArgs): string | undefined {
 
 function readCliSubnoteType(args: CliArgs): string | undefined {
   rejectCliAliases(args, {
-    subnoteType: "subnote_type",
-    type: "subnote_type"
+    subnoteType: "subnote_type"
   });
   return readCliString(args, "subnote_type");
 }

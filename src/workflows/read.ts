@@ -269,7 +269,7 @@ async function readSurfaceKey(
     throw unknownReadKeyError(spec, originalKey);
   }
   if (parts.length === 1) return surface.children;
-  throw new Error(`children is a read-only index; use child=["${parts[1]}"] to address a child`);
+  throw new Error(`children is a read-only index; use para-zk:read-child root_type/root_title/relpath/title to address a child`);
 }
 
 function readBacklinkSurfaceKey(

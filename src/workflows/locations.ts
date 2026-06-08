@@ -501,7 +501,7 @@ function findUniqueNoteByTitle(
       && (!options.type || type === options.type)
       && (!options.typePrefix || type.startsWith(options.typePrefix))
       // A nested area has a `parent`; bare-title area lookup must resolve only root areas
-      // so name-based addressing stays unambiguous (nested areas are reached via child=).
+      // so name-based addressing stays unambiguous (nested areas are reached via *-child commands).
       && (!options.requireRootArea || frontmatterLinks(frontmatter.parent).length === 0);
   });
   const exactMatches = files.filter((file) => file.basename === options.title);

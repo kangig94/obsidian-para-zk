@@ -63,9 +63,10 @@ describe("MCP update arg builder", () => {
         content
       }
     })).toEqual([
-      "para-zk:update-area",
-      "title=Health",
-      `child=${JSON.stringify(["Habits"])}`,
+      "para-zk:update-child",
+      "root_type=area",
+      "root_title=Health",
+      "title=Habits",
       "key=body",
       "op=set",
       `value=${content}`,
@@ -85,14 +86,23 @@ describe("MCP update arg builder", () => {
       tool: "set",
       params: { type: "area", title: "Ops", child: ["Hiring", "Interviews"], key: "body", content: "x" }
     })).toEqual([
-      "para-zk:update-area",
-      "title=Ops",
-      `child=${JSON.stringify(["Hiring", "Interviews"])}`,
+      "para-zk:update-child",
+      "root_type=area",
+      "root_title=Ops",
+      `relpath=${JSON.stringify(["Hiring"])}`,
+      "title=Interviews",
       "key=body",
       "op=set",
       "value=x",
       "format=json"
     ]);
+  });
+
+  it("rejects child updates on non-project/area types", () => {
+    expect(() => buildUpdateArgs({
+      tool: "set",
+      params: { type: "resource", title: "Reading Queue", child: ["Plan"], key: "body", content: "x" }
+    })).toThrow(/child updates require type=project or type=area/);
   });
 
   it("builds add args for append and prepend positions", () => {

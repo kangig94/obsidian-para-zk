@@ -17,10 +17,11 @@ describe("rename-project", () => {
 
   it("moves the folder, child notes, and source-scoped retro", async () => {
     await cli.run("para-zk:create-project", { title: "Old", open: "false" });
-    await cli.run("para-zk:create-subnote", {
+    await cli.run("para-zk:create-child", {
+      type: "subnote",
       title: "Child",
-      parent_type: "project",
-      parent_title: "Old",
+      root_type: "project",
+      root_title: "Old",
       subnote_type: "free",
       open: "false"
     });
@@ -44,14 +45,15 @@ describe("rename-project", () => {
 
   it("renames a child subnote via child drill instead of the container", async () => {
     await cli.run("para-zk:create-project", { title: "Host", open: "false" });
-    await cli.run("para-zk:create-subnote", {
+    await cli.run("para-zk:create-child", {
+      type: "subnote",
       title: "Draft",
-      parent_type: "project",
-      parent_title: "Host",
+      root_type: "project",
+      root_title: "Host",
       subnote_type: "free",
       open: "false"
     });
-    const renamed = await cli.run("para-zk:rename-project", { title: "Host", child: '["Draft"]', new_title: "Final" });
+    const renamed = await cli.run("para-zk:rename-child", { root_type: "project", root_title: "Host", title: "Draft", new_title: "Final" });
     expect(renamed.ok).toBe(true);
     expect(cli.app.readPath("PARA/Projects/Host/Final.md")).toBeDefined();
     expect(cli.app.readPath("PARA/Projects/Host/Draft.md")).toBeUndefined();

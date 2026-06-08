@@ -14,12 +14,12 @@ describe("canonical CLI argument aliases", () => {
   const cases: Array<{ label: string; command: string; args: Record<string, unknown>; message: string }> = [
     { label: "name", command: "para-zk:create-area", args: { name: "Alias Area" }, message: "Use title instead of name" },
     { label: "path (removed)", command: "para-zk:read-project", args: { title: "Alpha", path: "PARA/Projects/Alpha/Alpha.md" }, message: "path is not supported" },
-    { label: "sourcePath (removed)", command: "para-zk:create-subnote", args: { title: "X", sourcePath: "PARA/Projects/Alpha/Alpha.md" }, message: "sourcePath is not supported" },
+    { label: "sourcePath (removed)", command: "para-zk:create-child", args: { type: "subnote", root_type: "project", root_title: "Alpha", title: "X", sourcePath: "PARA/Projects/Alpha/Alpha.md" }, message: "sourcePath is not supported" },
     { label: "areaTitles", command: "para-zk:create-project", args: { title: "Alias Project", areaTitles: JSON.stringify(["A"]) }, message: "Use area_titles instead of areaTitles" },
     { label: "aliases", command: "para-zk:create-project", args: { title: "Alias Project", aliases: "PMG" }, message: "Use alias instead of aliases" },
     { label: "alias_list", command: "para-zk:create-resource", args: { title: "Alias Resource", alias_list: "PMG" }, message: "Use alias instead of alias_list" },
     { label: "aliasList", command: "para-zk:create-zk", args: { title: "Alias ZK", kind: "permanent", aliasList: "PMG" }, message: "Use alias instead of aliasList" },
-    { label: "subnoteType", command: "para-zk:create-subnote", args: { title: "X", subnoteType: "meeting" }, message: "Use subnote_type instead of subnoteType" },
+    { label: "subnoteType", command: "para-zk:create-child", args: { type: "subnote", root_type: "project", root_title: "Alpha", title: "X", subnoteType: "meeting" }, message: "Use subnote_type instead of subnoteType" },
     { label: "type", command: "para-zk:create-zk", args: { title: "Alias ZK", type: "permanent" }, message: "Use kind instead of type" },
     { label: "memo", command: "para-zk:capture-journal", args: { memo: "Alias memo" }, message: "Use content instead of memo" },
     { label: "text", command: "para-zk:capture-journal", args: { text: "Alias text" }, message: "Use content instead of text" }

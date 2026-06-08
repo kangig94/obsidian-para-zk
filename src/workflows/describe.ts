@@ -312,12 +312,19 @@ function specForSurfaceType(type: SurfaceType): ReadSurfaceSpec {
 
 // Addressing facet: how an LLM reaches/creates a note of this type. Separated from
 // the surface (keys) facet because some types are create-able but not directly
-// addressable for R/U/R/D — they are reached through their container with child=.
+// addressable for R/U/R/D — they are reached through the dedicated *-child CLI family.
 function addressingForType(type: SurfaceType): SurfaceAddressing {
   switch (type) {
     case "project":
+      return { addressable: true, selectors: ["title", "archived"], create: "para-zk:create-project", rename: true };
     case "area":
-      return { addressable: true, selectors: ["title", "archived", "child"], create: `para-zk:create-${type}`, rename: true };
+      return {
+        addressable: true,
+        selectors: ["title", "archived"],
+        addressVia: "Root areas are directly addressable by title. Nested areas are child notes: create/read/update/delete/rename them with the *-child commands using root_type=area + root_title + relpath (ancestor chain to the immediate parent) + title.",
+        create: "para-zk:create-area",
+        rename: true
+      };
     case "resource":
       return { addressable: true, selectors: ["title", "archived"], create: "para-zk:create-resource", rename: true };
     case "retro":
@@ -325,13 +332,13 @@ function addressingForType(type: SurfaceType): SurfaceAddressing {
     case "journal":
       return { addressable: true, selectors: ["date"], create: "para-zk:capture-journal", rename: false };
     case "subnote":
-      return { addressable: false, addressVia: `parent project/area + child=["title"]; no update-subnote — read/update/delete it via read-/update-/delete-project|area with that child`, create: "para-zk:create-subnote", rename: true };
+      return { addressable: false, addressVia: "not directly addressable — create/read/update/delete/rename it with the *-child commands: root_type (project|area) + root_title + relpath (ancestor chain to the immediate parent) + title", create: "para-zk:create-child", rename: true };
     case "zk_spark":
     case "zk_digest":
     case "zk_permanent":
       return { addressable: true, selectors: ["title", "kind"], create: "para-zk:create-zk", rename: true };
     case "note":
-      return { addressable: false, addressVia: `parent project/area + child=["title"]; reach it via read-/update-/delete-project|area with that child`, rename: true };
+      return { addressable: false, addressVia: "not directly addressable — read/update/delete/rename it with the *-child commands: root_type (project|area) + root_title + relpath (ancestor chain to the immediate parent) + title", rename: true };
   }
 }
 

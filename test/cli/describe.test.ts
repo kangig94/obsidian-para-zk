@@ -80,8 +80,10 @@ describe("describe", () => {
     const workflows = all.workflows as Array<{ command: string; inputs: string[] }>;
     const addReference = workflows.find((w) => w.command === "para-zk:add-reference");
     expect(addReference?.inputs).toEqual(expect.arrayContaining(["type", "title", "target"]));
+    const createChild = workflows.find((w) => w.command === "para-zk:create-child");
+    expect(createChild?.inputs).toEqual(expect.arrayContaining(["type", "root_type", "root_title", "relpath", "title"]));
     expect(workflows.map((w) => w.command)).toEqual(
-      expect.arrayContaining(["para-zk:capture-journal", "para-zk:distill-spark", "para-zk:create-from-digest"])
+      expect.arrayContaining(["para-zk:read-child", "para-zk:update-child", "para-zk:rename-child", "para-zk:delete-child", "para-zk:capture-journal", "para-zk:distill-spark", "para-zk:create-from-digest"])
     );
 
     const retro = await cli.run("para-zk:describe", { type: "retro" });
@@ -154,22 +156,25 @@ describe("describe", () => {
     const subnote = (result.surfaces as Array<Record<string, unknown>>)[0];
     const addressing = subnote.addressing as { addressable: boolean; addressVia?: string; create: string; createInputs: string[] };
     expect(addressing.addressable).toBe(false);
-    expect(addressing.addressVia).toContain("child=");
-    // addressVia teaches that there is no direct update-subnote; reach it through the parent.
-    expect(addressing.addressVia).toContain("no update-");
-    expect(addressing.create).toBe("para-zk:create-subnote");
+    expect(addressing.addressVia).toContain("*-child commands");
+    expect(addressing.addressVia).toContain("root_type");
+    expect(addressing.addressVia).toContain("relpath");
+    expect(addressing.create).toBe("para-zk:create-child");
     // createInputs come from the real create command's options (no obsidian help needed).
-    expect(addressing.createInputs).toEqual(expect.arrayContaining(["title", "parent_title", "subnote_type", "body"]));
+    expect(addressing.createInputs).toEqual(expect.arrayContaining(["type", "root_type", "root_title", "relpath", "title", "subnote_type", "body"]));
 
-    // A nested area is not a distinct type — it is an `area` created with a parent. The
-    // `area` surface stays directly addressable and advertises nesting via create-area's
-    // parent_title input + the child= selector, so a cold caller discovers it from describe.
+    // A nested area is not a distinct type — it is an `area` child. The `area`
+    // surface stays directly addressable for root areas and points nested-area
+    // operations at the *-child commands.
     const area = (await cli.run("para-zk:describe", { type: "area" })).surfaces as Array<Record<string, unknown>>;
-    const areaAddressing = area[0].addressing as { addressable: boolean; create: string; createInputs: string[]; selectors?: string[] };
+    const areaAddressing = area[0].addressing as { addressable: boolean; addressVia?: string; create: string; createInputs: string[]; selectors?: string[] };
     expect(areaAddressing.addressable).toBe(true);
     expect(areaAddressing.create).toBe("para-zk:create-area");
-    expect(areaAddressing.createInputs).toEqual(expect.arrayContaining(["title", "parent_title"]));
-    expect(areaAddressing.selectors).toEqual(expect.arrayContaining(["child"]));
+    expect(areaAddressing.createInputs).toEqual(expect.arrayContaining(["title"]));
+    expect(areaAddressing.createInputs).not.toEqual(expect.arrayContaining(["parent_title"]));
+    expect(areaAddressing.selectors).not.toEqual(expect.arrayContaining(["child"]));
+    expect(areaAddressing.addressVia).toContain("Nested areas");
+    expect(areaAddressing.addressVia).toContain("*-child");
 
     // `subarea` is no longer a stored/surface type.
     const bad = await cli.run("para-zk:describe", { type: "subarea" });
