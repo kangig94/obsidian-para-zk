@@ -184,8 +184,8 @@ function runLiveScenario() {
     "format=json"
   ]);
   assertCreated(reorderProject, "reference reorder project");
-  cliJson("para-zk:add-reference", ["type=project", `title=Smoke Reorder ${stamp}`, "target=https://example.com/reorder-a", "open=false", "format=json"]);
-  cliJson("para-zk:add-reference", ["type=project", `title=Smoke Reorder ${stamp}`, "target=https://example.com/reorder-b", "open=false", "format=json"]);
+  cliJson("para-zk:update-project", [`title=Smoke Reorder ${stamp}`, "key=references", "op=insert", `value_json=${JSON.stringify({ link: "https://example.com/reorder-a" })}`, "format=json"]);
+  cliJson("para-zk:update-project", [`title=Smoke Reorder ${stamp}`, "key=references", "op=insert", `value_json=${JSON.stringify({ link: "https://example.com/reorder-b" })}`, "format=json"]);
   assertReferenceRendererReorder(reorderProject.path);
 
   const taskProject = cliJson("para-zk:create-project", [
@@ -439,7 +439,7 @@ function assertCitationRendering(stamp) {
   ].join("\n"));
   const resource = cliJson("para-zk:create-resource", [`title=${title}`, `body=@${bodyFile}`, "open=false", "format=json"]);
   assertCreated(resource, "citation resource");
-  const ref = cliJson("para-zk:add-reference", ["type=resource", `title=${title}`, "target=https://example.com/cite-a", "open=false", "format=json"]);
+  const ref = cliJson("para-zk:update-resource", [`title=${title}`, "key=references", "op=insert", `value_json=${JSON.stringify({ link: "https://example.com/cite-a" })}`, "format=json"]);
   assert(ref.ok === true && ref.added === true, "citation reference setup failed");
 
   // Reading view uses a markdown post-processor; Live Preview (source mode) uses the CM6
@@ -602,11 +602,11 @@ function assertObjectReferenceRenameSurvival() {
     "format=json"
   ]);
   assertCreated(renameTarget, "object rename target");
-  const objectReference = cliJson("para-zk:add-reference", [
-    "type=project", `title=${renameProjectTitle}`,
-    `target=${renameTarget.path}`,
-    "description=Object rename description",
-    "open=false",
+  const objectReference = cliJson("para-zk:update-project", [
+    `title=${renameProjectTitle}`,
+    "key=references",
+    "op=insert",
+    `value_json=${JSON.stringify({ link: renameTarget.path, description: "Object rename description" })}`,
     "format=json"
   ]);
   assert(objectReference.ok === true && objectReference.added === true, "object rename reference setup failed");
@@ -638,10 +638,11 @@ function assertObjectReferenceRenameSurvival() {
   // Re-adding the renamed target must dedupe against the rename-normalized stored link
   // (Obsidian normalized it to a bare basename; dedupe resolves both forms to the same
   // file, so no duplicate entry is created).
-  const readdAfterRename = cliJson("para-zk:add-reference", [
-    "type=project", `title=${renameProjectTitle}`,
-    `target=${renamedTarget.path}`,
-    "open=false",
+  const readdAfterRename = cliJson("para-zk:update-project", [
+    `title=${renameProjectTitle}`,
+    "key=references",
+    "op=insert",
+    `value_json=${JSON.stringify({ link: renamedTarget.path })}`,
     "format=json"
   ]);
   assert(readdAfterRename.ok === true && readdAfterRename.added === false, "re-adding the renamed target should dedupe to the existing reference, not add a duplicate");

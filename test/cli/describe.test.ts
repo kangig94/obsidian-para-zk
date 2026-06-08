@@ -67,6 +67,8 @@ describe("describe", () => {
     // and names created/updated as not writable here.
     expect(String(all.scope)).toContain("optsidian");
     expect(String(all.scope)).toContain("created");
+    // A cold caller learns the inline-citation convention from scope alone.
+    expect(String(all.scope)).toContain("PZ[n]");
     expect(all.surfaceTypes).toEqual(
       expect.arrayContaining(["project", "area", "resource", "retro", "note"])
     );
@@ -78,8 +80,7 @@ describe("describe", () => {
 
     // Named (non-surface) workflows are discoverable from the index, with inputs.
     const workflows = all.workflows as Array<{ command: string; inputs: string[] }>;
-    const addReference = workflows.find((w) => w.command === "para-zk:add-reference");
-    expect(addReference?.inputs).toEqual(expect.arrayContaining(["type", "title", "target"]));
+    expect(workflows.map((w) => w.command)).not.toContain("para-zk:add-reference");
     const createChild = workflows.find((w) => w.command === "para-zk:create-child");
     expect(createChild?.inputs).toEqual(expect.arrayContaining(["type", "root_type", "root_title", "relpath", "title"]));
     expect(workflows.map((w) => w.command)).toEqual(

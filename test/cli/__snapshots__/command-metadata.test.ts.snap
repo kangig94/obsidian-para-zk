@@ -3,48 +3,6 @@
 exports[`native CLI command metadata is stable 1`] = `
 [
   {
-    "command": "para-zk:add-reference",
-    "description": "Add an existing vault file, wikilink, markdown link, URL, or text to a note's frontmatter reference registry",
-    "options": {
-      "child": {
-        "description": "Optional drill into a named child note (JSON list, left-to-right). Kept only where the receiver is a normally top-level note, such as add-reference.",
-        "value": "<["title", ...]>",
-      },
-      "date": {
-        "description": "Receiving note date when type=journal/retro.",
-        "value": "<YYYY-MM-DD>",
-      },
-      "description": {
-        "description": "Optional per-reference description.",
-        "value": "<text>",
-      },
-      "format": {
-        "description": "Output format (default: text).",
-        "value": "<text|json>",
-      },
-      "kind": {
-        "description": "Receiving ZK kind when type=zk.",
-        "value": "<spark|digest|permanent>",
-      },
-      "open": {
-        "description": "Open the receiving note in Obsidian.",
-        "value": "<true|false>",
-      },
-      "target": {
-        "description": "Reference target to add. Use [[Title]] to reference a note by name.",
-        "value": "<[[wikilink]]|url|markdown-link|text>",
-      },
-      "title": {
-        "description": "Receiving note title (project/area/resource/zk/retro).",
-        "value": "<title>",
-      },
-      "type": {
-        "description": "Type of the note that receives the reference.",
-        "value": "<project|area|resource|zk|retro|journal>",
-      },
-    },
-  },
-  {
     "command": "para-zk:attach-file",
     "description": "Copy local files or directories into the vault attachment folder",
     "options": {

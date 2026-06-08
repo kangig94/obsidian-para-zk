@@ -132,8 +132,10 @@ Then link as requested. To make an existing note reference a resource — e.g. "
 AI area":
 
 ```
-optsidian para-zk:add-reference type=area title="AI" target="[[<resource title>]]" format=json
+optsidian para-zk:update-area title="AI" key=references op=insert value_json='{"link":"[[<resource title>]]"}' format=json
 ```
+
+For a child receiver, use `para-zk:update-child root_type=<project|area> root_title="<root>" relpath='<ancestors>' title="<child>" key=references op=insert value_json='{"link":"[[<resource title>]]"}' format=json`.
 
 For multiple resources (per chapter, per item), create each and link them into the requested
 hub — an area, a project, or an index resource — so the set is navigable.

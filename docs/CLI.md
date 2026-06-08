@@ -30,9 +30,8 @@ ZK notes derived from an origin name it with `source_title` (and `source_type`
 where the origin type is ambiguous, e.g. scoped retro / resource link). Each
 concept uses exactly one option name: `title`, `kind`, `area_titles`,
 `subnote_type`, `content`, `root_type`, `root_title`, `relpath`, `source_type`,
-`source_title`. `child` remains only where the receiving note is normally
-top-level but may optionally be a child, such as `add-reference` and the MCP
-mutation tools.
+`source_title`. Child notes are addressed through the dedicated `*-child`
+commands instead of a `child=` argument on top-level commands.
 
 ### Discovering a command's arguments
 
@@ -185,8 +184,8 @@ Important fields:
 - `workflows` — named (non-surface) commands with their inputs:
   `create-child`, `read-child`, `update-child`, `rename-child`, `delete-child`,
   `capture-journal`, `distill-spark`, `create-from-digest`, `create-from-resource`,
-  `add-reference`, `attach-file`. This is how you discover those commands and args
-  without a separate help lookup.
+  `attach-file`. This is how you discover those commands and args without a
+  separate help lookup.
 - `collectionFilters`
 - `surfaces` when `type` is provided. Each surface carries an `addressing` facet:
   - `addressable` — whether the type is reached directly (`true`) or only through
@@ -626,7 +625,8 @@ references/<i>/link
 references/<i>/description
 ```
 
-Insert one reference with `key=references op=insert value_json='{...}'`.
+Add references through the update commands with
+`key=references op=insert value_json='{...}'`.
 The reference insert `position` in `value_json` is 0-based: `position: 0`
 inserts before the first reference, while omitted `position` appends. This is a
 different convention from task insert, where `position` is 1-based.
@@ -638,6 +638,10 @@ optional 0-based `position`. Insert returns `index`, `link`, `changed`, and
 `changed: false` and `added: false`. Wikilinks may include Obsidian display
 text, for example `[[Note Path|PMG]]`; the target is resolved to the real vault
 file while `PMG` is preserved as the displayed link text.
+
+For child notes, use the same insert shape through `para-zk:update-child` with
+`root_type`, `root_title`, optional `relpath`, `title`, `key=references`,
+`op=insert`, and `value_json='{"link":"..."}'`.
 
 Update one stored reference field with `key=references/<i>/<field> op=set`.
 Writable fields are `link` and `description`. Setting `link` keeps the item
@@ -651,6 +655,22 @@ serialized back as a bare string. Delete one item with
 Derived reference fields are read-only. `kind`, `path`, and `target` can be read
 through `key=references/<i>/<field>`, but cannot be updated.
 
+Canonical stored links are vault note/file wikilinks such as `[[path]]`,
+`[[path#subpath]]`, or `[[path|alias]]` when Obsidian display text is supplied.
+URLs are stored as raw URLs, unresolved wikilinks are stored as normalized
+`[[target]]` or `[[target|alias]]`, and plain non-link text remains text.
+Markdown text such as `[text](url)` is input syntax only and is dropped;
+wikilink display text such as `[[Note|alias]]` is preserved. `description` is
+set only when explicitly supplied. `kind`, `path`, and `target` are derived on
+read and never stored. The accepted read kinds are `url`, `note`, `file`,
+`wiki`, and `text`; `markdown` is not a stored or derived kind.
+
+Hand-authored bare-string `references` entries must use wikilink or URL syntax
+when they should behave as links. A frontmatter entry such as
+`references: ["folder/note.md"]` is read as `kind: "text"` and does not produce
+a backlink. Path-to-wikilink canonicalization runs through
+`update ... key=references op=insert`.
+
 Read-only keys include `children`, `backlinks`, `path`, `title`, `type`, and
 `archived`.
 
@@ -661,6 +681,7 @@ optsidian para-zk:update-project title="Model Evaluation" key=frontmatter/status
 optsidian para-zk:update-project title="Model Evaluation" key=summary op=replace match="old claim" with="new claim" format=json
 optsidian para-zk:update-project title="Model Evaluation" key=tasks op=insert value_json='{"name":"Review evaluation set","due":"2026-06-05","priority":"high"}' format=json
 optsidian para-zk:update-project title="Model Evaluation" key=references op=insert value_json='{"link":"https://example.com/paper","description":"Reviewed in May","position":0}' format=json
+optsidian para-zk:update-child root_type=project root_title="Model Evaluation" title="Planning Meeting" key=references op=insert value_json='{"link":"[[Source Paper]]"}' format=json
 optsidian para-zk:update-project title="Model Evaluation" key=references/0/description op=set value="Important source paper" format=json
 optsidian para-zk:update-project title="Model Evaluation" key=references/0/description op=set value_json=null format=json
 optsidian para-zk:update-project title="Model Evaluation" key=references/0 op=delete format=json
@@ -670,6 +691,15 @@ optsidian para-zk:update-child root_type=project root_title="Model Evaluation" t
 optsidian para-zk:update-child root_type=area root_title="AI" relpath='["Generation"]' title="Vision" key=overview op=set value=@/tmp/vision.md format=json
 optsidian para-zk:update-project title="Model Evaluation" key=frontmatter/status op=set value=archived format=json
 ```
+
+### Inline citations (`PZ[n]`)
+
+Body prose cites the note's own registry references inline with a code span whose
+whole content is `` `PZ[n]` `` — it renders as a `[n]` link to that note's n-th
+reference (0-based, matching `key=references/<i>`). Use `` `PZ[1, 2]` `` for
+several (comma-separated, each an independent link). It resolves in reading view
+and Live Preview; an out-of-range index renders as an unresolved marker. The
+reference must already be in the registry (add it with `key=references op=insert`).
 
 For projects, `key=frontmatter/status op=set value=archived` is a structural
 archive operation: it moves the folder-style project from `PARA/Projects` to
@@ -858,7 +888,8 @@ Side effects:
 Creates a resource note and optionally appends a frontmatter reference to it on
 the source note. Use this when the reference needs its own note, body text,
 metadata, or future reuse. For an existing file, note, or URL, use
-`para-zk:add-reference`.
+`update-* key=references op=insert value_json='{"link":"..."}'` or the
+equivalent `update-child` form for child notes.
 
 Options:
 
@@ -900,72 +931,6 @@ Important fields:
 
 - `sourcePath`
 - `linkedFromSource`
-
-### `para-zk:add-reference`
-
-Adds an existing vault file, wikilink, markdown link, URL, or text reference to
-a note's frontmatter `references` array.
-
-Options:
-
-The receiving note is addressed **by name** (like every other command). The
-`target` references another note by name too — use `[[Title]]`, which Obsidian
-resolves by basename or alias, so you never need a full path (and a just-created
-note's returned `path`/title can be used directly).
-
-| Option | Values | Notes |
-| --- | --- | --- |
-| `type` | `project`, `area`, `resource`, `zk`, `retro`, `journal` | Type of the note that receives the reference. |
-| `title` | string | Receiving note title (project/area/resource/zk/retro). |
-| `kind` | `spark`, `digest`, `permanent` | Receiving ZK kind when `type=zk`. |
-| `date` | YYYY-MM-DD | Receiving note date when `type=journal`/`retro`. |
-| `child` | JSON list | Optional. Drill into a nested child of the receiving container. |
-| `target` | `[[wikilink]]`, URL, markdown link, or text | Required. `[[Title]]` is resolved by basename or Obsidian alias to a vault note. `[[Title|PMG]]` stores the resolved target with `PMG` as display text. URLs are stored directly. Markdown-link text is input syntax only and is dropped. |
-| `description` | string | Optional per-reference description. |
-| `open` | boolean | Default `false`. |
-
-Examples:
-
-```bash
-optsidian para-zk:add-reference \
-  type=resource title="Attention Is All You Need" \
-  target="[[Telegram Clone]]" \
-  description="Project that applies this" \
-  format=json
-
-optsidian para-zk:add-reference \
-  type=project title="Model Evaluation" \
-  target="https://example.com/paper" \
-  description="Source paper" \
-  format=json
-```
-
-Important fields:
-
-- `path`
-- `index`
-- `link`
-- `added`
-
-`index` is the 0-based position of the affected reference. If the canonical
-`link` already exists, the command returns that existing index with
-`added: false` and does not rewrite the stored description.
-
-Canonical stored links are vault note/file wikilinks such as `[[path]]`,
-`[[path#subpath]]`, or `[[path|alias]]` when Obsidian display text is supplied;
-URLs are stored as raw URLs, unresolved wikilinks are stored as normalized
-`[[target]]` or `[[target|alias]]`, and plain non-link text remains text.
-Markdown text such as `[text](url)` is dropped; wikilink display text such as
-`[[Note|alias]]` is preserved. `description` is set only when explicitly
-supplied. `kind`, `path`, and `target` are derived on read and never stored. The
-accepted read kinds are `url`, `note`, `file`, `wiki`, and `text`; `markdown` is
-not a stored or derived kind.
-
-Hand-authored bare-string `references` entries must use wikilink or URL syntax
-when they should behave as links. A frontmatter entry such as
-`references: ["folder/note.md"]` is read as `kind: "text"` and does not produce
-a backlink. Path-to-wikilink canonicalization runs only through write paths such
-as `add-reference` and `update ... key=references op=insert`.
 
 ### `para-zk:create-retro`
 

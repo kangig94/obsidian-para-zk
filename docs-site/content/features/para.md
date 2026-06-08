@@ -79,7 +79,7 @@ You can:
 CLI example:
 
 ```bash
-optsidian para-zk:add-reference type=project title="Model Evaluation" target="https://example.com/paper" description="Source paper"
+optsidian para-zk:update-project title="Model Evaluation" key=references op=insert value_json='{"link":"https://example.com/paper","description":"Source paper"}'
 ```
 
 ## Tasks Block

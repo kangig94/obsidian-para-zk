@@ -103,7 +103,7 @@ export function registerReferenceRenderers(plugin: ParaZkPluginContext): void {
 }
 
 // References render from the host note's frontmatter, so a change made outside this
-// block — add-reference / create-resource from the CLI, MCP, or another view — must
+// block — reference updates / create-resource from the CLI, MCP, or another view — must
 // re-render it; otherwise the list only refreshed when the note was reopened. Mirrors
 // the vault-event subscription the retro-summary and dataview renderers already use.
 class ReferenceBlockRenderChild extends MarkdownRenderChild {

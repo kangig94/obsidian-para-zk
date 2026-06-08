@@ -29,11 +29,11 @@ describe("MCP server pure helpers", () => {
       ok: true as const,
       surfaceTypes: ["project"],
       collectionFilters: {},
-      workflows: [{ command: "para-zk:add-reference", inputs: ["type", "title", "target"] }]
+      workflows: [{ command: "para-zk:create-child", inputs: ["type", "root_type", "root_title", "title"] }]
     };
 
     const envelope = buildEnvelope({ cli: "optsidian", describe: describePayload }) as { workflows?: unknown };
-    expect(envelope.workflows).toEqual([{ command: "para-zk:add-reference", inputs: ["type", "title", "target"] }]);
+    expect(envelope.workflows).toEqual([{ command: "para-zk:create-child", inputs: ["type", "root_type", "root_title", "title"] }]);
   });
 
   it("builds a fallback index carrying the failure reason", () => {

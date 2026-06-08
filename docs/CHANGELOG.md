@@ -6,6 +6,9 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Breaking
 
+- Removed the redundant `para-zk:add-reference` CLI command. Add references via
+  `para-zk:update-* key=references op=insert value_json='{"link":"..."}'`;
+  child-note receivers use `para-zk:update-child ... key=references op=insert`.
 - Restructured child-note CLI addressing into a dedicated `*-child` family.
   Parent CRUD commands (`read/update/delete/rename-project|area|resource`) now
   address only directly-addressable notes and reject `child=` with a migration

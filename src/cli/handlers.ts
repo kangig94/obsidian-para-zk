@@ -127,7 +127,6 @@ type AttachedFile = {
 };
 
 type WorkflowFunctionName =
-  | "addReference"
   | "captureJournal"
   | "createArea"
   | "createProject"
@@ -199,10 +198,6 @@ type ChildAddress = {
 
 const FORMAT_OPTION: CliOptionSpec = { value: "<text|json>", description: "Output format (default: text)." };
 const ALIAS_OPTION: CliOptionSpec = { value: "<text>", description: "Optional single Obsidian alias to store in frontmatter." };
-const CHILD_OPTION: CliOptionSpec = {
-  value: `<["title", ...]>`,
-  description: "Optional drill into a named child note (JSON list, left-to-right). Kept only where the receiver is a normally top-level note, such as add-reference."
-};
 const ARCHIVED_OPTION: CliOptionSpec = {
   value: "<true|false>",
   description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy."
@@ -1040,32 +1035,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     })
   },
   {
-    command: "para-zk:add-reference",
-    description: "Add an existing vault file, wikilink, markdown link, URL, or text to a note's frontmatter reference registry",
-    options: {
-      type: { value: "<project|area|resource|zk|retro|journal>", description: "Type of the note that receives the reference." },
-      title: { value: "<title>", description: "Receiving note title (project/area/resource/zk/retro)." },
-      kind: { value: `<${ZK_KIND_CODE_HELP}>`, description: "Receiving ZK kind when type=zk." },
-      date: { value: "<YYYY-MM-DD>", description: "Receiving note date when type=journal/retro." },
-      child: CHILD_OPTION,
-      target: { value: "<[[wikilink]]|url|markdown-link|text>", description: "Reference target to add. Use [[Title]] to reference a note by name." },
-      description: { value: "<text>", description: "Optional per-reference description." },
-      open: { value: "<true|false>", description: "Open the receiving note in Obsidian." },
-      format: { value: "<text|json>", description: "Output format (default: text)." }
-    },
-    text: "reference added",
-    run: workflowRun("addReference", (args) => ({
-      type: readCliString(args, "type"),
-      title: readCliTitle(args),
-      kind: readCliString(args, "kind"),
-      date: readCliString(args, "date"),
-      child: parseList(readCliString(args, "child")),
-      target: readRequiredCliString(args, "target"),
-      description: readCliString(args, "description"),
-      open: readCliBoolean(args, "open") ?? false
-    }))
-  },
-  {
     command: "para-zk:create-retro",
     description: "Create a weekly retro note, optionally scoped to a project or area",
     options: {
@@ -1202,7 +1171,7 @@ const VAULT_CONTEXT = "Obsidian is a local-first, single-user personal knowledge
 // Sets the operator's expectation of what this CLI does and does not own, so it does not
 // bang on PARA-ZK for raw vault operations it deliberately leaves to the host. Kept verbatim
 // in sync with the MCP server's SCOPE_NOTE.
-const SCOPE_NOTE = "PARA-ZK owns typed PARA/ZK operations — create/read/update/rename/archive of the surface types above, addressed by name; child notes (subnotes, fallback notes, and nested areas) are addressed with the *-child commands using root_type/root_title/relpath/title. It does not rename, move, or copy files on disk, do raw file edits, free-form frontmatter, or full-text search; for those use your host's file/search tools (e.g. optsidian rename/move/copy, optsidian edit/apply_patch/write, optsidian grep/search). Per type, the mutable keys are in its writeKeys; keys absent there are not writable here — notably created/updated, which the vault maintains automatically.";
+const SCOPE_NOTE = "PARA-ZK owns typed PARA/ZK operations — create/read/update/rename/archive of the surface types above, addressed by name; child notes (subnotes, fallback notes, and nested areas) are addressed with the *-child commands using root_type/root_title/relpath/title. It does not rename, move, or copy files on disk, do raw file edits, free-form frontmatter, or full-text search; for those use your host's file/search tools (e.g. optsidian rename/move/copy, optsidian edit/apply_patch/write, optsidian grep/search). Per type, the mutable keys are in its writeKeys; keys absent there are not writable here — notably created/updated, which the vault maintains automatically. Body prose cites the note's own references inline with a `PZ[n]` code span (0-based, matching references/<i>; `PZ[1, 2]` for several).";
 
 // Discoverability: derive create/workflow inputs from the real command option
 // specs so `describe` is self-contained (a caller never needs `obsidian help`).
@@ -1219,7 +1188,6 @@ const NAMED_WORKFLOW_COMMANDS = [
   "para-zk:distill-spark",
   "para-zk:create-from-digest",
   "para-zk:create-from-resource",
-  "para-zk:add-reference",
   "para-zk:attach-file"
 ];
 

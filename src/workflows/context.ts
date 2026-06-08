@@ -54,12 +54,7 @@ export type CreateResourceOptions = {
 };
 
 export type AddReferenceOptions = {
-  sourcePath?: string;
-  type?: string;
-  title?: string;
-  kind?: string;
-  date?: string;
-  child?: string[];
+  sourcePath: string;
   target: string;
   description?: string;
   open?: boolean;

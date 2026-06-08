@@ -98,6 +98,7 @@ async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: 
       return title ? workflows.createArea(ctx, { title, open: true }) : undefined;
     }
     case "add-reference": {
+      if (!activePath) return undefined;
       const target = await prompt(plugin, labels.addReferenceCommandName, labels.promptReferenceTarget);
       return target ? workflows.addReference(ctx, { sourcePath: activePath, target, open: false }) : undefined;
     }

@@ -728,8 +728,9 @@ function valuePrompt(target: WritableSurfaceTarget, allowedOps: UpdateOperation[
     case "text":
       return " and value=<text> (read a file with value=@path)";
     case "taskCollection":
-    case "referenceCollection":
       return " and value_json=<json>";
+    case "referenceCollection":
+      return " and value_json={\"link\": ..., optional \"description\", optional 0-based \"position\"}";
     case "taskItem":
     case "referenceItem":
       return target.field ? " and value=<text>" : "";

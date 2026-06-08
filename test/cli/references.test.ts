@@ -10,14 +10,20 @@ beforeEach(async () => {
   await cli.run("para-zk:create-project", { title: "Alpha", status: "in_progress", open: "false" });
 });
 
-describe("add-reference", () => {
+function insertProjectReference(value: Record<string, unknown>): Promise<Record<string, unknown>> {
+  return cli.run("para-zk:update-project", {
+    title: "Alpha",
+    key: "references",
+    op: "insert",
+    value_json: JSON.stringify(value)
+  });
+}
+
+describe("reference collection insert", () => {
   it("adds a URL reference at index 0 with a canonical link", async () => {
-    const ref = await cli.run("para-zk:add-reference", {
-      type: "project",
-      title: "Alpha",
-      target: "https://example.com/source",
-      description: "Source",
-      open: "false"
+    const ref = await insertProjectReference({
+      link: "https://example.com/source",
+      description: "Source"
     });
     expect(ref.ok).toBe(true);
     expect(ref.added).toBe(true);
@@ -30,33 +36,24 @@ describe("add-reference", () => {
     const targetPath = "PARA/Resources/Target.md";
     const heading = "Section";
 
-    const headingRef = await cli.run("para-zk:add-reference", {
-      type: "project",
-      title: "Alpha",
-      target: `[[${targetPath}#${heading}]]`,
-      description: "Heading description",
-      open: "false"
+    const headingRef = await insertProjectReference({
+      link: `[[${targetPath}#${heading}]]`,
+      description: "Heading description"
     });
     expect(headingRef.added).toBe(true);
     expect(headingRef.link).toBe(`[[${targetPath}#${heading}]]`);
 
     // The same target written as a markdown link dedupes to the existing wiki entry.
-    const dupMarkdown = await cli.run("para-zk:add-reference", {
-      type: "project",
-      title: "Alpha",
-      target: `[Markdown heading](${targetPath}#${heading})`,
-      open: "false"
+    const dupMarkdown = await insertProjectReference({
+      link: `[Markdown heading](${targetPath}#${heading})`
     });
     expect(dupMarkdown.added).toBe(false);
     expect(dupMarkdown.index).toBe(headingRef.index);
     expect(dupMarkdown.link).toBe(`[[${targetPath}#${heading}]]`);
 
     // A different subpath (block ref) on the same file is a distinct reference.
-    const blockRef = await cli.run("para-zk:add-reference", {
-      type: "project",
-      title: "Alpha",
-      target: `[[${targetPath}#^smoke-block]]`,
-      open: "false"
+    const blockRef = await insertProjectReference({
+      link: `[[${targetPath}#^smoke-block]]`
     });
     expect(blockRef.added).toBe(true);
 
@@ -72,20 +69,14 @@ describe("add-reference", () => {
     await cli.run("para-zk:create-resource", { title: "Alias Demo P2", alias: "PMG", open: "false" });
     const targetPath = "PARA/Resources/Alias Demo P2.md";
 
-    const ref = await cli.run("para-zk:add-reference", {
-      type: "project",
-      title: "Alpha",
-      target: `[[${targetPath}|PMG]]`,
-      open: "false"
+    const ref = await insertProjectReference({
+      link: `[[${targetPath}|PMG]]`
     });
     expect(ref.added).toBe(true);
     expect(ref.link).toBe(`[[${targetPath}|PMG]]`);
 
-    const duplicate = await cli.run("para-zk:add-reference", {
-      type: "project",
-      title: "Alpha",
-      target: targetPath,
-      open: "false"
+    const duplicate = await insertProjectReference({
+      link: targetPath
     });
     expect(duplicate.added).toBe(false);
     expect(duplicate.index).toBe(ref.index);
@@ -106,11 +97,8 @@ describe("add-reference", () => {
   it("rejects a bare wikilink alias that does not resolve by path or basename", async () => {
     await cli.run("para-zk:create-resource", { title: "Alias Demo P2", alias: "PMG", open: "false" });
 
-    const rejected = await cli.run("para-zk:add-reference", {
-      type: "project",
-      title: "Alpha",
-      target: "[[PMG]]",
-      open: "false"
+    const rejected = await insertProjectReference({
+      link: "[[PMG]]"
     });
     expect(rejected.ok).toBe(false);
     expect(String(rejected.error)).toContain("reference target must resolve to an existing vault note: PMG");
@@ -122,15 +110,82 @@ describe("add-reference", () => {
   });
 
   it("treats a duplicate URL as a no-op returning the existing index", async () => {
-    await cli.run("para-zk:add-reference", { type: "project", title: "Alpha", target: "https://example.com/x", open: "false" });
-    const dup = await cli.run("para-zk:add-reference", { type: "project", title: "Alpha", target: "https://example.com/x", open: "false" });
+    await insertProjectReference({ link: "https://example.com/x" });
+    const dup = await insertProjectReference({ link: "https://example.com/x" });
     expect(dup.ok).toBe(true);
     expect(dup.added).toBe(false);
     expect(dup.index).toBe(0);
   });
+
+  it("uses omitted position as append and supports prepend and middle insertion", async () => {
+    const first = await insertProjectReference({ link: "https://example.com/a" });
+    const second = await insertProjectReference({ link: "https://example.com/b" });
+    const prepended = await insertProjectReference({ link: "https://example.com/start", position: 0 });
+    const middle = await insertProjectReference({ link: "https://example.com/middle", position: 2 });
+
+    expect(first.index).toBe(0);
+    expect(second.index).toBe(1);
+    expect(prepended.index).toBe(0);
+    expect(middle.index).toBe(2);
+
+    const read = await cli.run("para-zk:read-project", { title: "Alpha", key: "references", limit: "all" });
+    const value = read.value as { items?: Record<string, ReferenceRead> };
+    expect(Object.values(value.items ?? {}).map((item) => item.link)).toEqual([
+      "https://example.com/start",
+      "https://example.com/a",
+      "https://example.com/middle",
+      "https://example.com/b"
+    ]);
+  });
+
+  it("inserts references into a subnote through update-child", async () => {
+    await cli.run("para-zk:create-child", {
+      type: "subnote",
+      root_type: "project",
+      root_title: "Alpha",
+      title: "Plan",
+      body: "Initial plan.",
+      open: "false"
+    });
+
+    const inserted = await cli.run("para-zk:update-child", {
+      root_type: "project",
+      root_title: "Alpha",
+      title: "Plan",
+      key: "references",
+      op: "insert",
+      value_json: JSON.stringify({ link: "https://example.com/child", description: "Child reference" })
+    });
+    expect(inserted.ok).toBe(true);
+    expect(inserted.path).toBe("PARA/Projects/Alpha/Plan.md");
+    expect(inserted.index).toBe(0);
+    expect(inserted.added).toBe(true);
+
+    const read = await cli.run("para-zk:read-child", {
+      root_type: "project",
+      root_title: "Alpha",
+      title: "Plan",
+      key: "references/0"
+    });
+    expect(read.value).toMatchObject({
+      link: "https://example.com/child",
+      description: "Child reference",
+      kind: "url"
+    });
+  });
 });
 
 describe("reference collection updates", () => {
+  it("guides missing reference inserts with the reference value_json shape", async () => {
+    const rejected = await cli.run("para-zk:update-project", {
+      title: "Alpha",
+      key: "references",
+      op: "insert"
+    });
+    expect(rejected.ok).toBe(false);
+    expect(String(rejected.error)).toContain("value_json={\"link\": ..., optional \"description\", optional 0-based \"position\"}");
+  });
+
   it("rejects raw appends to the references key", async () => {
     const rejected = await cli.run("para-zk:update-project", {
       title: "Alpha",
