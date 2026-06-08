@@ -4,3 +4,10 @@ node_modules/
 dist/
 *.log
 .claude/coral
+
+# docs-site (Quartz): commit ONLY our content + config; the CI workflow clones the
+# Quartz framework at build time, so the framework/deps/build output stay out of git.
+docs-site/*
+!docs-site/content/
+!docs-site/quartz.config.yaml
+!docs-site/quartz.lock.json

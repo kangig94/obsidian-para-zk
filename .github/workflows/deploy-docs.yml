@@ -1,0 +1,75 @@
+name: Deploy Quartz docs site to GitHub Pages
+
+# Only our content + config live in the repo (docs-site/content, quartz.config.yaml,
+# quartz.lock.json). This workflow clones the Quartz framework at build time and overlays
+# them, so the ~290-file framework never has to be committed.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs-site/content/**"
+      - "docs-site/quartz.config.yaml"
+      - "docs-site/quartz.lock.json"
+      - ".github/workflows/deploy-docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+env:
+  QUARTZ_REF: v5
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo (our content + config)
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Clone Quartz framework
+        run: git clone --depth 1 --branch "$QUARTZ_REF" https://github.com/jackyzha0/quartz.git .quartz-build
+      - name: Overlay our content + config
+        run: |
+          rm -rf .quartz-build/content
+          cp -r docs-site/content .quartz-build/content
+          cp docs-site/quartz.config.yaml .quartz-build/quartz.config.yaml
+          cp docs-site/quartz.lock.json .quartz-build/quartz.lock.json
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Cache npm
+        uses: actions/cache@v5
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-quartz-${{ env.QUARTZ_REF }}-${{ hashFiles('docs-site/quartz.lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-quartz-${{ env.QUARTZ_REF }}-
+      - name: Build site
+        working-directory: .quartz-build
+        run: |
+          npm ci
+          npx quartz plugin install
+          npx quartz build
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .quartz-build/public
+
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
