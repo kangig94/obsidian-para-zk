@@ -75,16 +75,19 @@ Apply the transform faithfully, and always make the form tidy:
   mark anything uncertain or unverified; do not invent.
 
 For translation requests, preserve the source's structure, argument flow, and domain precision
-while making the prose readable in the requested target language. Translate ordinary prose
-naturally, but keep field-specific terms, named concepts, identifiers, metrics, acronyms, and
-proper nouns in the source language when practitioners would normally do so or when translation
-would reduce clarity. Translate widely established target-language terms when they are unambiguous
-and easier to read. Do not add bilingual glosses, invent terminology, over-localize, or simplify the
-source beyond what the user asked for. Preserve equations, symbols, citations, tables, and figure
-references unless instructed otherwise. Preserve citation markers in the translated body; do not
-replace `introduced in [27]` with author-only prose such as "Zhang et al." unless the source itself
-uses that form. If the source renderer exposes only citation keys, resolve them back to the paper's
-numbered citation form before writing the final note.
+while making the prose natural in the requested target language. Translate ordinary prose,
+general academic wording, and widely established technical vocabulary when the target-language
+term is clear and reads naturally. Keep source-language terms only for proper nouns, acronyms,
+identifiers, symbols, metrics, code-facing names, named concepts, or field-specific anchors whose
+translation would obscure the meaning or break alignment with the paper, code, or formulas.
+Do not leave generic words untranslated merely because they appear near technical content.
+When a source-language anchor is kept, integrate it into fluent target-language prose rather
+than producing translationese. Do not add bilingual glosses, invent terminology, over-localize,
+or simplify the source beyond what the user asked for. Preserve equations, symbols, citations,
+tables, and figure references unless instructed otherwise. Preserve citation markers in the
+translated body; do not replace `introduced in [27]` with author-only prose such as "Zhang et al."
+unless the source itself uses that form. If the source renderer exposes only citation keys, resolve
+them back to the paper's numbered citation form before writing the final note.
 
 Across all of them: real headings (`#`/`##`), valid Markdown tables (no empty cells, no
 equations trapped in cells), math as LaTeX (`$…$`), figures embedded (web images by URL,
