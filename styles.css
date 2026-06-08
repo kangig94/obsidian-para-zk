@@ -180,6 +180,10 @@
   min-width: 0;
 }
 
+.cm-embed-block[class*="cm-lang-para-zk-"] > .edit-block-button {
+  display: none;
+}
+
 .para-zk-view-toolbar {
   align-items: center;
   display: flex;

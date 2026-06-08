@@ -160,6 +160,19 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Changed
 
+- Relabeled the props-block mode buttons to action words — `Edit`/`Read` (ko `편집`/`읽기`)
+  instead of `Live Preview`/`Reading view` (ko `실시간 미리보기`/`읽기 화면`). The buttons are
+  an edit↔read action pair (pencil/eye icons) that send the note to `source`/`preview` mode,
+  not references to Obsidian's rendering-mode brand: `Live Preview` clashed with the adjacent
+  `Reading view` (both read as "view") and was inaccurate for users who keep Live Preview off,
+  where `source` mode is plain Source. The labels now match the buttons' intent and icons.
+- Hid Obsidian's "Edit this block" (`</>`) button on PARA-ZK rendered widgets in Live Preview.
+  Obsidian attaches `.edit-block-button` to any code-block widget so the source can be edited,
+  but PARA-ZK blocks (`para-zk-props`, `-managed`, `-view`, `-tasks`, `-references`,
+  `-latest-retro-summary`, `-dashboard-*`) are plugin-managed and not hand-edited as raw text,
+  so the affordance was noise. A single CSS rule scoped by the `cm-lang-para-zk-` language-class
+  prefix hides it; other plugins' and normal code blocks' edit buttons are untouched, and
+  reading view is unaffected (no such button there).
 - Collapsed the `subarea` stored type back into `area`. A nested area is now an ordinary
   `area` that simply has a `parent` (the sole root/nested discriminator), so it renders the
   area template and managed UI, is caught by `type=area` filters/search, and behaves

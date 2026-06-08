@@ -193,14 +193,14 @@ function renderPropsToolbar(plugin: ParaZkPluginContext, container: HTMLElement,
 
   renderPropsModeButton(plugin, controls, {
     sourcePath,
-    label: labelValue(labels.edit, "Live Preview"),
+    label: labelValue(labels.edit, "Edit"),
     icon: "pencil",
     className: "para-zk-props-edit",
     mode: "source"
   });
   renderPropsModeButton(plugin, controls, {
     sourcePath,
-    label: labelValue(labels.view, "Reading view"),
+    label: labelValue(labels.view, "Read"),
     icon: "eye",
     className: "para-zk-props-view",
     mode: "preview"
