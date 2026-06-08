@@ -1,14 +1,20 @@
 import {
   MarkdownRenderChild,
   MarkdownRenderer,
+  Notice,
   TFile,
   type MarkdownPostProcessorContext
 } from "obsidian";
 import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { DATAVIEW_VIEW_KEYS, dataviewViewBlock, type DataviewViewKey } from "../templates";
+import {
+  renderBlockNotice,
+  renderBlockShell,
+  renderShellAction
+} from "./block-shell";
 import { parseCodeBlockKeyValues } from "./code-block-args";
-import { createWorkflowButton } from "./workflow-buttons";
+import { runGuiWorkflow } from "./workflow-commands";
 
 type DataviewViewArgs = {
   key: string;
@@ -115,17 +121,13 @@ async function renderDataviewView(
   const block = dataviewViewBlock(key, plugin.settings, sourcePath);
 
   el.empty();
-  el.addClass("para-zk-view");
-  if (key) el.addClass(`para-zk-view-${viewClassName(key)}`);
   if (!block) {
-    el.createDiv({ cls: "para-zk-props-muted", text: `Unknown PARA-ZK view: ${key || "(empty)"}` });
+    renderBlockNotice(el, viewBlockKind(key), `Unknown PARA-ZK view: ${key || "(empty)"}`);
     return Promise.resolve();
   }
 
   const viewKey = readDataviewViewKey(key);
-  if (viewKey || args.title) renderDataviewViewToolbar(plugin, el, viewKey, sourcePath, args.title);
-
-  const body = el.createDiv({ cls: "para-zk-view-body" });
+  const body = renderDataviewViewShell(plugin, el, viewKey, sourcePath, key, args.title);
   await MarkdownRenderer.render(plugin.app, block, body, sourcePath, child);
   if (!isCurrent()) return;
 }
@@ -144,36 +146,46 @@ function legacyViewKey(source: string): string {
 }
 
 function renderDataviewViewError(el: HTMLElement, error: unknown): void {
-  el.empty();
-  el.addClass("para-zk-view");
-  el.createDiv({
-    cls: "para-zk-props-muted",
-    text: error instanceof Error ? error.message : String(error)
-  });
+  renderBlockNotice(el, "view", error instanceof Error ? error.message : String(error));
 }
 
-function renderDataviewViewToolbar(
+function renderDataviewViewShell(
   plugin: ParaZkPluginContext,
   el: HTMLElement,
   key: DataviewViewKey | undefined,
   sourcePath: string,
+  rawKey: string,
   title?: string
-): void {
+): HTMLElement {
   const toolbar = key ? dataviewViewToolbar(plugin, key) : undefined;
   const actions = toolbar?.actions ?? [];
   const titleText = title?.trim();
-  if (!titleText && actions.length === 0) return;
+  return renderBlockShell(el, {
+    kind: viewBlockKind(rawKey),
+    title: titleText,
+    renderActions: actions.length > 0 ? (controls) => {
+      for (const action of actions) {
+        renderShellAction(controls, {
+          label: action.label,
+          icon: action.icon,
+          cta: true,
+          onClick: async (_button, component) => {
+            if (!action.command) {
+              new Notice(localePack(plugin.settings.locale).messages.buttonMissingCommand);
+              return;
+            }
 
-  const toolbarEl = el.createDiv({ cls: "para-zk-view-toolbar" });
-  if (titleText) toolbarEl.createDiv({ cls: "para-zk-view-toolbar-heading", text: titleText });
-  const controls = toolbarEl.createDiv({ cls: "para-zk-view-toolbar-controls" });
-
-  for (const action of actions) {
-    const button = createWorkflowButton(plugin, action.label, action.command, sourcePath, { icon: action.icon });
-    button.addClass("para-zk-view-toolbar-button", "para-zk-view-action");
-    button.setAttr("aria-label", action.label);
-    controls.appendChild(button);
-  }
+            component.setDisabled(true);
+            try {
+              await runGuiWorkflow(plugin, action.command, sourcePath);
+            } finally {
+              component.setDisabled(false);
+            }
+          }
+        });
+      }
+    } : undefined
+  }).body;
 }
 
 function dataviewViewToolbar(plugin: ParaZkPluginContext, key: DataviewViewKey): DataviewViewToolbar | undefined {
@@ -222,4 +234,9 @@ function readDataviewViewKey(key: string): DataviewViewKey | undefined {
 
 function viewClassName(key: string): string {
   return key.toLocaleLowerCase().replace(/[^a-z0-9_-]+/g, "-");
+}
+
+function viewBlockKind(key: string): string {
+  const className = key ? viewClassName(key) : "";
+  return className ? `view-${className}` : "view";
 }

@@ -6,6 +6,7 @@ import {
 } from "obsidian";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { managedUiBlockForType } from "../templates";
+import { applyBlockKind, renderBlockNotice } from "./block-shell";
 
 export function registerManagedSectionRenderers(plugin: ParaZkPluginContext): void {
   plugin.registerMarkdownCodeBlockProcessor("para-zk-managed", (source, el, ctx) => {
@@ -49,14 +50,13 @@ async function renderManagedSections(
   const block = type ? managedUiBlockForType(type, plugin.settings) : undefined;
 
   el.empty();
-  el.addClass("para-zk-managed");
-  if (type) el.addClass(`para-zk-managed-${className(type)}`);
 
   if (!type) {
-    el.createDiv({ cls: "para-zk-props-muted", text: `No PARA-ZK managed UI for type: ${type || "(unknown)"}` });
+    renderBlockNotice(el, "managed", `No PARA-ZK managed UI for type: ${type || "(unknown)"}`);
     return;
   }
 
+  applyBlockKind(el, `managed-${type}`);
   if (!block) return;
 
   await MarkdownRenderer.render(plugin.app, block, el, sourcePath, child);
@@ -113,14 +113,5 @@ function readFrontmatterTypeFromText(content: string): string | undefined {
 }
 
 function renderManagedSectionsError(el: HTMLElement, error: unknown): void {
-  el.empty();
-  el.addClass("para-zk-managed");
-  el.createDiv({
-    cls: "para-zk-props-muted",
-    text: error instanceof Error ? error.message : String(error)
-  });
-}
-
-function className(value: string): string {
-  return value.toLocaleLowerCase().replace(/[^a-z0-9_-]+/g, "-");
+  renderBlockNotice(el, "managed", error instanceof Error ? error.message : String(error));
 }

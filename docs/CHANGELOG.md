@@ -160,6 +160,14 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Changed
 
+- Unified the props/tasks/references/view custom UI renderers behind one shared
+  `para-zk-block` shell (`src/ux/block-shell.ts`) and renamed their DOM/CSS structure to a
+  single BEM-style `para-zk-block` / `--<kind>` / `__<part>` vocabulary — collapsing four
+  near-duplicate toolbar/list/heading rulesets into one and dropping dead CSS. Code-block
+  language names (and thus stored notes) are unchanged, but custom CSS snippets or themes
+  that targeted the old per-block classes (`.para-zk-task-toolbar`, `.para-zk-reference-row`,
+  `.para-zk-view-toolbar`, `.para-zk-props-block`, …) must move to the new `para-zk-block__*`
+  classes.
 - Relabeled the props-block mode buttons to action words — `Edit`/`Read` (ko `편집`/`읽기`)
   instead of `Live Preview`/`Reading view` (ko `실시간 미리보기`/`읽기 화면`). The buttons are
   an edit↔read action pair (pencil/eye icons) that send the note to `source`/`preview` mode,

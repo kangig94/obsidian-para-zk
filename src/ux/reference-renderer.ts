@@ -36,11 +36,15 @@ import {
   registryErrorMessage,
   renderRegistryBlockError,
   renderRegistryRow,
-  renderRegistryToolbar,
   runRegistryBlockAction,
   type RegistryBlockState,
   type RegistryDragOptions
 } from "./registry-block";
+import {
+  renderBlockEmpty,
+  renderBlockShell,
+  renderShellAction
+} from "./block-shell";
 import { parseCodeBlockKeyValues } from "./code-block-args";
 import { referenceTargetHint, referenceTitle, renderReferenceAnchor } from "./reference-link";
 
@@ -150,7 +154,6 @@ async function renderReferenceBlock(
   const blockState = beginReferenceBlockRender(el, args);
   const generation = blockState.generation;
   el.empty();
-  el.addClass("para-zk-references");
 
   try {
     if (args.root !== "current") {
@@ -160,10 +163,10 @@ async function renderReferenceBlock(
     const labels = localePack(plugin.settings.locale).labels;
     const rootFile = plugin.app.vault.getFileByPath(ctx.sourcePath) ?? undefined;
     if (!(rootFile instanceof TFile)) {
-      el.createDiv({
-        cls: "para-zk-reference-empty",
-        text: labelValue(labels.referenceEmpty, "No references.")
-      });
+      renderBlockEmpty(
+        renderBlockShell(el, { kind: "references", title: args.title }).body,
+        labelValue(labels.referenceEmpty, "No references.")
+      );
       return;
     }
 
@@ -185,7 +188,7 @@ async function renderReferenceBlock(
       })
       : undefined;
 
-    renderReferenceToolbar(plugin, el, {
+    const body = renderReferenceShell(plugin, el, {
       rootFile,
       title: args.title,
       items,
@@ -193,14 +196,11 @@ async function renderReferenceBlock(
     });
 
     if (items.length === 0) {
-      el.createDiv({
-        cls: "para-zk-reference-empty",
-        text: labelValue(labels.referenceEmpty, "No references.")
-      });
+      renderBlockEmpty(body, labelValue(labels.referenceEmpty, "No references."));
       return;
     }
 
-    const list = el.createDiv({ cls: "para-zk-reference-list" });
+    const list = body.createDiv({ cls: "para-zk-block__list" });
     for (const item of items) {
       renderReferenceRow(plugin, list, item, {
         blockState,
@@ -214,7 +214,7 @@ async function renderReferenceBlock(
   }
 }
 
-function renderReferenceToolbar(
+function renderReferenceShell(
   plugin: ParaZkPluginContext,
   el: HTMLElement,
   options: {
@@ -223,27 +223,20 @@ function renderReferenceToolbar(
     items: RenderableReference[];
     rerender: () => Promise<void>;
   }
-): void {
+): HTMLElement {
   const labels = localePack(plugin.settings.locale).labels;
-  renderRegistryToolbar(el, {
-    toolbarClass: "para-zk-reference-toolbar",
-    headingClass: "para-zk-reference-toolbar-heading",
-    summaryClass: "para-zk-reference-toolbar-summary",
-    controlsClass: "para-zk-reference-toolbar-controls",
-    titleText: options.title,
-    summaryText: referenceSummaryText(options.items, labels),
-    renderControls: (controls) => {
-      const add = new ButtonComponent(controls);
-      const addButton = add.buttonEl;
+  return renderBlockShell(el, {
+    kind: "references",
+    title: options.title,
+    summary: referenceSummaryText(options.items, labels),
+    renderActions: (actions) => {
       const addLabel = labelValue(labels.referenceAdd, labelValue(labels.addReference, "Add reference"));
-      addButton.addClass("para-zk-reference-toolbar-button", "para-zk-reference-add");
-      addButton.setAttr("aria-label", addLabel);
-      add
-        .setIcon("plus")
-        .setButtonText(addLabel)
-        .setTooltip(addLabel)
-        .setCta()
-        .onClick(() => {
+      renderShellAction(actions, {
+        label: addLabel,
+        icon: "plus",
+        cta: true,
+        variant: "add",
+        onClick: () => {
           new ReferenceEditModal(
             plugin,
             addLabel,
@@ -257,19 +250,16 @@ function renderReferenceToolbar(
               await options.rerender();
             }
           ).open();
-        });
+        }
+      });
 
-      const createResourceButton = new ButtonComponent(controls);
-      const createResourceButtonEl = createResourceButton.buttonEl;
       const createResourceLabel = labelValue(labels.createResource, "Create resource");
-      createResourceButtonEl.addClass("para-zk-reference-toolbar-button", "para-zk-reference-create-resource");
-      createResourceButtonEl.setAttr("aria-label", createResourceLabel);
-      createResourceButton
-        .setIcon("file-plus")
-        .setButtonText(createResourceLabel)
-        .setTooltip(createResourceLabel)
-        .setCta()
-        .onClick(async () => {
+      renderShellAction(actions, {
+        label: createResourceLabel,
+        icon: "file-plus",
+        cta: true,
+        variant: "create-resource",
+        onClick: async (createResourceButtonEl) => {
           await runRegistryBlockAction(createResourceButtonEl, async () => {
             const title = await promptText(
               plugin.app,
@@ -292,9 +282,10 @@ function renderReferenceToolbar(
             );
             await options.rerender();
           });
-        });
+        }
+      });
     }
-  });
+  }).body;
 }
 
 function renderReferenceRow(
@@ -310,23 +301,19 @@ function renderReferenceRow(
 ): void {
   const labels = localePack(plugin.settings.locale).labels;
   renderRegistryRow(list, item, {
-    rowClass: "para-zk-reference-row",
     dataset: {
       referenceIndex: String(item.index),
       referenceLink: item.reference.link,
       referenceKind: item.reference.kind
     },
-    reorderableClass: "is-reorderable",
     drag: options.drag ? {
       state: options.blockState,
       itemKey: referenceItemKey,
-      handleClass: "para-zk-reference-drag",
       label: "Reorder reference",
-      rowSelector: ".para-zk-reference-row",
       drag: options.drag
     } : undefined,
     renderBody: (row) => {
-      const body = row.createDiv({ cls: "para-zk-reference-body" });
+      const body = row.createDiv({ cls: "para-zk-block__rowbody" });
       renderReferenceAnchor(plugin, body, item.reference, {
         text: referenceTitle(item.reference),
         title: referenceTargetHint(item.reference),
@@ -342,11 +329,11 @@ function renderReferenceRow(
         });
       }
 
-      const actions = row.createDiv({ cls: "para-zk-reference-actions" });
+      const actions = row.createDiv({ cls: "para-zk-block__rowactions" });
       const editAction = new ButtonComponent(actions);
       const edit = editAction.buttonEl;
       const editLabel = labelValue(labels.referenceEdit, "Edit reference");
-      edit.addClass("para-zk-reference-edit");
+      edit.addClass("para-zk-block__action", "is-edit");
       edit.setAttr("aria-label", editLabel);
       editAction
         .setIcon("pencil")
@@ -368,7 +355,7 @@ function renderReferenceRow(
       const removeAction = new ButtonComponent(actions);
       const remove = removeAction.buttonEl;
       const deleteLabel = labelValue(labels.referenceDelete, "Delete reference");
-      remove.addClass("para-zk-reference-delete");
+      remove.addClass("para-zk-block__action", "is-delete");
       remove.setAttr("aria-label", deleteLabel);
       removeAction
         .setIcon("trash")
@@ -489,10 +476,7 @@ function assertSameReferenceLinkSet(left: string[], right: string[], goneMessage
 }
 
 function renderReferenceError(el: HTMLElement, error: unknown): void {
-  renderRegistryBlockError(el, error, {
-    blockClass: "para-zk-references",
-    emptyClass: "para-zk-reference-empty"
-  });
+  renderRegistryBlockError(el, error, "references");
 }
 
 function buildReferenceLinkInput(target: string, anchor: string): string {

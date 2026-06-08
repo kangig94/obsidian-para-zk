@@ -1,4 +1,5 @@
-import { ButtonComponent, DropdownComponent, Notice } from "obsidian";
+import { ButtonComponent, Notice } from "obsidian";
+import { renderBlockNotice } from "./block-shell";
 
 export type RegistryBlockState<TToolbar, TItem> = {
   toolbar: TToolbar;
@@ -24,9 +25,7 @@ type RegistryFile = {
 type RegistryRowDragOptions<TItem, TState extends RegistryDragState> = {
   state: TState;
   itemKey: (item: TItem) => string;
-  handleClass: string;
   label: string;
-  rowSelector: string;
   drag: RegistryDragOptions;
 };
 
@@ -82,14 +81,9 @@ export async function runRegistryBlockAction(button: HTMLButtonElement, action: 
 export function renderRegistryBlockError(
   el: HTMLElement,
   error: unknown,
-  options: {
-    blockClass: string;
-    emptyClass: string;
-  }
+  kind: string
 ): void {
-  el.empty();
-  el.addClass(options.blockClass);
-  el.createDiv({ cls: options.emptyClass, text: registryErrorMessage(error) });
+  renderBlockNotice(el, kind, registryErrorMessage(error));
 }
 
 export function registryErrorMessage(error: unknown): string {
@@ -112,78 +106,21 @@ export async function queueRegistryFileWrite<T>(file: RegistryFile, write: () =>
   }
 }
 
-export function renderRegistryToolbar(
-  parent: HTMLElement,
-  options: {
-    toolbarClass: string;
-    headingClass: string;
-    summaryClass: string;
-    controlsClass: string;
-    titleText?: string;
-    summaryText: string;
-    renderControls: (controls: HTMLElement) => void;
-  }
-): {
-  toolbar: HTMLElement;
-  heading: HTMLElement;
-  summaryEl: HTMLElement;
-  controls: HTMLElement;
-} {
-  const toolbar = parent.createDiv({ cls: options.toolbarClass });
-  const heading = toolbar.createDiv({ cls: options.headingClass });
-  const titleText = options.titleText?.trim();
-  if (titleText) heading.createDiv({
-    cls: `${options.headingClass}-title`,
-    text: titleText
-  });
-  const summaryEl = heading.createDiv({
-    cls: options.summaryClass,
-    text: options.summaryText
-  });
-  const controls = toolbar.createDiv({ cls: options.controlsClass });
-  options.renderControls(controls);
-  return { toolbar, heading, summaryEl, controls };
-}
-
-export function renderRegistryToolbarSelect<TValue extends string>(
-  parent: HTMLElement,
-  options: {
-    selectClass: string;
-    label: string;
-    value: TValue;
-    options: Array<{ value: TValue; label: string }>;
-    onChange: (value: TValue) => void;
-  }
-): void {
-  const wrap = parent.createDiv({ cls: options.selectClass });
-  const dropdown = new DropdownComponent(wrap);
-  dropdown.selectEl.setAttr("aria-label", options.label);
-  dropdown.selectEl.setAttr("title", options.label);
-  for (const item of options.options) {
-    dropdown.addOption(item.value, item.label);
-  }
-  dropdown
-    .setValue(options.value)
-    .onChange((value) => options.onChange(value as TValue));
-}
-
 export function renderRegistryRow<TItem, TState extends RegistryDragState>(
   list: HTMLElement,
   item: TItem,
   options: {
-    rowClass: string;
     dataset?: Record<string, string>;
-    reorderableClass: string;
     drag?: RegistryRowDragOptions<TItem, TState>;
     renderBody: (row: HTMLElement) => void;
   }
 ): HTMLElement {
-  const row = list.createDiv({ cls: options.rowClass });
+  const row = list.createDiv({ cls: "para-zk-block__row" });
   for (const [key, value] of Object.entries(options.dataset ?? {})) {
     row.dataset[key] = value;
   }
   if (options.drag) {
-    row.addClass(options.reorderableClass);
+    row.addClass("is-reorderable");
     attachRegistryDragHandle(list, row, item, options.drag);
   }
 
@@ -252,7 +189,7 @@ function attachRegistryDragHandle<TItem, TState extends RegistryDragState>(
 ): void {
   const handle = new ButtonComponent(row);
   const button = handle.buttonEl;
-  button.addClass(options.handleClass);
+  button.addClass("para-zk-block__drag");
   button.draggable = true;
   button.setAttr("aria-label", options.label);
   handle
@@ -268,7 +205,7 @@ function attachRegistryDragHandle<TItem, TState extends RegistryDragState>(
   });
   button.addEventListener("dragend", () => {
     options.state.draggingItemKey = undefined;
-    cleanupRegistryDragMarks(list, options.rowSelector);
+    cleanupRegistryDragMarks(list);
   });
 
   row.addEventListener("dragover", (event) => {
@@ -277,7 +214,7 @@ function attachRegistryDragHandle<TItem, TState extends RegistryDragState>(
     if (!draggedKey || draggedKey === key) return;
     event.preventDefault();
     if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-    markRegistryDropPosition(list, row, isRegistryDropAfter(event, row), options.rowSelector);
+    markRegistryDropPosition(list, row, isRegistryDropAfter(event, row));
   });
   row.addEventListener("dragleave", (event) => {
     if (event.relatedTarget instanceof Node && row.contains(event.relatedTarget)) return;
@@ -290,7 +227,7 @@ function attachRegistryDragHandle<TItem, TState extends RegistryDragState>(
     event.preventDefault();
     const placeAfter = isRegistryDropAfter(event, row);
     options.state.draggingItemKey = undefined;
-    cleanupRegistryDragMarks(list, options.rowSelector);
+    cleanupRegistryDragMarks(list);
     void options.drag.onDrop(draggedKey, key, placeAfter).catch((error: unknown) => {
       new Notice(registryErrorMessage(error));
     });
@@ -305,21 +242,20 @@ function isRegistryDropAfter(event: DragEvent, row: HTMLElement): boolean {
 function markRegistryDropPosition(
   list: HTMLElement,
   row: HTMLElement,
-  placeAfter: boolean,
-  rowSelector: string
+  placeAfter: boolean
 ): void {
-  cleanupRegistryDropMarks(list, rowSelector);
+  cleanupRegistryDropMarks(list);
   row.addClass(placeAfter ? "is-drop-after" : "is-drop-before");
 }
 
-function cleanupRegistryDropMarks(list: HTMLElement, rowSelector: string): void {
-  for (const row of list.querySelectorAll(rowSelector)) {
+function cleanupRegistryDropMarks(list: HTMLElement): void {
+  for (const row of list.querySelectorAll(".para-zk-block__row")) {
     row.removeClass("is-drop-before", "is-drop-after");
   }
 }
 
-function cleanupRegistryDragMarks(list: HTMLElement, rowSelector: string): void {
-  for (const row of list.querySelectorAll(rowSelector)) {
+function cleanupRegistryDragMarks(list: HTMLElement): void {
+  for (const row of list.querySelectorAll(".para-zk-block__row")) {
     row.removeClass("is-dragging", "is-drop-before", "is-drop-after");
   }
 }

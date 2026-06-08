@@ -27,6 +27,11 @@ import {
 import { frontmatterLinks, readFileTypeFresh } from "../vault/frontmatter";
 import { workflowContext } from "../vault/host";
 import { normalizeVaultPath, wikiLink } from "../vault/paths";
+import {
+  renderBlockNotice,
+  renderBlockShell,
+  renderShellAction
+} from "./block-shell";
 import { parseCodeBlockKeyValues } from "./code-block-args";
 
 type Frontmatter = Record<string, unknown>;
@@ -125,15 +130,13 @@ function renderPropsCodeBlock(
   const type = parsePropsViewType(args.type) ?? inferPropsViewType(frontmatter);
 
   el.empty();
-  el.removeClass("para-zk-props", "is-disabled");
-  el.addClass("para-zk-props-block");
   if (!type) {
-    renderMuted(el, "PARA-ZK props type is missing or unsupported.");
+    renderBlockNotice(el, "props", "PARA-ZK props type is missing or unsupported.");
     return;
   }
 
-  renderPropsToolbar(plugin, el, ctx.sourcePath);
-  renderPropsGrid(plugin, propsSchemaForType(type, plugin.settings.locale), el.createDiv(), ctx.sourcePath);
+  const body = renderPropsShell(plugin, el, ctx.sourcePath);
+  renderPropsGrid(plugin, propsSchemaForType(type, plugin.settings.locale), body, ctx.sourcePath);
 }
 
 function renderInlinePropsInputs(plugin: ParaZkPluginContext, el: HTMLElement, ctx: MarkdownPostProcessorContext): void {
@@ -172,39 +175,41 @@ function renderPropsGrid(
   const frontmatter = file ? fileFrontmatter(plugin, file) : {};
 
   container.empty();
-  container.addClass("para-zk-props");
+  container.addClass("para-zk-block__grid");
   container.removeClass("is-disabled");
   if (!file) container.addClass("is-disabled");
 
   for (const row of schema.rows) {
     const visibleFields = row.filter((field) => !isHiddenDisplayField(field, frontmatter));
     if (visibleFields.length === 0) continue;
-    const rowEl = container.createDiv({ cls: "para-zk-props-row" });
+    const rowEl = container.createDiv({ cls: "para-zk-block__row" });
     for (const field of visibleFields) {
       renderField(plugin, schema, field, frontmatter, rowEl, sourcePath);
     }
   }
 }
 
-function renderPropsToolbar(plugin: ParaZkPluginContext, container: HTMLElement, sourcePath?: string): void {
+function renderPropsShell(plugin: ParaZkPluginContext, container: HTMLElement, sourcePath?: string): HTMLElement {
   const labels = localePack(plugin.settings.locale).labels;
-  const toolbar = container.createDiv({ cls: "para-zk-props-toolbar" });
-  const controls = toolbar.createDiv({ cls: "para-zk-props-toolbar-controls" });
-
-  renderPropsModeButton(plugin, controls, {
-    sourcePath,
-    label: labelValue(labels.edit, "Edit"),
-    icon: "pencil",
-    className: "para-zk-props-edit",
-    mode: "source"
-  });
-  renderPropsModeButton(plugin, controls, {
-    sourcePath,
-    label: labelValue(labels.view, "Read"),
-    icon: "eye",
-    className: "para-zk-props-view",
-    mode: "preview"
-  });
+  return renderBlockShell(container, {
+    kind: "props",
+    renderActions: (actions) => {
+      renderPropsModeButton(plugin, actions, {
+        sourcePath,
+        label: labelValue(labels.edit, "Edit"),
+        icon: "pencil",
+        variant: "edit-mode",
+        mode: "source"
+      });
+      renderPropsModeButton(plugin, actions, {
+        sourcePath,
+        label: labelValue(labels.view, "Read"),
+        icon: "eye",
+        variant: "read-mode",
+        mode: "preview"
+      });
+    }
+  }).body;
 }
 
 function renderPropsModeButton(
@@ -214,20 +219,15 @@ function renderPropsModeButton(
     sourcePath?: string;
     label: string;
     icon: string;
-    className: string;
+    variant: string;
     mode: "source" | "preview";
   }
 ): void {
-  const buttonComponent = new ButtonComponent(container);
-  const button = buttonComponent.buttonEl;
-  button.addClass("para-zk-props-toolbar-button", options.className);
-  button.setAttr("aria-label", options.label);
-  buttonComponent
-    .setIcon(options.icon)
-    .setButtonText(options.label)
-    .setTooltip(options.label)
-    .setDisabled(!options.sourcePath)
-    .onClick(async () => {
+  const buttonComponent = renderShellAction(container, {
+    label: options.label,
+    icon: options.icon,
+    variant: options.variant,
+    onClick: async (button) => {
       button.disabled = true;
       try {
         await focusMarkdownMode(plugin, options.sourcePath, options.mode);
@@ -237,7 +237,9 @@ function renderPropsModeButton(
       } finally {
         button.disabled = false;
       }
-    });
+    }
+  });
+  buttonComponent.setDisabled(!options.sourcePath);
 }
 
 // Read-only display fields with no value (e.g. an area note's empty `parent`)
@@ -255,9 +257,9 @@ function renderField(
   rowEl: HTMLElement,
   sourcePath?: string
 ): void {
-  const fieldEl = rowEl.createDiv({ cls: "para-zk-props-field" });
-  fieldEl.createDiv({ cls: "para-zk-props-label", text: field.label });
-  const controlEl = fieldEl.createDiv({ cls: "para-zk-props-control" });
+  const fieldEl = rowEl.createDiv({ cls: "para-zk-block__field" });
+  fieldEl.createDiv({ cls: "para-zk-block__label", text: field.label });
+  const controlEl = fieldEl.createDiv({ cls: "para-zk-block__control" });
   const gridEl = rowEl.parentElement ?? rowEl;
   const rerender = latestPropsRerender(gridEl, () => {
     renderPropsGrid(plugin, schema, gridEl, sourcePath);
@@ -324,7 +326,7 @@ function renderTextInput(
 ): void {
   const input = new TextComponent(container);
   input.inputEl.type = "text";
-  input.inputEl.addClass("para-zk-props-input");
+  input.inputEl.addClass("para-zk-block__input");
   input
     .setValue(valueText(readFieldValue(field, frontmatter)))
     .setDisabled(!field.key || !sourcePath);
@@ -349,7 +351,7 @@ function renderDateInput(
 ): void {
   const input = new TextComponent(container);
   input.inputEl.type = type;
-  input.inputEl.addClass("para-zk-props-input");
+  input.inputEl.addClass("para-zk-block__input");
   const currentValue = valueText(readFieldValue(field, frontmatter));
   const inputValue = type === "datetime-local" ? toDateTimeInputValue(currentValue) : currentValue;
   input
@@ -371,7 +373,7 @@ function renderSelectInput(
   sourcePath?: string
 ): void {
   const select = new DropdownComponent(container);
-  select.selectEl.addClass("para-zk-props-select");
+  select.selectEl.addClass("para-zk-block__select");
   select.setDisabled(!field.key || !sourcePath);
   select.addOption("", "");
   const options = field.options ?? [];
@@ -457,12 +459,12 @@ function renderDisplayValue(
   const value = readFieldValue(field, frontmatter);
   const tokens = Array.isArray(value) ? value.map((item) => String(item)) : [valueText(value)];
   tokens.forEach((token, index) => {
-    if (index > 0) container.createSpan({ cls: "para-zk-props-display", text: ", " });
+    if (index > 0) container.createSpan({ cls: "para-zk-block__display", text: ", " });
     const link = parseDisplayLink(token);
     if (link) {
-      renderInternalLink(plugin, container, link.target, link.label, sourcePath, "para-zk-props-display");
+      renderInternalLink(plugin, container, link.target, link.label, sourcePath, "para-zk-block__display");
     } else if (token) {
-      container.createSpan({ cls: "para-zk-props-display", text: token });
+      container.createSpan({ cls: "para-zk-block__display", text: token });
     }
   });
 }
@@ -741,10 +743,6 @@ function parseInlineInputToken(value: string): InlineInputToken | undefined {
     return type ? { type, fieldId: maybeField } : undefined;
   }
   return { fieldId: maybeType };
-}
-
-function renderMuted(el: HTMLElement, text: string): void {
-  el.createDiv({ cls: "para-zk-props-muted", text });
 }
 
 function valueText(value: unknown): string {

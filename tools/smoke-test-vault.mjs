@@ -378,14 +378,14 @@ function assertDataviewToolbarLayout(path) {
     let viewTitle = "";
     for (let index = 0; index < 50; index += 1) {
       const root = leaf.view.containerEl;
-      taskToolbar = root.querySelector(".para-zk-task-toolbar");
-      referenceToolbar = root.querySelector(".para-zk-reference-toolbar");
-      viewToolbar = root.querySelector(".para-zk-view-project-subnotes .para-zk-view-toolbar");
-      viewRoot = root.querySelector(".para-zk-view-project-subnotes");
-      viewButton = root.querySelector(".para-zk-view-project-subnotes .para-zk-view-toolbar-button");
-      taskTitle = taskToolbar?.querySelector(".para-zk-task-toolbar-heading-title")?.textContent?.trim() ?? "";
-      referenceTitle = referenceToolbar?.querySelector(".para-zk-reference-toolbar-heading-title")?.textContent?.trim() ?? "";
-      viewTitle = viewToolbar?.querySelector(".para-zk-view-toolbar-heading")?.textContent?.trim() ?? "";
+      taskToolbar = root.querySelector(".para-zk-block--tasks .para-zk-block__toolbar");
+      referenceToolbar = root.querySelector(".para-zk-block--references .para-zk-block__toolbar");
+      viewToolbar = root.querySelector(".para-zk-block--view-project-subnotes .para-zk-block__toolbar");
+      viewRoot = root.querySelector(".para-zk-block--view-project-subnotes");
+      viewButton = root.querySelector(".para-zk-block--view-project-subnotes .para-zk-block__toolbar .para-zk-block__action");
+      taskTitle = taskToolbar?.querySelector(".para-zk-block__title")?.textContent?.trim() ?? "";
+      referenceTitle = referenceToolbar?.querySelector(".para-zk-block__title")?.textContent?.trim() ?? "";
+      viewTitle = viewToolbar?.querySelector(".para-zk-block__title")?.textContent?.trim() ?? "";
       if (taskToolbar && referenceToolbar && viewToolbar && viewRoot) break;
       await sleep(100);
     }
@@ -664,7 +664,7 @@ function assertReferenceRendererReorder(path) {
         : [];
     }
     function matchingRows() {
-      return Array.from(document.querySelectorAll(".para-zk-reference-row"))
+      return Array.from(document.querySelectorAll(".para-zk-block--references .para-zk-block__row"))
         .filter((row) => before.includes(row.dataset.referenceLink));
     }
     function dragEvent(type, init = {}) {
@@ -692,7 +692,7 @@ function assertReferenceRendererReorder(path) {
 
     const first = rows[0];
     const second = rows[1];
-    const handle = first.querySelector(".para-zk-reference-drag");
+    const handle = first.querySelector(".para-zk-block__drag");
     if (!handle) throw new Error("reference drag handle missing");
     handle.dispatchEvent(dragEvent("dragstart"));
     const rect = second.getBoundingClientRect();
@@ -736,24 +736,24 @@ function assertTaskBlockRendererRegression(path, taskName) {
     let rows = [];
     let row = null;
     for (let index = 0; index < 30; index += 1) {
-      rows = Array.from(document.querySelectorAll(".para-zk-task-row"));
+      rows = Array.from(document.querySelectorAll(".para-zk-block--tasks .para-zk-block__row"));
       row = rows.find((item) => item.textContent.includes(taskName)) ?? null;
-      block = row?.closest(".para-zk-tasks") ?? document.querySelector(".para-zk-tasks");
+      block = row?.closest(".para-zk-block--tasks") ?? document.querySelector(".para-zk-block--tasks");
       if (block && row) break;
       await sleep(100);
     }
 
-    const actions = row ? Array.from(row.querySelectorAll(".para-zk-task-actions button"))
-      .map((button) => Array.from(button.classList).filter((name) => name.startsWith("para-zk-task-"))) : [];
+    const actions = row ? Array.from(row.querySelectorAll(".para-zk-block__rowactions .para-zk-block__action"))
+      .map((button) => Array.from(button.classList).filter((name) => name === "para-zk-block__action" || name.startsWith("is-"))) : [];
     console.log(JSON.stringify({
       ok: true,
       hasBlock: Boolean(block),
-      hasToolbar: Boolean(block?.querySelector(".para-zk-task-toolbar")),
-      hasSummary: Boolean(block?.querySelector(".para-zk-task-toolbar-summary")),
-      hasAdd: Boolean(block?.querySelector(".para-zk-task-add")),
+      hasToolbar: Boolean(block?.querySelector(".para-zk-block__toolbar")),
+      hasSummary: Boolean(block?.querySelector(".para-zk-block__summary")),
+      hasAdd: Boolean(block?.querySelector(".para-zk-block__toolbar .para-zk-block__action.is-add")),
       rowCount: rows.length,
       hasMatchingRow: Boolean(row),
-      hasDrag: Boolean(row?.querySelector(".para-zk-task-drag")),
+      hasDrag: Boolean(row?.querySelector(".para-zk-block__drag")),
       hasCheckbox: Boolean(row?.querySelector(".para-zk-task-checkbox")),
       hasName: row?.querySelector(".para-zk-task-name")?.textContent === taskName,
       actions
@@ -770,8 +770,8 @@ function assertTaskBlockRendererRegression(path, taskName) {
   assert(snapshot.hasCheckbox === true, "task block renderer did not render checkbox action");
   assert(snapshot.hasName === true, "task block renderer did not render task name");
   assert(
-    snapshot.actions?.some((classes) => classes.includes("para-zk-task-edit"))
-      && snapshot.actions?.some((classes) => classes.includes("para-zk-task-delete")),
+    snapshot.actions?.some((classes) => classes.includes("is-edit"))
+      && snapshot.actions?.some((classes) => classes.includes("is-delete")),
     `task block renderer did not render edit/delete actions: ${JSON.stringify(snapshot.actions)}`
   );
 }
@@ -800,7 +800,7 @@ function assertCreateRetroButtonProjectLink() {
 
     let button = null;
     for (let index = 0; index < 30; index += 1) {
-      button = leaf.view.containerEl.querySelector(".para-zk-view-project-retros .para-zk-view-toolbar-button");
+      button = leaf.view.containerEl.querySelector(".para-zk-block--view-project-retros .para-zk-block__toolbar .para-zk-block__action");
       if (button) break;
       await sleep(100);
     }
@@ -881,8 +881,8 @@ function assertCreateRetroButtonProjectLink() {
     for (let index = 0; index < 50; index += 1) {
       const root = leaf.view.containerEl;
       hasComponent = Boolean(root.querySelector(".para-zk-latest-retro-summary"));
-      retrosText = root.querySelector(".para-zk-view-project-retros")?.textContent?.trim() ?? "";
-      hasUpdatedColumn = Array.from(root.querySelectorAll(".para-zk-view-project-retros th, .para-zk-view-project-retros .table-view-th"))
+      retrosText = root.querySelector(".para-zk-block--view-project-retros")?.textContent?.trim() ?? "";
+      hasUpdatedColumn = Array.from(root.querySelectorAll(".para-zk-block--view-project-retros th, .para-zk-block--view-project-retros .table-view-th"))
         .some((el) => el.textContent?.trim() === ${JSON.stringify(L.updated)}) || retrosText.includes(${JSON.stringify(L.updated)});
       hasRetroInView = retrosText.includes(retroWeekLabel) && !retrosText.includes(retroTitle);
       if (hasComponent && hasRetroInView && hasUpdatedColumn) break;
@@ -913,7 +913,7 @@ function assertCreateRetroButtonProjectLink() {
 
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     const leaves = app.workspace.getLeavesOfType("markdown").filter((item) => item.view?.file?.path === path);
-    const leaf = leaves.find((item) => item.view?.containerEl?.querySelector(".para-zk-view-project-retros"))
+    const leaf = leaves.find((item) => item.view?.containerEl?.querySelector(".para-zk-block--view-project-retros"))
       ?? leaves.find((item) => item.view?.containerEl?.querySelector(".para-zk-latest-retro-summary"))
       ?? leaves[0]
       ?? app.workspace.getLeaf(false);
@@ -928,11 +928,11 @@ function assertCreateRetroButtonProjectLink() {
     for (let index = 0; index < 50; index += 1) {
       const root = leaf.view.containerEl;
       const component = root.querySelector(".para-zk-latest-retro-summary");
-      const retrosView = root.querySelector(".para-zk-view-project-retros");
+      const retrosView = root.querySelector(".para-zk-block--view-project-retros");
       hasComponent = Boolean(component);
       body = component?.querySelector(".para-zk-latest-retro-summary-body")?.textContent?.trim() ?? "";
       retrosText = retrosView?.textContent?.trim() ?? "";
-      hasUpdatedColumn = Array.from(root.querySelectorAll(".para-zk-view-project-retros th, .para-zk-view-project-retros .table-view-th"))
+      hasUpdatedColumn = Array.from(root.querySelectorAll(".para-zk-block--view-project-retros th, .para-zk-block--view-project-retros .table-view-th"))
         .some((el) => el.textContent?.trim() === ${JSON.stringify(L.updated)}) || retrosText.includes(${JSON.stringify(L.updated)});
       hasRetroInView = retrosText.includes(retroWeekLabel) && !retrosText.includes(retroTitle);
       codeBlocks = Array.from(root.querySelectorAll("code"))

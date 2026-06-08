@@ -35,12 +35,16 @@ import {
   registryErrorMessage,
   renderRegistryBlockError,
   renderRegistryRow,
-  renderRegistryToolbar,
-  renderRegistryToolbarSelect,
   runRegistryBlockAction,
   type RegistryBlockState,
   type RegistryDragOptions
 } from "./registry-block";
+import {
+  renderBlockEmpty,
+  renderBlockShell,
+  renderShellAction,
+  renderShellSelect
+} from "./block-shell";
 
 type TaskBlockArgs = {
   root: "current" | "all";
@@ -102,7 +106,6 @@ async function renderTaskBlock(
   if (args.root === "all" && blockState.toolbar.order === "manual") blockState.toolbar.order = "smart";
   const generation = blockState.generation;
   el.empty();
-  el.addClass("para-zk-tasks");
 
   try {
     const t = localePack(plugin.settings.locale);
@@ -111,7 +114,7 @@ async function renderTaskBlock(
       : undefined;
 
     if (args.root === "current" && !(rootFile instanceof TFile)) {
-      el.createDiv({ cls: "para-zk-task-empty", text: t.labels.taskRootUnavailable });
+      renderBlockEmpty(renderBlockShell(el, { kind: "tasks", title: args.title }).body, t.labels.taskRootUnavailable);
       return;
     }
 
@@ -134,7 +137,7 @@ async function renderTaskBlock(
       rerender: () => renderTaskBlock(plugin, source, el, ctx)
     }) : undefined;
 
-    renderTaskToolbar(plugin, el, source, ctx, {
+    const body = renderTaskShell(plugin, el, source, ctx, {
       args,
       rootFile,
       items,
@@ -143,11 +146,11 @@ async function renderTaskBlock(
     });
 
     if (visible.length === 0) {
-      el.createDiv({ cls: "para-zk-task-empty", text: t.labels.noTasks });
+      renderBlockEmpty(body, t.labels.noTasks);
       return;
     }
 
-    const list = el.createDiv({ cls: "para-zk-task-list" });
+    const list = body.createDiv({ cls: "para-zk-block__list" });
     for (const item of visible) {
       renderTaskRow(plugin, list, item, {
         blockState,
@@ -164,7 +167,7 @@ async function renderTaskBlock(
   }
 }
 
-function renderTaskToolbar(
+function renderTaskShell(
   plugin: ParaZkPluginContext,
   el: HTMLElement,
   source: string,
@@ -176,19 +179,15 @@ function renderTaskToolbar(
     visible: RenderableTask[];
     blockState: TaskBlockState;
   }
-): void {
+): HTMLElement {
   const labels = localePack(plugin.settings.locale).labels;
-  const rendered = renderRegistryToolbar(el, {
-    toolbarClass: "para-zk-task-toolbar",
-    headingClass: "para-zk-task-toolbar-heading",
-    summaryClass: "para-zk-task-toolbar-summary",
-    controlsClass: "para-zk-task-toolbar-controls",
-    titleText: options.args.title,
-    summaryText: taskSummaryText(options.items, options.visible, labels),
-    renderControls: (controls) => {
+  const rendered = renderBlockShell(el, {
+    kind: "tasks",
+    title: options.args.title,
+    summary: taskSummaryText(options.items, options.visible, labels),
+    renderActions: (actions) => {
       const rootFile = options.rootFile;
-      renderRegistryToolbarSelect(controls, {
-        selectClass: "para-zk-task-toolbar-select",
+      renderShellSelect(actions, {
         label: labels.taskOrder,
         value: options.blockState.toolbar.order,
         options: taskOrderOptions(labels, options.args.root === "current"),
@@ -197,8 +196,7 @@ function renderTaskToolbar(
           void renderTaskBlock(plugin, source, el, ctx);
         }
       });
-      renderRegistryToolbarSelect(controls, {
-        selectClass: "para-zk-task-toolbar-select",
+      renderShellSelect(actions, {
         label: labels.status,
         value: options.blockState.toolbar.status,
         options: taskStatusOptions(labels),
@@ -207,8 +205,7 @@ function renderTaskToolbar(
           void renderTaskBlock(plugin, source, el, ctx);
         }
       });
-      renderRegistryToolbarSelect(controls, {
-        selectClass: "para-zk-task-toolbar-select",
+      renderShellSelect(actions, {
         label: labels.priority,
         value: options.blockState.toolbar.priority,
         options: taskPriorityOptions(labels),
@@ -219,16 +216,12 @@ function renderTaskToolbar(
       });
 
       if (options.args.root === "current" && rootFile) {
-        const add = new ButtonComponent(controls);
-        const addButton = add.buttonEl;
-        addButton.addClass("para-zk-task-toolbar-button", "para-zk-task-add");
-        addButton.setAttr("aria-label", labels.addTask);
-        add
-          .setIcon("plus")
-          .setButtonText(labels.addTask)
-          .setTooltip(labels.addTask)
-          .setCta()
-          .onClick(async () => {
+        renderShellAction(actions, {
+          label: labels.addTask,
+          icon: "plus",
+          cta: true,
+          variant: "add",
+          onClick: async (addButton) => {
             await runRegistryBlockAction(addButton, async () => {
               const name = await promptText(
                 plugin.app,
@@ -242,11 +235,13 @@ function renderTaskToolbar(
               await queueRootTaskWrite(rootFile, () => insertRootTask(workflowContext(plugin), rootFile, { name }));
               await renderTaskBlock(plugin, source, el, ctx);
             });
-          });
+          }
+        });
       }
     }
   });
   options.blockState.summaryEl = rendered.summaryEl;
+  return rendered.body;
 }
 
 async function currentRootTasks(plugin: ParaZkPluginContext, rootFile: TFile): Promise<RenderableTask[]> {
@@ -317,15 +312,11 @@ function renderTaskRow(
 ): void {
   const labels = localePack(plugin.settings.locale).labels;
   renderRegistryRow(list, item, {
-    rowClass: "para-zk-task-row",
     dataset: { taskId: item.id },
-    reorderableClass: "is-reorderable",
     drag: options.drag ? {
       state: options.blockState,
       itemKey: taskItemKey,
-      handleClass: "para-zk-task-drag",
       label: labels.reorderTask,
-      rowSelector: ".para-zk-task-row",
       drag: options.drag
     } : undefined,
     renderBody: (row) => {
@@ -395,7 +386,7 @@ function renderTaskRow(
           });
         });
 
-      const body = row.createDiv({ cls: "para-zk-task-body" });
+      const body = row.createDiv({ cls: "para-zk-block__rowbody" });
       body.createDiv({ cls: "para-zk-task-name", text: item.task.name });
 
       const meta = taskMeta(item.task);
@@ -412,16 +403,16 @@ function renderTaskRow(
         }
         for (const chip of meta) {
           metaEl.createSpan({
-            cls: `para-zk-task-chip para-zk-task-chip-${chip.kind}`,
+            cls: `para-zk-task-chip para-zk-task-chip--${chip.kind}`,
             text: chip.label
           });
         }
       }
 
-      const actions = row.createDiv({ cls: "para-zk-task-actions" });
+      const actions = row.createDiv({ cls: "para-zk-block__rowactions" });
       const editAction = new ButtonComponent(actions);
       const edit = editAction.buttonEl;
-      edit.addClass("para-zk-task-edit");
+      edit.addClass("para-zk-block__action", "is-edit");
       edit.setAttr("aria-label", "Edit task");
       editAction
         .setIcon("pencil")
@@ -435,7 +426,7 @@ function renderTaskRow(
 
       const removeAction = new ButtonComponent(actions);
       const remove = removeAction.buttonEl;
-      remove.addClass("para-zk-task-delete");
+      remove.addClass("para-zk-block__action", "is-delete");
       remove.setAttr("aria-label", "Delete task");
       removeAction
         .setIcon("trash")
@@ -461,10 +452,7 @@ async function updateTaskFromEditor(plugin: ParaZkPluginContext, item: Renderabl
 }
 
 function renderTaskError(el: HTMLElement, error: unknown): void {
-  renderRegistryBlockError(el, error, {
-    blockClass: "para-zk-tasks",
-    emptyClass: "para-zk-task-empty"
-  });
+  renderRegistryBlockError(el, error, "tasks");
 }
 
 class TaskEditModal extends Modal {
