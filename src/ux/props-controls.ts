@@ -78,20 +78,25 @@ const PROPS_RERENDER_DELAY_MS = 120;
 // re-fire change (no write loop).
 class PropsBlockRenderChild extends MarkdownRenderChild {
   private renderTimer: number | undefined;
+  private currentSourcePath: string | undefined;
 
   constructor(
     private readonly plugin: ParaZkPluginContext,
     private readonly source: string,
     containerEl: HTMLElement,
-    private readonly ctx: MarkdownPostProcessorContext
+    ctx: MarkdownPostProcessorContext
   ) {
     super(containerEl);
+    this.currentSourcePath = ctx.sourcePath;
   }
 
   onload(): void {
     this.render();
     this.registerEvent(
       this.plugin.app.metadataCache.on("changed", (file) => this.onMetadataChange(file))
+    );
+    this.registerEvent(
+      this.plugin.app.vault.on("rename", (file, oldPath) => this.onRename(file, oldPath))
     );
   }
 
@@ -101,7 +106,15 @@ class PropsBlockRenderChild extends MarkdownRenderChild {
   }
 
   private onMetadataChange(file: TFile): void {
-    if (file.path !== this.ctx.sourcePath) return;
+    if (file.path !== this.currentSourcePath) return;
+    this.scheduleRender();
+  }
+
+  private onRename(file: unknown, oldPath?: string): void {
+    if (!(file instanceof TFile)) return;
+    const isHostRename = oldPath !== undefined && oldPath === this.currentSourcePath;
+    if (!isHostRename) return;
+    this.currentSourcePath = file.path;
     this.scheduleRender();
   }
 
@@ -114,7 +127,7 @@ class PropsBlockRenderChild extends MarkdownRenderChild {
   }
 
   private render(): void {
-    renderPropsCodeBlock(this.plugin, this.source, this.containerEl, this.ctx);
+    renderPropsCodeBlock(this.plugin, this.source, this.containerEl, this.currentSourcePath);
   }
 }
 
@@ -122,10 +135,10 @@ function renderPropsCodeBlock(
   plugin: ParaZkPluginContext,
   source: string,
   el: HTMLElement,
-  ctx: MarkdownPostProcessorContext
+  sourcePath: string | undefined
 ): void {
   const args = parseCodeBlockKeyValues(source);
-  const file = sourceFile(plugin, ctx.sourcePath);
+  const file = sourceFile(plugin, sourcePath);
   const frontmatter = file ? fileFrontmatter(plugin, file) : {};
   const type = parsePropsViewType(args.type) ?? inferPropsViewType(frontmatter);
 
@@ -136,8 +149,8 @@ function renderPropsCodeBlock(
   }
 
   const schema = propsSchemaForType(type, plugin.settings.locale);
-  const body = renderPropsShell(plugin, schema, el, ctx.sourcePath);
-  renderPropsGrid(plugin, schema, body, ctx.sourcePath);
+  const body = renderPropsShell(plugin, schema, el, sourcePath);
+  renderPropsGrid(plugin, schema, body, sourcePath);
 }
 
 function renderInlinePropsInputs(plugin: ParaZkPluginContext, el: HTMLElement, ctx: MarkdownPostProcessorContext): void {

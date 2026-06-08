@@ -1,8 +1,7 @@
 import {
   MarkdownRenderChild,
   TFile,
-  parseYaml,
-  type MarkdownPostProcessorContext
+  parseYaml
 } from "obsidian";
 import { localePack, type LocalePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
@@ -27,13 +26,15 @@ class LatestRetroSummaryRenderChild extends MarkdownRenderChild {
   private renderTimer: number | undefined;
   private renderGeneration = 0;
   private unloaded = true;
+  private currentSourcePath: string | undefined;
 
   constructor(
     private readonly plugin: ParaZkPluginContext,
     containerEl: HTMLElement,
-    private readonly sourcePath: string
+    sourcePath: string | undefined
   ) {
     super(containerEl);
+    this.currentSourcePath = sourcePath;
   }
 
   onload(): void {
@@ -54,8 +55,9 @@ class LatestRetroSummaryRenderChild extends MarkdownRenderChild {
 
   private onVaultFile(file: unknown, oldPath?: string): void {
     if (!(file instanceof TFile)) return;
+    if (oldPath !== undefined && oldPath === this.currentSourcePath) this.currentSourcePath = file.path;
     if (
-      file.path !== this.sourcePath
+      file.path !== this.currentSourcePath
       && !isInRetrosFolder(this.plugin, file)
       && !isInRetrosFolderPath(this.plugin, oldPath)
     ) return;
@@ -76,7 +78,7 @@ class LatestRetroSummaryRenderChild extends MarkdownRenderChild {
     void renderLatestRetroSummary(
       this.plugin,
       this.containerEl,
-      this.sourcePath,
+      this.currentSourcePath,
       () => this.isCurrentRender(generation)
     )
       .catch((error: unknown) => {
@@ -92,7 +94,7 @@ class LatestRetroSummaryRenderChild extends MarkdownRenderChild {
 async function renderLatestRetroSummary(
   plugin: ParaZkPluginContext,
   el: HTMLElement,
-  sourcePath: MarkdownPostProcessorContext["sourcePath"],
+  sourcePath: string | undefined,
   isCurrent: () => boolean
 ): Promise<void> {
   if (!isCurrent()) return;

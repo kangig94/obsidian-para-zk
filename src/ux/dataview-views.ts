@@ -35,7 +35,7 @@ const DATAVIEW_INITIAL_RERENDER_DELAYS_MS = [1600, 3600] as const;
 const DATAVIEW_CHANGE_RERENDER_DELAYS_MS = [300, 3200] as const;
 
 // Renders a compact `para-zk-view` block by expanding its view key into a
-// managed Dataview query and optional PARA-ZK workflow toolbar. ctx.sourcePath
+// managed Dataview query and optional PARA-ZK workflow toolbar. The source path
 // is passed so the query's `this.file` resolves to the host note.
 export function registerDataviewViewRenderers(plugin: ParaZkPluginContext): void {
   plugin.registerMarkdownCodeBlockProcessor("para-zk-view", (source, el, ctx) => {
@@ -47,14 +47,16 @@ class DataviewViewRenderChild extends MarkdownRenderChild {
   private readonly renderTimers = new Set<number>();
   private renderGeneration = 0;
   private unloaded = true;
+  private currentSourcePath: string | undefined;
 
   constructor(
     private readonly plugin: ParaZkPluginContext,
     containerEl: HTMLElement,
     private readonly args: DataviewViewArgs,
-    private readonly sourcePath: MarkdownPostProcessorContext["sourcePath"]
+    sourcePath: MarkdownPostProcessorContext["sourcePath"]
   ) {
     super(containerEl);
+    this.currentSourcePath = sourcePath;
   }
 
   onload(): void {
@@ -64,7 +66,7 @@ class DataviewViewRenderChild extends MarkdownRenderChild {
     this.registerEvent(this.plugin.app.vault.on("modify", (file) => this.onVaultFile(file)));
     this.registerEvent(this.plugin.app.vault.on("create", (file) => this.onVaultFile(file)));
     this.registerEvent(this.plugin.app.vault.on("delete", (file) => this.onVaultFile(file)));
-    this.registerEvent(this.plugin.app.vault.on("rename", (file) => this.onVaultFile(file)));
+    this.registerEvent(this.plugin.app.vault.on("rename", (file, oldPath) => this.onVaultFile(file, oldPath)));
   }
 
   onunload(): void {
@@ -74,8 +76,11 @@ class DataviewViewRenderChild extends MarkdownRenderChild {
     this.renderTimers.clear();
   }
 
-  private onVaultFile(file: unknown): void {
-    if (!(file instanceof TFile) || file.extension !== "md") return;
+  private onVaultFile(file: unknown, oldPath?: string): void {
+    if (!(file instanceof TFile)) return;
+    const renamedCurrentSource = oldPath !== undefined && oldPath === this.currentSourcePath;
+    if (renamedCurrentSource) this.currentSourcePath = file.path;
+    if (!renamedCurrentSource && file.extension !== "md") return;
     for (const delay of DATAVIEW_CHANGE_RERENDER_DELAYS_MS) this.scheduleRender(delay);
   }
 
@@ -94,7 +99,7 @@ class DataviewViewRenderChild extends MarkdownRenderChild {
       this.plugin,
       this.args,
       this.containerEl,
-      this.sourcePath,
+      this.currentSourcePath,
       this,
       () => this.isCurrentRender(generation)
     )
@@ -112,7 +117,7 @@ async function renderDataviewView(
   plugin: ParaZkPluginContext,
   args: DataviewViewArgs,
   el: HTMLElement,
-  sourcePath: MarkdownPostProcessorContext["sourcePath"],
+  sourcePath: string | undefined,
   child: MarkdownRenderChild,
   isCurrent: () => boolean
 ): Promise<void> {
@@ -128,7 +133,7 @@ async function renderDataviewView(
 
   const viewKey = readDataviewViewKey(key);
   const body = renderDataviewViewShell(plugin, el, viewKey, sourcePath, key, args.title);
-  await MarkdownRenderer.render(plugin.app, block, body, sourcePath, child);
+  await MarkdownRenderer.render(plugin.app, block, body, sourcePath ?? "", child);
   if (!isCurrent()) return;
 }
 
@@ -153,7 +158,7 @@ function renderDataviewViewShell(
   plugin: ParaZkPluginContext,
   el: HTMLElement,
   key: DataviewViewKey | undefined,
-  sourcePath: string,
+  sourcePath: string | undefined,
   rawKey: string,
   title?: string
 ): HTMLElement {

@@ -102,14 +102,16 @@ export function registerReferenceRenderers(plugin: ParaZkPluginContext): void {
 // the vault-event subscription the retro-summary and dataview renderers already use.
 class ReferenceBlockRenderChild extends MarkdownRenderChild {
   private renderTimer: number | undefined;
+  private currentSourcePath: string | undefined;
 
   constructor(
     private readonly plugin: ParaZkPluginContext,
     private readonly source: string,
     containerEl: HTMLElement,
-    private readonly ctx: MarkdownPostProcessorContext
+    ctx: MarkdownPostProcessorContext
   ) {
     super(containerEl);
+    this.currentSourcePath = ctx.sourcePath;
   }
 
   onload(): void {
@@ -126,7 +128,12 @@ class ReferenceBlockRenderChild extends MarkdownRenderChild {
 
   private onVaultFile(file: unknown, oldPath?: string): void {
     if (!(file instanceof TFile)) return;
-    if (file.path !== this.ctx.sourcePath && oldPath !== this.ctx.sourcePath) return;
+    if (oldPath !== undefined && oldPath === this.currentSourcePath) {
+      this.currentSourcePath = file.path;
+      this.scheduleRender();
+      return;
+    }
+    if (file.path !== this.currentSourcePath) return;
     this.scheduleRender();
   }
 
@@ -139,7 +146,7 @@ class ReferenceBlockRenderChild extends MarkdownRenderChild {
   }
 
   private render(): Promise<void> {
-    return renderReferenceBlock(this.plugin, this.source, this.containerEl, this.ctx)
+    return renderReferenceBlock(this.plugin, this.source, this.containerEl, this.currentSourcePath)
       .catch((error: unknown) => renderReferenceError(this.containerEl, error));
   }
 }
@@ -148,7 +155,7 @@ async function renderReferenceBlock(
   plugin: ParaZkPluginContext,
   source: string,
   el: HTMLElement,
-  ctx: MarkdownPostProcessorContext
+  sourcePath: string | undefined
 ): Promise<void> {
   const args = parseReferenceBlockArgs(source);
   const blockState = beginReferenceBlockRender(el, args);
@@ -161,7 +168,7 @@ async function renderReferenceBlock(
     }
 
     const labels = localePack(plugin.settings.locale).labels;
-    const rootFile = plugin.app.vault.getFileByPath(ctx.sourcePath) ?? undefined;
+    const rootFile = sourcePath ? plugin.app.vault.getFileByPath(sourcePath) ?? undefined : undefined;
     if (!(rootFile instanceof TFile)) {
       renderBlockEmpty(
         renderBlockShell(el, { kind: "references", title: args.title }).body,
@@ -184,7 +191,7 @@ async function renderReferenceBlock(
           rootFile,
           () => persistReferenceOrder(plugin, rootFile, renderedLinks, nextLinks)
         ),
-        rerender: () => renderReferenceBlock(plugin, source, el, ctx)
+        rerender: () => renderReferenceBlock(plugin, source, el, sourcePath)
       })
       : undefined;
 
@@ -192,7 +199,7 @@ async function renderReferenceBlock(
       rootFile,
       title: args.title,
       items,
-      rerender: () => renderReferenceBlock(plugin, source, el, ctx)
+      rerender: () => renderReferenceBlock(plugin, source, el, sourcePath)
     });
 
     if (items.length === 0) {
@@ -204,9 +211,9 @@ async function renderReferenceBlock(
     for (const item of items) {
       renderReferenceRow(plugin, list, item, {
         blockState,
-        ctx,
+        sourcePath,
         drag,
-        rerender: () => renderReferenceBlock(plugin, source, el, ctx)
+        rerender: () => renderReferenceBlock(plugin, source, el, sourcePath)
       });
     }
   } catch (error) {
@@ -294,7 +301,7 @@ function renderReferenceRow(
   item: RenderableReference,
   options: {
     blockState: ReferenceBlockState;
-    ctx: MarkdownPostProcessorContext;
+    sourcePath: string | undefined;
     drag?: RegistryDragOptions;
     rerender: () => Promise<void>;
   }
@@ -319,7 +326,7 @@ function renderReferenceRow(
         title: referenceTargetHint(item.reference),
         cls: "para-zk-reference-link",
         hoverParent: body,
-        sourcePath: options.ctx.sourcePath
+        sourcePath: options.sourcePath ?? ""
       });
       const description = item.reference.description;
       if (description) {

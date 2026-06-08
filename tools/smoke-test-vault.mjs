@@ -196,6 +196,7 @@ function runLiveScenario() {
   assertCreated(taskProject, "task render project");
   assertGeneratedNoteTemplateShape(taskProject.path, "project");
   assertPropsHeaderAliasInput(taskProject.path);
+  assertPropsBlockRenameSurvival();
   cliJson("para-zk:update-project", [
     `title=Smoke Task Render ${stamp}`,
     "key=tasks",
@@ -832,6 +833,252 @@ function assertPropsHeaderAliasInput(path) {
   );
   assert(snapshot.gridFieldCount === 6, `props grid field count changed: ${JSON.stringify(snapshot)}`);
   assert(snapshot.gridAliasInputs === 0, "props aliases input should render in the header, not the grid");
+}
+
+function assertPropsBlockRenameSurvival() {
+  const title = `Smoke Props Rename ${stamp}`;
+  const renamedTitle = `Smoke Props Renamed ${stamp}`;
+  const aliasValue = `rename-survived-${stamp}`;
+  const referenceUrl = `https://example.com/rename-reference-${stamp}`;
+  const expectedReferenceSummary = `1 ${L.references}`;
+  const resource = cliJson("para-zk:create-resource", [
+    `title=${title}`,
+    "link=false",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(resource, "props rename resource");
+  assertGeneratedNoteTemplateShape(resource.path, "resource");
+
+  const renamedPath = resource.path.replace(/[^/]+$/, `${renamedTitle}.md`);
+  const snapshot = guiJson(`(async () => {
+    const oldPath = ${JSON.stringify(resource.path)};
+    const newPath = ${JSON.stringify(renamedPath)};
+    const aliasValue = ${JSON.stringify(aliasValue)};
+    const referenceUrl = ${JSON.stringify(referenceUrl)};
+    const expectedReferenceTitle = ${JSON.stringify(L.references)};
+    const expectedReferenceSummary = ${JSON.stringify(expectedReferenceSummary)};
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const clearNotices = () => document.querySelectorAll(".notice").forEach((el) => el.remove());
+    const noticeText = () => Array.from(document.querySelectorAll(".notice"))
+      .map((el) => el.textContent ?? "")
+      .join("\\n");
+    const referenceLinks = (file) => {
+      const references = file ? app.metadataCache.getFileCache(file)?.frontmatter?.references : null;
+      return Array.isArray(references)
+        ? references.map((item) => typeof item === "string" ? item : item?.link).filter(Boolean)
+        : [];
+    };
+    const leaf = app.workspace.getLeaf(false);
+    await leaf.setViewState({ type: "markdown", state: { file: oldPath, mode: "preview" }, active: true });
+
+    let block = null;
+    let input = null;
+    let edit = null;
+    let referenceBlock = null;
+    let referenceAdd = null;
+    let referenceCreateResource = null;
+    let referenceTitle = "";
+    let referenceSummary = "";
+    let referenceRows = [];
+    const refreshReferenceBlock = () => {
+      referenceBlock = leaf.view.containerEl.querySelector(".para-zk-block--references");
+      referenceAdd = referenceBlock?.querySelector(".para-zk-block__action.is-add") ?? null;
+      referenceCreateResource = referenceBlock?.querySelector(".para-zk-block__action.is-create-resource") ?? null;
+      referenceTitle = referenceBlock?.querySelector(".para-zk-block__title")?.textContent?.trim() ?? "";
+      referenceSummary = referenceBlock?.querySelector(".para-zk-block__summary")?.textContent?.trim() ?? "";
+      referenceRows = referenceBlock
+        ? Array.from(referenceBlock.querySelectorAll(".para-zk-block__row")).map((row) => row.dataset.referenceLink ?? "")
+        : [];
+    };
+    for (let index = 0; index < 50; index += 1) {
+      block = leaf.view.containerEl.querySelector(".para-zk-block--props");
+      input = block?.querySelector(".para-zk-block__lead input.para-zk-block__input") ?? null;
+      edit = block?.querySelector(".para-zk-block__action.is-edit-mode") ?? null;
+      if (block && input && edit && input.disabled === false) break;
+      await sleep(100);
+    }
+    if (!block || !input || !edit) throw new Error("props block did not render before rename: " + oldPath);
+
+    const oldFile = app.vault.getFileByPath(oldPath);
+    if (!oldFile) throw new Error("props rename source not found: " + oldPath);
+    await app.fileManager.renameFile(oldFile, newPath);
+
+    let newFile = null;
+    let oldExists = true;
+    let activePath = "";
+    for (let index = 0; index < 50; index += 1) {
+      newFile = app.vault.getFileByPath(newPath);
+      oldExists = Boolean(app.vault.getFileByPath(oldPath));
+      activePath = leaf.view?.file?.path ?? "";
+      block = leaf.view.containerEl.querySelector(".para-zk-block--props");
+      input = block?.querySelector(".para-zk-block__lead input.para-zk-block__input") ?? null;
+      edit = block?.querySelector(".para-zk-block__action.is-edit-mode") ?? null;
+      refreshReferenceBlock();
+      if (
+        newFile
+        && !oldExists
+        && activePath === newPath
+        && block
+        && input
+        && edit
+        && input.disabled === false
+        && referenceBlock
+        && referenceAdd
+        && referenceCreateResource
+        && referenceSummary
+      ) break;
+      await sleep(100);
+    }
+    if (!newFile || oldExists || activePath !== newPath) {
+      throw new Error("props rename did not propagate to open leaf: " + JSON.stringify({
+        oldPath,
+        newPath,
+        newExists: Boolean(newFile),
+        oldExists,
+        activePath
+      }));
+    }
+    if (!referenceBlock || !referenceAdd || !referenceCreateResource || !referenceSummary) {
+      throw new Error("references block did not survive rename: " + JSON.stringify({
+        newPath,
+        hasReferenceBlock: Boolean(referenceBlock),
+        hasReferenceAdd: Boolean(referenceAdd),
+        hasReferenceCreateResource: Boolean(referenceCreateResource),
+        referenceTitle,
+        referenceSummary
+      }));
+    }
+    if (referenceTitle !== expectedReferenceTitle) {
+      throw new Error("references block title mismatch after rename: " + JSON.stringify({ referenceTitle, expectedReferenceTitle }));
+    }
+
+    clearNotices();
+    referenceAdd.click();
+    let referenceTargetInput = null;
+    let referenceConfirm = null;
+    for (let index = 0; index < 50; index += 1) {
+      referenceTargetInput = document.querySelector(".modal .para-zk-reference-edit-target");
+      referenceConfirm = document.querySelector(".modal button.mod-cta");
+      if (referenceTargetInput && referenceConfirm) break;
+      await sleep(100);
+    }
+    if (!referenceTargetInput || !referenceConfirm) {
+      throw new Error("reference add modal did not open after rename: " + newPath);
+    }
+    referenceTargetInput.value = referenceUrl;
+    referenceTargetInput.dispatchEvent(new Event("input", { bubbles: true }));
+    referenceTargetInput.dispatchEvent(new Event("change", { bubbles: true }));
+    referenceConfirm.click();
+
+    let references = [];
+    let referenceNotice = "";
+    for (let index = 0; index < 50; index += 1) {
+      referenceNotice = noticeText();
+      newFile = app.vault.getFileByPath(newPath);
+      references = referenceLinks(newFile);
+      refreshReferenceBlock();
+      if (
+        references.includes(referenceUrl)
+        && referenceRows.includes(referenceUrl)
+        && referenceAdd
+        && referenceCreateResource
+        && referenceSummary === expectedReferenceSummary
+      ) break;
+      if (referenceNotice.includes("current note not found")) break;
+      await sleep(100);
+    }
+
+    clearNotices();
+    if (input) {
+      input.value = aliasValue;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    let aliases = [];
+    let aliasNotice = "";
+    for (let index = 0; index < 50; index += 1) {
+      aliasNotice = noticeText();
+      newFile = app.vault.getFileByPath(newPath);
+      const rawAliases = newFile ? app.metadataCache.getFileCache(newFile)?.frontmatter?.aliases : null;
+      aliases = Array.isArray(rawAliases) ? rawAliases : (rawAliases ? [rawAliases] : []);
+      if (aliases.includes(aliasValue) || aliasNotice.includes("current note not found")) break;
+      await sleep(100);
+    }
+
+    clearNotices();
+    for (let index = 0; index < 50; index += 1) {
+      block = leaf.view.containerEl.querySelector(".para-zk-block--props");
+      edit = block?.querySelector(".para-zk-block__action.is-edit-mode") ?? null;
+      if (edit && edit.disabled === false) break;
+      await sleep(100);
+    }
+    if (edit) edit.click();
+
+    let mode = "";
+    let editNotice = "";
+    for (let index = 0; index < 50; index += 1) {
+      editNotice = noticeText();
+      activePath = leaf.view?.file?.path ?? "";
+      mode = typeof leaf.view?.getMode === "function" ? leaf.view.getMode() : "";
+      if ((activePath === newPath && mode === "source") || editNotice.includes("current note not found")) break;
+      await sleep(100);
+    }
+
+    console.log(JSON.stringify({
+      ok: true,
+      oldExists,
+      newExists: Boolean(app.vault.getFileByPath(newPath)),
+      activePath,
+      hasBlock: Boolean(block),
+      hasAliasInput: Boolean(input),
+      aliasInputDisabled: input?.disabled ?? null,
+      aliases,
+      aliasNotice,
+      hasEditButton: Boolean(edit),
+      editNotice,
+      hasReferenceBlock: Boolean(referenceBlock),
+      hasReferenceAdd: Boolean(referenceAdd),
+      hasReferenceCreateResource: Boolean(referenceCreateResource),
+      referenceTitle,
+      referenceSummary,
+      referenceRows,
+      references,
+      referenceNotice,
+      mode
+    }));
+  })()`);
+
+  assert(snapshot.oldExists === false, `old props rename path still resolves: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.newExists === true, `renamed props file does not resolve: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.activePath === renamedPath, `open leaf did not track renamed props file: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.hasBlock === true, `props block missing after rename: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.hasAliasInput === true, `props aliases input missing after rename: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.aliasInputDisabled === false, `props aliases input disabled after rename: ${JSON.stringify(snapshot)}`);
+  assert(
+    Array.isArray(snapshot.aliases) && snapshot.aliases.includes(aliasValue),
+    `props aliases write did not survive rename: ${JSON.stringify(snapshot)}`
+  );
+  assert(snapshot.hasReferenceBlock === true, `references block missing after rename: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.hasReferenceAdd === true, `references add button missing after rename: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.hasReferenceCreateResource === true, `references create-resource button missing after rename: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.referenceTitle === L.references, `references block title mismatch after rename: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.referenceSummary === expectedReferenceSummary, `references count summary did not update after rename: ${JSON.stringify(snapshot)}`);
+  assert(
+    Array.isArray(snapshot.references) && snapshot.references.includes(referenceUrl),
+    `reference add action did not write to renamed note: ${JSON.stringify(snapshot)}`
+  );
+  assert(
+    Array.isArray(snapshot.referenceRows) && snapshot.referenceRows.includes(referenceUrl),
+    `references block did not render the added reference after rename: ${JSON.stringify(snapshot)}`
+  );
+  assert(snapshot.hasEditButton === true, `props edit button missing after rename: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.mode === "source", `props edit button did not switch renamed note to source mode: ${JSON.stringify(snapshot)}`);
+  assert(
+    !`${snapshot.aliasNotice}\n${snapshot.editNotice}\n${snapshot.referenceNotice}`.includes("current note not found"),
+    `props action captured stale source path after rename: ${JSON.stringify(snapshot)}`
+  );
+  assertGeneratedNoteTemplateShape(renamedPath, "resource");
 }
 
 function assertCreateRetroButtonProjectLink() {
