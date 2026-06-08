@@ -47,14 +47,19 @@ command + inputs. Identify the note(s) to link from (area / project / resource).
 **Prefer an HTML/text rendering over a PDF.** Converting a PDF to Markdown is slow and
 lossy, so when the same source exists as HTML or Markdown, fetch that instead — even if you
 were handed a PDF link. For arXiv papers, use the HTML view (`https://arxiv.org/html/<id>`,
-or `https://ar5iv.org/abs/<id>`), never the PDF. Fall back to a PDF only when no HTML/text
-rendering is available.
+or `https://ar5iv.org/abs/<id>`) first. If citations or the bibliography are unresolved
+(`\cite{...}`, citation keys like `[zhang2022kinematic]`, `\printbibliography`, missing
+References), fetch the arXiv source bundle and use its `.tex`, `.bbl`, or `.bib` files to
+restore the paper's numbered citations and bibliography entries. Use PDF text extraction only
+as a fallback, and OCR only when there is no usable text/source.
 
-Record provenance for everything (URL, file path, identifier, date, license/permission where
-relevant). The four core fields go in the resource **frontmatter** at create time (see step 6):
+Record source provenance for everything (URL, file path, identifier, date, license/permission
+where relevant). The four core fields go in the resource **frontmatter** at create time (see step 6):
 `url`, `first_author`, `license`, `kind` — `license` as an SPDX identifier (short recognizable
 token like `arXiv` when none fits, never a long sentence), `kind` as a code. Keep any extra detail
-(DOI, version, other URLs, transform note) in a short body provenance section. For images:
+(DOI, version, other URLs) in a short body provenance section only when useful. Do not add routine
+transform notes such as "translated", "converted", or "cleaned" unless the user explicitly asks for
+that metadata or it is needed to avoid ambiguity. For images:
 - A **web** image → embed it by its source URL with `![alt](https://…)`; Obsidian renders
   remote images inline, so do **not** download or attach it.
 - A **local** image (from a local-file source) → `optsidian para-zk:attach-file
@@ -64,25 +69,38 @@ token like `arXiv` when none fits, never a long sentence), `kind` as a code. Kee
 
 Apply the transform faithfully, and always make the form tidy:
 - **Verbatim import** → preserve text and structure exactly; fix only conversion artifacts.
-- **Translation** → faithful translation, same structure; label it a translation and cite the
-  original.
+- **Translation** → faithful translation, same structure; cite the original source. Do not add a
+  visible translation label, title postfix, or transform note unless the user asks for one.
 - **Research / synthesis** → organize into clear sections; attribute facts to their sources;
   mark anything uncertain or unverified; do not invent.
 
+For translation requests, preserve the source's structure, argument flow, and domain precision
+while making the prose readable in the requested target language. Translate ordinary prose
+naturally, but keep field-specific terms, named concepts, identifiers, metrics, acronyms, and
+proper nouns in the source language when practitioners would normally do so or when translation
+would reduce clarity. Translate widely established target-language terms when they are unambiguous
+and easier to read. Do not add bilingual glosses, invent terminology, over-localize, or simplify the
+source beyond what the user asked for. Preserve equations, symbols, citations, tables, and figure
+references unless instructed otherwise. Preserve citation markers in the translated body; do not
+replace `introduced in [27]` with author-only prose such as "Zhang et al." unless the source itself
+uses that form. If the source renderer exposes only citation keys, resolve them back to the paper's
+numbered citation form before writing the final note.
+
 Across all of them: real headings (`#`/`##`), valid Markdown tables (no empty cells, no
 equations trapped in cells), math as LaTeX (`$…$`), figures embedded (web images by URL,
-local images attached), boilerplate dropped. Provenance lives in the frontmatter (step 6); only
-when there is overflow detail beyond `url`/`first_author`/`license`/`kind` (DOI, version, extra
-URLs, transform note) add a short **Source / provenance** section at the top — otherwise omit it.
+local images attached), boilerplate dropped. Source provenance lives in the frontmatter (step 6);
+only when there is useful overflow detail beyond `url`/`first_author`/`license`/`kind` (DOI,
+version, extra URLs) add a short **Source / provenance** section at the top — otherwise omit it.
 
-A source's own reference list or numbered in-text citations (`[1]`, `[2]`, …) stay plain
-text — keep each entry as its own plain line `[1] …`. Never write them as a `- [1]` list
-item: Obsidian renders `- [x]` whose bracket holds a single character (so `- [0]` through
-`- [9]`) as a task checkbox, silently turning a bibliography into a to-do list. These are the
-source's content, not the note's reference registry — do **not** copy them into PARA-ZK
-`references`. That registry holds only the connections the vault owner deliberately curates
-(the area/project it belongs to, related vault notes); leave it to them to register the few
-they want, as `[[wiki]]` links to notes they actually keep.
+For verbatim imports and translations, include the source's own References/Bibliography section
+in the body unless the user asks to omit it. Numbered in-text citations and bibliography entries
+(`[1]`, `[2]`, …) stay plain text — keep each entry as its own plain line `[1] …`. Never write
+them as a `- [1]` list item: Obsidian renders `- [x]` whose bracket holds a single character
+(so `- [0]` through `- [9]`) as a task checkbox, silently turning a bibliography into a to-do
+list. These are the source's content, not the note's reference registry — do **not** copy them
+into PARA-ZK `references`. That registry holds only the connections the vault owner deliberately
+curates (the area/project it belongs to, related vault notes); leave it to them to register the
+few they want, as `[[wiki]]` links to notes they actually keep.
 
 ## 5. Correction & verification pass — DO NOT SKIP
 
