@@ -40,10 +40,10 @@ describe("managed templates", () => {
     expect(permanent).not.toContain("# Body");
     expect(permanent).not.toContain("## Limitations");
     expect(permanent).not.toContain("## Related questions");
-    expect(subnote).not.toContain("para-zk-managed");
+    expect(subnote).toContain("```para-zk-props\ntype: subnote\n```\n{{cursor}}\n\n```para-zk-managed");
     expect(retro).not.toContain("para-zk-managed");
 
-    for (const content of [project, area, resource, journal, spark, source, permanent]) {
+    for (const content of [project, area, resource, journal, spark, source, permanent, subnote]) {
       expect(content.match(/```para-zk-managed/g)).toHaveLength(1);
       expect(content).not.toContain("---\n```para-zk-managed");
       expect(content).not.toContain("project-subnotes");
@@ -84,7 +84,11 @@ describe("managed templates", () => {
     expect(source).toContain("para-zk-references");
     expect(permanent).toContain("permanent-cited-by");
     expect(permanent).toContain("title: Cited by");
-    expect(managedUiBlockForType("subnote", DEFAULT_SETTINGS)).toBeUndefined();
+    const subnote = managedUiBlockForType("subnote", DEFAULT_SETTINGS) ?? "";
+    expect(subnote).toContain("para-zk-references");
+    expect(subnote).toContain("title: References");
+    expect(subnote).not.toContain("para-zk-tasks");
+    expect(subnote).not.toContain("para-zk-view");
   });
 
   it("renders Dataview tables for managed ZK views (cited-by and distilled-into)", () => {

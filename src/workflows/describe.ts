@@ -115,6 +115,7 @@ export const RETRO_READ_SPEC: ReadSurfaceSpec = {
 const SUBNOTE_READ_SPEC: ReadSurfaceSpec = {
   frontmatter: ["subnote_type"],
   sections: [
+    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" },
     BACKLINK_READ_SECTION
   ],
   body: true

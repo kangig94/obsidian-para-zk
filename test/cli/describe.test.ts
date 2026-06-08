@@ -162,6 +162,11 @@ describe("describe", () => {
     expect(addressing.create).toBe("para-zk:create-child");
     // createInputs come from the real create command's options (no obsidian help needed).
     expect(addressing.createInputs).toEqual(expect.arrayContaining(["type", "root_type", "root_title", "relpath", "title", "subnote_type", "body"]));
+    // Subnotes carry a references registry (rendered as a managed block), so the surface
+    // exposes it for read-child/update-child key=references, matching project/area/etc.
+    expect(subnote.readKeys).toEqual(expect.arrayContaining(["references"]));
+    expect(subnote.writeKeys).toEqual(expect.arrayContaining(["references=insert"]));
+    expect(subnote.collections).toMatchObject({ references: "reference" });
 
     // A nested area is not a distinct type — it is an `area` child. The `area`
     // surface stays directly addressable for root areas and points nested-area

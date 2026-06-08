@@ -55,7 +55,7 @@ describe("create-project", () => {
     expect(subnote.ok).toBe(true);
     const subnoteContent = cli.app.readPath("PARA/Projects/Template Shape/Template Child.md") ?? "";
     expect(subnoteContent).toContain("```para-zk-props\ntype: subnote\n```");
-    expect(subnoteContent).not.toContain("```para-zk-managed");
+    expect(subnoteContent).toContain("```para-zk-managed");
     expect(subnoteContent.endsWith("\n\n")).toBe(false);
   });
 

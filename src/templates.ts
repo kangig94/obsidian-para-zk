@@ -223,8 +223,9 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "parent:"
         ]),
         paraZkPropsBlock("subnote"),
-        "",
         "{{cursor}}",
+        "",
+        paraZkManagedBlock(),
         ""
       ].join("\n");
     case "zk_spark":
@@ -353,6 +354,10 @@ export function managedUiBlockForType(type: string, settings: ParaZkSettings): s
         paraZkViewBlock("area-subareas", t.labels.subareas),
         paraZkViewBlock("area-subnotes", t.labels.subnotes),
         paraZkViewBlock("area-retros", t.labels.retros),
+        paraZkReferencesBlock("current", t.labels.references)
+      ]);
+    case "subnote":
+      return joinManagedUiBlocks([
         paraZkReferencesBlock("current", t.labels.references)
       ]);
     case "resource":
