@@ -6,6 +6,15 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- Added a status-bar **editor-width slider** that widens the readable note width globally (sets
+  the width variable on `<body>`), with a settings-tab on/off toggle (off removes both the slider
+  and the width override, restoring the theme's own widths). Works across themes: vanilla Obsidian
+  reads `--file-line-width`, but themes such as **Minimal** ignore it and drive width via
+  `--line-width` / `--line-width-wide` and size custom-UI code blocks by their content — so the
+  slider maps its value onto all of those (including on `<body>`, where Minimal computes its
+  centering margin) and pins the plugin's own block embeds, keeping body text, props/managed
+  blocks, and tables aligned and resizing together. Gated by a body class so it is fully inert
+  when off.
 - Added an editable **alias** (call-name) to project, resource, and ZK permanent notes, rendered
   in the props block's toolbar header (the shell `__lead` slot) so the attribute grid stays
   balanced (project/resource remain 2×3; zk_permanent's existing alias moved out of the grid into

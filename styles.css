@@ -34,6 +34,38 @@
   text-align: right;
 }
 
+/*
+ * Slider-driven note width. The slider sets a single value var on <body>; this maps it
+ * onto every width variable a theme might read so the override lands regardless of theme.
+ * Vanilla Obsidian uses --file-line-width; Minimal (and similar) use --line-width /
+ * --line-width-wide instead and ignore --file-line-width. The override must reach <body>
+ * itself, not just the view: Minimal derives its centering margin (--content-margin-start)
+ * from --line-width on <body>, so overriding only on the view leaves tables and embeds
+ * left-anchored (width grows but the left margin stays fixed). Gated by the body class so
+ * the mapping is fully inert — and the theme's own widths (e.g. Minimal wide mode) intact —
+ * whenever the feature is off.
+ */
+body.para-zk-width-active,
+body.para-zk-width-active .markdown-source-view,
+body.para-zk-width-active .markdown-preview-view {
+  --file-line-width: var(--para-zk-editor-width) !important;
+  --line-width: var(--para-zk-editor-width) !important;
+  --line-width-wide: var(--para-zk-editor-width) !important;
+}
+
+/*
+ * The custom-UI code blocks (props, managed, views, tasks, references) render as
+ * code-block embeds. Some themes (Minimal) size these embeds to their content width
+ * instead of the line width, so the variables above never reach them — pin the embed
+ * itself to the width. Live preview wraps it in .cm-embed-block; reading view wraps it
+ * in a .markdown-preview-sizer child div.
+ */
+body.para-zk-width-active .markdown-source-view .cm-embed-block[class*="cm-lang-para-zk-"],
+body.para-zk-width-active .markdown-preview-view .markdown-preview-sizer > div:has(> [class*="block-language-para-zk-"]) {
+  width: var(--para-zk-editor-width) !important;
+  max-width: 100% !important;
+}
+
 .workspace-ribbon .para-zk-ribbon-action,
 .workspace-ribbon .para-zk-ribbon-action svg {
   color: var(--para-zk-ribbon-color, var(--icon-color));

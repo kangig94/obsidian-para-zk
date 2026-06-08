@@ -1,7 +1,8 @@
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { EDITOR_LINE_WIDTH_MAX, EDITOR_LINE_WIDTH_MIN, EDITOR_LINE_WIDTH_STEP } from "../types";
 
-const FILE_LINE_WIDTH_VAR = "--file-line-width";
+const WIDTH_VALUE_VAR = "--para-zk-editor-width";
+const WIDTH_ACTIVE_CLASS = "para-zk-width-active";
 const WIDTH_SLIDER_CLASS = "para-zk-width-slider";
 const SAVE_DEBOUNCE_MS = 300;
 const saveTimers = new WeakMap<ParaZkPluginContext, number>();
@@ -11,7 +12,7 @@ export function registerEditorWidthControl(plugin: ParaZkPluginContext): void {
 
   plugin.register(() => {
     flushPendingSave(plugin);
-    document.body.style.removeProperty(FILE_LINE_WIDTH_VAR);
+    clearEditorWidth();
   });
 }
 
@@ -24,7 +25,7 @@ function renderEditorWidthControl(plugin: ParaZkPluginContext): void {
   removeEditorWidthControls();
 
   if (!plugin.settings.editorWidthSliderEnabled) {
-    document.body.style.removeProperty(FILE_LINE_WIDTH_VAR);
+    clearEditorWidth();
     return;
   }
 
@@ -59,7 +60,13 @@ function renderEditorWidthControl(plugin: ParaZkPluginContext): void {
 }
 
 function applyEditorWidth(px: number): void {
-  document.body.style.setProperty(FILE_LINE_WIDTH_VAR, `${px}px`);
+  document.body.classList.add(WIDTH_ACTIVE_CLASS);
+  document.body.style.setProperty(WIDTH_VALUE_VAR, `${px}px`);
+}
+
+function clearEditorWidth(): void {
+  document.body.classList.remove(WIDTH_ACTIVE_CLASS);
+  document.body.style.removeProperty(WIDTH_VALUE_VAR);
 }
 
 function removeEditorWidthControls(): void {
