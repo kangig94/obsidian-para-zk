@@ -74,20 +74,29 @@ Apply the transform faithfully, and always make the form tidy:
 - **Research / synthesis** → organize into clear sections; attribute facts to their sources;
   mark anything uncertain or unverified; do not invent.
 
-For translation requests, preserve the source's structure, argument flow, and domain precision
-while making the prose natural in the requested target language. Translate ordinary prose,
-general academic wording, and widely established technical vocabulary when the target-language
-term is clear and reads naturally. Keep source-language terms only for proper nouns, acronyms,
-identifiers, symbols, metrics, code-facing names, named concepts, or field-specific anchors whose
-translation would obscure the meaning or break alignment with the paper, code, or formulas.
-Do not leave generic words untranslated merely because they appear near technical content.
-When a source-language anchor is kept, integrate it into fluent target-language prose rather
-than producing translationese. Do not add bilingual glosses, invent terminology, over-localize,
-or simplify the source beyond what the user asked for. Preserve equations, symbols, citations,
-tables, and figure references unless instructed otherwise. Preserve citation markers in the
-translated body; do not replace `introduced in [27]` with author-only prose such as "Zhang et al."
-unless the source itself uses that form. If the source renderer exposes only citation keys, resolve
-them back to the paper's numbered citation form before writing the final note.
+For translation requests, do the translation **yourself**, in context — never route the text
+through an external machine-translation engine or tool (Google Translate, DeepL, a translation
+API or `trans`-style CLI); only your own translation can apply the rules below, and a generic MT
+pass yields translationese and mangles terminology, math, and citations.
+
+Preserve the source's structure, argument flow, and domain precision, and **default to
+translating** — render each term the way the source's field actually publishes it in the target
+language. Keep the source-language form only for atoms with no settled target-language
+equivalent: proper nouns, acronyms, mathematical symbols, units and metrics, code-/API-facing
+identifiers, and method/model/architecture names the field itself leaves untranslated (e.g.
+*Diffusion Policy*, *ResNet*). Everything else — a field's everyday research vocabulary — is
+translated; being technical or sitting next to a formula is **not** a reason to keep a word (for
+an ML paper: observation, demonstration, learning, policy, action, task, inference, success rate,
+manipulation). This test is **relative to the source's field**, so apply it the same way in
+economics, law, or biology.
+
+**Decide each recurring term once and apply it uniformly**; never alternate between the source
+word and its translation for the same concept. Inflect the sentence naturally around any kept
+source term rather than producing translationese. Do not invent terminology, over-localize,
+simplify beyond what was asked, or add bilingual glosses. Preserve equations, symbols, citations,
+tables, and figure references unless instructed otherwise. Keep citation markers in the body
+(`[27]`); resolve bare citation keys back to the paper's numbered form, and do not rewrite
+`introduced in [27]` as "Zhang et al." unless the source itself does.
 
 Across all of them: real headings (`#`/`##`), valid Markdown tables (no empty cells, no
 equations trapped in cells), math as LaTeX (`$…$`), figures embedded (web images by URL,
