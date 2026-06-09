@@ -6,6 +6,10 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Breaking
 
+- Inline reference citations now use stable reference ids instead of positional
+  indices. The citation token is `` `PZ[<id>]` `` or `` `PZ[<id>, <id>]` ``, where
+  ids come from `read key=references` or the editor `PZ[` suggester; numeric
+  positional input such as `` `PZ[0]` `` is no longer supported.
 - Removed the redundant `para-zk:add-reference` CLI command. Add references via
   `para-zk:update-* key=references op=insert value_json='{"link":"..."}'`;
   child-note receivers use `para-zk:update-child ... key=references op=insert`.
@@ -43,20 +47,21 @@ Notable changes for PARA-ZK are tracked here.
   accept `key=frontmatter/aliases` (a bare `value=` or a `value_json` list both normalize to the
   same single-item list the GUI writes; more than one value is rejected), `read-*` reads it, and
   `para-zk:describe` advertises it.
-- Inline reference citations in note bodies: an inline code span `` `PZ[n]` `` renders as a
-  `[n]` link to the note's n-th registry reference (0-based, matching the CLI's `references/n`).
-  A comma-separated list `` `PZ[1, 2]` `` (spaces optional, e.g. `PZ[1,2]`) renders as
-  `[1, 2]` — each number an independent link, spacing normalized to one space after each comma
-  (academic `[1, 2]` style).
+- Inline reference citations in note bodies: references now get short random stable ids stored
+  in frontmatter, and an inline code span `` `PZ[<id>]` `` renders as a `[n]` link to the
+  reference's current 0-based registry position. A comma-separated list
+  `` `PZ[<id>, <id>]` `` renders as `[1, 2]` — each id an independent link, spacing normalized
+  to one space after each comma (academic `[1, 2]` style). The Obsidian editor has a `PZ[`
+  suggester that searches references by title/alias, description, or link and inserts the id.
   Works in both reading view (markdown post-processor) and Live Preview (a CM6 editor
   extension), mirroring how the other PZ tokens (`PZ_INPUT[...]`) and the former action
   buttons are written in backticks. In Live Preview the token reveals its raw source for
-  editing when the cursor is inside it and renders as `[n]` otherwise; source (raw) mode
+  editing when the cursor is inside it and renders as the current `[n]` otherwise; source (raw) mode
   leaves it untouched. note/file/wiki references get native Obsidian behavior —
   click to open, hover to preview; URLs open externally; plain-text references render as a
-  non-navigable link; an out-of-range index renders as an unresolved marker. Positional by
-  design, so the link's tooltip always shows the resolved target — a reordered registry is
-  visible at a glance. The shared reference-link rendering (anchor, hover, open) was extracted
+  non-navigable link; a missing id renders as an unresolved marker. The token remains stable
+  across reference reorders while the rendered number follows the current registry position.
+  The shared reference-link rendering (anchor, hover, open) was extracted
   to `src/ux/reference-link.ts` and reused by both the references block and citations.
 - Recorded source provenance in the `resource` frontmatter: `url`, `first_author`,
   `license`, and `kind` (the source's type). They render as editable fields in the resource
@@ -430,11 +435,11 @@ Notable changes for PARA-ZK are tracked here.
 - Task registry files now omit duplicated root frontmatter; each shard is only
   `# Tasks` plus task lines.
 - References are now stored in each note's frontmatter `references` array as
-  ordered canonical links or `{ link, description? }` objects, and rendered in
-  notes through the native `para-zk-references` block.
+  ordered `{ link, id, description? }` objects, and rendered in notes through
+  the native `para-zk-references` block.
 - Reference reads now expose a derived, index-addressed collection:
   `references`, `references/<i>`, and `references/<i>/<field>`, with derived
-  read-only `kind`, `path`, and `target` fields.
+  read-only `id`, `kind`, `path`, and `target` fields.
 - Reference updates now use `key=references op=insert` with optional 0-based
   `position`, `references/<i>/{link|description} op=set`, and
   `references/<i> op=delete`. Inserts and `add-reference` return `index` and

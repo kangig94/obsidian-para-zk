@@ -611,7 +611,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{parent}, overview, tasks, tasks/<id>, tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, children.",
+        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{parent}, overview, tasks, tasks/<id>, tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}, references, references/<i>, references/<i>/{id|link|description|kind|path|target}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, children.",
         "value": "<map-path>",
       },
       "limit": {
@@ -739,7 +739,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{date|energy}, focus, quick_memo, timeline, tasks, tasks/<id>, tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}, short_review, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}.",
+        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{date|energy}, focus, quick_memo, timeline, tasks, tasks/<id>, tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}, short_review, references, references/<i>, references/<i>/{id|link|description|kind|path|target}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}.",
         "value": "<map-path>",
       },
       "limit": {
@@ -793,7 +793,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{aliases|areas|status|priority|start_date|due_date|done_date}, summary, goals, tasks, tasks/<id>, tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, children.",
+        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{aliases|areas|status|priority|start_date|due_date|done_date}, summary, goals, tasks, tasks/<id>, tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}, references, references/<i>, references/<i>/{id|link|description|kind|path|target}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, children.",
         "value": "<map-path>",
       },
       "limit": {
@@ -851,7 +851,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{aliases|url|first_author|license|kind}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body.",
+        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{aliases|url|first_author|license|kind}, references, references/<i>, references/<i>/{id|link|description|kind|path|target}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body.",
         "value": "<map-path>",
       },
       "limit": {
@@ -967,7 +967,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Stable read key; depends on ZK kind. spark: frontmatter, frontmatter/{processed}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body; digest: frontmatter, frontmatter/{sourceTitle|url|first_author|published}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body; permanent: frontmatter, frontmatter/{maturity|aliases}, references, references/<i>, references/<i>/{link|description}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body.",
+        "description": "Stable read key; depends on ZK kind. spark: frontmatter, frontmatter/{processed}, references, references/<i>, references/<i>/{id|link|description|kind|path|target}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body; digest: frontmatter, frontmatter/{sourceTitle|url|first_author|published}, references, references/<i>, references/<i>/{id|link|description|kind|path|target}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body; permanent: frontmatter, frontmatter/{maturity|aliases}, references, references/<i>, references/<i>/{id|link|description|kind|path|target}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body.",
         "value": "<map-path>",
       },
       "kind": {

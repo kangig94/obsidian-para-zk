@@ -514,8 +514,8 @@ Important fields:
   `checkbox` is the literal status character from `[ ]`, `[x]`, `[-]`, `[/]`,
   and other Tasks-compatible statuses.
 - `references`: structured frontmatter reference collection. Items expose
-  stored `link`, derived `kind`, optional `description`, and derived
-  `path` or `target` where applicable.
+  stored stable `id`, stored `link`, derived `kind`, optional `description`,
+  and derived `path` or `target` where applicable.
 - `backlinks`: read-only inbound resolved-link collection. Items expose the
   source note `link`, `path`, `title`, and `type`; use `type=` to filter by
   source note type.
@@ -615,8 +615,11 @@ Use `position` in task `value_json` to insert before the 1-based task position,
 or omit it to append at the end.
 
 References are stored in the selected note's `references` frontmatter array,
-not as body lines. Each stored item is either a bare canonical `link` string or
-an object `{ link, description? }`. The writable collection keys are:
+not as body lines. Each stored item is an object `{ link, id, description? }`.
+`id` is a short random stable token assigned by PARA-ZK, stored once, and never
+derived from the title, link, or position. Legacy bare-string or id-less entries
+are still read and receive ids when the registry is written. The writable
+collection keys are:
 
 ```text
 references
@@ -645,15 +648,15 @@ For child notes, use the same insert shape through `para-zk:update-child` with
 
 Update one stored reference field with `key=references/<i>/<field> op=set`.
 Writable fields are `link` and `description`. Setting `link` keeps the item
-at the same index and re-derives `kind`, `path`, and `target`. Setting `link` to
-another existing canonical link is rejected as a duplicate without merging,
-deleting, or reordering either item. Setting `description` to `value=""`, or
-to `value_json=null`, clears that field; if only `link` remains, the item is
-serialized back as a bare string. Delete one item with
+at the same index, preserves `id`, and re-derives `kind`, `path`, and `target`.
+Setting `link` to another existing canonical link is rejected as a duplicate
+without merging, deleting, or reordering either item. Setting `description` to
+`value=""`, or to `value_json=null`, clears that field; the item still
+serializes as `{ link, id }`. Delete one item with
 `key=references/<i> op=delete`; later indices shift after deletion.
 
-Derived reference fields are read-only. `kind`, `path`, and `target` can be read
-through `key=references/<i>/<field>`, but cannot be updated.
+Derived and managed reference fields are read-only. `id`, `kind`, `path`, and
+`target` can be read through `key=references/<i>/<field>`, but cannot be updated.
 
 Canonical stored links are vault note/file wikilinks such as `[[path]]`,
 `[[path#subpath]]`, or `[[path|alias]]` when Obsidian display text is supplied.
@@ -692,14 +695,21 @@ optsidian para-zk:update-child root_type=area root_title="AI" relpath='["Generat
 optsidian para-zk:update-project title="Model Evaluation" key=frontmatter/status op=set value=archived format=json
 ```
 
-### Inline citations (`PZ[n]`)
+### Inline citations (`PZ[<id>]`)
 
 Body prose cites the note's own registry references inline with a code span whose
-whole content is `` `PZ[n]` `` — it renders as a `[n]` link to that note's n-th
-reference (0-based, matching `key=references/<i>`). Use `` `PZ[1, 2]` `` for
-several (comma-separated, each an independent link). It resolves in reading view
-and Live Preview; an out-of-range index renders as an unresolved marker. The
-reference must already be in the registry (add it with `key=references op=insert`).
+whole content is `` `PZ[<id>]` ``. The `<id>` is the stable `id` returned by
+`read ... key=references`; it is not the visible registry position and is not
+typed by hand in normal editing. In Obsidian, type `PZ[` in the editor to open
+the reference suggester, search by title/alias, description, or link, and select
+the reference; the suggester inserts the full inline-code citation token.
+
+At render time, the citation displays the reference's current 0-based registry
+position as `[n]`, matching `key=references/<i>`. Use `` `PZ[<id>, <id>]` `` for
+several references (comma-separated, each an independent link). It resolves in
+reading view and Live Preview; an id that is not present in the note's registry
+renders as an unresolved marker. Numeric positional tokens such as `` `PZ[0]` ``
+are not supported.
 
 For projects, `key=frontmatter/status op=set value=archived` is a structural
 archive operation: it moves the folder-style project from `PARA/Projects` to

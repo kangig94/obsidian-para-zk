@@ -10,36 +10,37 @@ import {
 import { TFile, editorInfoField, editorLivePreviewField } from "obsidian";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import type { ReferenceRead } from "../workflows";
-import { buildCitationElement, parseCitationIndices, resolveReferences } from "./citation-renderer";
+import { buildCitationElement, parseCitationKeys, resolveReferences } from "./citation-renderer";
 
 // Live Preview counterpart to the reading-view citation post-processor: render a
-// `` `PZ[n]` `` / `` `PZ[n, m]` `` inline-code token as bracketed `[n, m]` links, reusing the
+// `` `PZ[<id>]` `` / `` `PZ[<id>, <id>]` `` inline-code token as bracketed `[n, m]` links, reusing the
 // same anchor builder and sync reference resolver. CM6 decorations are synchronous, so
 // references resolve once per pass (from the cached frontmatter) and are handed to each
-// widget — which keeps it fresh when the registry changes (eq compares the resolved targets).
+// widget — which keeps it fresh when the registry changes (eq compares ordered reference ids).
 // (Mirrors the removed inline-actions.ts pattern: ViewPlugin + replace widget.)
 export function createCitationEditorExtension(plugin: ParaZkPluginContext): Extension {
   class CitationWidget extends WidgetType {
+    private readonly referenceSignature: string;
+
     constructor(
-      private readonly indices: number[],
+      private readonly keys: string[],
       private readonly references: ReferenceRead[],
       private readonly sourcePath: string
     ) {
       super();
+      this.referenceSignature = citationReferenceSignature(references);
     }
 
     eq(widget: WidgetType): boolean {
-      if (!(widget instanceof CitationWidget) || widget.indices.length !== this.indices.length) return false;
-      return this.indices.every((index, position) =>
-        index === widget.indices[position]
-        && this.references[index]?.link === widget.references[index]?.link
-        && this.references[index]?.kind === widget.references[index]?.kind);
+      if (!(widget instanceof CitationWidget) || widget.keys.length !== this.keys.length) return false;
+      return this.referenceSignature === widget.referenceSignature
+        && this.keys.every((key, position) => key === widget.keys[position]);
     }
 
     toDOM(): HTMLElement {
       const host = document.createElement("span");
       host.className = "para-zk-citation-host";
-      buildCitationElement(plugin, this.references, this.indices, this.sourcePath, host);
+      buildCitationElement(plugin, this.references, this.keys, this.sourcePath, host);
       return host;
     }
 
@@ -50,7 +51,7 @@ export function createCitationEditorExtension(plugin: ParaZkPluginContext): Exte
     }
   }
 
-  const tokenRe = /`(PZ\[\s*\d+(?:\s*,\s*\d+)*\s*\])`/g;
+  const tokenRe = /`(PZ\[\s*[A-Za-z0-9_-]+(?:\s*,\s*[A-Za-z0-9_-]+)*\s*\])`/g;
 
   // Reveal the raw token source (skip the widget) when the cursor/selection is strictly
   // inside it, so the user can edit it — matching native Live Preview behavior for
@@ -71,12 +72,12 @@ export function createCitationEditorExtension(plugin: ParaZkPluginContext): Exte
       const text = view.state.doc.sliceString(range.from, range.to);
       tokenRe.lastIndex = 0;
       for (let match = tokenRe.exec(text); match; match = tokenRe.exec(text)) {
-        const indices = parseCitationIndices(match[1]);
-        if (!indices) continue;
+        const keys = parseCitationKeys(match[1]);
+        if (!keys) continue;
         const from = range.from + match.index;
         const to = from + match[0].length;
         if (selectionInside(view, from, to)) continue;
-        builder.add(from, to, Decoration.replace({ widget: new CitationWidget(indices, references, sourcePath) }));
+        builder.add(from, to, Decoration.replace({ widget: new CitationWidget(keys, references, sourcePath) }));
       }
     }
     return builder.finish();
@@ -100,4 +101,17 @@ export function createCitationEditorExtension(plugin: ParaZkPluginContext): Exte
   return ViewPlugin.fromClass(CitationEditorPlugin, {
     decorations: (value) => value.decorations
   });
+}
+
+function citationReferenceSignature(references: ReferenceRead[]): string {
+  return references
+    .map((reference) => [
+      reference.id,
+      reference.link,
+      reference.kind,
+      reference.path ?? "",
+      reference.target ?? "",
+      reference.description ?? ""
+    ].join("\u0000"))
+    .join("\u0001");
 }

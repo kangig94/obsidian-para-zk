@@ -4,15 +4,15 @@ import { workflowContext } from "../vault/host";
 import { readReferenceItemsFromFrontmatter, type ReferenceRead } from "../workflows";
 import { referenceTitle, renderReferenceAnchor } from "./reference-link";
 
-const CITATION_RE = /^PZ\[\s*(\d+(?:\s*,\s*\d+)*)\s*\]$/;
+const CITATION_RE = /^PZ\[\s*([A-Za-z0-9_-]+(?:\s*,\s*[A-Za-z0-9_-]+)*)\s*\]$/;
 
-// Pure: a citation token is a code span whose whole content is `PZ[n]` or `PZ[n, m, ...]`
-// (0-based indices into the note's reference registry, comma-separated, spaces optional).
-// Returns the index list, or undefined for anything else.
-export function parseCitationIndices(text: string): number[] | undefined {
+// Pure: a citation token is a code span whose whole content is `PZ[<id>]` or
+// `PZ[<id>, <id>, ...]` (stable reference ids, comma-separated, spaces optional).
+// Returns the id list, or undefined for anything else.
+export function parseCitationKeys(text: string): string[] | undefined {
   const match = text.trim().match(CITATION_RE);
   if (!match) return undefined;
-  return match[1].split(",").map((part) => Number(part.trim()));
+  return match[1].split(",").map((part) => part.trim());
 }
 
 // Synchronous reference lookup from the note's cached frontmatter — both the reading-view
@@ -28,28 +28,29 @@ export function resolveReferences(plugin: ParaZkPluginContext, file: TFile): Ref
 }
 
 // Build the rendered citation into `host`: bracketed, comma-separated links — `[1, 2]` —
-// one per index. Each number links to its resolved reference (note/file/wiki → hover preview
-// + open; url → external) or shows an unresolved marker when the index is out of range; the
-// tooltip shows the resolved target so a reordered registry is visible at a glance. Spacing
-// is normalized to a single space after each comma regardless of the source.
+// one per stable id. Each id renders as its reference's current 0-based registry position
+// and links to its resolved reference (note/file/wiki → hover preview + open; url → external)
+// or shows an unresolved marker when the id is absent. Spacing is normalized to a single
+// space after each comma regardless of the source.
 export function buildCitationElement(
   plugin: ParaZkPluginContext,
   references: ReferenceRead[],
-  indices: number[],
+  keys: string[],
   sourcePath: string,
   host: HTMLElement
 ): void {
-  const last = indices.length - 1;
-  indices.forEach((index, position) => {
+  const last = keys.length - 1;
+  keys.forEach((key, position) => {
     // Only the comma is a literal separator; the brackets and the space after each comma
-    // belong to the adjacent index's link, so the whole `[1` / ` 2]` segment is its hover
+    // belong to the adjacent number's link, so the whole `[1` / ` 2]` segment is its hover
     // and click target (not just the bare digit).
     if (position > 0) host.appendText(",");
-    const text = `${position === 0 ? "[" : " "}${index}${position === last ? "]" : ""}`;
-    const reference = references[index];
+    const index = references.findIndex((reference) => reference.id === key);
+    const text = `${position === 0 ? "[" : " "}${index === -1 ? "?" : index}${position === last ? "]" : ""}`;
+    const reference = index === -1 ? undefined : references[index];
     if (!reference) {
       const broken = host.createEl("span", { cls: "para-zk-citation is-unresolved", text });
-      broken.setAttr("title", `No reference #${index}`);
+      broken.setAttr("title", `No reference for ${key}`);
       return;
     }
     renderReferenceAnchor(plugin, host, reference, {
@@ -62,7 +63,7 @@ export function buildCitationElement(
   });
 }
 
-// Reading view: a code span `` `PZ[n]` `` cites the note's n-th registry reference.
+// Reading view: a code span `` `PZ[<id>]` `` cites a stable reference id.
 // Live Preview is handled by the CM6 editor extension (citation-editor.ts).
 export function registerCitationRenderers(plugin: ParaZkPluginContext): void {
   plugin.registerMarkdownPostProcessor((el, ctx) => renderCitations(plugin, el, ctx));
@@ -72,8 +73,8 @@ function renderCitations(plugin: ParaZkPluginContext, el: HTMLElement, ctx: Mark
   let references: ReferenceRead[] | undefined;
   for (const codeEl of Array.from(el.querySelectorAll("code"))) {
     if (codeEl.closest("pre")) continue;
-    const indices = parseCitationIndices(codeEl.textContent ?? "");
-    if (!indices) continue;
+    const keys = parseCitationKeys(codeEl.textContent ?? "");
+    if (!keys) continue;
 
     if (!references) {
       const file = plugin.app.vault.getFileByPath(ctx.sourcePath);
@@ -82,7 +83,7 @@ function renderCitations(plugin: ParaZkPluginContext, el: HTMLElement, ctx: Mark
     }
     const host = codeEl.ownerDocument.createElement("span");
     host.className = "para-zk-citation-host";
-    buildCitationElement(plugin, references, indices, ctx.sourcePath, host);
+    buildCitationElement(plugin, references, keys, ctx.sourcePath, host);
     codeEl.replaceWith(host);
   }
 }

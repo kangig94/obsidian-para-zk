@@ -4,6 +4,7 @@ import { loadSettings as loadRuntimeSettings, saveSettings as saveRuntimeSetting
 import { DEFAULT_SETTINGS, type SetupOptions, type SetupResult, type ParaZkSettings } from "./types";
 import { createCitationEditorExtension } from "./ux/citation-editor";
 import { registerCitationRenderers } from "./ux/citation-renderer";
+import { CitationSuggest } from "./ux/citation-suggest";
 import { registerDashboardActionRenderers } from "./ux/dashboard-actions";
 import { registerDashboardSummaryRenderers } from "./ux/dashboard-summary";
 import { registerDataviewViewRenderers } from "./ux/dataview-views";
@@ -42,6 +43,7 @@ export default class ParaZkPlugin extends Plugin {
     registerReferenceRenderers(this);
     registerCitationRenderers(this);
     this.registerEditorExtension(createCitationEditorExtension(this));
+    this.registerEditorSuggest(new CitationSuggest(this));
     registerManagedSectionRenderers(this);
 
     this.addSettingTab(new ParaZkSettingTab(this));

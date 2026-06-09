@@ -184,7 +184,7 @@ function readKeyHints(spec: ReadSurfaceSpec): string[] {
     if (section.collection === "task") {
       keys.push("tasks", "tasks/<id>", "tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}");
     } else if (section.collection === "reference") {
-      keys.push("references", "references/<i>", "references/<i>/{link|description}");
+      keys.push("references", "references/<i>", "references/<i>/{id|link|description|kind|path|target}");
     } else if (section.collection === "backlink") {
       keys.push("backlinks", "backlinks/<i>", "backlinks/<i>/{link|path|title|type}");
     } else {
@@ -364,7 +364,8 @@ export function keyParts(key: string): string[] {
 
 async function readReferences(_content: string, context: SectionTransformContext): Promise<Record<string, ReferenceRead>> {
   return Object.fromEntries(
-    (await readReferenceItemsFresh(context.ctx, context.file)).map((item, index) => [String(index), item])
+    (await readReferenceItemsFresh(context.ctx, context.file))
+      .map((item, index) => [String(index), item])
   );
 }
 

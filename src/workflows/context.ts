@@ -341,10 +341,12 @@ type ReferenceKind = "url" | "note" | "file" | "wiki" | "text";
 
 export type ReferenceStoredItem = string | {
   link: string;
+  id?: string;
   description?: string;
 };
 
 export type ReferenceRead = {
+  id: string;
   link: string;
   kind: ReferenceKind;
   description?: string;

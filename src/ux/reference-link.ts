@@ -10,7 +10,7 @@ import {
 import { registryErrorMessage } from "./registry-block";
 
 // Render a reference (registry item) as a clickable anchor, shared by the references
-// block rows and inline `PZ[n]` citations. Note/file/wiki refs get native internal-link
+// block rows and inline `PZ[<id>]` citations. Note/file/wiki refs get native internal-link
 // behavior (hover preview + click-to-open); URLs open externally; the visible text and
 // tooltip are supplied by the caller so the same anchor can show a title or a citation index.
 export function renderReferenceAnchor(

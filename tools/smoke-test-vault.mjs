@@ -429,22 +429,28 @@ function assertDataviewToolbarLayout(path) {
 function assertCitationRendering(stamp) {
   const title = `Smoke Cite ${stamp}`;
   const bodyFile = join(tmpdir(), `para-zk-cite-${stamp}.md`);
-  writeFileSync(bodyFile, [
-    "single `PZ[0]` and multi `PZ[0,5]`.",
-    "",
-    "```text",
-    "literal PZ[0] in a fenced code block",
-    "```",
-    ""
-  ].join("\n"));
-  const resource = cliJson("para-zk:create-resource", [`title=${title}`, `body=@${bodyFile}`, "open=false", "format=json"]);
+  const resource = cliJson("para-zk:create-resource", [`title=${title}`, "open=false", "format=json"]);
   assertCreated(resource, "citation resource");
   const ref = cliJson("para-zk:update-resource", [`title=${title}`, "key=references", "op=insert", `value_json=${JSON.stringify({ link: "https://example.com/cite-a" })}`, "format=json"]);
   assert(ref.ok === true && ref.added === true, "citation reference setup failed");
+  const read = cliJson("para-zk:read-resource", [`title=${title}`, "key=references", "limit=all", "format=json"]);
+  const citeId = read.value?.items?.["0"]?.id;
+  assert(typeof citeId === "string" && /[A-Za-z]/.test(citeId), `citation reference id missing: ${JSON.stringify(read)}`);
+  const missingId = "missing1";
+  writeFileSync(bodyFile, [
+    `single \`PZ[${citeId}]\` and multi \`PZ[${citeId}, ${missingId}]\`.`,
+    "",
+    "```text",
+    `literal PZ[${citeId}] in a fenced code block`,
+    "```",
+    ""
+  ].join("\n"));
+  const bodyUpdate = cliJson("para-zk:update-resource", [`title=${title}`, "key=body", "op=set", `value=@${bodyFile}`, "format=json"]);
+  assert(bodyUpdate.ok === true && bodyUpdate.changed === true, "citation body setup failed");
 
   // Reading view uses a markdown post-processor; Live Preview (source mode) uses the CM6
-  // editor extension. Both must render `` `PZ[0]` `` as `[0]`, normalize `` `PZ[0,5]` `` to
-  // `[0, 5]` with the out-of-range 5 unresolved, and leave a fenced block's PZ[0] untouched.
+  // editor extension. Both must render `` `PZ[<id>]` `` as `[0]`, normalize a multi-cite to
+  // `[0, ?]` with the missing id unresolved, and leave a fenced block's PZ token untouched.
   const snapshot = guiJson(`(async () => {
     const path = ${JSON.stringify(resource.path)};
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -468,7 +474,7 @@ function assertCitationRendering(stamp) {
         resolvedText: resolved ? resolved.textContent : null,
         href: resolved ? (resolved.getAttribute("data-href") || resolved.getAttribute("href")) : null,
         unresolved: unresolved ? unresolved.textContent : null,
-        // single [0] = 1 link; multi [0, 5] = 1 link + 1 unresolved; fenced bare PZ[0] = 0.
+        // single [0] = 1 link; multi [0, ?] = 1 link + 1 unresolved; fenced bare PZ token = 0.
         count: subtree.querySelectorAll(".para-zk-citation").length
       };
     };
@@ -480,11 +486,11 @@ function assertCitationRendering(stamp) {
   for (const mode of ["preview", "source"]) {
     const s = snapshot[mode];
     assert(s.hosts.includes("[0]"), `single citation [0] not rendered in ${mode}: ${JSON.stringify(snapshot)}`);
-    assert(s.hosts.includes("[0, 5]"), `multi citation [0, 5] not rendered/normalized in ${mode}: ${JSON.stringify(snapshot)}`);
+    assert(s.hosts.includes("[0, ?]"), `multi citation [0, ?] not rendered/normalized in ${mode}: ${JSON.stringify(snapshot)}`);
     // The bracket belongs to the link (hover/click target spans the whole `[n` segment).
     assert(Boolean(s.resolvedText) && s.resolvedText.includes("["), `bracket not part of citation link in ${mode}: ${JSON.stringify(snapshot)}`);
     assert(s.href === "https://example.com/cite-a", `citation href wrong in ${mode}: ${JSON.stringify(snapshot)}`);
-    assert(Boolean(s.unresolved) && s.unresolved.includes("5"), `out-of-range index not unresolved in ${mode}: ${JSON.stringify(snapshot)}`);
+    assert(Boolean(s.unresolved) && s.unresolved.includes("?"), `missing id not unresolved in ${mode}: ${JSON.stringify(snapshot)}`);
     assert(s.count === 3, `expected 3 citation links (single + multi) in ${mode}: ${JSON.stringify(snapshot)}`);
   }
 

@@ -164,9 +164,12 @@ their Markdown headings are content, not enforced keys. `describe` remains the
 source of truth for each type's read/write keys and collections.
 
 Within body/section prose, cite the note's own registry references inline with a
-code span whose whole content is `` `PZ[n]` `` (0-based, matching
-`key=references/<i>`; `` `PZ[1, 2]` `` for several). The `describe` scope note
-states this too.
+code span whose whole content is `` `PZ[<id>]` ``. The `<id>` is the reference's
+stable id returned by `read key=references`; `` `PZ[<id>, <id>]` `` cites several
+references. Obsidian authors can type `PZ[` and search the registry by
+title/alias, description, or link with the editor suggester. Citations render as
+the reference's current 0-based registry position `[n]`; positional input such as
+`` `PZ[0]` `` is not supported. The `describe` scope note states this too.
 
 ## Shell Safety
 

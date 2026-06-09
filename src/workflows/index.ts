@@ -38,6 +38,7 @@ export {
   addReference,
   canonicalWikiLink,
   deleteReferenceItem,
+  ensureReferenceItemId,
   insertReferenceItem,
   isExternalReference,
   parseWikiLink,

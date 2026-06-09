@@ -29,6 +29,17 @@ describe("reference collection insert", () => {
     expect(ref.added).toBe(true);
     expect(ref.index).toBe(0);
     expect(ref.link).toBe("https://example.com/source");
+
+    const read = await cli.run("para-zk:read-project", { title: "Alpha", key: "references", limit: "all" });
+    const value = read.value as { items?: Record<string, ReferenceRead> };
+    const references = Object.values(value.items ?? {});
+    expect(references[0]).toMatchObject({
+      link: "https://example.com/source",
+      kind: "url",
+      description: "Source"
+    });
+    expect(references[0].id).toMatch(/^[a-z0-9]{6}$/i);
+    expect(references[0].id).toMatch(/[a-z]/i);
   });
 
   it("preserves subpath wikilinks, dedupes wiki/markdown syntax, and keeps distinct subpaths", async () => {

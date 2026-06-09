@@ -38,6 +38,16 @@ export class Setting {}
 export class ButtonComponent {}
 export class DropdownComponent {}
 export class TextComponent {}
+export class EditorSuggest<T> {
+  context: unknown = null;
+  limit = 100;
+
+  constructor(public app: App) {}
+
+  setInstructions(): void {}
+  open(): void {}
+  close(): void {}
+}
 
 export class Notice {
   constructor(_message?: string | DocumentFragment, _duration?: number) {}
@@ -50,3 +60,4 @@ export function requestUrl(): never {
 export function setIcon(): void {}
 
 export const editorInfoField = {};
+export const editorLivePreviewField = {};

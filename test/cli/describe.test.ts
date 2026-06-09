@@ -68,7 +68,8 @@ describe("describe", () => {
     expect(String(all.scope)).toContain("optsidian");
     expect(String(all.scope)).toContain("created");
     // A cold caller learns the inline-citation convention from scope alone.
-    expect(String(all.scope)).toContain("PZ[n]");
+    expect(String(all.scope)).toContain("PZ[<id>]");
+    expect(String(all.scope)).not.toContain("PZ[n]");
     expect(all.surfaceTypes).toEqual(
       expect.arrayContaining(["project", "area", "resource", "retro", "note"])
     );
