@@ -4,7 +4,12 @@ import { workflowContext } from "../vault/host";
 import { readReferenceItemsFromFrontmatter, type ReferenceRead } from "../workflows";
 import { referenceTitle, renderReferenceAnchor } from "./reference-link";
 
-const CITATION_RE = /^PZ\[\s*([A-Za-z0-9_-]+(?:\s*,\s*[A-Za-z0-9_-]+)*)\s*\]$/;
+const CITATION_ID_RE_SOURCE = "[A-Za-z0-9_-]+";
+const CITATION_ID_LIST_RE_SOURCE = `${CITATION_ID_RE_SOURCE}(?:\\s*,\\s*${CITATION_ID_RE_SOURCE})*`;
+const CITATION_CODE_RE_SOURCE = `PZ\\[\\s*(${CITATION_ID_LIST_RE_SOURCE})\\s*\\]`;
+const CITATION_TOKEN_CODE_RE_SOURCE = `PZ\\[\\s*${CITATION_ID_LIST_RE_SOURCE}\\s*\\]`;
+const CITATION_RE = new RegExp(`^${CITATION_CODE_RE_SOURCE}$`);
+export const CITATION_TOKEN_RE = new RegExp("`(" + CITATION_TOKEN_CODE_RE_SOURCE + ")`", "g");
 
 // Pure: a citation token is a code span whose whole content is `PZ[<id>]` or
 // `PZ[<id>, <id>, ...]` (stable reference ids, comma-separated, spaces optional).
@@ -45,7 +50,7 @@ export function buildCitationElement(
     // belong to the adjacent number's link, so the whole `[1` / ` 2]` segment is its hover
     // and click target (not just the bare digit).
     if (position > 0) host.appendText(",");
-    const index = references.findIndex((reference) => reference.id === key);
+    const index = references.findIndex((reference) => reference.id !== null && reference.id === key);
     const text = `${position === 0 ? "[" : " "}${index === -1 ? "?" : index}${position === last ? "]" : ""}`;
     const reference = index === -1 ? undefined : references[index];
     if (!reference) {

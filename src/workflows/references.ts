@@ -94,9 +94,13 @@ export async function addReference(ctx: WorkflowContext, options: AddReferenceOp
 }
 
 type NormalizedReferenceItem = {
-  id: string;
+  id: string | null;
   link: string;
   description?: string;
+};
+
+type PersistedReferenceItem = NormalizedReferenceItem & {
+  id: string;
 };
 
 type NormalizedReferenceItemsRead = {
@@ -111,6 +115,9 @@ type ParsedReferenceTarget = {
 };
 
 const REFERENCE_ID_RE = /^[A-Za-z0-9_-]+$/;
+const REFERENCE_ID_SPACE = 36 ** 6;
+const UINT32_SPACE = 2 ** 32;
+const REFERENCE_ID_REJECTION_LIMIT = Math.floor(UINT32_SPACE / REFERENCE_ID_SPACE) * REFERENCE_ID_SPACE;
 
 // Pure read: never writes. Reference ids are assigned only on writes (insert/reorder/
 // field edits) and when the citation suggester picks a still-id-less reference
@@ -121,6 +128,20 @@ export async function readReferenceItemsFresh(
 ): Promise<ReferenceRead[]> {
   const read = referenceItemsReadFromFrontmatter(await readFileFrontmatterFresh(ctx, file));
   return read.items.map((item) => deriveReferenceRead(ctx, file, item));
+}
+
+export async function backfillReferenceIds(
+  ctx: WorkflowContext,
+  file: TFile
+): Promise<{ changed: boolean; items: ReferenceRead[] }> {
+  const read = referenceItemsReadFromFrontmatter(await readFileFrontmatterFresh(ctx, file));
+  const items = read.needsBackfill
+    ? await writeReferenceItems(ctx, file, read.items)
+    : read.items;
+  return {
+    changed: read.needsBackfill,
+    items: items.map((item) => deriveReferenceRead(ctx, file, item))
+  };
 }
 
 // Synchronous variant for renderers that already hold the note's cached frontmatter
@@ -146,7 +167,7 @@ export async function insertReferenceItem(
   const read = referenceItemsReadFromFrontmatter(await readFileFrontmatterFresh(ctx, file));
   const items = read.items;
   const item = normalizeReferenceItem({
-    id: generateUniqueReferenceId(new Set(items.map((candidate) => candidate.id))),
+    id: generateUniqueReferenceId(referenceIdsInUse(items)),
     link: canonical.link,
     description
   });
@@ -282,10 +303,12 @@ export async function reorderReferenceItems(
   }
 
   const changed = !items.every((item, itemIndex) => item.link === next[itemIndex]?.link);
-  if (changed || read.needsBackfill) await writeReferenceItems(ctx, file, next);
+  const persisted = changed || read.needsBackfill
+    ? await writeReferenceItems(ctx, file, next)
+    : next;
   return {
     changed,
-    items: next.map((item) => deriveReferenceRead(ctx, file, item))
+    items: persisted.map((item) => deriveReferenceRead(ctx, file, item))
   };
 }
 
@@ -296,7 +319,9 @@ export async function ensureReferenceItemId(
   preferredIndex?: number
 ): Promise<ReferenceRead> {
   const read = referenceItemsReadFromFrontmatter(await readFileFrontmatterFresh(ctx, file));
-  let index = read.items.findIndex((item) => item.id === reference.id);
+  let index = reference.id === null
+    ? -1
+    : read.items.findIndex((item) => item.id === reference.id);
 
   if (index === -1 && preferredIndex !== undefined) {
     const preferred = read.items[preferredIndex];
@@ -308,7 +333,10 @@ export async function ensureReferenceItemId(
   }
 
   if (index === -1) throw new Error(`reference no longer present: ${reference.link}`);
-  if (read.needsBackfill) await writeReferenceItems(ctx, file, read.items);
+  if (read.needsBackfill || read.items[index].id === null) {
+    const persisted = await writeReferenceItems(ctx, file, read.items);
+    return deriveReferenceRead(ctx, file, persisted[index]);
+  }
   return deriveReferenceRead(ctx, file, read.items[index]);
 }
 
@@ -344,22 +372,29 @@ function normalizeReferenceStoredItem(
   usedIds: Set<string>
 ): { item: NormalizedReferenceItem; needsBackfill: boolean } {
   if (typeof value === "string") {
+    const link = normalizeReferenceLinkValue(value, `references[${index}].link`);
     return {
-      item: normalizeReferenceItem({ id: undefined, link: value }, index, usedIds),
+      item: { id: null, link },
       needsBackfill: true
     };
   }
   if (!isRecord(value)) {
     throw new Error(`references[${index}] must be a string or object`);
   }
-  const item = normalizeReferenceItem({
-    id: hasOwn(value, "id") ? value.id : undefined,
-    link: value.link,
-    description: hasOwn(value, "description") ? value.description : undefined
-  }, index, usedIds);
+  const id = readReferenceStoredId(hasOwn(value, "id") ? value.id : undefined, usedIds);
+  const link = normalizeReferenceLinkValue(value.link, `references[${index}].link`);
+  const description = normalizeReferenceOptionalField(
+    hasOwn(value, "description") ? value.description : undefined,
+    "description"
+  );
+  const item: NormalizedReferenceItem = {
+    id: id.value,
+    link,
+    ...(description !== undefined ? { description } : {})
+  };
   return {
     item,
-    needsBackfill: typeof value.id !== "string" || value.id.trim() !== item.id
+    needsBackfill: id.needsBackfill
   };
 }
 
@@ -367,7 +402,7 @@ function normalizeReferenceItem(value: {
   id?: unknown;
   link: unknown;
   description?: unknown;
-}, index?: number, usedIds?: Set<string>): NormalizedReferenceItem {
+}, index?: number, usedIds?: Set<string>): PersistedReferenceItem {
   const keyPrefix = index === undefined ? "reference" : `references[${index}]`;
   const id = normalizeReferenceId(value.id, `${keyPrefix}.id`, usedIds);
   const link = normalizeReferenceLinkValue(value.link, `${keyPrefix}.link`);
@@ -383,11 +418,10 @@ async function writeReferenceItems(
   ctx: WorkflowContext,
   file: TFile,
   items: NormalizedReferenceItem[]
-): Promise<void> {
+): Promise<PersistedReferenceItem[]> {
   const usedIds = new Set<string>();
-  const stored = items
-    .map((item, index) => normalizeReferenceItem(item, index, usedIds))
-    .map(serializeReferenceStoredItem);
+  const normalized = items.map((item, index) => normalizeReferenceItem(item, index, usedIds));
+  const stored = normalized.map(serializeReferenceStoredItem);
   await ctx.host.processFrontMatter(file, (fm) => {
     if (stored.length === 0) {
       delete fm.references;
@@ -395,9 +429,10 @@ async function writeReferenceItems(
       fm.references = stored;
     }
   });
+  return normalized;
 }
 
-function serializeReferenceStoredItem(item: NormalizedReferenceItem): ReferenceStoredItem {
+function serializeReferenceStoredItem(item: PersistedReferenceItem): ReferenceStoredItem {
   return {
     link: item.link,
     id: item.id,
@@ -417,7 +452,8 @@ function normalizeReferenceId(value: unknown, key: string, usedIds?: Set<string>
     if (typeof value !== "string") throw new Error(`${key} must be a string`);
     const id = value.trim();
     if (!REFERENCE_ID_RE.test(id)) throw new Error(`${key} must match ${REFERENCE_ID_RE.source}`);
-    if (/[A-Za-z]/.test(id) && (!usedIds || !usedIds.has(id))) {
+    if (/[A-Za-z]/.test(id)) {
+      if (usedIds?.has(id)) throw new Error(`${key}: duplicate reference id "${id}" — reference ids must be unique`);
       usedIds?.add(id);
       return id;
     }
@@ -426,6 +462,29 @@ function normalizeReferenceId(value: unknown, key: string, usedIds?: Set<string>
   const id = generateUniqueReferenceId(usedIds ?? new Set<string>());
   usedIds?.add(id);
   return id;
+}
+
+function readReferenceStoredId(
+  value: unknown,
+  usedIds: Set<string>
+): { value: string | null; needsBackfill: boolean } {
+  if (typeof value !== "string") return { value: null, needsBackfill: true };
+
+  const id = value.trim();
+  if (!id || !REFERENCE_ID_RE.test(id) || !/[A-Za-z]/.test(id)) {
+    return { value: null, needsBackfill: true };
+  }
+
+  const duplicate = usedIds.has(id);
+  usedIds.add(id);
+  return {
+    value: id,
+    needsBackfill: duplicate || id !== value
+  };
+}
+
+function referenceIdsInUse(items: NormalizedReferenceItem[]): Set<string> {
+  return new Set(items.flatMap((item) => item.id === null ? [] : [item.id]));
 }
 
 function generateUniqueReferenceId(usedIds: Set<string>): string {
@@ -438,8 +497,11 @@ function generateUniqueReferenceId(usedIds: Set<string>): string {
 }
 
 function randomBase36Id(): string {
-  const value = randomUint32();
-  return value.toString(36).padStart(6, "0").slice(-6);
+  let value = randomUint32();
+  while (value >= REFERENCE_ID_REJECTION_LIMIT) {
+    value = randomUint32();
+  }
+  return (value % REFERENCE_ID_SPACE).toString(36).padStart(6, "0");
 }
 
 function randomUint32(): number {
@@ -447,9 +509,9 @@ function randomUint32(): number {
   if (crypto && typeof crypto.getRandomValues === "function") {
     const buffer = new Uint32Array(1);
     crypto.getRandomValues(buffer);
-    return buffer[0] % 2176782336; // 36 ** 6
+    return buffer[0];
   }
-  return Math.floor(Math.random() * 2176782336);
+  return Math.floor(Math.random() * UINT32_SPACE);
 }
 
 function referenceItemsEqual(left: NormalizedReferenceItem, right: NormalizedReferenceItem): boolean {

@@ -195,7 +195,7 @@ export type ListOptions = {
   limit?: number | "all";
 };
 
-export type UpdateOperation = "set" | "insert" | "append" | "prepend" | "replace" | "delete";
+export type UpdateOperation = "set" | "insert" | "append" | "prepend" | "replace" | "delete" | "backfill";
 
 export type UpdatePayloadOptions = {
   key?: string;
@@ -232,6 +232,7 @@ export type UpdateSurfaceResult = {
   moved?: boolean;
   fromPath?: string;
   toPath?: string;
+  value?: unknown;
 };
 
 export type RenameByTitleOptions = {
@@ -346,7 +347,7 @@ export type ReferenceStoredItem = string | {
 };
 
 export type ReferenceRead = {
-  id: string;
+  id: string | null;
   link: string;
   kind: ReferenceKind;
   description?: string;

@@ -474,6 +474,33 @@ absolute 0-based list index in frontmatter:
 }
 ```
 
+Reference collection reads use the absolute 0-based list index as the item key
+and include the stable stored reference id:
+
+```json
+{
+  "value": {
+    "count": 1,
+    "offset": 0,
+    "limit": 20,
+    "returned": 1,
+    "has_more": false,
+    "items": {
+      "0": {
+        "id": "a3k9mp",
+        "link": "https://example.com/source",
+        "kind": "url",
+        "target": "https://example.com/source"
+      }
+    }
+  }
+}
+```
+
+A legacy id-less reference reads as `"id": null`; it is not citable until
+`key=references op=backfill`, a reference insert/edit, or the editor suggester
+assigns and persists an id.
+
 Use `key=tasks/<id>` or `key=tasks/<id>/<field>` to read one task, and use
 `key=references/<i>` or `key=references/<i>/<field>` to read one reference by
 0-based index. When filters are provided, `count` is the number of matching
@@ -618,8 +645,8 @@ References are stored in the selected note's `references` frontmatter array,
 not as body lines. Each stored item is an object `{ link, id, description? }`.
 `id` is a short random stable token assigned by PARA-ZK, stored once, and never
 derived from the title, link, or position. Legacy bare-string or id-less entries
-are still read and receive ids when the registry is written. The writable
-collection keys are:
+are still read as `id: null`; use `key=references op=backfill` to assign ids
+without changing the rest of the registry. The writable collection keys are:
 
 ```text
 references
@@ -633,6 +660,16 @@ Add references through the update commands with
 The reference insert `position` in `value_json` is 0-based: `position: 0`
 inserts before the first reference, while omitted `position` appends. This is a
 different convention from task insert, where `position` is 1-based.
+
+Backfill hand-authored or legacy id-less references with
+`key=references op=backfill`. It takes no `value` or `value_json`, assigns ids
+through the same reference write path used by inserts/edits, and returns a
+`key=references`-shaped collection value with the now-citable ids; items are
+keyed by 0-based index and also include `index`. It is
+idempotent: when every reference already has an id, it returns `changed: false`
+and the same references without writing. This is the CLI path for making an
+`id: null` reference citable; the GUI editor `PZ[` suggester performs the same
+intentional assignment automatically when a reference is selected for citation.
 
 Reference insert values accept `link`, optional `description`, and
 optional 0-based `position`. Insert returns `index`, `link`, `changed`, and
@@ -672,7 +709,9 @@ Hand-authored bare-string `references` entries must use wikilink or URL syntax
 when they should behave as links. A frontmatter entry such as
 `references: ["folder/note.md"]` is read as `kind: "text"` and does not produce
 a backlink. Path-to-wikilink canonicalization runs through
-`update ... key=references op=insert`.
+`update ... key=references op=insert`. Assigning an id with
+`key=references op=backfill` does not canonicalize text links; it only persists
+missing stable ids.
 
 Read-only keys include `children`, `backlinks`, `path`, `title`, `type`, and
 `archived`.
@@ -684,6 +723,7 @@ optsidian para-zk:update-project title="Model Evaluation" key=frontmatter/status
 optsidian para-zk:update-project title="Model Evaluation" key=summary op=replace match="old claim" with="new claim" format=json
 optsidian para-zk:update-project title="Model Evaluation" key=tasks op=insert value_json='{"name":"Review evaluation set","due":"2026-06-05","priority":"high"}' format=json
 optsidian para-zk:update-project title="Model Evaluation" key=references op=insert value_json='{"link":"https://example.com/paper","description":"Reviewed in May","position":0}' format=json
+optsidian para-zk:update-project title="Model Evaluation" key=references op=backfill format=json
 optsidian para-zk:update-child root_type=project root_title="Model Evaluation" title="Planning Meeting" key=references op=insert value_json='{"link":"[[Source Paper]]"}' format=json
 optsidian para-zk:update-project title="Model Evaluation" key=references/0/description op=set value="Important source paper" format=json
 optsidian para-zk:update-project title="Model Evaluation" key=references/0/description op=set value_json=null format=json
@@ -703,6 +743,8 @@ whole content is `` `PZ[<id>]` ``. The `<id>` is the stable `id` returned by
 typed by hand in normal editing. In Obsidian, type `PZ[` in the editor to open
 the reference suggester, search by title/alias, description, or link, and select
 the reference; the suggester inserts the full inline-code citation token.
+If a hand-authored reference reads as `id: null`, run
+`update ... key=references op=backfill` first; pure reads never assign ids.
 
 At render time, the citation displays the reference's current 0-based registry
 position as `[n]`, matching `key=references/<i>`. Use `` `PZ[<id>, <id>]` `` for
@@ -710,6 +752,9 @@ several references (comma-separated, each an independent link). It resolves in
 reading view and Live Preview; an id that is not present in the note's registry
 renders as an unresolved marker. Numeric positional tokens such as `` `PZ[0]` ``
 are not supported.
+
+The stored `<id>` is stable across reference reorders; only the rendered `[n]`
+follows the reference's current 0-based registry position.
 
 For projects, `key=frontmatter/status op=set value=archived` is a structural
 archive operation: it moves the folder-style project from `PARA/Projects` to

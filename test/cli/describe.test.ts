@@ -45,7 +45,7 @@ describe("describe", () => {
       "tasks=insert",
       "tasks/<id>=delete",
       "tasks/<id>/<field>=set",
-      "references=insert",
+      "references=insert|backfill",
       "references/<i>=delete",
       "references/<i>/{link|description}=set"
     ]);
@@ -107,7 +107,7 @@ describe("describe", () => {
     expect(resource.readKeys).toEqual(["frontmatter", "references", "backlinks", "body"]);
     expect(resource.writeKeys).toEqual([
       "frontmatter/{aliases|url|first_author|license|kind}=set",
-      "references=insert",
+      "references=insert|backfill",
       "references/<i>=delete",
       "references/<i>/{link|description}=set",
       "body=set|append|prepend|replace"
@@ -126,7 +126,7 @@ describe("describe", () => {
     expect(source.readKeys).toEqual(["frontmatter", "references", "backlinks", "body"]);
     expect(source.writeKeys).toEqual([
       "frontmatter/{sourceTitle|url|first_author|published}=set",
-      "references=insert",
+      "references=insert|backfill",
       "references/<i>=delete",
       "references/<i>/{link|description}=set",
       "body=set|append|prepend|replace"
@@ -167,7 +167,7 @@ describe("describe", () => {
     // Subnotes carry a references registry (rendered as a managed block), so the surface
     // exposes it for read-child/update-child key=references, matching project/area/etc.
     expect(subnote.readKeys).toEqual(expect.arrayContaining(["references"]));
-    expect(subnote.writeKeys).toEqual(expect.arrayContaining(["references=insert"]));
+    expect(subnote.writeKeys).toEqual(expect.arrayContaining(["references=insert|backfill"]));
     expect(subnote.collections).toMatchObject({ references: "reference" });
 
     // A nested area is not a distinct type — it is an `area` child. The `area`

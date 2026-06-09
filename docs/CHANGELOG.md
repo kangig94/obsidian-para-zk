@@ -9,7 +9,9 @@ Notable changes for PARA-ZK are tracked here.
 - Inline reference citations now use stable reference ids instead of positional
   indices. The citation token is `` `PZ[<id>]` `` or `` `PZ[<id>, <id>]` ``, where
   ids come from `read key=references` or the editor `PZ[` suggester; numeric
-  positional input such as `` `PZ[0]` `` is no longer supported.
+  positional input such as `` `PZ[0]` `` is no longer supported. Existing
+  positional `PZ[n]` tokens render as unresolved `[?]`; no automatic migration is
+  performed.
 - Removed the redundant `para-zk:add-reference` CLI command. Add references via
   `para-zk:update-* key=references op=insert value_json='{"link":"..."}'`;
   child-note receivers use `para-zk:update-child ... key=references op=insert`.
@@ -28,6 +30,10 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- Added `key=references op=backfill` to explicitly assign stable ids to
+  hand-authored or legacy id-less references from the CLI. It takes no value,
+  is idempotent, returns the read-shaped reference collection with ids, and
+  preserves pure `read key=references` behavior.
 - Added a status-bar **editor-width slider** that widens the readable note width globally (sets
   the width variable on `<body>`), with a settings-tab on/off toggle (off removes both the slider
   and the width override, restoring the theme's own widths). Works across themes: vanilla Obsidian
@@ -50,9 +56,11 @@ Notable changes for PARA-ZK are tracked here.
 - Inline reference citations in note bodies: references now get short random stable ids stored
   in frontmatter, and an inline code span `` `PZ[<id>]` `` renders as a `[n]` link to the
   reference's current 0-based registry position. A comma-separated list
-  `` `PZ[<id>, <id>]` `` renders as `[1, 2]` — each id an independent link, spacing normalized
-  to one space after each comma (academic `[1, 2]` style). The Obsidian editor has a `PZ[`
-  suggester that searches references by title/alias, description, or link and inserts the id.
+  `` `PZ[<id>, <id>]` `` citing the second and third references renders as
+  `[1, 2]` — each id an independent link, spacing normalized to one space after
+  each comma (academic `[1, 2]` style). The Obsidian editor has a `PZ[`
+  suggester that searches references by title/alias, description, or link and
+  inserts the full inline-code citation token `` `PZ[<id>]` ``.
   Works in both reading view (markdown post-processor) and Live Preview (a CM6 editor
   extension), mirroring how the other PZ tokens (`PZ_INPUT[...]`) and the former action
   buttons are written in backticks. In Live Preview the token reveals its raw source for
@@ -117,9 +125,9 @@ Notable changes for PARA-ZK are tracked here.
   `addressing` facet now includes `createInputs` (the create command's
   arguments, derived from the real command spec — no drift), and the index +
   MCP envelope expose `workflows` (named non-surface commands such as
-  `add-reference`, `capture-journal`, `distill-spark`, `create-from-*`,
-  `attach-file`, `list`, each with its inputs). A caller can now learn the full
-  create/workflow contract from `describe` alone, without a separate help lookup.
+  `capture-journal`, `distill-spark`, `create-from-*`, `attach-file`, `list`,
+  each with its inputs). A caller can now learn the full create/workflow
+  contract from `describe` alone, without a separate help lookup.
 - Added native Obsidian commands and native CLI handlers for PARA/ZK workflows:
   vault setup, project/area/resource creation, subnotes, retros, ZK notes,
   journal capture, and note promotion.
@@ -149,9 +157,6 @@ Notable changes for PARA-ZK are tracked here.
   replacing Meta Bind input controls while writing frontmatter directly.
 - Added native PARA-ZK ribbon actions for project, area, resource, ZK, daily
   note, and quick memo workflows, replacing Commander-managed QuickAdd shortcuts.
-- Added an `add-reference` workflow/CLI command for adding existing vault files,
-  wikilinks, markdown links, URLs, or text references to a note's frontmatter
-  reference registry.
 - Added `para-zk:read-project`, `read-area`, `read-resource`, `read-zk`,
   `read-journal`, and `read-retro` for reading editable surfaces by stable map
   keys such as `frontmatter/status`, `children`, and
@@ -296,9 +301,9 @@ Notable changes for PARA-ZK are tracked here.
 - Made the CLI/MCP surface fully **name-based** — no command exposes a vault
   file `path` anymore. Notes are addressed by `title` (project/area/resource),
   `date` (journal/retro), or `title`+`kind` (zk). Child notes use the dedicated
-  `*-child` commands with `root_type`/`root_title`/`relpath`/`title`; transforms/scoped-retro/resource links name
-  their origin with `source_type`/`source_title`; `add-reference` addresses the
-  receiving note by `type`+`title` and its target by `[[Title]]` wikilink.
+  `*-child` commands with `root_type`/`root_title`/`relpath`/`title`;
+  transforms/scoped-retro/resource links name their origin with
+  `source_type`/`source_title`.
   Removed-path aliases (`path`, `file_path`, `sourcePath`, …) are now rejected
   with a direct error instead of being silently ignored. `attach-file` keeps its
   filesystem `source`/`sources` (external file import, not note addressing).
@@ -442,9 +447,8 @@ Notable changes for PARA-ZK are tracked here.
   read-only `id`, `kind`, `path`, and `target` fields.
 - Reference updates now use `key=references op=insert` with optional 0-based
   `position`, `references/<i>/{link|description} op=set`, and
-  `references/<i> op=delete`. Inserts and `add-reference` return `index` and
-  canonical `link`; duplicate canonical links are no-op inserts or rejected link
-  updates.
+  `references/<i> op=delete`. Inserts return `index` and canonical `link`;
+  duplicate canonical links are no-op inserts or rejected link updates.
 - Reference duplicate detection now resolves links to their vault target instead of
   comparing link text, so a stored link still dedupes after Obsidian's rename
   auto-update normalizes it to a different textual form (distinct Obsidian subpaths
@@ -468,9 +472,10 @@ Notable changes for PARA-ZK are tracked here.
   so excluding `Templates/` did not hide the nested managed-templates folder from search
   and link suggestions.
 - The references block now re-renders live when the host note's frontmatter
-  references change from outside the block — e.g. `add-reference` or
-  `create-resource` run from the CLI/MCP, or an edit in another view. Previously
-  the list only refreshed when the note was closed and reopened. The renderer now
+  references change from outside the block — e.g.
+  `update-* key=references op=insert` or `create-resource` run from the CLI/MCP,
+  or an edit in another view. Previously the list only refreshed when the note
+  was closed and reopened. The renderer now
   subscribes to vault modify/delete/rename events for its host note, matching the
   retro-summary and Dataview renderers.
 - The props panel (`para-zk-props`) now re-renders live when the host note's frontmatter

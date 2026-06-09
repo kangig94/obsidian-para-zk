@@ -79,6 +79,7 @@ import {
   resolveRequiredZk
 } from "./locations";
 import {
+  backfillReferenceIds,
   deleteReferenceItem,
   insertReferenceItem,
   readReferenceWritableField,
@@ -164,6 +165,7 @@ type TextUpdateResult = {
   moved?: boolean;
   fromPath?: string;
   toPath?: string;
+  value?: unknown;
 };
 
 async function updateSurface(
@@ -220,7 +222,8 @@ async function updateSurface(
     added: result.added,
     moved: result.moved,
     fromPath: result.fromPath,
-    toPath: result.toPath
+    toPath: result.toPath,
+    ...(result.value !== undefined ? { value: result.value } : {})
   };
 }
 
@@ -512,7 +515,16 @@ async function updateReferenceCollectionSurface(
   operation: UpdateOperation,
   options: UpdatePayloadOptions
 ): Promise<TextUpdateResult> {
-  if (operation !== "insert") throw new Error("references collection root only supports op=insert");
+  if (operation === "backfill") {
+    rejectReferenceBackfillValue(options);
+    const result = await backfillReferenceIds(ctx, target.file);
+    return {
+      changed: result.changed,
+      value: referenceCollectionReadValue(result.items)
+    };
+  }
+
+  if (operation !== "insert") throw new Error("references collection root only supports op=insert|backfill");
   if (options.valueSource !== "value_json") throw new Error("reference insert requires value_json object");
   const write = normalizeReferenceInsertValue(requireUpdateValue(options));
   const result = await insertReferenceItem(ctx, target.file, write);
@@ -521,6 +533,26 @@ async function updateReferenceCollectionSurface(
     index: result.index,
     link: result.link,
     added: result.added
+  };
+}
+
+function rejectReferenceBackfillValue(options: UpdatePayloadOptions): void {
+  if (!hasOwn(options, "value")) return;
+  const valueName = options.valueSource === "value_json" ? "value_json" : "value";
+  throw new Error(`references backfill does not accept ${valueName}`);
+}
+
+function referenceCollectionReadValue(items: unknown[]): Record<string, unknown> {
+  return {
+    count: items.length,
+    offset: 0,
+    limit: "all",
+    returned: items.length,
+    has_more: false,
+    items: Object.fromEntries(items.map((item, index) => [
+      String(index),
+      isRecord(item) ? { ...item, index } : item
+    ]))
   };
 }
 
@@ -569,7 +601,7 @@ function applyTextOperation(
       };
     }
     case "insert":
-      throw new Error("op=insert only supports task collection keys");
+      throw new Error("op=insert only supports task/reference collection keys");
     case "append": {
       const value = requireUpdateText(options, { allowEmpty: false });
       assertTextUpdateDoesNotSplitSection(value, splitGuard);
@@ -608,6 +640,8 @@ function applyTextOperation(
     }
     case "delete":
       throw new Error("op=delete only supports structured item keys");
+    case "backfill":
+      throw new Error("op=backfill only supports key=references");
   }
 }
 
@@ -760,10 +794,10 @@ function targetOperationRequiresValue(target: WritableSurfaceTarget, operation: 
 
 function parseUpdateOperation(value: string | undefined): UpdateOperation {
   const normalized = value?.trim().toLowerCase();
-  if (normalized === "set" || normalized === "insert" || normalized === "append" || normalized === "prepend" || normalized === "replace" || normalized === "delete") {
+  if (normalized === "set" || normalized === "insert" || normalized === "append" || normalized === "prepend" || normalized === "replace" || normalized === "delete" || normalized === "backfill") {
     return normalized;
   }
-  throw new Error("op must be one of: set|insert|append|prepend|replace|delete");
+  throw new Error("op must be one of: set|insert|append|prepend|replace|delete|backfill");
 }
 
 function requireUpdateValue(options: UpdatePayloadOptions): unknown {

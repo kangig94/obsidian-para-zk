@@ -18,7 +18,7 @@ import { resolveReferences } from "./citation-renderer";
 import { referenceTitle } from "./reference-link";
 
 export class CitationSuggest extends EditorSuggest<ReferenceRead> {
-  private readonly suggestionIndexes = new Map<string, number>();
+  private readonly suggestionIndexes = new Map<ReferenceRead, number>();
 
   constructor(private readonly plugin: ParaZkPluginContext) {
     super(plugin.app);
@@ -27,9 +27,11 @@ export class CitationSuggest extends EditorSuggest<ReferenceRead> {
   onTrigger(cursor: EditorPosition, editor: Editor, file: TFile | null): EditorSuggestTriggerInfo | null {
     if (!(file instanceof TFile)) return null;
 
-    const beforeCursor = editor.getLine(cursor.line).slice(0, cursor.ch);
+    const line = editor.getLine(cursor.line);
+    const beforeCursor = line.slice(0, cursor.ch);
     const match = beforeCursor.match(/PZ\[([^\]\n]*)$/);
     if (!match) return null;
+    if (line[cursor.ch] === "]") return null;
 
     return {
       start: {
@@ -45,7 +47,7 @@ export class CitationSuggest extends EditorSuggest<ReferenceRead> {
     const references = resolveReferences(this.plugin, context.file);
     this.suggestionIndexes.clear();
     references.forEach((reference, index) => {
-      this.suggestionIndexes.set(reference.id, index);
+      this.suggestionIndexes.set(reference, index);
     });
 
     const query = context.query.trim().toLocaleLowerCase();
@@ -56,7 +58,7 @@ export class CitationSuggest extends EditorSuggest<ReferenceRead> {
 
   renderSuggestion(reference: ReferenceRead, el: HTMLElement): void {
     el.addClass("para-zk-reference-suggestion");
-    const index = this.suggestionIndexes.get(reference.id);
+    const index = this.suggestionIndexes.get(reference);
     const title = index === undefined
       ? referenceTitle(reference)
       : `[${index}] ${referenceTitle(reference)}`;
@@ -64,7 +66,7 @@ export class CitationSuggest extends EditorSuggest<ReferenceRead> {
     if (reference.description) {
       el.createDiv({ cls: "para-zk-reference-suggestion-detail", text: reference.description });
     }
-    el.createDiv({ cls: "para-zk-reference-suggestion-path", text: reference.link });
+    el.createDiv({ cls: "para-zk-reference-suggestion-link", text: reference.link });
   }
 
   selectSuggestion(reference: ReferenceRead, _evt: MouseEvent | KeyboardEvent): void {
@@ -77,13 +79,15 @@ export class CitationSuggest extends EditorSuggest<ReferenceRead> {
     const context = this.context;
     if (!context) return;
 
-    const preferredIndex = this.suggestionIndexes.get(reference.id);
+    const preferredIndex = this.suggestionIndexes.get(reference);
     const persisted = await ensureReferenceItemId(
       workflowContext(this.plugin),
       context.file,
       reference,
       preferredIndex
     );
+    if (this.context !== context) return;
+    if (persisted.id === null) throw new Error("reference id was not persisted");
     const token = `\`PZ[${persisted.id}]\``;
     context.editor.replaceRange(token, context.start, context.end);
     context.editor.setCursor({

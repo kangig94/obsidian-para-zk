@@ -124,8 +124,10 @@ plugin blocks replace those mechanisms:
 - `` `PZ[<id>]` `` / `` `PZ[<id>, <id>]` `` — inline body citation (code span): the
   id is the stable reference id from `read key=references` or the editor `PZ[` suggester
   (search by title/alias, description, or link). It renders as the reference's current
-  0-based registry position `[n]` / `[1, 2]`, in both reading view and Live Preview;
-  positional input such as `` `PZ[0]` `` is not supported.
+  0-based registry position `[n]`; citing the second and third references renders
+  as `[1, 2]`, in both reading view and Live Preview. The stored `<id>` is stable
+  across reference reorders; only the rendered `[n]` follows the current position.
+  Positional input such as `` `PZ[0]` `` is not supported.
 
 Required community plugins, configured during setup: Dataview (query engine, with
 DataviewJS enabled for dashboards), Tasks (status/metadata syntax), Folder Notes

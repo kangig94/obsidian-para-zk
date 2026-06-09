@@ -9,13 +9,14 @@ import { CitationSuggest } from "../../src/ux/citation-suggest";
 import type { ParaZkPluginContext } from "../../src/plugin-interface";
 import { DEFAULT_SETTINGS } from "../../src/types";
 import { MockApp } from "../harness/vault";
+import { expectGeneratedReferenceId } from "./reference-id-test-helpers";
 
 describe("CitationSuggest", () => {
-  it("triggers on PZ[ before the cursor without swallowing a following bracket", async () => {
+  it("triggers on PZ[ before the cursor", async () => {
     const app = new MockApp();
     const file = await app.vault.create("Source.md", "---\nreferences: []\n---\n");
     const suggest = new CitationSuggest(fakePlugin(app));
-    const line = "Before PZ[ali] after";
+    const line = "Before PZ[ali";
     const cursor = { line: 0, ch: "Before PZ[ali".length };
     const editor = fakeEditor(line);
 
@@ -26,6 +27,33 @@ describe("CitationSuggest", () => {
       end: cursor,
       query: "ali"
     });
+  });
+
+  it("does not trigger without an open PZ[ token at the cursor", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("Source.md", "---\nreferences: []\n---\n");
+    const suggest = new CitationSuggest(fakePlugin(app));
+
+    expect(suggest.onTrigger({ line: 0, ch: "Before ".length }, fakeEditor("Before PZ[ali"), file))
+      .toBeNull();
+  });
+
+  it("does not trigger inside an already closed PZ token", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("Source.md", "---\nreferences: []\n---\n");
+    const suggest = new CitationSuggest(fakePlugin(app));
+    const line = "Before PZ[ali] after";
+
+    expect(suggest.onTrigger({ line: 0, ch: "Before PZ[ali".length }, fakeEditor(line), file))
+      .toBeNull();
+  });
+
+  it("does not trigger without a file", () => {
+    const app = new MockApp();
+    const suggest = new CitationSuggest(fakePlugin(app));
+
+    expect(suggest.onTrigger({ line: 0, ch: "PZ[".length }, fakeEditor("PZ["), null))
+      .toBeNull();
   });
 
   it("filters suggestions by title, description, and link in registry order", async () => {
@@ -81,6 +109,24 @@ describe("CitationSuggest", () => {
     ]);
   });
 
+  it("renders an unindexed suggestion without a registry position prefix", () => {
+    const app = new MockApp();
+    const suggest = new CitationSuggest(fakePlugin(app));
+    const el = fakeSuggestionElement();
+
+    suggest.renderSuggestion({
+      id: null,
+      link: "https://example.com/unindexed",
+      kind: "url",
+      target: "https://example.com/unindexed"
+    }, el.host);
+
+    expect(el.children.map((child) => child.text)).toEqual([
+      "https://example.com/unindexed",
+      "https://example.com/unindexed"
+    ]);
+  });
+
   it("persists a missing reference id before inserting the citation token", async () => {
     const app = new MockApp();
     const file = await app.vault.create("Legacy.md", [
@@ -96,6 +142,7 @@ describe("CitationSuggest", () => {
     const editor = fakeEditor("Body PZ[legacy");
     const suggestContext = context(file, "legacy", editor, { line: 0, ch: 5 }, { line: 0, ch: 14 });
     const suggestions = suggest.getSuggestions(suggestContext);
+    expect(suggestions[0].id).toBeNull();
     suggest.context = suggestContext;
 
     suggest.selectSuggestion(suggestions[0], {} as KeyboardEvent);
@@ -103,10 +150,44 @@ describe("CitationSuggest", () => {
 
     const token = editor.replacement ?? "";
     const id = token.match(/^`PZ\[([A-Za-z0-9_-]+)\]`$/)?.[1];
-    expect(id).toBeTruthy();
+    expectGeneratedReferenceId(id);
     expect(token).toBe(`\`PZ[${id}]\``);
     expect(editor.cursor).toEqual({ line: 0, ch: 5 + token.length });
     expect(app.readPath("Legacy.md")).toContain(`id: ${id}`);
+  });
+
+  it("does not edit the stale editor when context changes before id persistence resolves", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("Legacy.md", [
+      "---",
+      "references:",
+      "  - link: https://example.com/legacy",
+      "    description: Legacy source",
+      "---",
+      "Body"
+    ].join("\n"));
+    const originalProcessFrontMatter = app.fileManager.processFrontMatter;
+    let releaseWrite: (() => void) | undefined;
+    app.fileManager.processFrontMatter = async (target, fn) => {
+      await new Promise<void>((resolve) => {
+        releaseWrite = resolve;
+      });
+      await originalProcessFrontMatter(target, fn);
+    };
+    const suggest = new CitationSuggest(fakePlugin(app));
+    const editor = fakeEditor("Body PZ[legacy");
+    const suggestContext = context(file, "legacy", editor, { line: 0, ch: 5 }, { line: 0, ch: 14 });
+    const suggestions = suggest.getSuggestions(suggestContext);
+    suggest.context = suggestContext;
+
+    suggest.selectSuggestion(suggestions[0], {} as KeyboardEvent);
+    await waitFor(() => releaseWrite !== undefined);
+    suggest.context = null;
+    releaseWrite?.();
+    await waitFor(() => app.readPath("Legacy.md")?.includes("id:") === true);
+
+    expect(editor.replacement).toBeUndefined();
+    expect(editor.cursor).toBeUndefined();
   });
 });
 

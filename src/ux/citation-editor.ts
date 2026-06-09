@@ -10,7 +10,7 @@ import {
 import { TFile, editorInfoField, editorLivePreviewField } from "obsidian";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import type { ReferenceRead } from "../workflows";
-import { buildCitationElement, parseCitationKeys, resolveReferences } from "./citation-renderer";
+import { CITATION_TOKEN_RE, buildCitationElement, parseCitationKeys, resolveReferences } from "./citation-renderer";
 
 // Live Preview counterpart to the reading-view citation post-processor: render a
 // `` `PZ[<id>]` `` / `` `PZ[<id>, <id>]` `` inline-code token as bracketed `[n, m]` links, reusing the
@@ -51,8 +51,6 @@ export function createCitationEditorExtension(plugin: ParaZkPluginContext): Exte
     }
   }
 
-  const tokenRe = /`(PZ\[\s*[A-Za-z0-9_-]+(?:\s*,\s*[A-Za-z0-9_-]+)*\s*\])`/g;
-
   // Reveal the raw token source (skip the widget) when the cursor/selection is strictly
   // inside it, so the user can edit it — matching native Live Preview behavior for
   // links/code. Touching the outer edges keeps the widget rendered.
@@ -70,8 +68,8 @@ export function createCitationEditorExtension(plugin: ParaZkPluginContext): Exte
 
     for (const range of view.visibleRanges) {
       const text = view.state.doc.sliceString(range.from, range.to);
-      tokenRe.lastIndex = 0;
-      for (let match = tokenRe.exec(text); match; match = tokenRe.exec(text)) {
+      CITATION_TOKEN_RE.lastIndex = 0;
+      for (let match = CITATION_TOKEN_RE.exec(text); match; match = CITATION_TOKEN_RE.exec(text)) {
         const keys = parseCitationKeys(match[1]);
         if (!keys) continue;
         const from = range.from + match.index;

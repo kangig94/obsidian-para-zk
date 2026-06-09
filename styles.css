@@ -758,6 +758,7 @@ body.para-zk-width-active .markdown-preview-view .markdown-preview-sizer > div:h
 }
 
 .para-zk-reference-suggestion-path,
+.para-zk-reference-suggestion-link,
 .para-zk-reference-suggestion-detail {
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);

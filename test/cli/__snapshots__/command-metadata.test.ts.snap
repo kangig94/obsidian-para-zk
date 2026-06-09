@@ -1169,7 +1169,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Stable writable key. Valid: frontmatter/{parent}=set, overview=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set.",
+        "description": "Stable writable key. Valid: frontmatter/{parent}=set, overview=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, references=insert|backfill, references/<i>=delete, references/<i>/{link|description}=set.",
         "value": "<map-path>",
       },
       "match": {
@@ -1178,7 +1178,7 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "op": {
         "description": "Update operation.",
-        "value": "<set|insert|append|prepend|replace|delete>",
+        "value": "<set|insert|append|prepend|replace|delete|backfill>",
       },
       "title": {
         "description": "Area title.",
@@ -1224,7 +1224,7 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "op": {
         "description": "Update operation.",
-        "value": "<set|insert|append|prepend|replace|delete>",
+        "value": "<set|insert|append|prepend|replace|delete|backfill>",
       },
       "relpath": {
         "description": "Optional ancestor chain from the root to the immediate parent. Empty or omitted means directly under the root.",
@@ -1273,7 +1273,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Stable writable key. Valid: frontmatter/{date|energy}=set, focus=set|append|prepend|replace, quick_memo=set|append|prepend|replace, timeline=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, short_review=set|append|prepend|replace, references=insert, references/<i>=delete, references/<i>/{link|description}=set.",
+        "description": "Stable writable key. Valid: frontmatter/{date|energy}=set, focus=set|append|prepend|replace, quick_memo=set|append|prepend|replace, timeline=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, short_review=set|append|prepend|replace, references=insert|backfill, references/<i>=delete, references/<i>/{link|description}=set.",
         "value": "<map-path>",
       },
       "match": {
@@ -1282,7 +1282,7 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "op": {
         "description": "Update operation.",
-        "value": "<set|insert|append|prepend|replace|delete>",
+        "value": "<set|insert|append|prepend|replace|delete|backfill>",
       },
       "value": {
         "description": "Text value for scalar set, append, or prepend operations.",
@@ -1315,7 +1315,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Stable writable key. Valid: frontmatter/{aliases|status|priority|start_date|due_date|done_date}=set, frontmatter/areas=set|append|prepend|delete, summary=set|append|prepend|replace, goals=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set.",
+        "description": "Stable writable key. Valid: frontmatter/{aliases|status|priority|start_date|due_date|done_date}=set, frontmatter/areas=set|append|prepend|delete, summary=set|append|prepend|replace, goals=set|append|prepend|replace, tasks=insert, tasks/<id>=delete, tasks/<id>/<field>=set, references=insert|backfill, references/<i>=delete, references/<i>/{link|description}=set.",
         "value": "<map-path>",
       },
       "match": {
@@ -1324,7 +1324,7 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "op": {
         "description": "Update operation.",
-        "value": "<set|insert|append|prepend|replace|delete>",
+        "value": "<set|insert|append|prepend|replace|delete|backfill>",
       },
       "title": {
         "description": "Project title.",
@@ -1361,7 +1361,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Stable writable key. Valid: frontmatter/{aliases|url|first_author|license|kind}=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace.",
+        "description": "Stable writable key. Valid: frontmatter/{aliases|url|first_author|license|kind}=set, references=insert|backfill, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace.",
         "value": "<map-path>",
       },
       "match": {
@@ -1370,7 +1370,7 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "op": {
         "description": "Update operation.",
-        "value": "<set|insert|append|prepend|replace|delete>",
+        "value": "<set|insert|append|prepend|replace|delete|backfill>",
       },
       "title": {
         "description": "Resource title.",
@@ -1420,7 +1420,7 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "op": {
         "description": "Update operation.",
-        "value": "<set|insert|append|prepend|replace|delete>",
+        "value": "<set|insert|append|prepend|replace|delete|backfill>",
       },
       "title": {
         "description": "Retro note title.",
@@ -1453,7 +1453,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Stable write key; depends on ZK kind. spark: frontmatter/{processed}=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace; digest: frontmatter/{sourceTitle|url|first_author|published}=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace; permanent: frontmatter/{maturity|aliases}=set, references=insert, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace.",
+        "description": "Stable write key; depends on ZK kind. spark: frontmatter/{processed}=set, references=insert|backfill, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace; digest: frontmatter/{sourceTitle|url|first_author|published}=set, references=insert|backfill, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace; permanent: frontmatter/{maturity|aliases}=set, references=insert|backfill, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace.",
         "value": "<map-path>",
       },
       "kind": {
@@ -1466,7 +1466,7 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "op": {
         "description": "Update operation.",
-        "value": "<set|insert|append|prepend|replace|delete>",
+        "value": "<set|insert|append|prepend|replace|delete|backfill>",
       },
       "title": {
         "description": "ZK note title.",

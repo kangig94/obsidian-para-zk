@@ -1,13 +1,39 @@
 import { describe, expect, it } from "vitest";
 import {
+  backfillReferenceIds,
   insertReferenceItem,
   readReferenceItemsFresh,
   reorderReferenceItems,
   updateReferenceItem
 } from "../../src/workflows";
 import { createTestContext } from "../harness/vault";
+import { expectGeneratedReferenceId } from "./reference-id-test-helpers";
 
 describe("reference ids", () => {
+  it("does not fabricate ids when reading id-less legacy references", async () => {
+    const { ctx, app } = createTestContext();
+    const file = await app.vault.create("Legacy.md", [
+      "---",
+      "type: resource",
+      "references:",
+      "  - https://example.com/bare",
+      "  - link: https://example.com/object",
+      "    description: Legacy object",
+      "---",
+      ""
+    ].join("\n"));
+    const before = app.readPath("Legacy.md");
+
+    const first = await readReferenceItemsFresh(ctx, file);
+    const second = await readReferenceItemsFresh(ctx, file);
+
+    expect(first.map((reference) => reference.id)).toEqual([null, null]);
+    expect(second.map((reference) => reference.id)).toEqual([null, null]);
+    expect(second).toEqual(first);
+    expect(app.readPath("Legacy.md")).toBe(before);
+    expect(app.readPath("Legacy.md")).not.toContain("id:");
+  });
+
   it("assigns unique short random ids when inserting references", async () => {
     const { ctx, app } = createTestContext();
     const file = await app.vault.create("Source.md", "---\ntype: resource\n---\n");
@@ -19,6 +45,29 @@ describe("reference ids", () => {
     const ids = references.map((reference) => reference.id);
     expect(new Set(ids).size).toBe(2);
     ids.forEach(expectGeneratedReferenceId);
+  });
+
+  it("explicitly backfills id-less references without changing stable ids on later calls", async () => {
+    const { ctx, app } = createTestContext();
+    const file = await app.vault.create("Legacy.md", [
+      "---",
+      "references:",
+      "  - https://example.com/a",
+      "  - link: https://example.com/b",
+      "    description: B",
+      "---",
+      ""
+    ].join("\n"));
+
+    const first = await backfillReferenceIds(ctx, file);
+    expect(first.changed).toBe(true);
+    expect(first.items).toHaveLength(2);
+    first.items.forEach((reference) => expectGeneratedReferenceId(reference.id));
+    expect(new Set(first.items.map((reference) => reference.id)).size).toBe(2);
+
+    const second = await backfillReferenceIds(ctx, file);
+    expect(second.changed).toBe(false);
+    expect(second.items.map((reference) => reference.id)).toEqual(first.items.map((reference) => reference.id));
   });
 
   it("backfills id-less legacy items when the registry is written", async () => {
@@ -45,6 +94,23 @@ describe("reference ids", () => {
     expect(content).toContain("link: https://example.com/legacy-a");
     expect(content).not.toContain("123456");
     expect(content).not.toContain("- https://example.com/legacy-a");
+  });
+
+  it("rejects duplicate hand-authored ids when a write normalizes references", async () => {
+    const { ctx, app } = createTestContext();
+    const file = await app.vault.create("Duplicate.md", [
+      "---",
+      "references:",
+      "  - link: https://example.com/a",
+      "    id: dup123",
+      "  - link: https://example.com/b",
+      "    id: dup123",
+      "---",
+      ""
+    ].join("\n"));
+
+    await expect(updateReferenceItem(ctx, file, 0, { description: "A" }))
+      .rejects.toThrow('references[1].id: duplicate reference id "dup123"');
   });
 
   it("keeps ids stable across link edits and reorders", async () => {
@@ -76,8 +142,3 @@ describe("reference ids", () => {
     ]);
   });
 });
-
-function expectGeneratedReferenceId(id: string): void {
-  expect(id).toMatch(/^[a-z0-9]{6}$/i);
-  expect(id).toMatch(/[a-z]/i);
-}

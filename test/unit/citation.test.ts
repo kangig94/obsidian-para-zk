@@ -57,12 +57,14 @@ describe("buildCitationElement", () => {
   it("renders the same id at a new position after references reorder", () => {
     const alpha: ReferenceRead = { id: "alpha1", link: "https://example.com/a", kind: "url", target: "https://example.com/a" };
     const beta: ReferenceRead = { id: "beta22", link: "https://example.com/b", kind: "url", target: "https://example.com/b" };
+    const keys = parseCitationKeys("PZ[beta22]") ?? [];
     const before = createCitationHost();
     const after = createCitationHost();
 
-    buildCitationElement(fakePlugin(), [alpha, beta], ["beta22"], "Source.md", before.host);
-    buildCitationElement(fakePlugin(), [beta, alpha], ["beta22"], "Source.md", after.host);
+    buildCitationElement(fakePlugin(), [alpha, beta], keys, "Source.md", before.host);
+    buildCitationElement(fakePlugin(), [beta, alpha], keys, "Source.md", after.host);
 
+    expect(keys).toEqual(["beta22"]);
     expect(before.links[0].text).toBe("[1]");
     expect(after.links[0].text).toBe("[0]");
   });
@@ -84,6 +86,22 @@ describe("buildCitationElement", () => {
     expect(rendered.links[0].classes).toContain("is-unresolved");
   });
 
+  it("does not resolve references with null ids", () => {
+    const reference: ReferenceRead = {
+      id: null,
+      link: "https://example.com/source",
+      kind: "url",
+      target: "https://example.com/source"
+    };
+    const rendered = createCitationHost();
+
+    buildCitationElement(fakePlugin(), [reference], ["legacy1"], "Source.md", rendered.host);
+
+    expect(rendered.links[0].text).toBe("[?]");
+    expect(rendered.links[0].attrs.title).toBe("No reference for legacy1");
+    expect(rendered.links[0].classes).toContain("is-unresolved");
+  });
+
   it("keeps comma spacing for multi-cite ids", () => {
     const alpha: ReferenceRead = { id: "alpha1", link: "https://example.com/a", kind: "url", target: "https://example.com/a" };
     const beta: ReferenceRead = { id: "beta22", link: "https://example.com/b", kind: "url", target: "https://example.com/b" };
@@ -92,6 +110,18 @@ describe("buildCitationElement", () => {
     buildCitationElement(fakePlugin(), [alpha, beta], ["beta22", "alpha1"], "Source.md", rendered.host);
 
     expect(rendered.text()).toBe("[1, 0]");
+  });
+
+  it("keeps unresolved markers in place for mixed multi-cite ids", () => {
+    const alpha: ReferenceRead = { id: "alpha1", link: "https://example.com/a", kind: "url", target: "https://example.com/a" };
+    const beta: ReferenceRead = { id: "beta22", link: "https://example.com/b", kind: "url", target: "https://example.com/b" };
+    const rendered = createCitationHost();
+
+    buildCitationElement(fakePlugin(), [alpha, beta], ["beta22", "MISSING", "alpha1"], "Source.md", rendered.host);
+
+    expect(rendered.text()).toBe("[1, ?, 0]");
+    expect(rendered.links[1].classes).toContain("is-unresolved");
+    expect(rendered.links[1].attrs.title).toBe("No reference for MISSING");
   });
 });
 

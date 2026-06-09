@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createCliHarness, type CliHarness } from "../harness/cli";
 import { referenceTitle } from "../../src/ux/reference-link";
 import type { ReferenceRead } from "../../src/workflows";
+import { expectGeneratedReferenceId } from "../unit/reference-id-test-helpers";
 
 let cli: CliHarness;
 
@@ -19,7 +20,92 @@ function insertProjectReference(value: Record<string, unknown>): Promise<Record<
   });
 }
 
+type ReturnedReferenceRead = ReferenceRead & { index?: number };
+
+function referenceItems(result: Record<string, unknown>): ReturnedReferenceRead[] {
+  const value = result.value as { items?: Record<string, ReturnedReferenceRead> };
+  return Object.values(value.items ?? {});
+}
+
 describe("reference collection insert", () => {
+  it("reads legacy id-less references as null without writing frontmatter", async () => {
+    const path = "PARA/Projects/Alpha/Alpha.md";
+    const file = cli.app.vault.getFileByPath(path);
+    if (!file) throw new Error(`missing fixture file: ${path}`);
+    await cli.app.vault.modify(file, [
+      "---",
+      "type: project",
+      "status: in_progress",
+      "references:",
+      "  - https://example.com/bare",
+      "  - link: https://example.com/object",
+      "    description: Legacy object",
+      "---",
+      ""
+    ].join("\n"));
+    const before = cli.app.readPath(path);
+
+    const first = await cli.run("para-zk:read-project", { title: "Alpha", key: "references", limit: "all" });
+    const second = await cli.run("para-zk:read-project", { title: "Alpha", key: "references", limit: "all" });
+    const firstItems = Object.values((first.value as { items?: Record<string, ReferenceRead> }).items ?? {});
+    const secondItems = Object.values((second.value as { items?: Record<string, ReferenceRead> }).items ?? {});
+
+    expect(firstItems.map((reference) => reference.id)).toEqual([null, null]);
+    expect(secondItems.map((reference) => reference.id)).toEqual([null, null]);
+    expect(second.value).toEqual(first.value);
+    expect(cli.app.readPath(path)).toBe(before);
+    expect(cli.app.readPath(path)).not.toContain("id:");
+  });
+
+  it("backfills id-less references, returns ids, and is idempotent", async () => {
+    const path = "PARA/Projects/Alpha/Alpha.md";
+    const file = cli.app.vault.getFileByPath(path);
+    if (!file) throw new Error(`missing fixture file: ${path}`);
+    await cli.app.vault.modify(file, [
+      "---",
+      "type: project",
+      "status: in_progress",
+      "references:",
+      "  - https://example.com/bare",
+      "  - link: https://example.com/object",
+      "    description: Legacy object",
+      "---",
+      ""
+    ].join("\n"));
+
+    const backfilled = await cli.run("para-zk:update-project", {
+      title: "Alpha",
+      key: "references",
+      op: "backfill"
+    });
+    expect(backfilled.ok).toBe(true);
+    expect(backfilled.changed).toBe(true);
+    expect(backfilled.value).toMatchObject({
+      count: 2,
+      offset: 0,
+      limit: "all",
+      returned: 2,
+      has_more: false
+    });
+    const returned = referenceItems(backfilled);
+    expect(returned).toHaveLength(2);
+    expect(returned.map((reference) => reference.index)).toEqual([0, 1]);
+    returned.forEach((reference) => expectGeneratedReferenceId(reference.id));
+    expect(new Set(returned.map((reference) => reference.id)).size).toBe(2);
+
+    const read = await cli.run("para-zk:read-project", { title: "Alpha", key: "references", limit: "all" });
+    const persisted = referenceItems(read);
+    expect(persisted.map((reference) => reference.id)).toEqual(returned.map((reference) => reference.id));
+
+    const second = await cli.run("para-zk:update-project", {
+      title: "Alpha",
+      key: "references",
+      op: "backfill"
+    });
+    expect(second.changed).toBe(false);
+    expect(referenceItems(second).map((reference) => reference.id)).toEqual(returned.map((reference) => reference.id));
+  });
+
   it("adds a URL reference at index 0 with a canonical link", async () => {
     const ref = await insertProjectReference({
       link: "https://example.com/source",
@@ -184,6 +270,45 @@ describe("reference collection insert", () => {
       kind: "url"
     });
   });
+
+  it("backfills id-less references in a subnote through update-child", async () => {
+    await cli.run("para-zk:create-child", {
+      type: "subnote",
+      root_type: "project",
+      root_title: "Alpha",
+      title: "Plan",
+      body: "Initial plan.",
+      open: "false"
+    });
+    const path = "PARA/Projects/Alpha/Plan.md";
+    const file = cli.app.vault.getFileByPath(path);
+    if (!file) throw new Error(`missing fixture file: ${path}`);
+    await cli.app.vault.modify(file, [
+      "---",
+      "type: subnote",
+      "subnote_type: meeting",
+      "references:",
+      "  - https://example.com/child-bare",
+      "---",
+      "",
+      "Initial plan."
+    ].join("\n"));
+
+    const backfilled = await cli.run("para-zk:update-child", {
+      root_type: "project",
+      root_title: "Alpha",
+      title: "Plan",
+      key: "references",
+      op: "backfill"
+    });
+    expect(backfilled.ok).toBe(true);
+    expect(backfilled.path).toBe(path);
+    expect(backfilled.changed).toBe(true);
+    const returned = referenceItems(backfilled);
+    expect(returned).toHaveLength(1);
+    expect(returned[0].index).toBe(0);
+    expectGeneratedReferenceId(returned[0].id);
+  });
 });
 
 describe("reference collection updates", () => {
@@ -206,6 +331,36 @@ describe("reference collection updates", () => {
     });
     expect(rejected.ok).toBe(false);
     expect(String(rejected.error)).toContain("op=insert");
+  });
+
+  it("rejects values on reference backfill", async () => {
+    const cases = [
+      { args: { value: "https://example.com/raw" }, message: "value" },
+      { args: { value_json: JSON.stringify({ link: "https://example.com/raw" }) }, message: "value_json" }
+    ];
+
+    for (const item of cases) {
+      const rejected = await cli.run("para-zk:update-project", {
+        title: "Alpha",
+        key: "references",
+        op: "backfill",
+        ...item.args
+      });
+      expect(rejected.ok).toBe(false);
+      expect(String(rejected.error)).toContain(`references backfill does not accept ${item.message}`);
+    }
+  });
+
+  it("rejects backfill on non-reference keys through write-shape validation", async () => {
+    await cli.run("para-zk:create-resource", { title: "Source", open: "false" });
+
+    const rejected = await cli.run("para-zk:update-resource", {
+      title: "Source",
+      key: "body",
+      op: "backfill"
+    });
+    expect(rejected.ok).toBe(false);
+    expect(String(rejected.error)).toContain("key=body accepts op=set|append|prepend|replace");
   });
 
   it("inserts, reads, edits the description, and deletes by index", async () => {

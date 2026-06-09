@@ -232,7 +232,7 @@ function writeKeyHints(spec: ReadSurfaceSpec): string[] {
     if (section.collection === "task") {
       keys.push("tasks=insert", "tasks/<id>=delete", "tasks/<id>/<field>=set");
     } else if (section.collection === "reference") {
-      keys.push("references=insert", "references/<i>=delete", "references/<i>/{link|description}=set");
+      keys.push("references=insert|backfill", "references/<i>=delete", "references/<i>/{link|description}=set");
     } else if (section.collection === "backlink") {
       continue;
     } else {
