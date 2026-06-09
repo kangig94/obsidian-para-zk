@@ -83,3 +83,47 @@ describe("file-backed body/content (@file)", () => {
     expect(created.created).toBe(true);
   });
 });
+
+describe("values are verbatim (no escape decoding)", () => {
+  it("preserves backslash escapes (LaTeX) when updating a body from an @file", async () => {
+    const file = join(tempDir, "math.md");
+    // \nabla / \theta / \tau / \times begin with \n and \t — the bug turned these
+    // into a newline and a tab, corrupting the math. They must survive byte-for-byte.
+    await writeFile(file, "# Math\n\n$\\nabla_\\theta \\pi_\\theta = \\tau$, with $a \\times b$.\n");
+
+    await cli.run("para-zk:create-resource", { title: "Math", body: "# Math\n", open: "false" });
+    const updated = await cli.run("para-zk:update-resource", { title: "Math", key: "body", op: "set", value: `@${file}` });
+    expect(updated.changed).toBe(true);
+
+    const read = await cli.run("para-zk:read-resource", { title: "Math", key: "body" });
+    const value = String(read.value);
+    expect(value).toContain("\\nabla_\\theta");
+    expect(value).toContain("\\tau");
+    expect(value).toContain("a \\times b");
+    expect(value).not.toContain("\t");
+    expect(value).not.toContain("\nabla");
+  });
+
+  it("stores an inline value verbatim, leaving backslash escapes literal", async () => {
+    await cli.run("para-zk:create-resource", { title: "Lit", body: "# Lit\n", open: "false" });
+    await cli.run("para-zk:update-resource", { title: "Lit", key: "body", op: "set", value: "alpha \\theta beta" });
+
+    const read = await cli.run("para-zk:read-resource", { title: "Lit", key: "body" });
+    expect(String(read.value)).toContain("alpha \\theta beta");
+    expect(String(read.value)).not.toContain("\t");
+  });
+
+  it("matches and replaces a backslash-escape literally (op=replace match/with verbatim)", async () => {
+    const file = join(tempDir, "src.md");
+    await writeFile(file, "# T\n\n$\\theta$ appears here.\n");
+    await cli.run("para-zk:create-resource", { title: "Repl", body: "# T\n", open: "false" });
+    await cli.run("para-zk:update-resource", { title: "Repl", key: "body", op: "set", value: `@${file}` });
+
+    const replaced = await cli.run("para-zk:update-resource", { title: "Repl", key: "body", op: "replace", match: "\\theta", with: "\\phi" });
+    expect(replaced.changed).toBe(true);
+
+    const read = await cli.run("para-zk:read-resource", { title: "Repl", key: "body" });
+    expect(String(read.value)).toContain("$\\phi$");
+    expect(String(read.value)).not.toContain("\\theta");
+  });
+});

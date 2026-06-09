@@ -62,12 +62,16 @@ optsidian para-zk:update-child root_type=project root_title="Model Evaluation" t
 ```
 
 This is the shell-safe way to pass long or multiline markdown (newlines, quotes,
-`$`, backticks survive untouched). The plugin performs the read, so `@file` works
+`$`, backticks, and backslash sequences such as LaTeX `\theta` / `\nabla` all survive
+untouched). **All values are verbatim — the CLI never interprets escape sequences**, so
+an inline `\n` / `\t` stays a literal backslash-n / backslash-t; to embed a real newline or
+tab, pass it directly or use `@file`. The plugin performs the read, so `@file` works
 on the native `obsidian` CLI and through optsidian alike. Use an **absolute path**:
 the read resolves against the Obsidian process working directory, not your shell's.
 Because a leading `@` always means "read this file", a body whose literal text begins
-with `@` must be supplied through a file. Only `body` is file-backed — short fields
-like a journal `content` memo are always literal, so `@mentions` are kept verbatim.
+with `@` must be supplied through a file. Only `body` and update `value` are file-backed —
+short fields like a journal `content` memo or a regex `match` / `with` are always literal,
+so `@mentions` and backslash escapes are kept verbatim.
 
 ## Stable Codes
 

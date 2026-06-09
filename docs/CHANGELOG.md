@@ -473,6 +473,13 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Fixed
 
+- CLI/MCP values are now passed through verbatim: the update `value` and the
+  `match`/`with` replacement strings are no longer escape-decoded. Previously a
+  `\n`/`\t` was rewritten to a newline/tab, which silently corrupted any content
+  containing LaTeX (`\theta`, `\tau`, `\nabla`, `\times`, …) or other literal
+  backslash escapes written through `value=@file`. `body` was already verbatim;
+  this aligns `value`/`match`/`with` with it. Multiline content uses `@file` or
+  real newlines; nothing is escape-interpreted.
 - Deleting the last task from a project now permanently deletes the empty
   per-root task shard note instead of leaving an orphaned `# Tasks` scaffold —
   the shard is plugin-owned with nothing to recover, so it is removed outright

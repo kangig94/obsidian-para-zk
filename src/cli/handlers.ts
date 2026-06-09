@@ -1750,7 +1750,7 @@ function readCliUpdateOptions(args: CliArgs): {
     replacement: "with"
   });
   const value = readCliUpdateValue(args);
-  const match = readDecodedCliString(args, "match");
+  const match = readCliStringIfPresent(args, "match");
   const replacement = readCliReplacement(args);
   return {
     key: readCliString(args, "key"),
@@ -1785,19 +1785,19 @@ function readCliUpdateValue(args: CliArgs): { present: boolean; value?: unknown;
   if (!hasText) return { present: false };
   return {
     present: true,
-    value: decodeCliEscapes(readCliString(args, "value") ?? ""),
+    value: readCliString(args, "value") ?? "",
     source: "value"
   };
 }
 
-function readDecodedCliString(args: CliArgs, key: string): string | undefined {
+function readCliStringIfPresent(args: CliArgs, key: string): string | undefined {
   if (!Object.prototype.hasOwnProperty.call(args, key)) return undefined;
-  return decodeCliEscapes(readCliString(args, key) ?? "");
+  return readCliString(args, key) ?? "";
 }
 
 function readCliReplacement(args: CliArgs): { present: boolean; value?: string } {
   if (!Object.prototype.hasOwnProperty.call(args, "with")) return { present: false };
-  return { present: true, value: decodeCliEscapes(readCliString(args, "with") ?? "") };
+  return { present: true, value: readCliString(args, "with") ?? "" };
 }
 
 function rejectCliAliases(args: CliArgs, aliases: Record<string, string>): void {
@@ -1816,6 +1816,3 @@ function readCliContent(args: CliArgs): string {
   return readCliString(args, "content") ?? "";
 }
 
-function decodeCliEscapes(value: string): string {
-  return value.replace(/\\n/g, "\n").replace(/\\t/g, "\t");
-}
