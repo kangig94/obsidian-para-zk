@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildCitationElement, parseCitationKeys } from "../../src/ux/citation-renderer";
+import { TFile } from "obsidian";
+import { buildCitationElement, parseCitationKeys, registerCitationRenderers } from "../../src/ux/citation-renderer";
 import type { ParaZkPluginContext } from "../../src/plugin-interface";
 import type { ReferenceRead } from "../../src/workflows";
 
@@ -125,6 +126,49 @@ describe("buildCitationElement", () => {
   });
 });
 
+describe("registerCitationRenderers", () => {
+  it("updates reading-view citation hosts when source metadata changes", () => {
+    const file = fakeFile("Source.md");
+    let frontmatter = {
+      references: [
+        { id: "beta22", link: "https://example.com/b" },
+        { id: "alpha1", link: "https://example.com/a" }
+      ]
+    };
+    const changedListeners: Array<(file: TFile) => void> = [];
+    let postProcessor: ((el: HTMLElement, ctx: { sourcePath: string; addChild: (child: { load: () => void }) => void }) => void) | undefined;
+    const plugin = fakeRendererPlugin({
+      file,
+      frontmatter: () => frontmatter,
+      onMetadataChanged: (listener) => changedListeners.push(listener),
+      registerPostProcessor: (processor) => {
+        postProcessor = processor;
+      }
+    });
+    const root = fakeMarkdownSectionWithCode("PZ[beta22]");
+
+    registerCitationRenderers(plugin);
+    postProcessor?.(root.asHtml(), {
+      sourcePath: file.path,
+      addChild: (child) => child.load()
+    });
+
+    expect(root.text()).toBe("[0]");
+    expect(root.links()[0].attrs.href).toBe("https://example.com/b");
+
+    frontmatter = {
+      references: [
+        { id: "alpha1", link: "https://example.com/a" },
+        { id: "beta22", link: "https://example.com/b" }
+      ]
+    };
+    changedListeners[0]?.(file);
+
+    expect(root.text()).toBe("[1]");
+    expect(root.links()[0].attrs.href).toBe("https://example.com/b");
+  });
+});
+
 type FakeLink = {
   text: string;
   attrs: Record<string, string>;
@@ -170,4 +214,160 @@ function fakePlugin(): ParaZkPluginContext {
       }
     }
   } as unknown as ParaZkPluginContext;
+}
+
+function fakeFile(path: string): TFile {
+  const file = new TFile();
+  file.path = path;
+  file.name = path.split("/").pop() ?? path;
+  file.basename = file.name.replace(/\.md$/i, "");
+  file.extension = file.name.includes(".") ? file.name.split(".").pop() ?? "" : "";
+  return file;
+}
+
+function fakeRendererPlugin(options: {
+  file: TFile;
+  frontmatter: () => Record<string, unknown>;
+  onMetadataChanged: (listener: (file: TFile) => void) => void;
+  registerPostProcessor: (
+    processor: (el: HTMLElement, ctx: { sourcePath: string; addChild: (child: { load: () => void }) => void }) => void
+  ) => void;
+}): ParaZkPluginContext {
+  return {
+    app: {
+      vault: {
+        getFileByPath: (path: string) => path === options.file.path ? options.file : null,
+        getAbstractFileByPath: () => null,
+        getMarkdownFiles: () => [],
+        read: async () => "",
+        cachedRead: async () => "",
+        create: async () => options.file,
+        createFolder: async () => {},
+        modify: async () => {},
+        trash: async () => {}
+      },
+      fileManager: {
+        processFrontMatter: async () => {},
+        renameFile: async () => {}
+      },
+      metadataCache: {
+        getFileCache: () => ({ frontmatter: options.frontmatter() }),
+        getFirstLinkpathDest: () => null,
+        resolvedLinks: {},
+        on: (name: string, listener: (file: TFile) => void) => {
+          expect(name).toBe("changed");
+          options.onMetadataChanged(listener);
+          return { detach: () => {} };
+        }
+      },
+      workspace: {
+        getActiveFile: () => null,
+        getLeaf: () => ({ openFile: async () => {} }),
+        openLinkText: async () => {},
+        trigger: () => {}
+      }
+    },
+    settings: {},
+    registerMarkdownPostProcessor: (processor: unknown) => {
+      options.registerPostProcessor(processor as Parameters<typeof options.registerPostProcessor>[0]);
+      return processor;
+    }
+  } as unknown as ParaZkPluginContext;
+}
+
+type FakeChild = FakeElement | string;
+
+class FakeElement {
+  readonly ownerDocument = fakeDocument;
+  parent: FakeElement | undefined;
+  className = "";
+  attrs: Record<string, string> = {};
+  private readonly tag: string;
+  private children: FakeChild[] = [];
+
+  constructor(tag: string, text?: string) {
+    this.tag = tag.toLowerCase();
+    if (text !== undefined) this.children.push(text);
+  }
+
+  get textContent(): string {
+    return this.children.map((child) => typeof child === "string" ? child : child.textContent).join("");
+  }
+
+  set textContent(value: string) {
+    this.children = [value];
+  }
+
+  querySelectorAll(tag: string): FakeElement[] {
+    const normalized = tag.toLowerCase();
+    const matches: FakeElement[] = [];
+    for (const child of this.children) {
+      if (typeof child === "string") continue;
+      if (child.tag === normalized) matches.push(child);
+      matches.push(...child.querySelectorAll(normalized));
+    }
+    return matches;
+  }
+
+  closest(tag: string): FakeElement | null {
+    const normalized = tag.toLowerCase();
+    for (let current: FakeElement | undefined = this; current; current = current.parent) {
+      if (current.tag === normalized) return current;
+    }
+    return null;
+  }
+
+  replaceWith(next: FakeElement): void {
+    if (!this.parent) return;
+    const index = this.parent.children.indexOf(this);
+    if (index === -1) return;
+    next.parent = this.parent;
+    this.parent.children[index] = next;
+    this.parent = undefined;
+  }
+
+  createEl(tag: string, options?: { cls?: string; text?: string }): FakeElement {
+    const child = new FakeElement(tag, options?.text);
+    child.parent = this;
+    if (options?.cls) child.className = options.cls;
+    this.children.push(child);
+    return child;
+  }
+
+  appendText(text: string): void {
+    this.children.push(text);
+  }
+
+  empty(): void {
+    this.children = [];
+  }
+
+  setAttr(key: string, value: string): void {
+    this.attrs[key] = value;
+  }
+
+  addClass(...classes: string[]): void {
+    const existing = this.className ? this.className.split(/\s+/) : [];
+    this.className = [...existing, ...classes].join(" ");
+  }
+
+  addEventListener(): void {}
+
+  asHtml(): HTMLElement {
+    return this as unknown as HTMLElement;
+  }
+}
+
+const fakeDocument = {
+  createElement: (tag: string) => new FakeElement(tag)
+};
+
+function fakeMarkdownSectionWithCode(codeText: string): { asHtml: () => HTMLElement; text: () => string; links: () => FakeElement[] } {
+  const root = new FakeElement("div");
+  root.createEl("code", { text: codeText });
+  return {
+    asHtml: () => root.asHtml(),
+    text: () => root.textContent,
+    links: () => root.querySelectorAll("a")
+  };
 }

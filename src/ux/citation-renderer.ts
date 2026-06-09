@@ -1,4 +1,4 @@
-import { TFile, type MarkdownPostProcessorContext } from "obsidian";
+import { MarkdownRenderChild, TFile, type MarkdownPostProcessorContext } from "obsidian";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { workflowContext } from "../vault/host";
 import { readReferenceItemsFromFrontmatter, type ReferenceRead } from "../workflows";
@@ -75,20 +75,74 @@ export function registerCitationRenderers(plugin: ParaZkPluginContext): void {
 }
 
 function renderCitations(plugin: ParaZkPluginContext, el: HTMLElement, ctx: MarkdownPostProcessorContext): void {
-  let references: ReferenceRead[] | undefined;
+  if (!containsCitationCode(el)) return;
+  ctx.addChild(new CitationRenderChild(plugin, el, ctx.sourcePath));
+}
+
+type RenderedCitation = {
+  host: HTMLElement;
+  keys: string[];
+};
+
+class CitationRenderChild extends MarkdownRenderChild {
+  private readonly citations: RenderedCitation[] = [];
+
+  constructor(
+    private readonly plugin: ParaZkPluginContext,
+    containerEl: HTMLElement,
+    private readonly sourcePath: string
+  ) {
+    super(containerEl);
+  }
+
+  onload(): void {
+    this.render();
+    this.registerEvent(
+      this.plugin.app.metadataCache.on("changed", (file) => this.onMetadataChange(file))
+    );
+  }
+
+  private onMetadataChange(file: TFile): void {
+    if (file.path !== this.sourcePath) return;
+    const references = this.resolveReferences();
+    for (const citation of this.citations) {
+      citation.host.empty();
+      buildCitationElement(this.plugin, references, citation.keys, this.sourcePath, citation.host);
+    }
+  }
+
+  private render(): void {
+    const references = this.resolveReferences();
+    for (const codeEl of citationCodeElements(this.containerEl)) {
+      const keys = parseCitationKeys(codeEl.textContent ?? "");
+      if (!keys) continue;
+
+      const host = codeEl.ownerDocument.createElement("span");
+      host.className = "para-zk-citation-host";
+      buildCitationElement(this.plugin, references, keys, this.sourcePath, host);
+      this.citations.push({ host, keys });
+      codeEl.replaceWith(host);
+    }
+  }
+
+  private resolveReferences(): ReferenceRead[] {
+    const file = this.plugin.app.vault.getFileByPath(this.sourcePath);
+    return file instanceof TFile ? resolveReferences(this.plugin, file) : [];
+  }
+}
+
+function containsCitationCode(el: HTMLElement): boolean {
+  for (const codeEl of citationCodeElements(el)) {
+    if (parseCitationKeys(codeEl.textContent ?? "")) return true;
+  }
+  return false;
+}
+
+function citationCodeElements(el: HTMLElement): HTMLElement[] {
+  const codeEls: HTMLElement[] = [];
   for (const codeEl of Array.from(el.querySelectorAll("code"))) {
     if (codeEl.closest("pre")) continue;
-    const keys = parseCitationKeys(codeEl.textContent ?? "");
-    if (!keys) continue;
-
-    if (!references) {
-      const file = plugin.app.vault.getFileByPath(ctx.sourcePath);
-      if (!(file instanceof TFile)) return;
-      references = resolveReferences(plugin, file);
-    }
-    const host = codeEl.ownerDocument.createElement("span");
-    host.className = "para-zk-citation-host";
-    buildCitationElement(plugin, references, keys, ctx.sourcePath, host);
-    codeEl.replaceWith(host);
+    codeEls.push(codeEl);
   }
+  return codeEls;
 }

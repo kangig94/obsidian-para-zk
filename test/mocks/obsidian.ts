@@ -31,7 +31,47 @@ export function parseYaml(value: string): unknown {
 }
 
 export class App {}
-export class Plugin {}
+export class Component {
+  private readonly registeredCallbacks: Array<() => void> = [];
+
+  load(): void {
+    this.onload();
+  }
+
+  onload(): void {}
+
+  unload(): void {
+    this.onunload();
+    for (const callback of this.registeredCallbacks) callback();
+    this.registeredCallbacks.length = 0;
+  }
+
+  onunload(): void {}
+
+  addChild<T extends Component>(component: T): T {
+    component.load();
+    return component;
+  }
+
+  removeChild<T extends Component>(component: T): T {
+    component.unload();
+    return component;
+  }
+
+  register(callback: () => void): void {
+    this.registeredCallbacks.push(callback);
+  }
+
+  registerEvent(eventRef: { detach?: () => void }): void {
+    this.register(() => eventRef.detach?.());
+  }
+}
+export class Plugin extends Component {}
+export class MarkdownRenderChild extends Component {
+  constructor(public containerEl: HTMLElement) {
+    super();
+  }
+}
 export class Modal {}
 export class PluginSettingTab {}
 export class Setting {}
