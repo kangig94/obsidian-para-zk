@@ -80,15 +80,18 @@ API or `trans`-style CLI); only your own translation can apply the rules below, 
 pass yields translationese and mangles terminology, math, and citations.
 
 Preserve the source's structure, argument flow, and domain precision, and **default to
-translating** — render each term the way the source's field actually publishes it in the target
-language. Keep the source-language form only for atoms with no settled target-language
-equivalent: proper nouns, acronyms, mathematical symbols, units and metrics, code-/API-facing
-identifiers, and method/model/architecture names the field itself leaves untranslated (e.g.
-*Diffusion Policy*, *ResNet*). Everything else — a field's everyday research vocabulary — is
-translated; being technical or sitting next to a formula is **not** a reason to keep a word (for
-an ML paper: observation, demonstration, learning, policy, action, task, inference, success rate,
-manipulation). This test is **relative to the source's field**, so apply it the same way in
-economics, law, or biology.
+translating** — the arbiter is how the source's field actually *writes* each term in the target
+language, not whether a target word exists. Keep the source-language form for **(a)** atoms with
+no target equivalent — proper nouns, acronyms, symbols, units, code-/API-facing identifiers, and
+method/model/architecture names (e.g. *Diffusion Policy*, *ResNet*); and **(b)** the handful of
+ordinary terms the field itself conventionally writes in the **source script** even though a
+target word exists (for ML, e.g. *epoch*, *gradient*, *baseline*, *advantage*, *rollout*).
+Translate everything else into the field's settled target-language form — its standard word
+(observation, demonstration, learning, policy, action, task, inference, success rate,
+manipulation) or, where the field writes a loanword, its standard transliteration (benchmark,
+embedding, minibatch). Being technical or sitting next to a formula is **not** a reason to keep a
+word, and **when unsure, translate**. This test is **relative to the source's field**, so apply
+it the same way in economics, law, or biology.
 
 **Decide each recurring term once and apply it uniformly**; never alternate between the source
 word and its translation for the same concept. Inflect the sentence naturally around any kept
