@@ -7,6 +7,7 @@ import {
   SuggestModal,
   TFile,
   TextComponent,
+  setIcon,
   type App,
   type MarkdownPostProcessorContext,
   type WorkspaceLeaf
@@ -349,6 +350,9 @@ function renderFieldControl(
     case "text-list":
       renderTextInput(plugin, field, frontmatter, container, sourcePath, blockEl, { list: true });
       return;
+    case "url":
+      renderUrlField(plugin, field, frontmatter, container, sourcePath, blockEl, rerender);
+      return;
     case "date":
       renderDateInput(plugin, field, frontmatter, container, sourcePath, blockEl, "date");
       return;
@@ -391,6 +395,94 @@ function renderTextInput(
     const value = options.list ? singleItemList(raw) : raw;
     void writeFrontmatterValue(plugin, sourcePath, blockEl, field.key, value);
   });
+}
+
+function renderUrlField(
+  plugin: ParaZkPluginContext,
+  field: PropsField,
+  frontmatter: Frontmatter,
+  container: HTMLElement,
+  sourcePath: string | undefined,
+  blockEl: HTMLElement,
+  rerender: PropsRerender
+): void {
+  const url = valueText(readFieldValue(field, frontmatter));
+  if (!isWebUrl(url)) {
+    renderUrlEditInput(plugin, field, frontmatter, container, sourcePath, blockEl, rerender, false);
+    return;
+  }
+
+  const link = container.createEl("a", { cls: "para-zk-block__url-link", text: url });
+  link.setAttr("href", url);
+  link.setAttr("rel", "noopener");
+  link.addEventListener("click", (event) => {
+    event.preventDefault();
+    window.open(url, "_blank", "noopener");
+  });
+
+  const editLabel = labelValue(localePack(plugin.settings.locale).labels.editUrl, "Edit URL");
+  const editButton = container.createEl("button", { cls: "para-zk-block__url-edit" });
+  editButton.type = "button";
+  editButton.setAttr("aria-label", editLabel);
+  editButton.setAttr("title", editLabel);
+  editButton.disabled = !field.key || !sourcePath;
+  setIcon(editButton, "pencil");
+  editButton.addEventListener("click", () => {
+    if (!field.key || !sourcePath) return;
+    container.empty();
+    renderUrlEditInput(plugin, field, frontmatter, container, sourcePath, blockEl, rerender, true);
+  });
+}
+
+// An editable URL input that confirms on blur (Enter blurs to confirm) and reverts to the
+// link display. The change event alone left the field stuck as an input: an unchanged edit
+// fires no change, so nothing re-rendered it back to the link. Blur drives both — a changed
+// value commits (the block re-renders to the link via its metadata listener), an unchanged
+// value re-renders in place. Escape discards (reverts to the link even if a value was typed).
+// An empty / not-yet-a-URL value has no link to revert to, so it stays an input to be filled in.
+function renderUrlEditInput(
+  plugin: ParaZkPluginContext,
+  field: PropsField,
+  frontmatter: Frontmatter,
+  container: HTMLElement,
+  sourcePath: string | undefined,
+  blockEl: HTMLElement,
+  rerender: PropsRerender,
+  autoFocus: boolean
+): void {
+  const original = valueText(readFieldValue(field, frontmatter));
+  const input = new TextComponent(container);
+  input.inputEl.type = "text";
+  input.inputEl.addClass("para-zk-block__input");
+  input.setValue(original).setDisabled(!field.key || !sourcePath);
+
+  let settled = false;
+  input.inputEl.addEventListener("blur", () => {
+    if (settled || !field.key || !sourcePath) return;
+    const value = input.getValue();
+    if (value !== original) {
+      settled = true;
+      void writeFrontmatterValue(plugin, sourcePath, blockEl, field.key, value);
+    } else if (isWebUrl(original)) {
+      settled = true;
+      rerender();
+    }
+  });
+  input.inputEl.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      input.inputEl.blur();
+    } else if (event.key === "Escape" && !settled) {
+      event.preventDefault();
+      settled = true;
+      rerender();
+    }
+  });
+
+  if (autoFocus) {
+    input.inputEl.focus();
+    input.inputEl.select();
+  }
 }
 
 function renderDateInput(
@@ -822,6 +914,13 @@ function valueText(value: unknown): string {
   if (Array.isArray(value)) return value.map(String).join(", ");
   if (value === null || value === undefined) return "";
   return String(value);
+}
+
+// Narrower than workflows' `isExternalReference` (which also accepts mailto:/tel: and any
+// scheme): a props `url` field renders as a clickable web link only for http/https, so a
+// stray non-web value stays an editable input rather than becoming an unopenable anchor.
+function isWebUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value);
 }
 
 function labelValue(value: string | undefined, fallback: string): string {

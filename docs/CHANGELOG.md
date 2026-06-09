@@ -30,6 +30,12 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- The props block's `url` field (resource / zk-digest) now renders as a real
+  clickable web link instead of a plain text box: a valid `http(s)` URL shows as
+  an external link (opens in the browser) with a pencil edit button; clicking it
+  swaps to an input that confirms on blur or Enter (Escape discards) and reverts
+  to the link. An empty or non-`http(s)` value stays an editable input so it can
+  be filled in.
 - Added `key=references op=backfill` to explicitly assign stable ids to
   hand-authored or legacy id-less references from the CLI. It takes no value,
   is idempotent, returns the read-shaped reference collection with ids, and

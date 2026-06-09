@@ -20,6 +20,7 @@ describe("props schema lead fields", () => {
       ["license", "kind"]
     ]);
     expect(findPropsField(resource, "aliases")).toBe(resource.lead);
+    expect(findPropsField(resource, "url")?.control).toBe("url");
 
     const permanent = propsSchemaForType("zk_permanent", "en");
     expect(permanent.lead?.id).toBe("aliases");
@@ -28,5 +29,10 @@ describe("props schema lead fields", () => {
       ["maturity"]
     ]);
     expect(findPropsField(permanent, "aliases")).toBe(permanent.lead);
+  });
+
+  it("uses the URL control for digest source links", () => {
+    const digest = propsSchemaForType("zk_digest", "en");
+    expect(findPropsField(digest, "url")?.control).toBe("url");
   });
 });

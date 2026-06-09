@@ -42,6 +42,7 @@ type PropsFieldControl =
   | "display"
   | "select"
   | "text"
+  | "url"
   | "text-list";
 
 export type PropsSelectOption = {
@@ -115,7 +116,7 @@ export function propsSchemaForType(type: PropsViewType, locale: Locale): PropsSc
       rows: [
         [created, updated],
         [
-          field("url", "url", t.labels.url, "text"),
+          field("url", "url", t.labels.url, "url"),
           field("first_author", "first_author", t.labels.firstAuthor, "text")
         ],
         [
@@ -163,7 +164,7 @@ export function propsSchemaForType(type: PropsViewType, locale: Locale): PropsSc
         [created, updated],
         [
           field("sourceTitle", "sourceTitle", t.labels.source, "text"),
-          field("url", "url", t.labels.url, "text")
+          field("url", "url", t.labels.url, "url")
         ],
         [
           field("first_author", "first_author", t.labels.firstAuthor, "text"),

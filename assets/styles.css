@@ -615,10 +615,54 @@ body.para-zk-width-active .markdown-preview-view .markdown-preview-sizer > div:h
   min-width: 0;
 }
 
+.para-zk-block__control:has(.para-zk-block__url-link) {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
 .para-zk-block__grid :is(.para-zk-block__input, select.para-zk-block__select) {
   box-sizing: border-box;
   min-height: 28px;
   width: 100%;
+}
+
+.para-zk-block__url-link {
+  color: var(--text-accent);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.para-zk-block__url-link:hover {
+  color: var(--text-accent-hover);
+  text-decoration: underline;
+}
+
+.para-zk-block__url-edit {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 24px;
+  justify-content: center;
+  padding: 2px;
+  width: 24px;
+}
+
+.para-zk-block__url-edit:hover:not(:disabled) {
+  color: var(--text-normal);
+}
+
+.para-zk-block__url-edit:disabled {
+  color: var(--text-faint);
+  cursor: default;
 }
 
 .para-zk-block__display {
