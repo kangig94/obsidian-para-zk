@@ -167,7 +167,7 @@ type WorkflowRunFunction = (
 ) => Promise<Record<string, unknown>>;
 
 type SelectorVariant =
-  | { variant: "by-title"; label: string }
+  | { variant: "by-title"; label: string; type: string }
   | { variant: "zk" }
   | { variant: "journal" }
   | { variant: "retro" };
@@ -198,6 +198,26 @@ type ChildAddress = {
 
 const FORMAT_OPTION: CliOptionSpec = { value: "<text|json>", description: "Output format (default: text)." };
 const ALIAS_OPTION: CliOptionSpec = { value: "<text>", description: "Optional single Obsidian alias to store in frontmatter." };
+const RESOURCE_CREATE_TITLE_OPTION: CliOptionSpec = {
+  value: "<title>",
+  description: "Resource title. Use / to address/create a Resources-relative path, e.g. AI/Foo."
+};
+const RESOURCE_TITLE_OPTION: CliOptionSpec = {
+  value: "<title>",
+  description: "Resource title. Use / to address a Resources-relative path, e.g. AI/Foo."
+};
+const RESOURCE_CURRENT_TITLE_OPTION: CliOptionSpec = {
+  value: "<title>",
+  description: "Current resource title. Use / to address a Resources-relative path, e.g. AI/Foo."
+};
+const RESOURCE_SOURCE_TITLE_OPTION: CliOptionSpec = {
+  value: "<title>",
+  description: "Optional source note title to link this resource from. When source_type=resource, use / to address a Resources-relative path, e.g. AI/Foo."
+};
+const SOURCE_RESOURCE_TITLE_OPTION: CliOptionSpec = {
+  value: "<title>",
+  description: "Source resource title. Use / to address a Resources-relative path, e.g. AI/Foo."
+};
 const ARCHIVED_OPTION: CliOptionSpec = {
   value: "<true|false>",
   description: "When selecting by title, true selects the archived PARA copy and false restricts lookup to the active copy."
@@ -389,10 +409,10 @@ function makeParaReadCommand(config: ParaNoteCommandConfig): NativeCliCommand {
   return makeReadCommand({
     command: `para-zk:read-${config.type}`,
     description: `Read ${config.article} ${config.type} note's stable PARA-ZK surface, optionally by map key`,
-    options: readCommandOptions({ variant: "by-title", label: config.label }, readKeyOption(config.type)),
+    options: readCommandOptions({ variant: "by-title", label: config.label, type: config.type }, readKeyOption(config.type)),
     text: `${config.type} read`,
     workflow: config.readWorkflow,
-    selector: { variant: "by-title", label: config.label }
+    selector: { variant: "by-title", label: config.label, type: config.type }
   });
 }
 
@@ -400,10 +420,10 @@ function makeParaUpdateCommand(config: ParaNoteCommandConfig): NativeCliCommand 
   return makeUpdateCommand({
     command: `para-zk:update-${config.type}`,
     description: `Update ${config.article} ${config.type} note's stable PARA-ZK surface by map key`,
-    options: updateCommandOptions({ variant: "by-title", label: config.label }, writeKeyOption(config.type)),
+    options: updateCommandOptions({ variant: "by-title", label: config.label, type: config.type }, writeKeyOption(config.type)),
     text: `${config.type} updated`,
     workflow: config.updateWorkflow,
-    selector: { variant: "by-title", label: config.label }
+    selector: { variant: "by-title", label: config.label, type: config.type }
   });
 }
 
@@ -411,10 +431,10 @@ function makeParaRenameCommand(config: ParaNoteCommandConfig): NativeCliCommand 
   return makeRenameCommand({
     command: `para-zk:rename-${config.type}`,
     description: config.renameDescription,
-    options: renameCommandOptions({ variant: "by-title", label: config.label }),
+    options: renameCommandOptions({ variant: "by-title", label: config.label, type: config.type }),
     text: `${config.type} renamed`,
     workflow: config.renameWorkflow,
-    selector: { variant: "by-title", label: config.label }
+    selector: { variant: "by-title", label: config.label, type: config.type }
   });
 }
 
@@ -422,10 +442,10 @@ function makeParaDeleteCommand(config: ParaNoteCommandConfig): NativeCliCommand 
   return makeDeleteCommand({
     command: `para-zk:delete-${config.type}`,
     description: `Move ${config.article} ${config.type} note to Obsidian trash and clean PARA-ZK-owned references`,
-    options: deleteCommandOptions({ variant: "by-title", label: config.label }),
+    options: deleteCommandOptions({ variant: "by-title", label: config.label, type: config.type }),
     text: `${config.type} deleted`,
     workflow: config.deleteWorkflow,
-    selector: { variant: "by-title", label: config.label }
+    selector: { variant: "by-title", label: config.label, type: config.type }
   });
 }
 
@@ -433,7 +453,7 @@ function readCommandOptions(selector: SelectorVariant, key: CliOptionSpec): Reco
   switch (selector.variant) {
     case "by-title":
       return {
-        title: { value: "<title>", description: `${selector.label} title.` },
+        title: titleOption(selector),
         archived: ARCHIVED_OPTION,
         key,
         ...READ_COLLECTION_OPTIONS,
@@ -470,7 +490,7 @@ function updateCommandOptions(selector: SelectorVariant, key: CliOptionSpec): Re
   switch (selector.variant) {
     case "by-title":
       return {
-        title: { value: "<title>", description: `${selector.label} title.` },
+        title: titleOption(selector),
         archived: ARCHIVED_OPTION,
         key,
         ...UPDATE_OPTIONS
@@ -503,7 +523,7 @@ function renameCommandOptions(selector: Extract<SelectorVariant, { variant: "by-
   switch (selector.variant) {
     case "by-title":
       return {
-        title: RENAME_OPTIONS.title,
+        title: titleOption(selector, true),
         new_title: RENAME_OPTIONS.new_title,
         format: RENAME_OPTIONS.format,
         archived: ARCHIVED_OPTION
@@ -520,7 +540,7 @@ function deleteCommandOptions(selector: Exclude<SelectorVariant, { variant: "jou
   switch (selector.variant) {
     case "by-title":
       return {
-        title: DELETE_OPTIONS.title,
+        title: titleOption(selector, true),
         force: DELETE_OPTIONS.force,
         format: DELETE_OPTIONS.format,
         archived: ARCHIVED_OPTION
@@ -537,6 +557,13 @@ function deleteCommandOptions(selector: Exclude<SelectorVariant, { variant: "jou
         archived: ARCHIVED_OPTION
       };
   }
+}
+
+function titleOption(selector: Extract<SelectorVariant, { variant: "by-title" }>, current = false): CliOptionSpec {
+  if (selector.type === "resource") return current ? RESOURCE_CURRENT_TITLE_OPTION : RESOURCE_TITLE_OPTION;
+  return current
+    ? { value: "<title>", description: "Current note title." }
+    : { value: "<title>", description: `${selector.label} title.` };
 }
 
 function selectorOptions(
@@ -1003,10 +1030,10 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     command: "para-zk:create-resource",
     description: "Create a PARA resource note and optionally link it from a source note",
     options: {
-      title: { value: "<title>", description: "Resource title." },
+      title: RESOURCE_CREATE_TITLE_OPTION,
       alias: ALIAS_OPTION,
       source_type: { value: "<project|area|resource|zk>", description: "Optional source note type to link this resource from." },
-      source_title: { value: "<title>", description: "Optional source note title to link this resource from." },
+      source_title: RESOURCE_SOURCE_TITLE_OPTION,
       link: { value: "<true|false>", description: "Whether to add the link to the source note." },
       url: { value: "<url>", description: "Optional provenance: where the source came from." },
       first_author: { value: "<name>", description: "Optional provenance: the source's first author." },
@@ -1100,7 +1127,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     command: "para-zk:create-from-resource",
     description: "Create a Digest or Permanent ZK note from a resource (resource preserved)",
     options: {
-      source_title: { value: "<title>", description: "Source resource title." },
+      source_title: SOURCE_RESOURCE_TITLE_OPTION,
       title: { value: "<title>", description: "New ZK note title." },
       kind: { value: `<${RESOURCE_CREATE_KIND_CODE_HELP}>`, description: "Locale-neutral target ZK kind (digest|permanent)." },
       maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },

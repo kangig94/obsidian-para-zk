@@ -141,12 +141,14 @@ Required: `type`, `key`, `content`, and a valid selector for the type. `position
 | --- | --- | --- | --- |
 | `project` | `update-project` | `title` | |
 | `area` | `update-area` | `title` | |
-| `resource` | `update-resource` | `title` | |
+| `resource` | `update-resource` | `title`; `/` addresses a Resources-relative path | |
 | `retro` | `update-retro` | `title` | optional `date` passes through |
 | `journal` | `update-journal` | `date` | no title selector |
 | `zk_spark` | `update-zk` | `title` | `kind=spark` |
 | `zk_digest` | `update-zk` | `title` | `kind=digest` |
 | `zk_permanent` | `update-zk` | `title` | `kind=permanent` |
+
+All `*-resource` CLI commands accept a slash path in `title`; mutation tools proxy `update-resource`, which also honors Resources-relative slash paths.
 
 The MCP mutation tools keep a convenient `child: ["<Child Title>", ...]` parameter for LLM callers. When `child` is omitted, the server invokes the direct `update-*` command above. When `child` is present for `type=project` or `type=area`, the server routes internally to `para-zk:update-child`:
 

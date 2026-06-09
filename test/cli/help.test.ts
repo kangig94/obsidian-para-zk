@@ -31,6 +31,25 @@ describe("per-command help", () => {
     expect((help.options as unknown[]).length).toBeGreaterThan(0);
   });
 
+  it("advertises resource subdirectory title paths in per-command help", async () => {
+    const createHelp = await cli.run("para-zk:create-resource", { help: "true" });
+    const createOptions = createHelp.options as Array<{ name: string; description: string }>;
+    expect(createOptions.find((option) => option.name === "title")?.description).toContain("Resources-relative path");
+    expect(createOptions.find((option) => option.name === "title")?.description).toContain("AI/Foo");
+
+    const readHelp = await cli.run("para-zk:read-resource", { help: "true" });
+    const readOptions = readHelp.options as Array<{ name: string; description: string }>;
+    expect(readOptions.find((option) => option.name === "title")?.description).toContain("Resources-relative path");
+
+    const renameHelp = await cli.run("para-zk:rename-resource", { help: "true" });
+    const renameOptions = renameHelp.options as Array<{ name: string; description: string }>;
+    expect(renameOptions.find((option) => option.name === "title")?.description).toContain("Resources-relative path");
+
+    const deleteHelp = await cli.run("para-zk:delete-resource", { help: "true" });
+    const deleteOptions = deleteHelp.options as Array<{ name: string; description: string }>;
+    expect(deleteOptions.find((option) => option.name === "title")?.description).toContain("Resources-relative path");
+  });
+
   it("treats help=false as a normal run — the command executes and reports its real error", async () => {
     const result = await cli.run("para-zk:create-area", { help: "false" });
 

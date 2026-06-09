@@ -327,7 +327,13 @@ function addressingForType(type: SurfaceType): SurfaceAddressing {
         rename: true
       };
     case "resource":
-      return { addressable: true, selectors: ["title", "archived"], create: "para-zk:create-resource", rename: true };
+      return {
+        addressable: true,
+        selectors: ["title", "archived"],
+        addressVia: "A resource title may be a Resources-relative path using /: title=\"AI/Foo\" addresses or creates <Resources>/AI/Foo.md. A bare title resolves anywhere under Resources and is ambiguous if duplicated.",
+        create: "para-zk:create-resource",
+        rename: true
+      };
     case "retro":
       return { addressable: true, selectors: ["title", "date", "archived"], create: "para-zk:create-retro", rename: false };
     case "journal":

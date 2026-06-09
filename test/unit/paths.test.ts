@@ -3,6 +3,7 @@ import {
   joinVaultPath,
   normalizeVaultPath,
   sanitizeFileName,
+  sanitizeVaultRelativePath,
   wikiLink
 } from "../../src/vault/paths";
 
@@ -37,6 +38,20 @@ describe("sanitizeFileName", () => {
 
   it("caps length at 120 characters", () => {
     expect(sanitizeFileName("x".repeat(200))).toHaveLength(120);
+  });
+});
+
+describe("sanitizeVaultRelativePath", () => {
+  it("sanitizes each non-empty path segment without flattening slashes", () => {
+    expect(sanitizeVaultRelativePath(" AI / Robotics:2026 / Foo? ")).toEqual(["AI", "Robotics 2026", "Foo"]);
+  });
+
+  it.each(["", "  ", "/x", "x/", "a//b", "a/ /b"])("rejects empty input or empty segments: %j", (value) => {
+    expect(() => sanitizeVaultRelativePath(value, "resource title")).toThrow(/resource title/);
+  });
+
+  it.each([".", "..", "../x", "x/..", ":..:"])("rejects traversal-like segments: %j", (value) => {
+    expect(() => sanitizeVaultRelativePath(value, "resource title")).toThrow(/\. or \.\./);
   });
 });
 

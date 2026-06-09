@@ -30,6 +30,12 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- `*-resource` CLI commands now accept a Resources-relative slash path in
+  `title`, so `title="AI/Foo"` creates or addresses
+  `PARA/Resources/AI/Foo.md` while bare titles keep flat-first then recursive
+  basename lookup. Path segments are validated against empty and `.`/`..`
+  traversal segments; `rename-resource` keeps renames in the current folder and
+  leaves cross-folder moves to native Obsidian/optsidian file moves.
 - The props block's `url` field (resource / zk-digest) now renders as a real
   clickable web link instead of a plain text box: a valid `http(s)` URL shows as
   an external link (opens in the browser) with a pencil edit button; clicking it

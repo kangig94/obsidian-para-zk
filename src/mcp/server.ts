@@ -67,7 +67,7 @@ const BASE_MUTATION_PROPERTIES = {
   },
   title: {
     type: "string",
-    description: "Title selector (most types)."
+    description: "Title selector (most types). For type=resource, / addresses a Resources-relative path, e.g. AI/Foo."
   },
   child: {
     type: "array",

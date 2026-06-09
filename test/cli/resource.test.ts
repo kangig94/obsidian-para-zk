@@ -8,6 +8,143 @@ beforeEach(() => {
 });
 
 describe("resource provenance frontmatter", () => {
+  it("creates a nested resource from a Resources-relative title path using basename metadata", async () => {
+    const created = await cli.run("para-zk:create-resource", {
+      title: "AI/Foo",
+      open: "false"
+    });
+
+    expect(created.ok).toBe(true);
+    expect(created.created).toBe(true);
+    expect(created.path).toBe("PARA/Resources/AI/Foo.md");
+    expect(created.title).toBe("Foo");
+    expect(cli.app.readPath("PARA/Resources/Foo.md")).toBeUndefined();
+
+    const content = cli.app.readPath("PARA/Resources/AI/Foo.md") ?? "";
+    expect(content).toContain("type: resource");
+    expect(content).toContain("tags:\n  - resource/foo");
+    expect(content).not.toContain("resource/ai/foo");
+  });
+
+  it("creates a three-level resource title path using basename metadata", async () => {
+    const created = await cli.run("para-zk:create-resource", {
+      title: "AI/ML/Foo",
+      open: "false"
+    });
+
+    expect(created.ok).toBe(true);
+    expect(created.created).toBe(true);
+    expect(created.path).toBe("PARA/Resources/AI/ML/Foo.md");
+    expect(created.title).toBe("Foo");
+
+    const content = cli.app.readPath("PARA/Resources/AI/ML/Foo.md") ?? "";
+    expect(content).toContain("tags:\n  - resource/foo");
+    expect(content).not.toContain("resource/ml/foo");
+  });
+
+  it("reads, updates, and deletes a nested resource by exact title path", async () => {
+    await cli.run("para-zk:create-resource", {
+      title: "AI/Foo",
+      body: "Initial notes",
+      open: "false"
+    });
+
+    const read = await cli.run("para-zk:read-resource", {
+      title: "AI/Foo",
+      key: "body"
+    });
+    expect(read.ok).toBe(true);
+    expect(read.path).toBe("PARA/Resources/AI/Foo.md");
+    expect(String(read.value)).toContain("Initial notes");
+
+    const update = await cli.run("para-zk:update-resource", {
+      title: "AI/Foo",
+      key: "body",
+      op: "set",
+      value: "Updated notes"
+    });
+    expect(update.ok).toBe(true);
+    expect(update.path).toBe("PARA/Resources/AI/Foo.md");
+
+    const updated = await cli.run("para-zk:read-resource", {
+      title: "AI/Foo",
+      key: "body"
+    });
+    expect(updated.ok).toBe(true);
+    expect(String(updated.value)).toContain("Updated notes");
+
+    const deleted = await cli.run("para-zk:delete-resource", { title: "AI/Foo" });
+    expect(deleted.ok).toBe(true);
+    expect(deleted.path).toBe("PARA/Resources/AI/Foo.md");
+    expect(cli.app.readPath("PARA/Resources/AI/Foo.md")).toBeUndefined();
+  });
+
+  it("keeps bare-title flat-first and recursive unique lookup behavior", async () => {
+    await cli.run("para-zk:create-resource", {
+      title: "AI/Foo",
+      body: "Nested",
+      open: "false"
+    });
+
+    const nestedUnique = await cli.run("para-zk:read-resource", {
+      title: "Foo",
+      key: "body"
+    });
+    expect(nestedUnique.ok).toBe(true);
+    expect(nestedUnique.path).toBe("PARA/Resources/AI/Foo.md");
+
+    await cli.run("para-zk:create-resource", {
+      title: "Foo",
+      body: "Flat",
+      open: "false"
+    });
+    const flatFirst = await cli.run("para-zk:read-resource", {
+      title: "Foo",
+      key: "body"
+    });
+    expect(flatFirst.path).toBe("PARA/Resources/Foo.md");
+    expect(String(flatFirst.value)).toContain("Flat");
+
+    await cli.run("para-zk:delete-resource", { title: "Foo" });
+    await cli.run("para-zk:create-resource", {
+      title: "ML/Foo",
+      body: "Duplicate nested",
+      open: "false"
+    });
+
+    const exact = await cli.run("para-zk:read-resource", {
+      title: "AI/Foo",
+      key: "body"
+    });
+    expect(exact.ok).toBe(true);
+    expect(exact.path).toBe("PARA/Resources/AI/Foo.md");
+
+    const ambiguous = await cli.run("para-zk:read-resource", {
+      title: "Foo",
+      key: "body"
+    });
+    expect(ambiguous.ok).toBe(false);
+    expect(String(ambiguous.error)).toContain("resource title is ambiguous: Foo");
+  });
+
+  it.each(["../x", "/x", "x/", "a//b", ".."])("rejects unsafe resource title paths: %s", async (title) => {
+    const before = cli.app.listPaths();
+    const created = await cli.run("para-zk:create-resource", {
+      title,
+      open: "false"
+    });
+    expect(created.ok).toBe(false);
+    expect(String(created.error)).toContain("resource title");
+
+    const read = await cli.run("para-zk:read-resource", {
+      title,
+      key: "body"
+    });
+    expect(read.ok).toBe(false);
+    expect(String(read.error)).toContain("resource title");
+    expect(cli.app.listPaths()).toEqual(before);
+  });
+
   it("create-resource records url/first_author/license/kind in frontmatter", async () => {
     const created = await cli.run("para-zk:create-resource", {
       title: "Attention",

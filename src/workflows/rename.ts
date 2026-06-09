@@ -2,7 +2,7 @@ import { TFile } from "obsidian";
 import { localePack } from "../i18n";
 import { frontmatterLinks, fileFrontmatter, readType, type Frontmatter } from "../vault/frontmatter";
 import { ensureFolder, isInFolder, parentFolder } from "../vault/files";
-import { joinVaultPath, sanitizeFileName } from "../vault/paths";
+import { joinVaultPath, sanitizeFileName, sanitizeVaultRelativePath } from "../vault/paths";
 import { slugify, uniqueStrings } from "../text";
 import type { RenameByTitleOptions, RenameResult, RenameZkOptions, WorkflowContext } from "./context";
 import {
@@ -33,10 +33,14 @@ export async function renameArea(ctx: WorkflowContext, options: RenameByTitleOpt
 }
 
 export async function renameResource(ctx: WorkflowContext, options: RenameByTitleOptions): Promise<RenameResult> {
+  const newTitleSegments = sanitizeVaultRelativePath(options.newTitle, "new_title");
+  if (newTitleSegments.length > 1) {
+    throw new Error("new_title for rename-resource must be a bare basename. Moving a resource between folders is a link-safe file move handled by the Obsidian/optsidian native CLI (rename/move), not rename-resource; rename-resource only changes the name in place.");
+  }
   return renameFlatNote(
     ctx,
     await resolveRequiredResource(ctx, options),
-    requireTitle(options.newTitle, "new_title"),
+    newTitleSegments[0],
     "resource"
   );
 }

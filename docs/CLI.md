@@ -195,8 +195,8 @@ Important fields:
   - `selectors` — how to address an existing note of this type.
   - `create` — the command that creates it, and `createInputs` — that command's
     arguments (so a caller learns the full create call from `describe` alone).
-  - `addressVia` — for non-addressable types (`subnote`/`note`) and nested
-    areas, how to reach existing ones with the `*-child` commands.
+  - `addressVia` — for non-addressable types (`subnote`/`note`), nested areas,
+    and resource subdirectory addressing, how to reach existing ones.
 
 `describe type=<t>` is the self-contained contract for one type: address selectors,
 create command + inputs, collections, and read/write keys. `readKeys` are the readable
@@ -557,6 +557,18 @@ When selecting by `title`, `read-project`, `read-area`, `read-resource`, and
 `read-retro` accept `archived=true` to select the matching note under
 `PARA/Archives`.
 
+For `*-resource` commands, `title` may be a Resources-relative slash path.
+`title="AI/Foo"` addresses or creates `PARA/Resources/AI/Foo.md`; archived
+lookup mirrors it under `PARA/Archives/Resources/AI/Foo.md`. The note basename,
+tag slug, tags, and visible title derive from `Foo`, not `AI/Foo`. A bare
+`title="Foo"` keeps the existing behavior: flat `PARA/Resources/Foo.md` wins
+first, then a unique `Foo.md` anywhere under Resources resolves recursively;
+duplicate bare basenames are ambiguous. Resource title paths reject empty
+segments and `.`/`..` segments (`/x`, `x/`, `a//b`, `../x`, and `..` are
+invalid). `rename-resource` only changes the basename in the current folder;
+use the Obsidian/optsidian native `move` or `rename` file operation to move a
+resource between folders link-safely.
+
 Surface types fall into two groups. `project`, `area`, `journal`, and `retro`
 are structured: their load-bearing template sections are stable keys. `resource`,
 child `subnote`/fallback `note`, and `zk_*` notes are free-form: prose is exposed as
@@ -567,7 +579,7 @@ stable keys.
 | Command | Selector | Top-level keys |
 | --- | --- | --- |
 | `para-zk:read-area` | `title` | `frontmatter`, `overview`, `tasks`, `references`, `backlinks`, `children` |
-| `para-zk:read-resource` | `title` | `frontmatter`, `body`, `references`, `backlinks` |
+| `para-zk:read-resource` | `title`; `/` addresses a Resources-relative path | `frontmatter`, `body`, `references`, `backlinks` |
 | `para-zk:read-zk` | `title` plus optional `kind` | `frontmatter`, `body`, `references`, `backlinks` |
 | `para-zk:read-journal` | `date` | `frontmatter`, `focus`, `quick_memo`, `timeline`, `tasks`, `short_review`, `references`, `backlinks` |
 | `para-zk:read-retro` | `title` plus optional `date` | `frontmatter`, `week_progress`, `good`, `improve`, `risks`, `tasks`, `retro_summary`, `references`, `backlinks` |
@@ -594,6 +606,7 @@ optsidian para-zk:read-child root_type=area root_title="AI" title="Generation" k
 optsidian para-zk:read-area title="AI" key=backlinks type=project format=json
 optsidian para-zk:read-project title="Finished Project" archived=true key=summary format=json
 optsidian para-zk:read-resource title="Source Paper" key=body format=json
+optsidian para-zk:read-resource title="AI/Source Paper" key=body format=json
 optsidian para-zk:read-zk title="Stable Interface Contracts" kind=permanent key=body format=json
 optsidian para-zk:read-zk title="Stable Interface Contracts" kind=permanent key=frontmatter/maturity format=json
 optsidian para-zk:read-journal date=2026-05-30 key=quick_memo format=json
@@ -778,7 +791,7 @@ The same update algorithm is used by the other domain update commands:
 | Command | Selector | Notes |
 | --- | --- | --- |
 | `para-zk:update-area` | `title` | Supports root area surface keys. |
-| `para-zk:update-resource` | `title` | Uses free-form `body`, `references`, and frontmatter keys. |
+| `para-zk:update-resource` | `title`; `/` addresses a Resources-relative path | Uses free-form `body`, `references`, and frontmatter keys. |
 | `para-zk:update-zk` | `title` plus optional `kind` | Uses free-form `body`, `references`, and type-specific frontmatter keys. |
 | `para-zk:update-journal` | `date` | Supports journal surface keys such as `quick_memo` and `tasks`. |
 | `para-zk:update-retro` | `title` plus optional `date` | Supports retro surface keys such as `tasks`. |
@@ -805,7 +818,7 @@ retros are left in place.
 | --- | --- | --- |
 | `para-zk:rename-project` | `title`; optional `archived` | Renames the folder-style project folder and main note. Child notes move with the folder; default project-scoped retros are renamed with it. |
 | `para-zk:rename-area` | `title`; optional `archived` | Renames the folder-style area folder and main note. Child areas move with the folder; default area-scoped retros and area tag namespaces are updated without dropping inherited parent tags. |
-| `para-zk:rename-resource` | `title`; optional `archived` | Renames the resource note file in place. |
+| `para-zk:rename-resource` | `title`; optional `archived`; `/` addresses a Resources-relative path | Renames the resource note file in its current folder. `new_title` must be a bare basename; use native `move`/`rename` to move folders. |
 | `para-zk:rename-zk` | `title` plus optional `kind` | Renames the selected ZK note file in place. |
 | `para-zk:rename-child` | `root_type` + `root_title` + optional `relpath` + `title` | Renames a subnote, fallback note, or nested area. `new_title` renames the addressed child. |
 
@@ -828,6 +841,7 @@ optsidian para-zk:rename-project title="Model Evaluation" new_title="Model Evalu
 optsidian para-zk:rename-area title="AI" new_title="Applied AI" format=json
 optsidian para-zk:rename-child root_type=area root_title="AI" relpath='["Generation"]' title="Vision" new_title="Computer Vision" format=json
 optsidian para-zk:rename-resource title="Source Paper" new_title="Source Paper Notes" format=json
+optsidian para-zk:rename-resource title="AI/Source Paper" new_title="Source Paper Notes" format=json
 optsidian para-zk:rename-zk title="Stable Interface Contracts" kind=permanent new_title="Stable CLI Contracts" format=json
 ```
 
@@ -858,7 +872,7 @@ needed. PARA-ZK only cleans relationships it owns directly:
 | --- | --- | --- |
 | `para-zk:delete-project` | `title`; optional `archived` | Deletes the folder-style project container. Requires `force=true` if child files are inside. |
 | `para-zk:delete-area` | `title`; optional `archived` | Deletes the folder-style area container. Requires `force=true` if child files are inside. |
-| `para-zk:delete-resource` | `title`; optional `archived` | Deletes the resource note and removes matching frontmatter reference items. |
+| `para-zk:delete-resource` | `title`; optional `archived`; `/` addresses a Resources-relative path | Deletes the resource note and removes matching frontmatter reference items. |
 | `para-zk:delete-zk` | `title` plus optional `kind` | Deletes the selected ZK note and removes matching frontmatter reference items. |
 | `para-zk:delete-journal` | `date` | Deletes a daily journal note. |
 | `para-zk:delete-retro` | `title` plus optional `date` | Deletes a retro note. |
@@ -881,6 +895,7 @@ Examples:
 
 ```bash
 optsidian para-zk:delete-resource title="Source Paper" format=json
+optsidian para-zk:delete-resource title="AI/Source Paper" format=json
 optsidian para-zk:delete-area title="Unused Area" format=json
 optsidian para-zk:delete-child root_type=project root_title="Model Evaluation" title="Planning Meeting" format=json
 optsidian para-zk:delete-project title="Prototype" force=true format=json
@@ -950,7 +965,7 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `title` | string | Required. |
+| `title` | string | Required. Use `/` to create under a Resources-relative subdirectory, e.g. `AI/Foo`. |
 | `alias` | string or one-item string list | Optional single short Obsidian alias. Stored as a one-item `aliases` frontmatter list (`aliases:\n  - X`). Rejects more than one value. Canonical create arg is `alias`. |
 | `source_type` | `project`, `area`, `resource`, `zk` | Optional source note type to link this resource from. |
 | `source_title` | string | Optional source note title. |

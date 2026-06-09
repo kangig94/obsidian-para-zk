@@ -5,7 +5,7 @@ import { dateFromCli, isoWeekInfo, localDate } from "../time";
 import type { ParaZkSettings, ZkKind } from "../types";
 import { ensureFolder, isInFolder, parentFolder } from "../vault/files";
 import type { WorkflowHost } from "../vault/host";
-import { joinVaultPath, normalizeVaultPath, sanitizeFileName, wikiLink } from "../vault/paths";
+import { joinVaultPath, normalizeVaultPath, sanitizeFileName, sanitizeVaultRelativePath, wikiLink } from "../vault/paths";
 import { uniqueStrings } from "../text";
 import { readOptionalCode } from "./code-options";
 import type { ReadAreaOptions, ReadJournalOptions, ReadProjectOptions, ReadResourceOptions, ReadRetroOptions, ReadZkOptions, WorkflowContext } from "./context";
@@ -287,7 +287,7 @@ export async function resolveRequiredArea(ctx: WorkflowContext, options: ReadAre
 export async function resolveRequiredResource(ctx: WorkflowContext, options: ReadResourceOptions): Promise<TFile> {
   const file = options.path
     ? resolveRequiredFile(ctx, options.path, "resource note")
-    : findResourceByTitle(ctx, requireTitle(options.title, "resource title"), options.archived);
+    : findResourceByTitle(ctx, resourceTitlePath(options.title), options.archived);
   if (!file) throw new Error(`resource not found: ${options.title}`);
 
   const type = await readFileTypeFresh(ctx, file);
@@ -408,16 +408,39 @@ function findAreaByTitleForRead(ctx: WorkflowContext, title: string, archived: b
   });
 }
 
-function findResourceByTitle(ctx: WorkflowContext, title: string, archived: boolean | undefined): TFile | undefined {
+export type ResourceTitlePath = {
+  basename: string;
+  qualified: boolean;
+  relpath: string;
+};
+
+export function resourceTitlePath(value: string | undefined): ResourceTitlePath {
+  const segments = sanitizeVaultRelativePath(value, "resource title");
+  return {
+    basename: segments[segments.length - 1],
+    qualified: segments.length > 1,
+    relpath: segments.join("/")
+  };
+}
+
+function findResourceByTitle(ctx: WorkflowContext, title: ResourceTitlePath, archived: boolean | undefined): TFile | undefined {
   const folders = archiveAwareFolders(ctx, ctx.settings.paths.resourcesFolder, archived);
 
+  if (title.qualified) {
+    for (const folder of folders) {
+      const file = ctx.host.getFile(joinVaultPath(folder, `${title.relpath}.md`));
+      if (file) return file;
+    }
+    return undefined;
+  }
+
   for (const folder of folders) {
-    const file = ctx.host.getFile(joinVaultPath(folder, `${title}.md`));
+    const file = ctx.host.getFile(joinVaultPath(folder, `${title.basename}.md`));
     if (file) return file;
   }
 
   return findUniqueNoteByTitle(ctx, {
-    title,
+    title: title.basename,
     folders,
     type: "resource",
     label: "resource"

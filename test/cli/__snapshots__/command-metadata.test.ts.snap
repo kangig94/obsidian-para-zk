@@ -181,7 +181,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<true|false>",
       },
       "source_title": {
-        "description": "Source resource title.",
+        "description": "Source resource title. Use / to address a Resources-relative path, e.g. AI/Foo.",
         "value": "<title>",
       },
       "title": {
@@ -265,7 +265,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<true|false>",
       },
       "source_title": {
-        "description": "Optional source note title to link this resource from.",
+        "description": "Optional source note title to link this resource from. When source_type=resource, use / to address a Resources-relative path, e.g. AI/Foo.",
         "value": "<title>",
       },
       "source_type": {
@@ -273,7 +273,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<project|area|resource|zk>",
       },
       "title": {
-        "description": "Resource title.",
+        "description": "Resource title. Use / to address/create a Resources-relative path, e.g. AI/Foo.",
         "value": "<title>",
       },
       "url": {
@@ -455,7 +455,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "title": {
-        "description": "Current note title.",
+        "description": "Current resource title. Use / to address a Resources-relative path, e.g. AI/Foo.",
         "value": "<title>",
       },
     },
@@ -875,7 +875,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<url|note|file|wiki|text>",
       },
       "title": {
-        "description": "Resource title.",
+        "description": "Resource title. Use / to address a Resources-relative path, e.g. AI/Foo.",
         "value": "<title>",
       },
       "type": {
@@ -1099,7 +1099,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<title>",
       },
       "title": {
-        "description": "Current note title.",
+        "description": "Current resource title. Use / to address a Resources-relative path, e.g. AI/Foo.",
         "value": "<title>",
       },
     },
@@ -1373,7 +1373,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<set|insert|append|prepend|replace|delete|backfill>",
       },
       "title": {
-        "description": "Resource title.",
+        "description": "Resource title. Use / to address a Resources-relative path, e.g. AI/Foo.",
         "value": "<title>",
       },
       "value": {

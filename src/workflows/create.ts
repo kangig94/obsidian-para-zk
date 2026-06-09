@@ -53,6 +53,7 @@ import {
   folderForZkKind,
   linkToFile,
   requireTitle,
+  resourceTitlePath,
   resolveOptionalFile,
   resolveRequiredByType,
   resolveRequiredFile,
@@ -208,14 +209,14 @@ async function resolveRequiredParent(
 }
 
 export async function createResource(ctx: WorkflowContext, options: CreateResourceOptions): Promise<CreateResourceResult> {
-  const title = requireTitle(options.title, "resource title");
+  const title = resourceTitlePath(options.title);
   const kind = readOptionalCode(options.kind, parseResourceKindCode, "kind", RESOURCE_KIND_CODE_HELP);
   const source = await resolveOptionalOrigin(ctx, options);
   const createdAt = localDateTimeSpace();
-  const path = await uniqueMarkdownPath(ctx.host, joinVaultPath(ctx.settings.paths.resourcesFolder, `${title}.md`));
+  const path = await uniqueMarkdownPath(ctx.host, joinVaultPath(ctx.settings.paths.resourcesFolder, `${title.relpath}.md`));
   const file = await createMarkdownFile(ctx, "resource", path, {
     created: createdAt,
-    slug: slugify(title),
+    slug: slugify(title.basename),
     cursor: ""
   });
 
@@ -223,7 +224,7 @@ export async function createResource(ctx: WorkflowContext, options: CreateResour
   await ctx.host.processFrontMatter(file, (fm) => {
     fm.type = "resource";
     applyAlias(fm, options.alias);
-    fm.tags = [`${tags.resource}/${slugify(title)}`];
+    fm.tags = [`${tags.resource}/${slugify(title.basename)}`];
     applyCreatedUpdatedDefaults(fm, createdAt);
     // Provenance: write only what was provided. url/first_author/license are free text;
     // kind is already validated to a code (or undefined) by readOptionalCode above.

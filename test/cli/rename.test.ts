@@ -69,4 +69,36 @@ describe("rename-resource", () => {
     expect(renamed.path).toBe("PARA/Resources/Renamed source.md");
     expect(cli.app.readPath("PARA/Resources/Source.md")).toBeUndefined();
   });
+
+  it("renames a nested resource in its current folder", async () => {
+    await cli.run("para-zk:create-resource", { title: "AI/Foo", open: "false" });
+
+    const renamed = await cli.run("para-zk:rename-resource", {
+      title: "AI/Foo",
+      new_title: "Bar"
+    });
+
+    expect(renamed.ok).toBe(true);
+    expect(renamed.path).toBe("PARA/Resources/AI/Bar.md");
+    expect(renamed.fromPath).toBe("PARA/Resources/AI/Foo.md");
+    expect(renamed.toPath).toBe("PARA/Resources/AI/Bar.md");
+    expect(cli.app.readPath("PARA/Resources/AI/Bar.md")).toBeDefined();
+    expect(cli.app.readPath("PARA/Resources/AI/Foo.md")).toBeUndefined();
+    expect(cli.app.readPath("PARA/Resources/Bar.md")).toBeUndefined();
+  });
+
+  it("rejects slash new_title because folder moves are native file moves", async () => {
+    await cli.run("para-zk:create-resource", { title: "AI/Foo", open: "false" });
+
+    const rejected = await cli.run("para-zk:rename-resource", {
+      title: "AI/Foo",
+      new_title: "X/Y"
+    });
+
+    expect(rejected.ok).toBe(false);
+    expect(String(rejected.error)).toContain("bare basename");
+    expect(String(rejected.error)).toContain("optsidian");
+    expect(String(rejected.error)).toContain("move");
+    expect(cli.app.readPath("PARA/Resources/AI/Foo.md")).toBeDefined();
+  });
 });
