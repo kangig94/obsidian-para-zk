@@ -44,14 +44,33 @@ command + inputs. Identify the note(s) to link from (area / project / resource).
 - **Web research** → search authoritative sources, cross-check facts, collect citations
   (prefer primary/official sources; for papers, arXiv/DOI).
 
-**Prefer an HTML/text rendering over a PDF.** Converting a PDF to Markdown is slow and
-lossy, so when the same source exists as HTML or Markdown, fetch that instead — even if you
-were handed a PDF link. For arXiv papers, use the HTML view (`https://arxiv.org/html/<id>`,
-or `https://ar5iv.org/abs/<id>`) first. If citations or the bibliography are unresolved
-(`\cite{...}`, citation keys like `[zhang2022kinematic]`, `\printbibliography`, missing
-References), fetch the arXiv source bundle and use its `.tex`, `.bbl`, or `.bib` files to
-restore the paper's numbered citations and bibliography entries. Use PDF text extraction only
-as a fallback, and OCR only when there is no usable text/source.
+**Prefer a clean HTML/source rendering when one exists** — no extraction step, and exact
+text, math, and citations. For arXiv papers, try the HTML view (`https://arxiv.org/html/<id>`
+or `https://ar5iv.org/abs/<id>`) first; if citations/bibliography come through unresolved
+(`\cite{...}`, keys like `[zhang2022kinematic]`, `\printbibliography`, missing References),
+fetch the arXiv source bundle and use its `.tex`/`.bbl`/`.bib` to restore numbered citations
+and the bibliography.
+
+**When you work from a PDF, convert it with `marker` — always, for any PDF.** You cannot know
+a PDF's math, tables, or figures until you open it, and `marker` recovers LaTeX equations,
+Markdown tables, and figure images (saved as files) far better than plain-text extraction or
+OCR. Resolve the tool once: if `marker_single` is on PATH, use it; else if `uv` is present, run
+`uv tool install marker-pdf`; else with only `python3`, bootstrap `uv` (or `python -m venv` +
+`pip install marker-pdf`). The install is one-time but heavy (Torch + models, several GB, first
+run a few minutes) — say so before starting. If your runtime sandboxes shell commands, relax it
+for the install and the run: the model download (network) and marker's GPU access are blocked
+otherwise, and a resulting "no GPU" or blocked-network error means the sandbox, not a real
+absence. Only if there is no Python at all, fall back to
+poppler: `pdftotext -layout` for text, and `pdftoppm -png -r 200 -f<page> -l<page> -x -y -W -H`
+to crop each figure (find the box from `pdftotext -bbox` — the figure sits between the preceding
+paragraph's last line and the `Figure N:` caption).
+
+Run `marker_single <file.pdf> --output_dir <dir> --output_format markdown`; it writes the
+Markdown plus the figure images. Treat that as a **draft, not the final note**: in step 5 fix
+marker's residual glitches (an occasional garbled caption clause, an equation number left
+outside `\tag{}`, a mis-leveled heading), and embed the figures it extracted as local images
+(attach each with `para-zk:attach-file`, step 6) under edited/translated captions — dropping
+marker's duplicate/debug images.
 
 Record source provenance for everything (URL, file path, identifier, date, license/permission
 where relevant). The four core fields go in the resource **frontmatter** at create time (see step 6):
@@ -62,8 +81,9 @@ transform notes such as "translated", "converted", or "cleaned" unless the user 
 that metadata or it is needed to avoid ambiguity. For images:
 - A **web** image → embed it by its source URL with `![alt](https://…)`; Obsidian renders
   remote images inline, so do **not** download or attach it.
-- A **local** image (from a local-file source) → `optsidian para-zk:attach-file
-  source=<abs-path> folder=assets/<slug> format=json`, then embed the returned `![[…]]`.
+- A **local** image — from a local-file source, or a figure `marker` extracted from a PDF →
+  `optsidian para-zk:attach-file source=<abs-path> folder=assets/<slug> format=json`, then
+  embed the returned `![[…]]`.
 
 ## 4. Produce clean Markdown — never a raw dump
 
