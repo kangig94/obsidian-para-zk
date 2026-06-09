@@ -13,6 +13,7 @@ export interface WorkflowHost {
   modify(file: TFile, data: string): Promise<void>;
   trash(file: TAbstractFile, system: boolean): Promise<void>;
   trashFile?: (file: TAbstractFile) => Promise<void>;
+  delete(file: TFile): Promise<void>;
   processFrontMatter(file: TFile, fn: (frontmatter: Record<string, unknown>) => void): Promise<void>;
   renameFile(file: TAbstractFile, newPath: string): Promise<void>;
   getFirstLinkpathDest(linkpath: string, sourcePath: string): TFile | null;
@@ -20,6 +21,16 @@ export interface WorkflowHost {
   resolvedLinks(): Record<string, Record<string, number>>;
   openFile(file: TFile): Promise<void>;
   getActiveFile(): TFile | null;
+}
+
+export async function trashAbstractFile(host: WorkflowHost, file: TAbstractFile): Promise<string> {
+  if (typeof host.trashFile === "function") {
+    await host.trashFile(file);
+    return "fileManager.trashFile";
+  }
+
+  await host.trash(file, false);
+  return "vault.trash.local";
 }
 
 function createObsidianHost(app: App): WorkflowHost {
@@ -40,6 +51,7 @@ function createObsidianHost(app: App): WorkflowHost {
     trashFile: typeof fileManager.trashFile === "function"
       ? (file) => fileManager.trashFile?.(file) ?? Promise.resolve()
       : undefined,
+    delete: (file) => app.vault.delete(file),
     processFrontMatter: (file, fn) => app.fileManager.processFrontMatter(file, fn),
     renameFile: (file, newPath) => app.fileManager.renameFile(file, newPath),
     getFirstLinkpathDest: (linkpath, sourcePath) => app.metadataCache.getFirstLinkpathDest(linkpath, sourcePath),

@@ -48,6 +48,7 @@ export class MockApp {
   private root = new TFolder();
 
   readonly trashed: Array<{ path: string; system: boolean }> = [];
+  readonly deleted: string[] = [];
   readonly opened: string[] = [];
 
   vault = {
@@ -73,6 +74,9 @@ export class MockApp {
     },
     trash: async (file: TAbstractFile, system: boolean): Promise<void> => {
       this.removePath(file.path, system);
+    },
+    delete: async (file: TAbstractFile): Promise<void> => {
+      this.deletePath(file.path);
     },
     adapter: {
       exists: async (path: string): Promise<boolean> =>
@@ -189,6 +193,20 @@ export class MockApp {
     );
     for (const target of targets) {
       this.trashed.push({ path: target, system });
+      this.contents.delete(target);
+      this.binaryContents.delete(target);
+      this.fileObjs.delete(target);
+      this.folderObjs.delete(target);
+    }
+    this.rewire();
+  }
+
+  private deletePath(path: string): void {
+    const targets = [...this.fileObjs.keys(), ...this.folderObjs.keys()].filter(
+      (candidate) => candidate === path || candidate.startsWith(`${path}/`)
+    );
+    for (const target of targets) {
+      this.deleted.push(target);
       this.contents.delete(target);
       this.binaryContents.delete(target);
       this.fileObjs.delete(target);

@@ -2,6 +2,7 @@ import { TAbstractFile, TFile, TFolder } from "obsidian";
 import { hasOwn, isRecord } from "../records";
 import { fileFrontmatter, readType } from "../vault/frontmatter";
 import { isInFolder, uniqueFiles } from "../vault/files";
+import { trashAbstractFile } from "../vault/host";
 import { uniqueStrings } from "../text";
 import type {
   DeleteByTitleOptions,
@@ -77,9 +78,9 @@ async function deleteDomainNote(
 
   const incomingLinks = incomingLinksForPaths(ctx, deletedFilePaths, deletedPathSet);
   const cleaned = await cleanupStructuredReferences(ctx, deletedFiles, deletedPathSet);
-  const trashMethod = await trashAbstractFile(ctx, container);
+  const trashMethod = await trashAbstractFile(ctx.host, container);
   for (const shard of taskShards) {
-    if (ctx.host.getAbstractFile(shard.path)) await trashAbstractFile(ctx, shard);
+    if (ctx.host.getAbstractFile(shard.path)) await trashAbstractFile(ctx.host, shard);
   }
 
   return {
@@ -124,16 +125,6 @@ async function taskShardsForDeletedFiles(ctx: WorkflowContext, files: TFile[]): 
     if (shard) shards.push(shard);
   }
   return uniqueFiles(shards);
-}
-
-async function trashAbstractFile(ctx: WorkflowContext, file: TAbstractFile): Promise<string> {
-  if (typeof ctx.host.trashFile === "function") {
-    await ctx.host.trashFile(file);
-    return "fileManager.trashFile";
-  }
-
-  await ctx.host.trash(file, false);
-  return "vault.trash.local";
 }
 
 function incomingLinksForPaths(

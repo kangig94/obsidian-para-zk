@@ -63,6 +63,7 @@ const TASK_ID_REGEX = /\u{1F194}\s*([a-zA-Z0-9-_]+)/u;
 const TASK_ID_GLOBAL_REGEX = /\u{1F194}\s*([a-zA-Z0-9-_]+)/gu;
 const TASK_ID_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
 const TASK_ID_LENGTH = 8;
+const TASK_SHARD_SCAFFOLD = "# Tasks\n";
 const TASK_DATE_FIELD_SYMBOLS: Record<TaskDateMetadataField, string> = {
   due: "\u{1F4C5}",
   scheduled: "\u{23F3}",
@@ -86,7 +87,7 @@ async function ensureTaskShard(ctx: WorkflowContext, rootFile: TFile): Promise<T
 
   let shardFile = ctx.host.getFile(path);
   if (!shardFile) {
-    shardFile = await ctx.host.create(path, "# Tasks\n");
+    shardFile = await ctx.host.create(path, TASK_SHARD_SCAFFOLD);
   }
   return shardFile;
 }
@@ -257,6 +258,13 @@ export async function deleteRootTask(ctx: WorkflowContext, rootFile: TFile, task
   if (!line) throw new Error(`task not found: ${taskId}`);
   const after = removeTextRanges(before, [line.range]);
   if (before === after) return false;
+  // Permanently delete (not trash) when deletion returns the shard to the empty managed scaffold:
+  // it is plugin-owned with nothing to recover, so it should not clutter the trash. User content
+  // (a remaining task, prose, or extra headings) fails the bare check and keeps the shard alive.
+  if (isBareTaskShard(after)) {
+    await ctx.host.delete(shardFile);
+    return true;
+  }
   await ctx.host.modify(shardFile, after);
   return true;
 }
@@ -322,7 +330,7 @@ function ensureTaskShardTaskSection(content: string): { content: string; range: 
   const existing = taskShardTaskRange(content);
   if (existing) return { content, range: existing };
 
-  const next = `${content.replace(/\s*$/, "")}\n\n# Tasks\n`;
+  const next = `${content.replace(/\s*$/, "")}\n\n${TASK_SHARD_SCAFFOLD}`;
   return {
     content: next,
     range: {
@@ -330,6 +338,11 @@ function ensureTaskShardTaskSection(content: string): { content: string; range: 
       end: next.length
     }
   };
+}
+
+function isBareTaskShard(content: string): boolean {
+  const text = content.trim();
+  return text === "" || text === TASK_SHARD_SCAFFOLD.trim();
 }
 
 function insertTaskLine(content: string, line: string, position: number | "end"): string {

@@ -473,6 +473,13 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Fixed
 
+- Deleting the last task from a project now permanently deletes the empty
+  per-root task shard note instead of leaving an orphaned `# Tasks` scaffold —
+  the shard is plugin-owned with nothing to recover, so it is removed outright
+  rather than cluttering the trash. Shards with remaining tasks or user-authored
+  content (prose or extra headings) are preserved. (Deleting the whole project
+  still trashes its shard alongside the project's other content, which is
+  recoverable.)
 - A nested area's props panel now labels its `parent` field "Parent area" (ko 상위 영역)
   instead of the ambiguous "Area", making clear it shows the containing area. Root areas
   (no parent) hide the field as before.
