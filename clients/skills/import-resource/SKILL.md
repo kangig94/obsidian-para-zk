@@ -122,7 +122,8 @@ tables, and figure references unless instructed otherwise. Keep citation markers
 `introduced in [27]` as "Zhang et al." unless the source itself does.
 
 Across all of them: real headings (`#`/`##`), valid Markdown tables (no empty cells, no
-equations trapped in cells), math as LaTeX (`$…$`), figures embedded (web images by URL,
+equations trapped in cells), math as Obsidian MathJax LaTeX (`$…$` inline, `$$…$$` block;
+do not use `\(...\)`/`\[...\]`), figures embedded (web images by URL,
 local images attached), boilerplate dropped. Source provenance lives in the frontmatter (step 6);
 only when there is useful overflow detail beyond `url`/`first_author`/`license`/`kind` (DOI,
 version, extra URLs) add a short **Source / provenance** section at the top — otherwise omit it.
@@ -176,7 +177,8 @@ hub — an area, a project, or an index resource — so the set is navigable.
 
 Run `para-zk:read-resource title="<title>" key=body format=json` and re-scan for artifacts;
 confirm links via the origin note's `key=references` and the resource's `key=backlinks`. Fix and
-repeat if anything is still broken.
+repeat if anything is still broken. For notes with math, confirm Obsidian delimiters are used:
+`$…$` for inline math and `$$…$$` for blocks; no `\(...\)` or `\[...\]` should remain.
 
 ## Examples
 
