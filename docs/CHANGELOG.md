@@ -30,6 +30,10 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- Home dashboard "create new" panel adds a daily-note (`open-journal`) button.
+  Both the dashboard panel and the left ribbon now order the create actions as
+  Project, Area, Resource, ZK, Daily note, Quick memo (quick memo appends into a
+  section of the daily note, so it follows it).
 - Settings panel adds a "Ribbon icons" toggle (`showRibbon`, default on) to show
   or hide the PARA-ZK left-ribbon action icons. Toggling applies live without a
   reload; older saved settings default to showing the ribbon.

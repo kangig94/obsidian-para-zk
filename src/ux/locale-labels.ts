@@ -30,19 +30,19 @@ export const RIBBON_ACTIONS: RibbonAction[] = [
     command: "create-area"
   },
   {
+    id: "create-resource",
+    icon: "file-plus",
+    color: "#3b82f6",
+    label: (labels) => labels.homeNewResource,
+    command: "create-resource"
+  },
+  {
     id: "create-zk",
     icon: "library-big",
     color: "#ffff00",
     lightColor: "#a16207",
     label: (labels) => labels.homeNewZk,
     command: "create-zk"
-  },
-  {
-    id: "create-resource",
-    icon: "file-plus",
-    color: "#3b82f6",
-    label: (labels) => labels.homeNewResource,
-    command: "create-resource"
   },
   {
     id: "open-journal",

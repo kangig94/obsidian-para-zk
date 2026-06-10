@@ -104,7 +104,7 @@ const ko: LocalePack = {
     createSubareaCommandName: "하위영역 만들기",
     createRetroCommandName: "새 회고 만들기",
     createZkCommandName: "새 ZK 만들기",
-    openJournalCommandName: "일일노트",
+    openJournalCommandName: "일일 노트",
     captureJournalCommandName: "빠른 메모",
     homeNewProject: "새 프로젝트",
     homeNewArea: "새 영역",

@@ -74,6 +74,7 @@ function dashboardActionGroups(plugin: ParaZkPluginContext): DashboardActionGrou
         commandAction(t.labels.homeNewArea, "create-area"),
         commandAction(t.labels.homeNewResource, "create-resource"),
         commandAction(t.labels.homeNewZk, "create-zk"),
+        commandAction(t.labels.openJournalCommandName, "open-journal"),
         commandAction(t.labels.captureJournalCommandName, "capture-journal")
       ]
     },
