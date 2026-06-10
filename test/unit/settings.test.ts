@@ -32,4 +32,19 @@ describe("mergeSettings", () => {
         .toBe(DEFAULT_SETTINGS.editorWidthSliderEnabled);
     }
   });
+
+  it("defaults showRibbon to true when absent", () => {
+    expect(mergeSettings({}).showRibbon).toBe(true);
+  });
+
+  it("preserves boolean showRibbon values", () => {
+    expect(mergeSettings({ showRibbon: true }).showRibbon).toBe(true);
+    expect(mergeSettings({ showRibbon: false }).showRibbon).toBe(false);
+  });
+
+  it("falls back for non-boolean showRibbon values", () => {
+    for (const showRibbon of ["false", 0, 1, null, undefined]) {
+      expect(mergeSettings({ showRibbon }).showRibbon).toBe(DEFAULT_SETTINGS.showRibbon);
+    }
+  });
 });

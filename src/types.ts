@@ -34,6 +34,7 @@ export type ParaZkSettings = {
   paths: ParaZkPaths;
   layoutFolders: string[];
   locale: Locale;
+  showRibbon: boolean;
   showEmptyTrashAction: boolean;
   editorWidthSliderEnabled: boolean;
   editorLineWidth: number;
@@ -150,6 +151,7 @@ export const DEFAULT_SETTINGS: ParaZkSettings = {
   paths: DEFAULT_PATHS,
   layoutFolders: DEFAULT_LAYOUT_FOLDERS,
   locale: "en",
+  showRibbon: true,
   showEmptyTrashAction: true,
   editorWidthSliderEnabled: true,
   editorLineWidth: 700,

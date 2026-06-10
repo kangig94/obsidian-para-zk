@@ -30,6 +30,9 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- Settings panel adds a "Ribbon icons" toggle (`showRibbon`, default on) to show
+  or hide the PARA-ZK left-ribbon action icons. Toggling applies live without a
+  reload; older saved settings default to showing the ribbon.
 - `*-resource` CLI commands now accept a Resources-relative slash path in
   `title`, so `title="AI/Foo"` creates or addresses
   `PARA/Resources/AI/Foo.md` while bare titles keep flat-first then recursive

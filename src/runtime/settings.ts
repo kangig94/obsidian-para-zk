@@ -27,6 +27,9 @@ export function mergeSettings(loaded: unknown): ParaZkSettings {
     paths,
     layoutFolders: readLayoutFolders(data.layoutFolders, paths),
     locale: normalizeLocale(data.locale, DEFAULT_SETTINGS.locale),
+    showRibbon: typeof data.showRibbon === "boolean"
+      ? data.showRibbon
+      : DEFAULT_SETTINGS.showRibbon,
     showEmptyTrashAction: typeof data.showEmptyTrashAction === "boolean"
       ? data.showEmptyTrashAction
       : DEFAULT_SETTINGS.showEmptyTrashAction,

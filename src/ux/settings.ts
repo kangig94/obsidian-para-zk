@@ -6,6 +6,7 @@ import { normalizeVaultPath } from "../vault/paths";
 import { refreshEditorWidthControl } from "./editor-width";
 import { refreshExplorerActions } from "./explorer-actions";
 import { refreshRegisteredLocaleLabels } from "./locale-labels";
+import { refreshRibbonActions } from "./ribbon-actions";
 
 export class ParaZkSettingTab extends PluginSettingTab {
   constructor(private readonly plugin: ParaZkPluginContext) {
@@ -60,6 +61,19 @@ export class ParaZkSettingTab extends PluginSettingTab {
           .setButtonText(labels.settingsInstallDepsButton)
           .onClick(() => {
             void this.runSetupAction(button, { installDeps: true });
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(labels.settingsShowRibbon)
+      .setDesc(labels.settingsShowRibbonDesc)
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.showRibbon)
+          .onChange(async (value) => {
+            this.plugin.settings.showRibbon = value;
+            await this.plugin.saveSettings();
+            refreshRibbonActions(this.plugin);
           });
       });
 
