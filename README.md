@@ -31,6 +31,11 @@ Without optsidian, just copy `manifest.json`, `main.js`, and `styles.css` from t
 repo root into `<vault>/.obsidian/plugins/para-zk/` and enable **PARA-ZK** under
 Settings → Community plugins — no build step needed, those artifacts are committed.
 
+Or track the beta with [BRAT](https://github.com/TfTHacker/obsidian42-brat): install
+**BRAT** from community plugins, then BRAT → **Add beta plugin** → enter
+`https://github.com/kangig94/obsidian-para-zk`. BRAT installs the latest published
+release and keeps it updated.
+
 Then scaffold the vault with the **PARA-ZK: Set up PARA-ZK vault** command (or
 `para-zk:setup`). Setup is idempotent: it creates the PARA/ZK layout, templates,
 and dashboards, and offers to install the required community plugins
@@ -73,18 +78,33 @@ rules, and the GUI/CLI contract. See [docs/CHANGELOG.md](docs/CHANGELOG.md) for 
 development changelog.
 
 ```bash
-npm install
-npm run lint      # architecture guard + tsc
-npm run test      # Vitest unit suite against an in-memory Obsidian mock
-npm run build
+pnpm install
+pnpm run lint      # architecture guard + tsc
+pnpm run test      # Vitest unit suite against an in-memory Obsidian mock
+pnpm run build
 ```
 
 The build treats the repo root as the Obsidian deployment shape (`manifest.json`,
 `main.js`, `styles.css`); CSS source lives in `assets/styles.css` and is copied to
 root on build.
 
-`npm run smoke:vault -- --vault /path/to/test-vault` runs the checks that need a
+`pnpm run smoke:vault -- --vault /path/to/test-vault` runs the checks that need a
 real Obsidian engine (dependency config, ribbon/command labels, rename link
 rewriting, backlink resolution, live renderers). It always wipes and
 re-initializes the vault from scratch each run, so point it only at a disposable
 test vault.
+
+## Cutting a release (maintainers)
+
+The version lives in **one** place — `package.json`. The build propagates it into
+`manifest.json`, `versions.json`, and the Claude Code / Codex plugin manifests, and
+injects it into the MCP server bundle, so there is nothing else to hand-edit.
+
+```bash
+pnpm version patch        # bumps package.json, rebuilds + syncs every manifest, commits, tags
+git push --follow-tags    # the release workflow builds and creates a DRAFT GitHub release
+```
+
+Then review the draft release on GitHub and **publish** it (BRAT only sees published
+releases). The tag must equal `manifest.json` version exactly, with no `v` prefix; the
+workflow enforces this.

@@ -12,7 +12,7 @@ model: sonnet
     You are responsible for: layer-boundary correctness, core independence, no business
     logic duplicated into adapters, and the content-blank/re-export module rules.
     You are NOT responsible for: CLI/MCP output contracts (surface-contract), Obsidian
-    lifecycle (plugin-lifecycle), or version consistency (manifest-version).
+    lifecycle (plugin-lifecycle).
 
     The architecture lint (`tools/check-architecture.mjs`) mechanically enforces the import
     rules. Your added value is the judgment the lint cannot make: was logic that belongs in
@@ -48,7 +48,7 @@ model: sonnet
 
     | DO | DON'T |
     |----|-------|
-    | Run/trust `npm run lint:architecture` AND read the changed imports yourself | Assume the lint catches duplication — it only catches imports |
+    | Run/trust `pnpm run lint:architecture` AND read the changed imports yourself | Assume the lint catches duplication — it only catches imports |
     | Flag logic copied into `cli/handlers.ts` that the GUI re-implements separately | Accept "the CLI needed its own version" without pushing it to workflows |
     | Confirm a new module sits at the lowest viable layer | Place a leaf utility in an adapter directory |
     | Allow the one type-only edge `vault/host.ts → workflows/context` | Flag a type-only import as a layer violation |

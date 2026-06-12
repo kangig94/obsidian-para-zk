@@ -41,6 +41,10 @@ Notable changes for PARA-ZK are tracked here.
   handlers and Node access are desktop-only and lazy.
 - Added GitHub Actions plugin CI for push/PR checks: `npm ci`, lint, tests,
   build, and a committed-artifact drift check.
+- Added a tag-triggered release workflow that builds and publishes a draft
+  GitHub release with the BRAT assets (`main.js`, `manifest.json`,
+  `styles.css`), plus a README BRAT install path. The release tag must equal
+  `manifest.json` version exactly (no `v` prefix); the workflow enforces it.
 - Home dashboard "create new" panel adds a daily-note (`open-journal`) button.
   Both the dashboard panel and the left ribbon now order the create actions as
   Project, Area, Resource, ZK, Daily note, Quick memo (quick memo appends into a
@@ -246,6 +250,14 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Changed
 
+- The plugin version is now single-sourced from `package.json`. The build injects
+  it into the MCP server bundle (esbuild `__VERSION__`) and propagates it into
+  `manifest.json`, `versions.json`, and the Claude Code / Codex plugin manifests,
+  so a release edits one file; `src/mcp/server.ts` no longer hardcodes a version
+  literal. Replaces the former seven-place manual bump checklist.
+- Migrated the toolchain from npm to pnpm (`pnpm@10.20.0`): committed
+  `pnpm-lock.yaml`, and switched CI and the release workflow to
+  `pnpm install --frozen-lockfile`.
 - Reframed the product positioning as an LLM-maintained PARA + Zettelkasten
   knowledge wiki (README intro and the `describe`/MCP `vault` context string,
   kept verbatim in sync). Framing only — no `id`, command, or contract change.

@@ -3,8 +3,13 @@
   "version": "0.0.1",
   "description": "Native Obsidian plugin for PARA and Zettelkasten workflows.",
   "type": "module",
+  "packageManager": "pnpm@10.20.0",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "NODE_ENV=production node tools/build.mjs production",
+    "version": "pnpm run build && git add -u",
     "dev": "node tools/build.mjs",
     "watch": "node tools/build.mjs --watch",
     "sync": "node tools/sync.mjs",
@@ -14,7 +19,7 @@
     "typecheck": "tsc --noEmit",
     "lint:architecture": "node tools/check-architecture.mjs",
     "lint:deadcode": "knip",
-    "lint": "npm run lint:architecture && npm run lint:deadcode && npm run typecheck"
+    "lint": "pnpm run lint:architecture && pnpm run lint:deadcode && pnpm run typecheck"
   },
   "keywords": [
     "obsidian",

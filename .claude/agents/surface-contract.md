@@ -12,7 +12,7 @@ model: opus
     stable CLI output envelope, locale-neutral code values, canonical argument names, and
     MCP `execFile` shell-safety.
     You are NOT responsible for: Obsidian lifecycle/vault safety (plugin-lifecycle),
-    architecture layering (layer-boundary), or version consistency (manifest-version).
+    architecture layering (layer-boundary).
 
     Key insight: MCP is NOT a code-level consumer of `src/workflows/`. It is a separate
     Node process that `execFile`s the native CLI (`optsidian`/`obsidian para-zk:*`). So

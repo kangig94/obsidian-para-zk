@@ -1,5 +1,5 @@
 import { build, context } from "esbuild";
-import { readFileSync, watch } from "node:fs";
+import { readFileSync, watch, writeFileSync } from "node:fs";
 import { access, copyFile, readFile, writeFile } from "node:fs/promises";
 import { builtinModules } from "node:module";
 import { join } from "node:path";
@@ -11,11 +11,20 @@ const watchMode = process.argv.includes("--watch");
 const filesToDeploy = ["main.js", "manifest.json", "styles.css"];
 const nodeBuiltins = [...builtinModules, ...builtinModules.map((name) => `node:${name}`)];
 
+// package.json is the single source of truth for the version. The build injects it
+// (__VERSION__) and propagates it into every distribution manifest, so a release only
+// edits package.json — no hand-syncing the seven places the version used to live.
+const { version } = JSON.parse(readFileSync("package.json", "utf8"));
+syncManifestVersions(version);
+
 const pluginBuildOptions = {
   banner: {
     js: "/* PARA-ZK Obsidian plugin */"
   },
   bundle: true,
+  define: {
+    __VERSION__: JSON.stringify(version)
+  },
   entryPoints: ["src/main.ts"],
   external: [
     "obsidian",
@@ -38,6 +47,9 @@ const mcpBuildOptions = {
     js: "#!/usr/bin/env node"
   },
   bundle: true,
+  define: {
+    __VERSION__: JSON.stringify(version)
+  },
   entryPoints: ["src/mcp/server.ts"],
   external: nodeBuiltins,
   format: "esm",
@@ -103,6 +115,46 @@ if (watchMode) {
   await build(pluginBuildOptions);
   await build(mcpBuildOptions);
   await afterBuild();
+}
+
+// Propagate package.json's version into the static manifests that external installers
+// read directly (Obsidian, the BRAT versions map, and the Claude Code / Codex plugin
+// manifests). Each entry is rewritten only when it drifts, so a same-version rebuild is
+// a no-op and CI's post-build `git diff --exit-code` catches any un-synced manifest.
+function syncManifestVersions(targetVersion) {
+  const manifest = JSON.parse(readFileSync("manifest.json", "utf8"));
+  if (manifest.version !== targetVersion) {
+    manifest.version = targetVersion;
+    writeFileSync("manifest.json", JSON.stringify(manifest, null, 2) + "\n");
+  }
+
+  // versions.json maps each released plugin version to its minAppVersion (Obsidian/BRAT
+  // update check). Add the current version on first sight; never rewrite history.
+  const versions = JSON.parse(readFileSync("versions.json", "utf8"));
+  if (!(targetVersion in versions)) {
+    versions[targetVersion] = manifest.minAppVersion;
+    writeFileSync("versions.json", JSON.stringify(versions, null, 2) + "\n");
+  }
+
+  for (const path of [
+    ".claude-plugin/marketplace.json",
+    "clients/.claude-plugin/plugin.json",
+    "clients/.codex-plugin/plugin.json"
+  ]) {
+    const json = JSON.parse(readFileSync(path, "utf8"));
+    let changed = false;
+    if (json.version !== undefined && json.version !== targetVersion) {
+      json.version = targetVersion;
+      changed = true;
+    }
+    if (json.plugins?.[0]?.version !== undefined && json.plugins[0].version !== targetVersion) {
+      json.plugins[0].version = targetVersion;
+      changed = true;
+    }
+    if (changed) {
+      writeFileSync(path, JSON.stringify(json, null, 2) + "\n");
+    }
+  }
 }
 
 function loadDotEnv() {

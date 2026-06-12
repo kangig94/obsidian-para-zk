@@ -5,6 +5,10 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult, type ListToolsResult } from "@modelcontextprotocol/sdk/types.js";
 import { isRecord } from "../records";
 
+// Injected from package.json at build time (esbuild `define`); the guard keeps the
+// unbundled path (tests, tsc) working without hardcoding the version in source.
+declare const __VERSION__: string;
+
 export type ParaZkCli = "optsidian" | "obsidian";
 export type UpdateTool = "replace" | "set" | "add";
 
@@ -504,7 +508,7 @@ function serializeToolCall<T>(run: () => Promise<T>): Promise<T> {
 function createServer(): Server {
   const server = new Server({
     name: "para-zk",
-    version: "0.0.1"
+    version: typeof __VERSION__ === "string" ? __VERSION__ : "0.0.0"
   }, {
     capabilities: {
       tools: {}

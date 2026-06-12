@@ -10,9 +10,9 @@ canonical argument name per concept — reject aliases (camelCase/legacy) with a
 error rather than accepting multiple spellings.
 **Option values**: locale-neutral codes only at the CLI/MCP boundary
 (`status=in_progress`); never localized labels.
-**Tests**: Vitest (`test/**/*.test.ts`), run via `npm test`. `obsidian` is aliased to
+**Tests**: Vitest (`test/**/*.test.ts`), run via `pnpm test`. `obsidian` is aliased to
 the in-memory mock `test/mocks/obsidian.ts`; harnesses in `test/harness/`. Pure logic is
-unit-tested here; engine-dependent behavior is covered by `npm run smoke:vault`.
+unit-tested here; engine-dependent behavior is covered by `pnpm run smoke:vault`.
 **Formatting**: no auto-formatter configured — match surrounding style.
 **Changelog**: update `docs/CHANGELOG.md` for notable behavior, workflow, CLI, template,
 dashboard, or dependency changes.
