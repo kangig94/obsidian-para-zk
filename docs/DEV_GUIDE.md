@@ -16,14 +16,17 @@ No runtime dependencies — the plugin bundles everything; `obsidian`, `electron
 
 `pnpm run build` produces **two** esbuild bundles plus the stylesheet:
 
-1. `src/main.ts` → `main.js` (cjs, browser, es2022, minified; externals: `obsidian`,
+1. `src/main.ts` → `build/main.js` (cjs, browser, es2022, minified; externals: `obsidian`,
    `electron`, `@codemirror/*`, node builtins) — the Obsidian plugin.
 2. `src/mcp/server.ts` → `clients/para-zk-mcp.mjs` (esm, node18, `#!/usr/bin/env node`
    banner) — the MCP server.
-3. `assets/styles.css` → `styles.css` (copied to repo root).
+3. `assets/styles.css` → `build/styles.css`.
 
-The repo root is the Obsidian deployment shape (`manifest.json`, `main.js`, `styles.css`)
-and these artifacts are committed, so installs need no build step.
+`build/` is the Obsidian deployment shape (`main.js`, `manifest.json` — staged from the
+committed root copy — and `styles.css`); it is **gitignored** and shipped as GitHub
+Release assets (BRAT installs from those). The MCP bundle is the exception: it stays
+committed at `clients/para-zk-mcp.mjs` because the Claude Code / Codex marketplace ships
+`clients/` via git clone with no install-time build.
 
 | Task | Command | Notes |
 |------|---------|-------|

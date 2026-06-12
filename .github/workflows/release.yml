@@ -43,4 +43,4 @@ jobs:
             --title "$tag" \
             --draft \
             --notes "Beta release $tag — install via BRAT (see README)." \
-            main.js manifest.json styles.css
+            build/main.js build/manifest.json build/styles.css

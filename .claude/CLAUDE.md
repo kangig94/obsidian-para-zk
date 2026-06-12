@@ -29,7 +29,7 @@ server. It ships as both an Obsidian community plugin and a Claude Code / Codex 
 pnpm install
 pnpm run lint      # architecture guard + knip deadcode + tsc --noEmit
 pnpm run test      # Vitest unit suite against an in-memory Obsidian mock
-pnpm run build     # esbuild: src/main.ts -> main.js, src/mcp/server.ts -> clients/para-zk-mcp.mjs
+pnpm run build     # esbuild: src/main.ts -> build/main.js, src/mcp/server.ts -> clients/para-zk-mcp.mjs
 pnpm run smoke:vault -- --vault /path/to/disposable-vault   # live Obsidian E2E
 ```
 

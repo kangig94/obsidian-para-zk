@@ -258,6 +258,12 @@ Notable changes for PARA-ZK are tracked here.
 - Migrated the toolchain from npm to pnpm (`pnpm@10.20.0`): committed
   `pnpm-lock.yaml`, and switched CI and the release workflow to
   `pnpm install --frozen-lockfile`.
+- Obsidian build outputs (`main.js`, `styles.css`, plus a staged `manifest.json`
+  copy) now build into a gitignored `build/` folder and ship only as GitHub Release
+  assets — the repo no longer commits them. A published release is the only official
+  install path (BRAT or release download); local builds are development-only. The MCP
+  bundle (`clients/para-zk-mcp.mjs`) stays committed, since the Claude Code / Codex
+  marketplace ships `clients/` via git clone with no install-time build.
 - Reframed the product positioning as an LLM-maintained PARA + Zettelkasten
   knowledge wiki (README intro and the `describe`/MCP `vault` context string,
   kept verbatim in sync). Framing only — no `id`, command, or contract change.

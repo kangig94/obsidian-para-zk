@@ -1,6 +1,6 @@
 import { build, context } from "esbuild";
 import { readFileSync, watch, writeFileSync } from "node:fs";
-import { access, copyFile, readFile, writeFile } from "node:fs/promises";
+import { access, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { builtinModules } from "node:module";
 import { join } from "node:path";
 
@@ -8,8 +8,14 @@ loadDotEnv();
 
 const production = process.env.NODE_ENV === "production" || process.argv.includes("production");
 const watchMode = process.argv.includes("--watch");
-const filesToDeploy = ["main.js", "manifest.json", "styles.css"];
 const nodeBuiltins = [...builtinModules, ...builtinModules.map((name) => `node:${name}`)];
+
+// build/ holds the complete Obsidian deployment shape (main.js + manifest.json +
+// styles.css); it is gitignored and shipped as release assets. main.js is emitted there
+// by esbuild, styles.css is copied from assets/, and manifest.json is staged from the
+// repo root (its committed source) at build time. The optional local vault sync copies
+// these straight into a plugin folder.
+const filesToDeploy = ["main.js", "manifest.json", "styles.css"];
 
 // package.json is the single source of truth for the version. The build injects it
 // (__VERSION__) and propagates it into every distribution manifest, so a release only
@@ -35,7 +41,7 @@ const pluginBuildOptions = {
   format: "cjs",
   logLevel: "info",
   minify: production,
-  outfile: "main.js",
+  outfile: "build/main.js",
   platform: "browser",
   sourcemap: production ? false : "inline",
   target: "es2022",
@@ -55,6 +61,8 @@ const mcpBuildOptions = {
   format: "esm",
   logLevel: "info",
   minify: production,
+  // The MCP bundle stays committed under clients/ — the Claude Code / Codex marketplace
+  // ships that folder via git clone and runs no build step at install time.
   outfile: "clients/para-zk-mcp.mjs",
   platform: "node",
   sourcemap: production ? false : "inline",
@@ -63,8 +71,9 @@ const mcpBuildOptions = {
 };
 
 async function buildCss() {
+  await mkdir("build", { recursive: true });
   const css = await readFile("assets/styles.css", "utf8");
-  await writeFile("styles.css", css, "utf8");
+  await writeFile("build/styles.css", css, "utf8");
 }
 
 async function syncToPlugin() {
@@ -73,7 +82,7 @@ async function syncToPlugin() {
 
   try {
     await access(pluginDir);
-    await Promise.all(filesToDeploy.map((file) => copyFile(file, join(pluginDir, file))));
+    await Promise.all(filesToDeploy.map((file) => copyFile(join("build", file), join(pluginDir, file))));
     console.log(`✓ Synced to ${pluginDir}`);
   } catch {
     // Build output is still valid when the optional local sync target is absent.
@@ -82,6 +91,8 @@ async function syncToPlugin() {
 
 async function afterBuild() {
   await buildCss();
+  // Stage the committed root manifest into the build/ deployment shape (and as a release asset).
+  await copyFile("manifest.json", "build/manifest.json");
   await syncToPlugin();
 }
 

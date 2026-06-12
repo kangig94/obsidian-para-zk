@@ -15,26 +15,19 @@ tools (`replace`/`set`/`add`) so scripts and LLMs can drive the vault.
 
 ### Obsidian plugin
 
-With [`optsidian`](https://github.com/kangig94/optsidian) installed, install
-straight from the repo in one shot:
-
-```bash
-optsidian plugin:install url=https://github.com/kangig94/obsidian-para-zk enable
-```
-
-The repo ships a prebuilt `main.js`, so this clones it, copies it into
-`<vault>/.obsidian/plugins/para-zk/`, enables it, and reloads Obsidian. Add
-`vault-path=<path>` to target a non-active vault, or `ref=<git-ref>` to pin a
-version.
-
-Without optsidian, just copy `manifest.json`, `main.js`, and `styles.css` from the
-repo root into `<vault>/.obsidian/plugins/para-zk/` and enable **PARA-ZK** under
-Settings → Community plugins — no build step needed, those artifacts are committed.
-
-Or track the beta with [BRAT](https://github.com/TfTHacker/obsidian42-brat): install
+Install the beta with [BRAT](https://github.com/TfTHacker/obsidian42-brat): install
 **BRAT** from community plugins, then BRAT → **Add beta plugin** → enter
-`https://github.com/kangig94/obsidian-para-zk`. BRAT installs the latest published
-release and keeps it updated.
+`https://github.com/kangig94/obsidian-para-zk`. BRAT downloads the latest published
+release and keeps it updated; enable **PARA-ZK** under Settings → Community plugins.
+
+The official install path is always a published **release**: BRAT (above), or a manual
+download of `manifest.json`, `main.js`, and `styles.css` from the
+[latest release](https://github.com/kangig94/obsidian-para-zk/releases) into
+`<vault>/.obsidian/plugins/para-zk/`. Build outputs are no longer committed to the repo.
+
+For local development only, build first (`pnpm build`) and deploy the generated `build/`
+folder — e.g. with [`optsidian`](https://github.com/kangig94/optsidian):
+`optsidian plugin:install path=build enable`.
 
 Then scaffold the vault with the **PARA-ZK: Set up PARA-ZK vault** command (or
 `para-zk:setup`). Setup is idempotent: it creates the PARA/ZK layout, templates,
