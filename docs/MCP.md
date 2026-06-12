@@ -1,6 +1,6 @@
 # PARA-ZK MCP
 
-PARA-ZK ships a thin MCP server for discovery plus shell-safe body/section edits. It exposes `describe` for the live PARA-ZK surface index, and `replace`, `set`, and `add` for body/section mutations. Frontmatter and task mutations stay CLI-only. The same server is packaged as both a Claude Code plugin and a Codex plugin that share `clients/` (`.claude-plugin/` + `.codex-plugin/` manifests and one bundled `para-zk-mcp.mjs`), or it can be registered as a plain MCP server in any client. The two platforms resolve plugin MCP paths differently, so each manifest declares its own config: Claude inlines `mcpServers` directly in `.claude-plugin/plugin.json` (`${CLAUDE_PLUGIN_ROOT}/para-zk-mcp.mjs`), while Codex points at `clients/.mcp.codex.json` (relative `para-zk-mcp.mjs` plus `cwd: "."`, which Codex rebases to the plugin root, since Codex neither expands `${CLAUDE_PLUGIN_ROOT}` in `args` nor accepts an inline `mcpServers` object).
+PARA-ZK ships a thin MCP server for discovery plus shell-safe edit tools. It exposes `describe` for the live PARA-ZK surface index, and `replace`, `set`, and `add` for string-based update operations. Those mutation tools are not limited to body/section keys: for the target type, use the documented `writeKeys` from `describe`, including `frontmatter/<key>` scalar keys with `set` and list keys with `set`/`add`. Structured task mutations that require `value_json` inserts or `tasks/<id>` deletion remain CLI-only. The same server is packaged as both a Claude Code plugin and a Codex plugin that share `clients/` (`.claude-plugin/` + `.codex-plugin/` manifests and one bundled `para-zk-mcp.mjs`), or it can be registered as a plain MCP server in any client. The two platforms resolve plugin MCP paths differently, so each manifest declares its own config: Claude inlines `mcpServers` directly in `.claude-plugin/plugin.json` (`${CLAUDE_PLUGIN_ROOT}/para-zk-mcp.mjs`), while Codex points at `clients/.mcp.codex.json` (relative `para-zk-mcp.mjs` plus `cwd: "."`, which Codex rebases to the plugin root, since Codex neither expands `${CLAUDE_PLUGIN_ROOT}` in `args` nor accepts an inline `mcpServers` object).
 
 ## Prerequisites
 
@@ -80,7 +80,7 @@ The `install` field is present in both states (the active vault running PARA-ZK 
 
 ### `replace`
 
-Claude-style edit for literal body/section replacement. It wraps `para-zk:update-*` with `execFile(file, argsArray)`, never a shell, so multi-line strings, quotes, `$`, and backticks are passed as one argv element.
+Claude-style edit for literal replacement in any documented key that supports `replace` (usually body/section prose). It wraps `para-zk:update-*` with `execFile(file, argsArray)`, never a shell, so multi-line strings, quotes, `$`, and backticks are passed as one argv element.
 
 Params:
 
@@ -100,7 +100,7 @@ Required: `type`, `key`, `old_string`, `new_string`, and a valid selector for th
 
 ### `set`
 
-Claude-style write for replacing the entire selected body or section.
+Claude-style write for replacing the entire selected writable key, including body/section keys and documented `frontmatter/<key>` scalar or list keys that support `set`.
 
 Params:
 
@@ -118,7 +118,7 @@ Required: `type`, `key`, `content`, and a valid selector for the type.
 
 ### `add`
 
-Append or prepend content to the selected body or section.
+Append or prepend content to the selected writable key, including body/section keys and documented list frontmatter keys that support `append`/`prepend`.
 
 Params:
 
@@ -179,4 +179,4 @@ The mutation tools receive JSON params and invoke `optsidian` or `obsidian` with
 
 CLI JSON results use the same compact envelope as the native commands: `ok` plus result fields such as `path`, or `ok: false` plus `error`. They do not echo the invoked command name.
 
-Only body/section edits are exposed through MCP mutation tools. Frontmatter updates, task insertion/deletion, and other mutation commands remain available through the CLI returned by `describe`.
+The MCP mutation tools expose only the `replace`, `set`, and `add` string-operation shapes. They pass the requested key through to the matching update command, so documented frontmatter and section/body keys work when the requested key supports that operation. Operations outside those shapes remain CLI-only, including task insertion with `key=tasks op=insert value_json=...` and task deletion with `key=tasks/<id> op=delete`; string task-field updates such as `key=tasks/<id>/<field> op=set` use the normal `set` path when that key appears in `writeKeys`.

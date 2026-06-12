@@ -35,6 +35,13 @@ and these artifacts are committed, so installs need no build step.
 Set `OBSIDIAN_PLUGIN_DIR=<vault>/.obsidian/plugins/para-zk` before a build to also copy
 `main.js`/`manifest.json`/`styles.css` straight into that vault.
 
+## Release Submission Notes
+
+`manifest.json` keeps `isDesktopOnly: false` because mobile can load the plugin as a
+pure GUI plugin. CLI handlers register only when the host injects `registerCliHandler`
+(desktop `optsidian`/`obsidian-native`), the bundle has no eager Node import, and Node
+access is lazy via `window.require` (Electron) with a dynamic `import()` fallback inside CLI handlers.
+
 ## Test, Typecheck, Lint
 
 | Task | Command | What it checks |
@@ -75,6 +82,24 @@ optsidian para-zk:setup installDeps=true format=json
 
 For a clean run, preserve `.obsidian`, clear the rest of the vault, and remove
 `$PARA_ZK_TEST_VAULT/.obsidian/plugins/para-zk/data.json` before `para-zk:setup`.
+
+## Setup Managed Files
+
+`para-zk:setup` treats generated templates, dashboards, and vault guide files as
+managed artifacts. The persisted `managedFiles` hash is the ownership record used to
+separate safe regeneration from user-managed or user-modified content.
+
+| Managed-file state | Default run | `force=true` | `dryRun=true` |
+|--------------------|-------------|--------------|---------------|
+| Missing path | Create file and record the generated hash; no warning | Same as default; no warning | Report `created`; write nothing; no warning |
+| Existing file already matches generated content, tracked or untracked | Report `existing` and refresh the managed hash; no warning | Same as default; no warning | Report `existing`; write nothing; no warning |
+| Known managed file, current hash matches the recorded hash, generated content changed | Overwrite with current generated content and record the new hash; no warning | Same as default; no warning | Report `updated`; write nothing; no warning |
+| Existing untracked file with different content | Skip and warn `Skipped user-managed file at <path>` | Overwrite and record the generated hash; no warning | Skip, write nothing, and warn `Skipped user-managed file at <path>` |
+| Known managed file, current hash differs from the recorded hash | Skip and warn `Skipped user-modified PARA-ZK file at <path>; pass force=true to overwrite` | Overwrite and record the generated hash; no warning | Skip, write nothing, and warn `Skipped user-modified PARA-ZK file at <path>; pass force=true to overwrite` |
+| Path is a folder or unsupported vault item | Skip and warn that the path cannot be created or is unsupported | Same as default | Same as default; write nothing |
+
+When `dryRun=true` is combined with `force=true`, setup reports the forced overwrite as
+`updated` but still does not write files or managed hashes.
 
 ## Environment Variables
 

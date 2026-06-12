@@ -71,18 +71,24 @@ export function parsePropsViewType(value: string | undefined): PropsViewType | u
   return PROPS_VIEW_TYPES.find((type) => type === token);
 }
 
+export function parsePropsNoteType(value: string | undefined): PropsViewType | undefined {
+  const token = value?.trim();
+  if (!token) return undefined;
+  if (token === "doc") return "subnote";
+  return parsePropsViewType(token);
+}
+
 export function inferPropsViewType(frontmatter: Record<string, unknown> | undefined): PropsViewType | undefined {
   const type = typeof frontmatter?.type === "string" ? frontmatter.type : undefined;
 
-  if (type === "doc") return "subnote";
-  return parsePropsViewType(type);
+  return parsePropsNoteType(type);
 }
 
 export function propsSchemaForType(type: PropsViewType, locale: Locale): PropsSchema {
   const t = localePack(locale);
   const aliases = field("aliases", "aliases", t.labels.aliases, "text-list");
-  const created = field("created", "created", t.labels.created, "datetime");
-  const updated = field("updated", "updated", t.labels.updated, "datetime");
+  const created = displayField("created", "created", t.labels.created);
+  const updated = displayField("updated", "updated", t.labels.updated);
 
   const schemas: Record<PropsViewType, PropsSchema> = {
     project: {

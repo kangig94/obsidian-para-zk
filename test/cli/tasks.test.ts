@@ -12,7 +12,13 @@ const ARCHIVED_PROJECT = "PARA/Archives/Projects/Alpha/Alpha.md";
 type TaskPage = {
   count?: number;
   returned?: number;
-  items?: Record<string, { name?: string }>;
+  items?: Record<string, TaskItem>;
+};
+
+type TaskItem = {
+  checkbox?: string;
+  name?: string;
+  [key: string]: unknown;
 };
 
 beforeEach(async () => {
@@ -52,14 +58,20 @@ async function readTaskPage(archived = false): Promise<TaskPage> {
   return read.value as TaskPage;
 }
 
-async function readTaskItems(archived = false): Promise<Record<string, { name?: string }>> {
+async function readTaskItems(archived = false): Promise<Record<string, TaskItem>> {
   return (await readTaskPage(archived)).items ?? {};
 }
 
-function taskIdByName(items: Record<string, { name?: string }>, name: string): string {
+function taskIdByName(items: Record<string, TaskItem>, name: string): string {
   const found = Object.entries(items).find(([, task]) => task.name === name);
   expect(found, `expected task named ${name}`).toBeDefined();
   return found?.[0] as string;
+}
+
+async function readTask(taskId: string): Promise<TaskItem> {
+  const task = (await readTaskItems())[taskId];
+  expect(task, `expected task ${taskId}`).toBeDefined();
+  return task as TaskItem;
 }
 
 async function insertTask(name: string): Promise<string> {
@@ -79,6 +91,15 @@ async function deleteTask(taskId: string, archived = false): Promise<Record<stri
     ...(archived ? { archived: "true" } : {}),
     key: `tasks/${taskId}`,
     op: "delete"
+  });
+}
+
+async function setTaskField(taskId: string, field: string, value: string): Promise<Record<string, unknown>> {
+  return cli.run("para-zk:update-project", {
+    title: "Alpha",
+    key: `tasks/${taskId}/${field}`,
+    op: "set",
+    value
   });
 }
 
@@ -122,6 +143,115 @@ describe("structured task inserts", () => {
     });
     expect(rejected.ok).toBe(false);
     expect(String(rejected.error)).toContain("value_json object");
+  });
+});
+
+describe("structured task field updates", () => {
+  it("sets checkbox values used by task status cycling", async () => {
+    const taskId = await insertTask("Cycle status");
+
+    for (const value of ["/", "x", "-", " "]) {
+      const updated = await setTaskField(taskId, "checkbox", value);
+
+      expect(updated.ok).toBe(true);
+      expect(updated.changed).toBe(true);
+      expect((await readTask(taskId)).checkbox).toBe(value);
+    }
+  });
+
+  it("sets the task name", async () => {
+    const taskId = await insertTask("Old name");
+
+    const updated = await setTaskField(taskId, "name", "New name");
+
+    expect(updated.ok).toBe(true);
+    expect(updated.changed).toBe(true);
+    const items = await readTaskItems();
+    expect(items[taskId]?.name).toBe("New name");
+    expect(Object.values(items).map((task) => task.name)).not.toContain("Old name");
+  });
+
+  it("sets every task date field", async () => {
+    const taskId = await insertTask("Date fields");
+    const dates: Record<string, string> = {
+      due: "2026-06-12",
+      scheduled: "2026-06-13",
+      start: "2026-06-14",
+      created: "2026-06-15",
+      done: "2026-06-16",
+      cancelled: "2026-06-17"
+    };
+
+    for (const [field, value] of Object.entries(dates)) {
+      const updated = await setTaskField(taskId, field, value);
+      expect(updated.ok).toBe(true);
+      expect(updated.changed).toBe(true);
+    }
+
+    const task = await readTask(taskId);
+    for (const [field, value] of Object.entries(dates)) {
+      expect(task[field]).toBe(value);
+    }
+  });
+
+  it("sets task priority", async () => {
+    const taskId = await insertTask("Priority task");
+
+    const updated = await setTaskField(taskId, "priority", "high");
+
+    expect(updated.ok).toBe(true);
+    expect(updated.changed).toBe(true);
+    expect((await readTask(taskId)).priority).toBe("high");
+    expect(currentShard()).toContain("\u{23EB}");
+  });
+
+  it("returns an error envelope for an invalid field value", async () => {
+    const taskId = await insertTask("Invalid priority");
+
+    const updated = await setTaskField(taskId, "priority", "urgent");
+
+    expect(updated.ok).toBe(false);
+    expect(String(updated.error)).toContain("task priority must be one of");
+    expect((await readTask(taskId)).priority).toBeUndefined();
+  });
+
+  it("returns an error envelope when setting a nonexistent task id", async () => {
+    const updated = await setTaskField("ghost-id", "due", "2026-06-12");
+
+    expect(updated.ok).toBe(false);
+    expect(String(updated.error)).toContain("task not found");
+  });
+
+  it("returns an error envelope for an unknown task field", async () => {
+    const taskId = await insertTask("Unknown field");
+
+    const updated = await setTaskField(taskId, "foobar", "value");
+
+    expect(updated.ok).toBe(false);
+    expect(String(updated.error)).toContain("unknown task field");
+  });
+
+  it("clears an optional metadata value", async () => {
+    const taskId = await insertTask("Clear due date");
+    await setTaskField(taskId, "due", "2026-06-12");
+
+    const updated = await setTaskField(taskId, "due", "");
+
+    expect(updated.ok).toBe(true);
+    expect(updated.changed).toBe(true);
+    expect((await readTask(taskId)).due).toBeUndefined();
+    expect(currentShard()).not.toContain("\u{1F4C5} 2026-06-12");
+  });
+
+  it("returns changed false when setting the same value", async () => {
+    const taskId = await insertTask("No-op due date");
+    await setTaskField(taskId, "due", "2026-06-12");
+
+    const updated = await setTaskField(taskId, "due", "2026-06-12");
+
+    expect(updated.ok).toBe(true);
+    expect(updated.changed).toBe(false);
+    expect((await readTask(taskId)).due).toBe("2026-06-12");
   });
 });
 

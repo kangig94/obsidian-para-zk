@@ -5,6 +5,7 @@ import {
   type Frontmatter
 } from "../vault/frontmatter";
 import { normalizeVaultPath } from "../vault/paths";
+import { serializeFileWrite } from "../vault/write-serializer";
 import type {
   AddReferenceOptions,
   AddReferenceResult,
@@ -134,6 +135,13 @@ export async function backfillReferenceIds(
   ctx: WorkflowContext,
   file: TFile
 ): Promise<{ changed: boolean; items: ReferenceRead[] }> {
+  return serializeFileWrite(file.path, () => backfillReferenceIdsUnlocked(ctx, file));
+}
+
+async function backfillReferenceIdsUnlocked(
+  ctx: WorkflowContext,
+  file: TFile
+): Promise<{ changed: boolean; items: ReferenceRead[] }> {
   const read = referenceItemsReadFromFrontmatter(await readFileFrontmatterFresh(ctx, file));
   const items = read.needsBackfill
     ? await writeReferenceItems(ctx, file, read.items)
@@ -156,6 +164,14 @@ export function readReferenceItemsFromFrontmatter(
 }
 
 export async function insertReferenceItem(
+  ctx: WorkflowContext,
+  file: TFile,
+  input: ReferenceWriteInput
+): Promise<ReferenceMutationResult> {
+  return serializeFileWrite(file.path, () => insertReferenceItemUnlocked(ctx, file, input));
+}
+
+async function insertReferenceItemUnlocked(
   ctx: WorkflowContext,
   file: TFile,
   input: ReferenceWriteInput
@@ -196,6 +212,18 @@ export async function insertReferenceItem(
 }
 
 export async function updateReferenceItem(
+  ctx: WorkflowContext,
+  file: TFile,
+  index: number,
+  patch: {
+    link?: unknown;
+    description?: unknown;
+  }
+): Promise<ReferenceMutationResult> {
+  return serializeFileWrite(file.path, () => updateReferenceItemUnlocked(ctx, file, index, patch));
+}
+
+async function updateReferenceItemUnlocked(
   ctx: WorkflowContext,
   file: TFile,
   index: number,
@@ -258,10 +286,18 @@ export async function setReferenceItemField(
   value: unknown
 ): Promise<ReferenceMutationResult> {
   const writableField = readReferenceWritableField(field, `references/${index}/${field}`);
-  return updateReferenceItem(ctx, file, index, { [writableField]: value });
+  return serializeFileWrite(file.path, () => updateReferenceItemUnlocked(ctx, file, index, { [writableField]: value }));
 }
 
 export async function deleteReferenceItem(
+  ctx: WorkflowContext,
+  file: TFile,
+  index: number
+): Promise<ReferenceMutationResult> {
+  return serializeFileWrite(file.path, () => deleteReferenceItemUnlocked(ctx, file, index));
+}
+
+async function deleteReferenceItemUnlocked(
   ctx: WorkflowContext,
   file: TFile,
   index: number
@@ -278,6 +314,14 @@ export async function deleteReferenceItem(
 }
 
 export async function reorderReferenceItems(
+  ctx: WorkflowContext,
+  file: TFile,
+  links: string[]
+): Promise<{ changed: boolean; items: ReferenceRead[] }> {
+  return serializeFileWrite(file.path, () => reorderReferenceItemsUnlocked(ctx, file, links));
+}
+
+async function reorderReferenceItemsUnlocked(
   ctx: WorkflowContext,
   file: TFile,
   links: string[]
@@ -313,6 +357,15 @@ export async function reorderReferenceItems(
 }
 
 export async function ensureReferenceItemId(
+  ctx: WorkflowContext,
+  file: TFile,
+  reference: Pick<ReferenceRead, "id" | "link" | "description">,
+  preferredIndex?: number
+): Promise<ReferenceRead> {
+  return serializeFileWrite(file.path, () => ensureReferenceItemIdUnlocked(ctx, file, reference, preferredIndex));
+}
+
+async function ensureReferenceItemIdUnlocked(
   ctx: WorkflowContext,
   file: TFile,
   reference: Pick<ReferenceRead, "id" | "link" | "description">,

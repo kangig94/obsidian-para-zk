@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ParaZkPluginContext } from "../../src/plugin-interface";
 import { DEFAULT_SETTINGS } from "../../src/types";
-import { registerPropsControlRenderers } from "../../src/ux/props-controls";
+import { registerPropsControlRenderers, writeFrontmatterValue } from "../../src/ux/props-controls";
 import { MockApp } from "../harness/vault";
 
 type CodeBlockProcessor = (
@@ -55,7 +55,7 @@ describe("props url control", () => {
 
     input!.value = newUrl;
     input!.dispatchEvent({ type: "blur" });
-    await nextMicrotask();
+    await waitForFrontmatterValue(app, file, "url", newUrl);
 
     expect(app.metadataCache.getFileCache(file)?.frontmatter?.url).toBe(newUrl);
   });
@@ -67,7 +67,7 @@ describe("props url control", () => {
     const input = control.querySelector("input.para-zk-block__input") as FakeElement;
     input.value = newUrl;
     input.dispatchEvent({ type: "blur" });
-    await nextMicrotask();
+    await waitForFrontmatterValue(app, file, "url", newUrl);
 
     expect(app.metadataCache.getFileCache(file)?.frontmatter?.url).toBe(newUrl);
   });
@@ -96,7 +96,7 @@ describe("props url control", () => {
     const input = control.querySelector("input.para-zk-block__input") as FakeElement;
     input.value = newUrl;
     input.dispatchEvent({ type: "keydown", key: "Enter" });
-    await nextMicrotask();
+    await waitForFrontmatterValue(app, file, "url", newUrl);
 
     expect(app.metadataCache.getFileCache(file)?.frontmatter?.url).toBe(newUrl);
   });
@@ -126,7 +126,7 @@ describe("props url control", () => {
     const input = control.querySelector("input.para-zk-block__input") as FakeElement;
     input.value = newUrl;
     input.dispatchEvent({ type: "blur" });
-    await nextMicrotask();
+    await waitForFrontmatterValue(app, file, "url", newUrl);
 
     // A second blur (e.g. the re-render detaching the focused input) must not re-write.
     input.value = "https://example.com/second-write";
@@ -143,9 +143,179 @@ describe("props url control", () => {
     const input = control.querySelector("input.para-zk-block__input") as FakeElement;
     input.value = "";
     input.dispatchEvent({ type: "blur" });
-    await nextMicrotask();
+    await waitForFrontmatterValue(app, file, "url", "");
 
     expect(app.metadataCache.getFileCache(file)?.frontmatter?.url).toBe("");
+  });
+});
+
+describe("props timestamp display controls", () => {
+  it("renders created and updated as display values, not editable datetime inputs", async () => {
+    const { root } = await renderPropsBlock("resource", "PARA/Resources/Doc.md", [
+      "---",
+      "type: resource",
+      "created: 2026-06-10 08:30",
+      "updated: 2026-06-11 09:45",
+      "url: https://example.com/source",
+      "---",
+      ""
+    ].join("\n"));
+
+    const created = propsFieldControl(root, "Created");
+    expect(created.textContent).toBe("2026-06-10 08:30");
+    expect(created.querySelector("input.para-zk-block__input")).toBeNull();
+
+    const updated = propsFieldControl(root, "Updated");
+    expect(updated.textContent).toBe("2026-06-11 09:45");
+    expect(updated.querySelector("input.para-zk-block__input")).toBeNull();
+  });
+});
+
+describe("props frontmatter workflow routing", () => {
+  it("keeps project status writes on the workflow path, including archive moves", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("PARA/Projects/Alpha.md", [
+      "---",
+      "type: project",
+      "status: in_progress",
+      "---",
+      ""
+    ].join("\n"));
+
+    await writePropsFrontmatter(app, file, "status", "archived");
+
+    expect(file.path).toBe("PARA/Archives/Projects/Alpha.md");
+    expect(app.listPaths()).not.toContain("PARA/Projects/Alpha.md");
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.status).toBe("archived");
+  });
+
+  it("routes area writes through the workflow writable-key contract", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("PARA/Areas/Health.md", [
+      "---",
+      "type: area",
+      "created: 2026-06-10 08:30",
+      "---",
+      ""
+    ].join("\n"));
+
+    await expectConsoleErrorDuring(() => writePropsFrontmatter(app, file, "created", "2026-06-11 09:45"));
+
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.created).toBe("2026-06-10 08:30");
+  });
+
+  it("routes resource writes through workflow validation and alias normalization", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("PARA/Resources/Doc.md", [
+      "---",
+      "type: resource",
+      "kind: paper",
+      "---",
+      ""
+    ].join("\n"));
+
+    await expectConsoleErrorDuring(() => writePropsFrontmatter(app, file, "kind", "invalid-kind"));
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.kind).toBe("paper");
+
+    await writePropsFrontmatter(app, file, "aliases", ["Research Note"]);
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.aliases).toEqual(["Research Note"]);
+  });
+
+  it("routes journal writes by file path through workflow validation", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("Journal/2026-06/2026-06-11.md", [
+      "---",
+      "type: journal",
+      "date: 2026-06-11",
+      "energy: normal",
+      "---",
+      ""
+    ].join("\n"));
+
+    await expectConsoleErrorDuring(() => writePropsFrontmatter(app, file, "energy", "wired"));
+
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.energy).toBe("normal");
+  });
+
+  it("routes retro list frontmatter through workflow area resolution", async () => {
+    const app = new MockApp();
+    await app.vault.create("PARA/Areas/Health.md", [
+      "---",
+      "type: area",
+      "---",
+      ""
+    ].join("\n"));
+    const file = await app.vault.create("PARA/Retros/Retro.md", [
+      "---",
+      "type: retro",
+      "areas: []",
+      "---",
+      ""
+    ].join("\n"));
+
+    await writePropsFrontmatter(app, file, "areas", ["Health"]);
+
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.areas).toEqual(["[[PARA/Areas/Health.md|Health]]"]);
+  });
+
+  it("routes ZK spark writes through workflow boolean normalization", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("ZK/Spark/Seed.md", [
+      "---",
+      "type: zk_spark",
+      "processed: false",
+      "---",
+      ""
+    ].join("\n"));
+
+    await writePropsFrontmatter(app, file, "processed", "true");
+
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.processed).toBe(true);
+  });
+
+  it("routes ZK digest writes by path through updateZk", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("ZK/Digest/Source.md", [
+      "---",
+      "type: zk_digest",
+      "sourceTitle: Old source",
+      "---",
+      ""
+    ].join("\n"));
+
+    await writePropsFrontmatter(app, file, "sourceTitle", "New source");
+
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.sourceTitle).toBe("New source");
+  });
+
+  it("routes ZK permanent writes through workflow validation", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("ZK/Permanent/Claim.md", [
+      "---",
+      "type: zk_permanent",
+      "maturity: draft",
+      "---",
+      ""
+    ].join("\n"));
+
+    await expectConsoleErrorDuring(() => writePropsFrontmatter(app, file, "maturity", "polished"));
+
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.maturity).toBe("draft");
+  });
+
+  it("keeps the subnote path-only fallback isolated to subnote frontmatter writes", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("PARA/Projects/Alpha/Meeting.md", [
+      "---",
+      "type: doc",
+      "subnote_type: free",
+      "---",
+      ""
+    ].join("\n"));
+
+    await writePropsFrontmatter(app, file, "subnote_type", "meeting");
+
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.subnote_type).toBe("meeting");
   });
 });
 
@@ -155,24 +325,56 @@ async function renderResourceProps(url: string): Promise<{
   control: FakeElement;
   file: Awaited<ReturnType<MockApp["vault"]["create"]>>;
 }> {
-  const app = new MockApp();
-  const file = await app.vault.create("PARA/Resources/Doc.md", [
+  const { app, root, file } = await renderPropsBlock("resource", "PARA/Resources/Doc.md", [
     "---",
     "type: resource",
     `url: ${url}`,
     "---",
     ""
   ].join("\n"));
+
+  return { app, root, control: propsFieldControl(root, "URL"), file };
+}
+
+async function renderPropsBlock(type: string, path: string, content: string): Promise<{
+  app: MockApp;
+  root: FakeElement;
+  file: Awaited<ReturnType<MockApp["vault"]["create"]>>;
+}> {
+  const app = new MockApp();
+  const file = await app.vault.create(path, content);
   const processors = new Map<string, CodeBlockProcessor>();
 
-  Object.assign(app.vault, {
-    on: () => ({ detach: () => {} })
-  });
-  Object.assign(app.metadataCache, {
-    on: () => ({ detach: () => {} })
+  stubAppEvents(app);
+  const plugin = createPropsPlugin(app, processors);
+  registerPropsControlRenderers(plugin);
+  const processor = processors.get("para-zk-props");
+  if (!processor) throw new Error("props code block processor was not registered");
+
+  const root = new FakeElement("div");
+  processor(`type: ${type}`, root.asHtml(), {
+    sourcePath: file.path,
+    addChild: (child) => {
+      child.load();
+      return child;
+    }
   });
 
-  const plugin = {
+  return { app, root, file };
+}
+
+async function writePropsFrontmatter(
+  app: MockApp,
+  file: Awaited<ReturnType<MockApp["vault"]["create"]>>,
+  key: string,
+  value: string | string[]
+): Promise<void> {
+  const plugin = createPropsPlugin(app);
+  await writeFrontmatterValue(plugin, file.path, new FakeElement("div").asHtml(), key, value);
+}
+
+function createPropsPlugin(app: MockApp, processors = new Map<string, CodeBlockProcessor>()): ParaZkPluginContext {
+  return {
     app,
     settings: DEFAULT_SETTINGS,
     registerMarkdownCodeBlockProcessor: (language: string, processor: CodeBlockProcessor) => {
@@ -181,21 +383,24 @@ async function renderResourceProps(url: string): Promise<{
     },
     registerMarkdownPostProcessor: () => {}
   } as unknown as ParaZkPluginContext;
+}
 
-  registerPropsControlRenderers(plugin);
-  const processor = processors.get("para-zk-props");
-  if (!processor) throw new Error("props code block processor was not registered");
-
-  const root = new FakeElement("div");
-  processor("type: resource", root.asHtml(), {
-    sourcePath: file.path,
-    addChild: (child) => {
-      child.load();
-      return child;
-    }
+function stubAppEvents(app: MockApp): void {
+  Object.assign(app.vault, {
+    on: () => ({ detach: () => {} })
   });
+  Object.assign(app.metadataCache, {
+    on: () => ({ detach: () => {} })
+  });
+}
 
-  return { app, root, control: propsFieldControl(root, "URL"), file };
+async function expectConsoleErrorDuring(run: () => Promise<void>): Promise<void> {
+  const error = vi.spyOn(console, "error").mockImplementation(() => {});
+  try {
+    await run();
+  } finally {
+    error.mockRestore();
+  }
 }
 
 function propsFieldControl(root: FakeElement, label: string): FakeElement {
@@ -207,8 +412,27 @@ function propsFieldControl(root: FakeElement, label: string): FakeElement {
   return control;
 }
 
-function nextMicrotask(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
+async function nextMicrotask(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
+async function waitForFrontmatterValue(
+  app: MockApp,
+  file: Awaited<ReturnType<MockApp["vault"]["create"]>>,
+  key: string,
+  value: unknown
+): Promise<void> {
+  await waitFor(() => Object.is(app.metadataCache.getFileCache(file)?.frontmatter?.[key], value));
+}
+
+async function waitFor(condition: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (condition()) return;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  expect(condition()).toBe(true);
 }
 
 class FakeElement {
@@ -248,6 +472,10 @@ class FakeElement {
 
   createDiv(options?: { cls?: string; text?: string; attr?: Record<string, string> }): FakeElement {
     return this.createEl("div", options);
+  }
+
+  createSpan(options?: { cls?: string; text?: string; attr?: Record<string, string> }): FakeElement {
+    return this.createEl("span", options);
   }
 
   createEl(tag: string, options?: { cls?: string; text?: string; attr?: Record<string, string> }): FakeElement {

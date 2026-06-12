@@ -18,6 +18,7 @@ import { singleItemList } from "../text";
 import {
   findPropsField,
   inferPropsViewType,
+  parsePropsNoteType,
   parsePropsViewType,
   propsSchemaForType,
   type PropsField,
@@ -29,6 +30,14 @@ import { frontmatterLinks, readFileTypeFresh } from "../vault/frontmatter";
 import { workflowContext } from "../vault/host";
 import { normalizeVaultPath, wikiLink } from "../vault/paths";
 import {
+  updateArea,
+  updateJournal,
+  updateProject,
+  updateResource,
+  updateRetro,
+  updateZk
+} from "../workflows";
+import {
   renderBlockNotice,
   renderBlockShell,
   renderShellAction
@@ -36,6 +45,11 @@ import {
 import { parseCodeBlockKeyValues } from "./code-block-args";
 
 type Frontmatter = Record<string, unknown>;
+type WorkflowFrontmatterType = Exclude<PropsViewType, "subnote">;
+type FrontmatterWorkflowUpdate = (
+  workflow: ReturnType<typeof workflowContext>,
+  options: { path: string; key: string; operation: "set"; value: string | string[] }
+) => Promise<unknown>;
 
 type InlineInputToken = {
   type?: PropsViewType;
@@ -52,6 +66,17 @@ type PropsRerender = (delayMs?: number) => void;
 
 type PropsRerenderState = {
   generation: number;
+};
+
+const FRONTMATTER_WORKFLOW_UPDATES: Record<WorkflowFrontmatterType, FrontmatterWorkflowUpdate> = {
+  project: updateProject,
+  area: updateArea,
+  resource: updateResource,
+  journal: updateJournal,
+  retro: updateRetro,
+  zk_spark: updateZk,
+  zk_digest: updateZk,
+  zk_permanent: updateZk
 };
 
 const propsRerenderStates = new WeakMap<HTMLElement, PropsRerenderState>();
@@ -750,7 +775,7 @@ function parseDisplayLink(value: string): { target: string; label: string } | un
   return { target, label };
 }
 
-async function writeFrontmatterValue(
+export async function writeFrontmatterValue(
   plugin: ParaZkPluginContext,
   sourcePath: string | undefined,
   blockEl: HTMLElement,
@@ -765,29 +790,40 @@ async function writeFrontmatterValue(
 
   try {
     const workflow = workflowContext(plugin);
-    const type = (await readFileTypeFresh(workflow, file)).toLowerCase();
-    if (type === "project" && key === "status") {
-      const workflows = await import("../workflows");
-      await workflows.updateProject(
-        workflow,
-        {
-          path: file.path,
-          key: "frontmatter/status",
-          operation: "set",
-          value
-        }
-      );
+    const rawType = await readFileTypeFresh(workflow, file);
+    const type = normalizePropsWorkflowType(rawType);
+    if (type === "subnote") {
+      // Core child updates are addressed by root project/area plus child-title chain, while
+      // a rendered subnote only has its own file path. Keep this direct write isolated here
+      // until the core grows a path selector for child-note updates.
+      await plugin.app.fileManager.processFrontMatter(file, (frontmatter) => {
+        frontmatter[key] = value;
+      });
       return;
     }
 
-    await plugin.app.fileManager.processFrontMatter(file, (frontmatter) => {
-      frontmatter[key] = value;
+    if (!isWorkflowFrontmatterType(type)) throw new Error(`unsupported props frontmatter type: ${rawType}`);
+    const update = FRONTMATTER_WORKFLOW_UPDATES[type];
+    await update(workflow, {
+      path: file.path,
+      key: `frontmatter/${key}`,
+      operation: "set",
+      value
     });
   } catch (error) {
     console.error(error);
     const message = error instanceof Error ? error.message : String(error);
     new Notice(`PARA-ZK: failed to update frontmatter: ${message}`);
   }
+}
+
+function normalizePropsWorkflowType(type: string): PropsViewType | undefined {
+  const normalized = type.trim().toLowerCase();
+  return parsePropsNoteType(normalized);
+}
+
+function isWorkflowFrontmatterType(type: PropsViewType | undefined): type is WorkflowFrontmatterType {
+  return type !== undefined && type !== "subnote";
 }
 
 function latestPropsRerender(container: HTMLElement, render: () => void): PropsRerender {

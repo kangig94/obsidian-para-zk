@@ -3,8 +3,9 @@
 Native Obsidian plugin for PARA and Zettelkasten workflows.
 
 PARA-ZK runs as an Obsidian plugin (GUI commands + ribbon shortcuts) and, while
-Obsidian is running, exposes the same workflows through a native CLI and a thin
-MCP server — so scripts and LLMs can discover and drive the vault.
+Obsidian is running, exposes the full workflow contract through a native CLI.
+Its thin MCP server discovers that CLI contract and exposes shell-safe edit
+tools (`replace`/`set`/`add`) so scripts and LLMs can drive the vault.
 
 ## Installation
 
@@ -54,8 +55,8 @@ See [docs/MCP.md](docs/MCP.md) for details and generic MCP-client registration.
 - **CLI** — run `para-zk:describe` for the live list of surface types; add
   `type=<surface>` to drill into that surface's read/write keys. Full contract in
   [docs/CLI.md](docs/CLI.md).
-- **MCP** — `describe` plus shell-safe section edits (`replace`/`set`/`add`); see
-  [docs/MCP.md](docs/MCP.md).
+- **MCP** — `describe` for the CLI contract plus shell-safe edit tools
+  (`replace`/`set`/`add`); see [docs/MCP.md](docs/MCP.md).
 
 CLI and MCP values are locale-neutral codes (e.g. `status=in_progress`); the
 plugin renders localized labels in the note. Default locale is English — pass

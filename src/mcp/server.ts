@@ -26,7 +26,7 @@ const VAULT_CONTEXT = "Obsidian is a local-first, single-user personal knowledge
 // What PARA-ZK does and does not own, so a caller routes raw vault operations to the host
 // instead of PARA-ZK. Kept verbatim in sync with the CLI's SCOPE_NOTE.
 const SCOPE_NOTE = "PARA-ZK owns typed PARA/ZK operations — create/read/update/rename/archive of the surface types above, addressed by name; child notes (subnotes, fallback notes, and nested areas) are addressed with the *-child commands using root_type/root_title/relpath/title. It does not rename, move, or copy files on disk, do raw file edits, free-form frontmatter, or full-text search; for those use your host's file/search tools (e.g. optsidian rename/move/copy, optsidian edit/apply_patch/write, optsidian grep/search). Per type, the mutable keys are in its writeKeys; keys absent there are not writable here — notably created/updated, which the vault maintains automatically. Body prose cites the note's own references inline with a `PZ[<id>]` code span — the reference's stable id from read key=references; id-less references read as id:null and become citable with key=references op=backfill; `PZ[<id>, <id>]` for several — rendered as its current position [n].";
-const HOWTO_BASE = "Locale-neutral codes. Collections (tasks/references/backlinks) page via offset/limit, key/<i> for one item; backlinks read-only. `schema`=per-type keys/filters; `commands`=full command list. Section content edits: `replace`/`set`/`add` (shell-safe; CLI mangles content). Frontmatter/tasks: CLI.";
+const HOWTO_BASE = "Locale-neutral codes. Collections page via offset/limit, key/<i>; backlinks read-only. `schema`=keys/filters; `commands`=commands. MCP: set scalar/list frontmatter + body/sections; add list frontmatter + body/sections; replace body/section prose. Task insert/delete via value_json/tasks/<id> = CLI-only.";
 const OPTSIDIAN_NOTE = " `optsidian` is an Obsidian-based optimized CLI; run the `invoke`/`schema`/`commands` strings exactly as given and do not substitute `obsidian`.";
 const FALLBACK_HOWTO_OBSIDIAN = "PARA-ZK CLI detected but no running Obsidian vault was reachable (or no obsidian CLI on PATH). Open the vault in Obsidian and ensure the CLI is on PATH, then call this tool again for the live schema.";
 const FALLBACK_HOWTO_OPTSIDIAN = "PARA-ZK CLI detected but no running Obsidian vault was reachable. Launch Obsidian with `optsidian open-gui` (it opens your last-opened vault and waits until the vault is ready), then call this tool again for the live schema. If optsidian is not found, ensure it is on PATH.";
@@ -84,7 +84,7 @@ const BASE_MUTATION_PROPERTIES = {
   },
   key: {
     type: "string",
-    description: "Section key, e.g. body or frontmatter/status. For a child note, set child=[...] and use the child's own key."
+    description: "Section/frontmatter key, e.g. body or frontmatter/status. For a child note, set child=[...] and use the child's own key."
   }
 } as const;
 const REPLACE_INPUT_SCHEMA = {
@@ -520,17 +520,17 @@ function createServer(): Server {
       },
       {
         name: "replace",
-        description: "Replace literal old_string→new_string in a note section. Use for section content (not the CLI): multi-line/quotes/$/backticks pass verbatim; the shell-routed CLI mangles them. Frontmatter/tasks: CLI.",
+        description: "Literal replace in body/section prose. Shell-safe multi-line/quotes/$/backticks.",
         inputSchema: REPLACE_INPUT_SCHEMA
       },
       {
         name: "set",
-        description: "Overwrite a note section's content. Shell-safe (CLI mangles raw content).",
+        description: "Set scalar/list frontmatter or body/section content. Shell-safe raw content.",
         inputSchema: SET_INPUT_SCHEMA
       },
       {
         name: "add",
-        description: "Append/prepend content to a note section. Shell-safe (CLI mangles raw content).",
+        description: "Append/prepend list frontmatter or body/section content. Shell-safe raw content.",
         inputSchema: ADD_INPUT_SCHEMA
       }
     ]

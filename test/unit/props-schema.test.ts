@@ -35,4 +35,22 @@ describe("props schema lead fields", () => {
     const digest = propsSchemaForType("zk_digest", "en");
     expect(findPropsField(digest, "url")?.control).toBe("url");
   });
+
+  it("keeps vault-managed timestamps display-only wherever they are shown", () => {
+    for (const type of ["area", "resource", "subnote", "zk_spark", "zk_digest", "zk_permanent"] as const) {
+      const schema = propsSchemaForType(type, "en");
+      expect(findPropsField(schema, "created")?.control).toBe("display");
+      expect(findPropsField(schema, "updated")?.control).toBe("display");
+    }
+
+    expect(findPropsField(propsSchemaForType("project", "en"), "created")).toBeUndefined();
+
+    const journal = propsSchemaForType("journal", "en");
+    expect(findPropsField(journal, "created")).toBeUndefined();
+    expect(findPropsField(journal, "updated")).toBeUndefined();
+
+    const retro = propsSchemaForType("retro", "en");
+    expect(findPropsField(retro, "created")).toBeUndefined();
+    expect(findPropsField(retro, "updated")).toBeUndefined();
+  });
 });

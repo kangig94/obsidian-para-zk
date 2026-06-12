@@ -308,6 +308,55 @@ Important fields:
 - `warnings`
 - `dependencies`
 
+### `para-zk:attach-file`
+
+Copies local desktop files or directories into the vault attachment folder. This
+is a desktop-only CLI workflow: sources are local paths on the machine running
+Obsidian, and the handler reads them through the desktop CLI runtime before
+creating vault files.
+
+Options:
+
+| Option | Values | Notes |
+| --- | --- | --- |
+| `source` | local path | One local file or directory. Required unless `sources` supplies at least one path. |
+| `sources` | JSON list or comma-list | Additional local file or directory paths. Multiple sources always return a collection result. |
+| `folder` | vault-relative path | Target attachment folder. Defaults to `assets`. Rejects `.` and `..` path segments. |
+| `name` | filename | Optional destination filename for a single file source only. When omitted, the source filename is used; when supplied without an extension, the source extension is appended. Rejects `.` and `..` path segments. |
+| `recursive` | boolean | Directory sources include nested files by default (`true`). Use `false` to copy only files directly inside each directory. |
+| `format` | `json`, `text` | Use `json` for automation. |
+
+Directory sources copy files under `<folder>/<directory-name>/`. Nested
+directories keep their relative folder names when `recursive=true`. `name` is
+invalid for directory sources and for calls with more than one source.
+
+If the destination filename already exists, PARA-ZK keeps the extension and
+tries a numeric suffix before it, such as `image 1.png`, until it finds a free
+vault path.
+
+Examples:
+
+```bash
+optsidian para-zk:attach-file source=/home/me/Pictures/diagram.png folder=assets/research format=json
+optsidian para-zk:attach-file sources='["/home/me/Pictures/a.png","/home/me/Pictures/b.png"]' format=json
+optsidian para-zk:attach-file source=/home/me/Downloads/papers recursive=false format=json
+```
+
+Single-file result fields:
+
+- `source`: original local path.
+- `path`: created vault path.
+- `name`: created vault filename.
+- `kind`: attachment kind (`image`, `video`, `audio`, `pdf`, or `file`).
+- `size`: byte length of the copied file.
+- `link`: wikilink to the vault file.
+- `embed`: embedded wikilink form.
+
+Multi-source or directory result fields:
+
+- `count`: number of files copied.
+- `files`: array of the same file objects returned by a single-file attach.
+
 ### `para-zk:create-area`
 
 Creates a root folder-style area note.
@@ -586,7 +635,7 @@ stable keys.
 | `para-zk:read-resource` | `title`; `/` addresses a Resources-relative path | `frontmatter`, `body`, `references`, `backlinks` |
 | `para-zk:read-zk` | `title` plus optional `kind` | `frontmatter`, `body`, `references`, `backlinks` |
 | `para-zk:read-journal` | `date` | `frontmatter`, `focus`, `quick_memo`, `timeline`, `tasks`, `short_review`, `references`, `backlinks` |
-| `para-zk:read-retro` | `title` plus optional `date` | `frontmatter`, `week_progress`, `good`, `improve`, `risks`, `tasks`, `retro_summary`, `references`, `backlinks` |
+| `para-zk:read-retro` | `title` plus optional `date` | `frontmatter`, `week_progress`, `good`, `improve`, `risks`, `retro_summary`, `backlinks` |
 
 Free-form top-level keys:
 
@@ -798,7 +847,7 @@ The same update algorithm is used by the other domain update commands:
 | `para-zk:update-resource` | `title`; `/` addresses a Resources-relative path | Uses free-form `body`, `references`, and frontmatter keys. |
 | `para-zk:update-zk` | `title` plus optional `kind` | Uses free-form `body`, `references`, and type-specific frontmatter keys. |
 | `para-zk:update-journal` | `date` | Supports journal surface keys such as `quick_memo` and `tasks`. |
-| `para-zk:update-retro` | `title` plus optional `date` | Supports retro surface keys such as `tasks`. |
+| `para-zk:update-retro` | `title` plus optional `date` | Uses retro writable keys: `frontmatter`, `week_progress`, `good`, `improve`, `risks`, and `retro_summary`; `backlinks` is read-only. |
 
 Use `para-zk:update-child` for child notes:
 

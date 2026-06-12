@@ -23,7 +23,7 @@ const runLocale = resolveRunLocale(args.locale);
 // template section headings and managed-toolbar titles that differ by locale.
 const LOCALIZED = {
   en: { summary: "Summary", goals: "Goals", retroSummary: "Retro summary (required)", references: "References", subnotes: "Subnotes", createRetro: "Create retro", updated: "Updated", aliases: "Aliases" },
-  ko: { summary: "요약", goals: "목표", retroSummary: "회고 요약 (필수)", references: "참고 자료", subnotes: "서브노트", createRetro: "새 회고 만들기", updated: "수정", aliases: "별칭" }
+  ko: { summary: "요약", goals: "목표", retroSummary: "회고 요약 (필수)", references: "참고 자료", subnotes: "하위노트", createRetro: "새 회고 만들기", updated: "수정", aliases: "별칭" }
 };
 const L = LOCALIZED[runLocale];
 const requiredDependencyIds = [
@@ -39,12 +39,12 @@ const requiredDependencyIds = [
 ];
 const guiLocaleExpectations = {
   en: {
-    ribbonLabels: ["New project", "New area", "New ZK", "New resource", "Open daily note", "Quick memo"],
+    ribbonLabels: ["New project", "New area", "New resource", "New ZK", "Open daily note", "Quick memo"],
     createProjectCommandName: "PARA-ZK: Create project",
     emptyTrashLabel: "Empty trash"
   },
   ko: {
-    ribbonLabels: ["새 프로젝트", "새 영역", "새 ZK", "새 리소스", "일일노트", "빠른 메모"],
+    ribbonLabels: ["새 프로젝트", "새 영역", "새 리소스", "새 ZK", "일일 노트", "빠른 메모"],
     createProjectCommandName: "PARA-ZK: 새 프로젝트 만들기",
     emptyTrashLabel: "휴지통 비우기"
   }
@@ -229,7 +229,7 @@ function assertManagedTemplateFiles() {
     const text = readVaultText(path);
     assertNoTemplateDrift(path, text);
 
-    if (name === "subnote" || name === "retro") {
+    if (name === "retro") {
       assert(!text.includes("```para-zk-managed"), `${path} should not include managed UI`);
     } else {
       assert(countOccurrences(text, "```para-zk-managed") === 1, `${path} must include exactly one managed block`);

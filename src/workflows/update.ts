@@ -16,6 +16,7 @@ import {
 import { ensureFolder, parentFolder } from "../vault/files";
 import { readFileFrontmatterFresh, readFileTypeFresh, readType } from "../vault/frontmatter";
 import { joinVaultPath, normalizeVaultPath } from "../vault/paths";
+import { serializeFileWrite } from "../vault/write-serializer";
 import {
   ENERGY_CODE_HELP,
   MATURITY_CODE_HELP,
@@ -179,6 +180,19 @@ async function updateSurface(
     spec = specForType(await readFileTypeFresh(ctx, file));
   }
   const key = requireUpdateKey(options.key);
+  if (textUpdateRequiresFileLock(spec, key)) {
+    return serializeFileWrite(file.path, () => updateSurfaceUnlocked(ctx, file, spec, options, key));
+  }
+  return updateSurfaceUnlocked(ctx, file, spec, options, key);
+}
+
+async function updateSurfaceUnlocked(
+  ctx: WorkflowContext,
+  file: TFile,
+  spec: ReadSurfaceSpec,
+  options: UpdatePayloadOptions,
+  key: string
+): Promise<UpdateSurfaceResult> {
   const target = await resolveWritableSurfaceTarget(ctx, file, spec, key, key);
   const shape = resolveTargetUpdateShape(spec, key, target, options.operation);
   requireTargetUpdateValue(target, key, shape.allowedOps, shape.operation, options);
@@ -225,6 +239,17 @@ async function updateSurface(
     toPath: result.toPath,
     ...(result.value !== undefined ? { value: result.value } : {})
   };
+}
+
+// True only for keys that resolve to plain text targets (body/non-collection
+// sections). Frontmatter/reference/task dispatchers acquire serializeFileWrite
+// themselves, and the lock is non-reentrant, so widening this would deadlock.
+function textUpdateRequiresFileLock(spec: ReadSurfaceSpec, key: string): boolean {
+  const parts = keyParts(key);
+  if (parts.length === 1 && parts[0] === "body" && spec.body) return true;
+  if (parts.length !== 1) return false;
+  const section = spec.sections?.find((item) => item.key === parts[0]);
+  return Boolean(section && !section.collection);
 }
 
 async function resolveWritableSurfaceTarget(
@@ -348,38 +373,40 @@ async function updateFrontmatterSurface(
   operation: UpdateOperation,
   options: UpdatePayloadOptions
 ): Promise<TextUpdateResult> {
-  if (target.frontmatterKey in LIST_FRONTMATTER_KEYS) {
-    return updateFrontmatterListKey(ctx, target, target.frontmatterKey, operation, options);
-  }
-  if (operation !== "set") throw new Error(`frontmatter key '${target.frontmatterKey}' only supports op=set`);
+  return serializeFileWrite(target.file.path, async () => {
+    if (target.frontmatterKey in LIST_FRONTMATTER_KEYS) {
+      return updateFrontmatterListKey(ctx, target, target.frontmatterKey, operation, options);
+    }
+    if (operation !== "set") throw new Error(`frontmatter key '${target.frontmatterKey}' only supports op=set`);
 
-  const frontmatter = await readFileFrontmatterFresh(ctx, target.file);
-  const type = readType(frontmatter);
-  const value = normalizeFrontmatterUpdateValue(
-    type,
-    target.frontmatterKey,
-    requireUpdateValue(options)
-  );
-  const movePlan = projectStatusMovePlan(ctx, target.file, type, target.frontmatterKey, value);
-  if (movePlan) await assertCanMoveNoteBetweenRoots(ctx, target.file, movePlan.fromRoot, movePlan.toRoot);
-  const before = frontmatter[target.frontmatterKey];
-  const frontmatterChanged = !frontmatterValuesEqual(before, value);
+    const frontmatter = await readFileFrontmatterFresh(ctx, target.file);
+    const type = readType(frontmatter);
+    const value = normalizeFrontmatterUpdateValue(
+      type,
+      target.frontmatterKey,
+      requireUpdateValue(options)
+    );
+    const movePlan = projectStatusMovePlan(ctx, target.file, type, target.frontmatterKey, value);
+    if (movePlan) await assertCanMoveNoteBetweenRoots(ctx, target.file, movePlan.fromRoot, movePlan.toRoot);
+    const before = frontmatter[target.frontmatterKey];
+    const frontmatterChanged = !frontmatterValuesEqual(before, value);
 
-  if (frontmatterChanged) {
-    await ctx.host.processFrontMatter(target.file, (fm) => {
-      fm[target.frontmatterKey] = value;
-    });
-  }
-  if (!movePlan) return { changed: frontmatterChanged };
+    if (frontmatterChanged) {
+      await ctx.host.processFrontMatter(target.file, (fm) => {
+        fm[target.frontmatterKey] = value;
+      });
+    }
+    if (!movePlan) return { changed: frontmatterChanged };
 
-  const moved = await moveNoteBetweenRoots(ctx, target.file, movePlan.fromRoot, movePlan.toRoot);
-  return {
-    changed: true,
-    file: moved.file,
-    moved: true,
-    fromPath: moved.fromPath,
-    toPath: moved.toPath
-  };
+    const moved = await moveNoteBetweenRoots(ctx, target.file, movePlan.fromRoot, movePlan.toRoot);
+    return {
+      changed: true,
+      file: moved.file,
+      moved: true,
+      fromPath: moved.fromPath,
+      toPath: moved.toPath
+    };
+  });
 }
 
 // Multi-value frontmatter lists (e.g. a project's areas) accept add/remove, not just a

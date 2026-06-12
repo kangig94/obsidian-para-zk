@@ -30,6 +30,17 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- Added a dedicated `para-zk:attach-file` CLI contract section covering local
+  source options, single-file and multi-source result fields, unique-name
+  collision behavior, directory recursion rules, desktop-local source paths,
+  and target `folder`/`name` path guardrails.
+- Added a setup managed-file acceptance matrix to the developer guide, covering
+  missing, tracked, user-managed, user-modified, folder, `force=true`, and
+  `dryRun=true` states. The same guide now records the release submission stance
+  for `isDesktopOnly: false`: mobile can load the pure GUI plugin, while CLI
+  handlers and Node access are desktop-only and lazy.
+- Added GitHub Actions plugin CI for push/PR checks: `npm ci`, lint, tests,
+  build, and a committed-artifact drift check.
 - Home dashboard "create new" panel adds a daily-note (`open-journal`) button.
   Both the dashboard panel and the left ribbon now order the create actions as
   Project, Area, Resource, ZK, Daily note, Quick memo (quick memo appends into a
@@ -220,13 +231,27 @@ Notable changes for PARA-ZK are tracked here.
   `/plugin install para-zk@obsidian-para-zk`, or in Codex with
   `codex plugin marketplace add kangig94/obsidian-para-zk`; the `describe` tool
   returns the live CLI contract.
-- Added shell-safe MCP section-mutation tools `replace`, `set`, and `add` that
+- Added shell-safe MCP edit tools `replace`, `set`, and `add` that
   wrap `para-zk:update-*` through `execFile` (never a shell), so multi-line,
   quoted, and `$`/backtick content edits reach the note verbatim instead of being
-  mangled by shell expansion. Frontmatter and task mutations stay on the CLI.
+  mangled by shell expansion. The tools pass documented update keys through to
+  `para-zk:update-*`, including supported `frontmatter/<key>` scalar/list
+  writes; structured task insertion/deletion and other non-string mutation
+  shapes stay on the CLI.
 
 ### Changed
 
+- `para-zk-props` now renders vault-managed `created` and `updated`
+  frontmatter as display-only wherever those fields are shown. GUI frontmatter
+  edits now route through the canonical workflow update functions by note type
+  (`updateProject`, `updateArea`, `updateResource`, `updateJournal`,
+  `updateRetro`, `updateZk`) instead of writing frontmatter directly; child
+  subnotes keep the documented direct-write exception because child updates do
+  not yet have a path selector.
+- Core workflow read-modify-write mutations now serialize per vault file through
+  a shared write serializer. Task shard mutations, reference mutations, and
+  section/frontmatter updates no longer interleave when invoked concurrently
+  against the same file, such as from parallel CLI calls.
 - Removed the invoked `command` field from JSON execution-result envelopes and
   per-command JSON help. Command names remain in the registered command catalog,
   `describe` workflow metadata, and text help headers.
@@ -408,10 +433,10 @@ Notable changes for PARA-ZK are tracked here.
 - Full read responses now mark compact mode and summarize large task/reference
   collections with `count`; exact collection root reads return paged `items`
   with `offset`, `limit`, `returned`, and `has_more`.
-- Journal and retro task collections now use the same stable `tasks` key as
-  project and area task collections.
-- Journal and retro references now use the same stable `references` key and
-  generated heading as project, area, resource, and ZK notes.
+- Journal task collections now use the same stable `tasks` key as project and
+  area task collections.
+- Journal references now use the same stable `references` key and generated
+  heading as project, area, resource, and ZK notes.
 - CLI compatibility aliases such as `name`, `type`, `areaTitles`,
   `subnoteType`, `text`, and `memo` are now rejected in favor of one canonical
   argument name per concept.
@@ -480,6 +505,14 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Fixed
 
+- Realigned stale `smoke:vault` expectations with the current GUI: ribbon
+  create-action order (resource before ZK), the subnote template's managed
+  block, and the Korean `일일 노트`/`하위노트` labels.
+- Corrected the MCP, README, and CLI docs to match the live contracts: MCP
+  `replace`/`set`/`add` accept documented write keys including
+  `frontmatter/<key>` where the operation is supported; structured task
+  insertion/deletion remains CLI-only; retro read/update docs no longer list
+  unsupported `tasks` or `references` keys.
 - CLI/MCP values are now passed through verbatim: the update `value` and the
   `match`/`with` replacement strings are no longer escape-decoded. Previously a
   `\n`/`\t` was rewritten to a newline/tab, which silently corrupted any content
