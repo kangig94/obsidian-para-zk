@@ -1,4 +1,8 @@
 export type {
+  AuditFinding,
+  AuditFixedItem,
+  AuditOptions,
+  AuditResult,
   CollectionReadOptions,
   ReferenceRead,
   SurfaceDescription,
@@ -33,6 +37,7 @@ export {
 export { renameArea, renameProject, renameResource, renameZk } from "./rename";
 export { deleteArea, deleteJournal, deleteProject, deleteResource, deleteRetro, deleteZk } from "./delete";
 export { listNotes } from "./list";
+export { auditVault } from "./audit";
 export { captureJournal, openJournal, distillSpark, createFromDigest, createFromResource } from "./promote";
 export {
   addReference,

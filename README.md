@@ -1,6 +1,10 @@
 # PARA-ZK
 
-Native Obsidian plugin for PARA and Zettelkasten workflows.
+An LLM-maintained PARA + Zettelkasten knowledge wiki for Obsidian.
+
+You curate the sources and ask the questions; PARA-ZK's workflows ingest them into
+interlinked notes and keep frontmatter, references, and backlinks coherent, so
+knowledge compounds in the vault instead of being re-derived on each query.
 
 PARA-ZK runs as an Obsidian plugin (GUI commands + ribbon shortcuts) and, while
 Obsidian is running, exposes the full workflow contract through a native CLI.

@@ -186,9 +186,9 @@ Important fields:
   `grep`/`search`), not PARA-ZK.
 - `surfaceTypes` — addressable/createable note types.
 - `workflows` — named (non-surface) commands with their inputs:
-  `create-child`, `read-child`, `update-child`, `rename-child`, `delete-child`,
-  `capture-journal`, `distill-spark`, `create-from-digest`, `create-from-resource`,
-  `attach-file`. This is how you discover those commands and args without a
+  `list`, `audit`, `create-child`, `read-child`, `update-child`, `rename-child`,
+  `delete-child`, `capture-journal`, `distill-spark`, `create-from-digest`,
+  `create-from-resource`, `attach-file`. This is how you discover those commands and args without a
   separate help lookup.
 - `collectionFilters`
 - `surfaces` when `type` is provided. Each surface carries an `addressing` facet:
@@ -234,6 +234,58 @@ optsidian para-zk:list type=zk limit=all format=json
 Returns `{ count, offset, limit, returned, has_more, items }`; each item is
 `{ title, type, path }` (plus `archived: true` in archived listings). `type` is
 the stored type (e.g. `zk_permanent` for a `type=zk` listing).
+
+### `para-zk:audit`
+
+Runs a deterministic, read-only content-health audit over active PARA-ZK notes.
+By default it reports findings only. `fix=true` performs the only safe automatic
+repair: vault-wide id backfill for id-less references. No other finding is
+mutated, and there is no `dryRun`; the report-only run is the preview.
+`fix=true` always backfills every id-less reference across the whole vault and
+is NOT constrained by `check`/`severity`/`type` (those filter only the reported
+`findings`).
+
+Options:
+
+| Option | Values | Notes |
+| --- | --- | --- |
+| `check` | `broken_link`, `dangling_reference`, `idless_reference`, `orphan_note`, `unprocessed_spark`, `stale_draft_permanent` | Optional check-code filter. |
+| `severity` | `high`, `medium`, `low` | Optional severity filter. |
+| `type` | stored note type | Optional frontmatter type filter, e.g. `resource` or `zk_permanent`. |
+| `offset` | number | Zero-based finding offset (default `0`). |
+| `limit` | number or `all` | Maximum findings to return (default `50`). |
+| `fix` | boolean | `true` backfills id-less reference ids vault-wide; all other findings remain report-only. |
+
+Checks:
+
+| Code | Severity | Meaning | Fix behavior |
+| --- | --- | --- | --- |
+| `broken_link` | `high` | An outgoing body wikilink or embed does not resolve. | Hint only: fix the link or create the target. |
+| `dangling_reference` | `high` | A `references` registry entry points at a missing vault file. | Hint only: correct or remove the reference. |
+| `idless_reference` | `medium` | A reference has `id: null` and cannot be cited with `PZ[<id>]`. | Auto-fixable with `fix=true` or `key=references op=backfill`. |
+| `orphan_note` | `medium` | A resource, digest, or permanent note has no incoming backlinks and no outgoing resolved links, excluding templates, dashboards, archives, and folder main-notes. | Hint only: link it from an area, project, or hub. |
+| `unprocessed_spark` | `low` | A `zk_spark` with `processed: false` is older than 7 days by `created`. | Hint only: distill or discard it. |
+| `stale_draft_permanent` | `low` | A `zk_permanent` with `maturity: draft` has not been updated for 14 days by `updated`. | Hint only: refine or promote maturity. |
+
+Examples:
+
+```bash
+optsidian para-zk:audit format=json
+optsidian para-zk:audit check=broken_link limit=all format=json
+optsidian para-zk:audit severity=high type=resource format=json
+optsidian para-zk:audit fix=true format=json
+```
+
+JSON output fields:
+
+- `ok`: true on success.
+- `command`: `para-zk:audit`.
+- `counts`: finding counts by check code after filters and before pagination.
+- `count`, `offset`, `limit`, `returned`, `has_more`: pagination envelope over
+  the flat filtered finding list.
+- `findings`: array of `{ code, severity, path, type, detail, fix }`.
+- `fixed`: present only when `fix=true`; each item is
+  `{ code: "idless_reference", path, action: "backfillReferenceIds" }`.
 
 ### `para-zk:setup`
 

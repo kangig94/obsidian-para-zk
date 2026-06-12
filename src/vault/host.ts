@@ -19,6 +19,7 @@ export interface WorkflowHost {
   getFirstLinkpathDest(linkpath: string, sourcePath: string): TFile | null;
   getFileCache(file: TFile): CachedMetadata | null;
   resolvedLinks(): Record<string, Record<string, number>>;
+  unresolvedLinks(): Record<string, Record<string, number>>;
   openFile(file: TFile): Promise<void>;
   getActiveFile(): TFile | null;
 }
@@ -57,6 +58,7 @@ function createObsidianHost(app: App): WorkflowHost {
     getFirstLinkpathDest: (linkpath, sourcePath) => app.metadataCache.getFirstLinkpathDest(linkpath, sourcePath),
     getFileCache: (file) => app.metadataCache.getFileCache(file),
     resolvedLinks: () => app.metadataCache.resolvedLinks,
+    unresolvedLinks: () => app.metadataCache.unresolvedLinks,
     openFile: async (file) => { await app.workspace.getLeaf(true).openFile(file); },
     getActiveFile: () => app.workspace.getActiveFile()
   };

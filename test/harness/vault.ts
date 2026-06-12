@@ -71,6 +71,8 @@ export class MockApp {
     },
     modify: async (file: TFile, content: string): Promise<void> => {
       this.contents.set(file.path, content);
+      file.stat.size = content.length;
+      this.rewire();
     },
     trash: async (file: TAbstractFile, system: boolean): Promise<void> => {
       this.removePath(file.path, system);
@@ -98,6 +100,9 @@ export class MockApp {
         file.path,
         keys.length > 0 ? `---\n${stringifyYaml(frontmatter)}---\n${body}` : body
       );
+      const nextContent = this.contents.get(file.path) ?? "";
+      file.stat.size = nextContent.length;
+      this.rewire();
     },
     renameFile: async (file: TAbstractFile, newPath: string): Promise<void> => {
       this.relocate(file.path, newPath);
@@ -112,7 +117,8 @@ export class MockApp {
     },
     getFirstLinkpathDest: (linkpath: string, _sourcePath: string): TFile | null =>
       this.resolveLinkpathDest(linkpath),
-    resolvedLinks: {} as Record<string, Record<string, number>>
+    resolvedLinks: {} as Record<string, Record<string, number>>,
+    unresolvedLinks: {} as Record<string, Record<string, number>>
   };
 
   workspace = {
@@ -254,10 +260,11 @@ export class MockApp {
   }
 
   private resolveLinkpathDest(linkpath: string): TFile | null {
-    const direct = this.fileObjs.get(linkpath) ?? this.fileObjs.get(`${linkpath}.md`);
+    const base = linkpath.split("#")[0];
+    const direct = this.fileObjs.get(base) ?? this.fileObjs.get(`${base}.md`);
     if (direct) return direct;
 
-    const target = baseName(linkpath).replace(/\.md$/i, "");
+    const target = baseName(base).replace(/\.md$/i, "");
     return [...this.fileObjs.values()].find((file) => file.basename === target) ?? null;
   }
 
@@ -270,7 +277,50 @@ export class MockApp {
       node.parent = parent;
       parent.children.push(node);
     }
+    this.rewireLinks();
   }
+
+  private rewireLinks(): void {
+    const resolved: Record<string, Record<string, number>> = {};
+    const unresolved: Record<string, Record<string, number>> = {};
+
+    for (const file of this.fileObjs.values()) {
+      if (file.extension !== "md") continue;
+      const content = this.contents.get(file.path) ?? "";
+      for (const target of wikiLinkTargets(splitFrontmatter(content).body)) {
+        const base = target.split("#")[0].trim();
+        const resolvedFile = base ? this.resolveLinkpathDest(target) : file;
+        if (resolvedFile) {
+          incrementLinkCount(resolved, file.path, resolvedFile.path);
+        } else {
+          incrementLinkCount(unresolved, file.path, target);
+        }
+      }
+    }
+
+    this.metadataCache.resolvedLinks = resolved;
+    this.metadataCache.unresolvedLinks = unresolved;
+  }
+}
+
+function wikiLinkTargets(content: string): string[] {
+  const targets: string[] = [];
+  const pattern = /!?\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(content)) !== null) {
+    const target = match[1]?.trim();
+    if (target) targets.push(target);
+  }
+  return targets;
+}
+
+function incrementLinkCount(
+  links: Record<string, Record<string, number>>,
+  sourcePath: string,
+  target: string
+): void {
+  links[sourcePath] ??= {};
+  links[sourcePath][target] = (links[sourcePath][target] ?? 0) + 1;
 }
 
 export function createTestContext(

@@ -109,6 +109,20 @@ export function folderForZkKind(settings: ParaZkSettings, kind: ZkKind): string 
   return settings.paths.sparkFolder;
 }
 
+export function isUnderAnyFolder(path: string, folders: string[]): boolean {
+  const normalized = normalizeVaultPath(path);
+  return folders
+    .map(normalizeVaultPath)
+    .filter(Boolean)
+    .some((folder) => normalized === folder || normalized.startsWith(`${folder}/`));
+}
+
+export function templateFolderPaths(ctx: WorkflowContext): string[] {
+  return [ctx.settings.paths.templatesFolder, ctx.settings.paths.managedTemplatesFolder]
+    .map(normalizeVaultPath)
+    .filter(Boolean);
+}
+
 function archiveAwareFolders(
   ctx: WorkflowContext,
   activeFolder: string,

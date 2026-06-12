@@ -18,6 +18,7 @@ import { joinVaultPath, normalizeVaultPath, sanitizeFileName, wikiLink } from ".
 import {
   describeSurface,
   describeSurfaces,
+  type AuditOptions,
   surfaceReadKeys,
   surfaceTypes,
   surfaceWriteKeys,
@@ -127,6 +128,7 @@ type AttachedFile = {
 };
 
 type WorkflowFunctionName =
+  | "auditVault"
   | "captureJournal"
   | "createArea"
   | "createProject"
@@ -770,6 +772,28 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     }))
   },
   {
+    command: "para-zk:audit",
+    description: "Audit the vault for deterministic PARA-ZK content-health findings",
+    options: {
+      check: { value: "<broken_link|dangling_reference|idless_reference|orphan_note|unprocessed_spark|stale_draft_permanent>", description: "Optional check code filter." },
+      severity: { value: "<high|medium|low>", description: "Optional severity filter." },
+      type: { value: "<note-type>", description: "Optional stored frontmatter type filter, e.g. resource or zk_permanent." },
+      offset: { value: "<number>", description: "Zero-based finding offset (default: 0)." },
+      limit: { value: "<number|all>", description: "Maximum findings to return (default: 50)." },
+      fix: { value: "<true|false>", description: "When true, backfill id-less reference ids vault-wide; no other finding is auto-fixed." },
+      format: FORMAT_OPTION
+    },
+    text: "vault audited",
+    run: async (plugin, args) => {
+      const workflows = await loadWorkflows() as Record<WorkflowFunctionName, WorkflowRunFunction>;
+      const result = await workflows.auditVault(workflowContext(plugin), readCliAuditOptions(args));
+      return {
+        command: "para-zk:audit",
+        ...result
+      };
+    }
+  },
+  {
     command: "para-zk:setup",
     description: "Set up the PARA-ZK vault layout and managed files",
     options: {
@@ -1193,7 +1217,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
 // it reasons from the right premise instead of treating notes as web/public content. An
 // Obsidian vault is a local-first, single-user personal knowledge base — not a shared or
 // published medium — so saving source material into it is personal use, never redistribution.
-const VAULT_CONTEXT = "Obsidian is a local-first, single-user personal knowledge base — a private 'second brain', not a shared, published, or collaborative medium like Notion. This vault is one person's private notebook on their own machine; its contents are never published or distributed and the user keeps them private. Material saved here (notes, excerpts, or full source texts the user is studying) is personal reference, not redistribution — storing it is ordinary personal-use note-taking, so do not decline content on public-distribution or redistribution grounds; nothing here leaves the user's machine.";
+const VAULT_CONTEXT = "Obsidian is a local-first, single-user personal knowledge base — a private 'second brain', not a shared, published, or collaborative medium like Notion. PARA-ZK runs it as an LLM-maintained PARA + Zettelkasten wiki: the user curates sources and asks questions while the assistant ingests them into interlinked notes and keeps references and backlinks coherent, so knowledge compounds in the vault instead of being re-derived. This vault is one person's private notebook on their own machine; its contents are never published or distributed and the user keeps them private. Material saved here (notes, excerpts, or full source texts the user is studying) is personal reference, not redistribution — storing it is ordinary personal-use note-taking, so do not decline content on public-distribution or redistribution grounds; nothing here leaves the user's machine.";
 
 // Sets the operator's expectation of what this CLI does and does not own, so it does not
 // bang on PARA-ZK for raw vault operations it deliberately leaves to the host. Kept verbatim
@@ -1206,6 +1230,7 @@ const SCOPE_NOTE = "PARA-ZK owns typed PARA/ZK operations — create/read/update
 const UNIVERSAL_OPTIONS = new Set(["open", "format"]);
 const NAMED_WORKFLOW_COMMANDS = [
   "para-zk:list",
+  "para-zk:audit",
   "para-zk:create-child",
   "para-zk:read-child",
   "para-zk:update-child",
@@ -1693,6 +1718,44 @@ function readCliRenameKind(args: CliArgs): string | undefined {
   return readCliKind(args);
 }
 
+function readCliAuditOptions(args: CliArgs): AuditOptions {
+  rejectCliAuditAliases(args);
+  return {
+    check: readCliString(args, "check"),
+    severity: readCliAuditSeverity(args),
+    type: readCliString(args, "type"),
+    offset: readCliInteger(args, "offset"),
+    limit: readCliCollectionLimit(args),
+    fix: readCliBoolean(args, "fix") ?? false
+  };
+}
+
+function rejectCliAuditAliases(args: CliArgs): void {
+  for (const key of ["dryRun", "dry_run"]) {
+    if (Object.prototype.hasOwnProperty.call(args, key)) {
+      throw new Error(`${key} is not accepted by para-zk:audit — run without fix to preview, then use fix=true to backfill id-less references`);
+    }
+  }
+  rejectCliAliases(args, {
+    code: "check",
+    checkCode: "check",
+    level: "severity",
+    noteType: "type",
+    note_type: "type",
+    start: "offset",
+    max: "limit",
+    autoFix: "fix",
+    auto_fix: "fix"
+  });
+}
+
+function readCliAuditSeverity(args: CliArgs): AuditOptions["severity"] {
+  const severity = readCliString(args, "severity");
+  if (severity === undefined) return undefined;
+  if (severity === "high" || severity === "medium" || severity === "low") return severity;
+  throw new Error("severity must be one of high, medium, low");
+}
+
 function readCliCollectionOptions(args: CliArgs): CollectionReadOptions | undefined {
   rejectCliAliases(args, {
     dueBefore: "due_before",
@@ -1815,4 +1878,3 @@ function readCliContent(args: CliArgs): string {
   });
   return readCliString(args, "content") ?? "";
 }
-

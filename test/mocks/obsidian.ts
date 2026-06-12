@@ -30,7 +30,12 @@ export function parseYaml(value: string): unknown {
   return parseYamlImpl(value);
 }
 
-export class App {}
+export class App {
+  metadataCache = {
+    resolvedLinks: {} as Record<string, Record<string, number>>,
+    unresolvedLinks: {} as Record<string, Record<string, number>>
+  };
+}
 export class Component {
   private readonly registeredCallbacks: Array<() => void> = [];
 

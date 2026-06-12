@@ -195,6 +195,51 @@ export type ListOptions = {
   limit?: number | "all";
 };
 
+export type AuditSeverity = "high" | "medium" | "low";
+
+export type AuditCheckCode =
+  | "broken_link"
+  | "dangling_reference"
+  | "idless_reference"
+  | "orphan_note"
+  | "unprocessed_spark"
+  | "stale_draft_permanent";
+
+export type AuditOptions = {
+  check?: string;
+  severity?: AuditSeverity;
+  type?: string;
+  offset?: number;
+  limit?: number | "all";
+  fix?: boolean;
+};
+
+export type AuditFinding = {
+  code: AuditCheckCode;
+  severity: AuditSeverity;
+  path: string;
+  type?: string;
+  detail: Record<string, unknown>;
+  fix: string;
+};
+
+export type AuditFixedItem = {
+  code: "idless_reference";
+  path: string;
+  action: string;
+};
+
+export type AuditResult = {
+  counts: Partial<Record<AuditCheckCode, number>>;
+  count: number;
+  offset: number;
+  limit: number | "all";
+  returned: number;
+  has_more: boolean;
+  findings: AuditFinding[];
+  fixed?: AuditFixedItem[];
+};
+
 export type UpdateOperation = "set" | "insert" | "append" | "prepend" | "replace" | "delete" | "backfill";
 
 export type UpdatePayloadOptions = {

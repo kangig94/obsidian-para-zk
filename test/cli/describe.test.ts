@@ -82,10 +82,12 @@ describe("describe", () => {
     // Named (non-surface) workflows are discoverable from the index, with inputs.
     const workflows = all.workflows as Array<{ command: string; inputs: string[] }>;
     expect(workflows.map((w) => w.command)).not.toContain("para-zk:add-reference");
+    const audit = workflows.find((w) => w.command === "para-zk:audit");
+    expect(audit?.inputs).toEqual(expect.arrayContaining(["check", "severity", "type", "offset", "limit", "fix"]));
     const createChild = workflows.find((w) => w.command === "para-zk:create-child");
     expect(createChild?.inputs).toEqual(expect.arrayContaining(["type", "root_type", "root_title", "relpath", "title"]));
     expect(workflows.map((w) => w.command)).toEqual(
-      expect.arrayContaining(["para-zk:read-child", "para-zk:update-child", "para-zk:rename-child", "para-zk:delete-child", "para-zk:capture-journal", "para-zk:distill-spark", "para-zk:create-from-digest"])
+      expect.arrayContaining(["para-zk:audit", "para-zk:read-child", "para-zk:update-child", "para-zk:rename-child", "para-zk:delete-child", "para-zk:capture-journal", "para-zk:distill-spark", "para-zk:create-from-digest"])
     );
 
     const retro = await cli.run("para-zk:describe", { type: "retro" });

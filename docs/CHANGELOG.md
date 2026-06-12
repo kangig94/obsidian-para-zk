@@ -151,6 +151,11 @@ Notable changes for PARA-ZK are tracked here.
 - Added `para-zk:list` — structured enumeration of notes by `type` with
   `archived`/`query` filters and `offset`/`limit` pagination (content search is
   left to the host CLI's grep/search). Returns `{ title, type, path }` items.
+- Added `para-zk:audit` — a deterministic content-health pass for broken links,
+  dangling/id-less references, conservative orphan notes, stale unprocessed
+  sparks, and stale draft permanent notes. It is report-only by default;
+  `fix=true` performs the only automatic repair, vault-wide id-less reference
+  backfill, and reports the changed files in `fixed`.
 - Made `para-zk:describe` self-contained for LLM discovery: each surface's
   `addressing` facet now includes `createInputs` (the create command's
   arguments, derived from the real command spec — no drift), and the index +
@@ -241,6 +246,9 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Changed
 
+- Reframed the product positioning as an LLM-maintained PARA + Zettelkasten
+  knowledge wiki (README intro and the `describe`/MCP `vault` context string,
+  kept verbatim in sync). Framing only — no `id`, command, or contract change.
 - `para-zk-props` now renders vault-managed `created` and `updated`
   frontmatter as display-only wherever those fields are shown. GUI frontmatter
   edits now route through the canonical workflow update functions by note type
