@@ -8,6 +8,12 @@ importers:
 
   .:
     devDependencies:
+      '@codemirror/state':
+        specifier: ^6.0.0
+        version: 6.5.0
+      '@codemirror/view':
+        specifier: ^6.0.0
+        version: 6.38.6
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@4.4.3)
