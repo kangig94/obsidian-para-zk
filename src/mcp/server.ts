@@ -5,6 +5,10 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult, type ListToolsResult } from "@modelcontextprotocol/sdk/types.js";
 import { isRecord } from "../records";
 
+// Injected from package.json at build time (esbuild `define`); the guard keeps the
+// unbundled path (tests, tsc) working without hardcoding the version in source.
+declare const __VERSION__: string;
+
 export type ParaZkCli = "optsidian" | "obsidian";
 export type UpdateTool = "replace" | "set" | "add";
 
@@ -31,8 +35,8 @@ const OPTSIDIAN_NOTE = " `optsidian` is an Obsidian-based optimized CLI; run the
 const FALLBACK_HOWTO_OBSIDIAN = "PARA-ZK CLI detected but no running Obsidian vault was reachable (or no obsidian CLI on PATH). Open the vault in Obsidian and ensure the CLI is on PATH, then call this tool again for the live schema.";
 const FALLBACK_HOWTO_OPTSIDIAN = "PARA-ZK CLI detected but no running Obsidian vault was reachable. Launch Obsidian with `optsidian open-gui` (it opens your last-opened vault and waits until the vault is ready), then call this tool again for the live schema. If optsidian is not found, ensure it is on PATH.";
 const REPO_URL = "https://github.com/kangig94/obsidian-para-zk";
-const INSTALL_OPTSIDIAN = `Set up a vault in two steps: (1) install the prebuilt plugin — \`optsidian plugin:install url=${REPO_URL} enable\` (add vault-path=<path> for a non-active vault); (2) initialize the vault — \`optsidian para-zk:setup installDeps=true format=json\` (creates the PARA/ZK layout and installs the required community plugins; add locale=ko for Korean).`;
-const INSTALL_OBSIDIAN = `Set up a vault in two steps: (1) install the plugin — copy the prebuilt manifest.json, main.js, and styles.css from ${REPO_URL} into <vault>/.obsidian/plugins/para-zk/ and enable PARA-ZK under Settings > Community plugins; (2) initialize the vault — run \`para-zk:setup installDeps=true\` (add locale=ko for Korean).`;
+const INSTALL_OPTSIDIAN = `Set up a vault in two steps: (1) install the plugin — \`optsidian plugin:install url=${REPO_URL} enable\` (add vault-path=<path> for a non-active vault); (2) initialize the vault — \`optsidian para-zk:setup installDeps=true format=json\` (creates the PARA/ZK layout and installs the required community plugins; add locale=ko for Korean).`;
+const INSTALL_OBSIDIAN = `Set up a vault in two steps: (1) install the plugin — via BRAT (in Obsidian: BRAT → Add beta plugin → ${REPO_URL}) or download manifest.json, main.js, and styles.css from the latest release at ${REPO_URL}/releases into <vault>/.obsidian/plugins/para-zk/, then enable PARA-ZK under Settings > Community plugins; (2) initialize the vault — run \`para-zk:setup installDeps=true\` (add locale=ko for Korean).`;
 const DESCRIBE_INPUT_SCHEMA = {
   type: "object",
   properties: {},
@@ -504,7 +508,7 @@ function serializeToolCall<T>(run: () => Promise<T>): Promise<T> {
 function createServer(): Server {
   const server = new Server({
     name: "para-zk",
-    version: "0.0.1"
+    version: typeof __VERSION__ === "string" ? __VERSION__ : "0.0.0"
   }, {
     capabilities: {
       tools: {}

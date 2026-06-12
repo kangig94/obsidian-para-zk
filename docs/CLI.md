@@ -1309,7 +1309,7 @@ Side effects:
 Use the automated smoke test against a disposable test vault:
 
 ```bash
-npm run smoke:vault -- --vault /path/to/test-vault
+pnpm run smoke:vault -- --vault /path/to/test-vault
 ```
 
 Use `--clean` only for a disposable vault. It deletes all top-level vault
@@ -1317,7 +1317,7 @@ contents except `.obsidian` and removes the PARA-ZK plugin data file before
 running the smoke test.
 
 ```bash
-npm run smoke:vault -- --vault /path/to/test-vault --clean
+pnpm run smoke:vault -- --vault /path/to/test-vault --clean
 ```
 
 On Linux, the smoke test opens the target vault with `open-gui no-wait` and

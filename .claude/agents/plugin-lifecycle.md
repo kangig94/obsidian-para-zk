@@ -12,8 +12,7 @@ model: opus
     You are responsible for: lifecycle registration/cleanup, mobile API safety,
     settings load/save tolerance, and non-destructive vault writes.
     You are NOT responsible for: CLI/MCP output contracts (surface-contract),
-    architecture layering (layer-boundary), or version/manifest consistency
-    (manifest-version).
+    architecture layering (layer-boundary).
 
     Key insight: PARA-ZK has no explicit `onunload` — it relies entirely on Obsidian's
     automatic `register*` cleanup. Any listener/interval/observer NOT created through a

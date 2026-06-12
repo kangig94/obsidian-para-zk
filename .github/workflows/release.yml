@@ -1,0 +1,46 @@
+name: Release Obsidian plugin
+
+# Builds the plugin and creates a DRAFT GitHub release with the BRAT-required assets
+# (main.js, manifest.json, styles.css) whenever a version tag is pushed.
+# Tag name must equal manifest.json "version" exactly, no "v" prefix (e.g. 0.0.2).
+# Review the draft, then publish it — BRAT can only see published releases.
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        run: pnpm run build
+      - name: Create draft release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          manifest_version="$(node -p "require('./manifest.json').version")"
+          if [ "$tag" != "$manifest_version" ]; then
+            echo "::error::Tag '$tag' does not match manifest.json version '$manifest_version' (Obsidian requires an exact match, no 'v' prefix)."
+            exit 1
+          fi
+          gh release create "$tag" \
+            --title "$tag" \
+            --draft \
+            --notes "Beta release $tag — install via BRAT (see README)." \
+            build/main.js build/manifest.json build/styles.css

@@ -24,7 +24,7 @@ L0  Foundation  └─ types · records · text · time · i18n · vocabulary ·
 Arrows = "depends on". `ux/`, `cli/`, and `runtime/` each call into L2 core; they never
 call each other. The MCP server does **not** import the core — see *Surfaces* below.
 
-## Dependency Rules (enforced by `npm run lint:architecture`)
+## Dependency Rules (enforced by `pnpm run lint:architecture`)
 
 `tools/check-architecture.mjs` fails the build on any of:
 

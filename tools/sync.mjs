@@ -14,7 +14,8 @@ if (!pluginDir) {
 
 try {
   await access(pluginDir);
-  await Promise.all(filesToDeploy.map((file) => copyFile(file, join(pluginDir, file))));
+  // Built artifacts live in build/ (run a build first); manifest.json is staged there too.
+  await Promise.all(filesToDeploy.map((file) => copyFile(join("build", file), join(pluginDir, file))));
   console.log(`✓ Synced to ${pluginDir}`);
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);

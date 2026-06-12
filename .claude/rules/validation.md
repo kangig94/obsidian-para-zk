@@ -19,7 +19,7 @@ paths:
   vault saved by an older version still loads.
 - Vault writes are non-destructive: `para-zk:setup` stays idempotent; existing
   non-managed files are not overwritten without `force=true`.
-- `npm run lint:architecture` passes — no layer-boundary or content-blank violations.
+- `pnpm run lint:architecture` passes — no layer-boundary or content-blank violations.
 - Changed code has corresponding tests (Vitest), or a documented reason it is
   smoke-only.
 
@@ -31,4 +31,4 @@ paths:
 ## MINOR (should document)
 - Code complexity within thresholds.
 - Naming conventions followed.
-- No dead code introduced (`npm run lint:deadcode`).
+- No dead code introduced (`pnpm run lint:deadcode`).

@@ -46,7 +46,7 @@ role-specific name. Re-exports live only in `index.ts`.
 | `src/mcp/` | L3 Adapter | Thin MCP server; proxies the native CLI via `execFile` | Isolated — imports only `records`; does NOT link the core |
 | `src/main.ts`, `src/mcp/server.ts` | L4 Entry | Plugin composition root / MCP process entry | Wire adapters together |
 
-Key rules (enforced by `npm run lint:architecture`):
+Key rules (enforced by `pnpm run lint:architecture`):
 1. Layer dependency: code in Lx may only depend on L0..L(x-1).
 2. `runtime/` must not import `ux/` or `cli/`.
 3. `cli/` must not import `ux/`; `ux/` must not import `cli/`.
@@ -57,7 +57,7 @@ See `docs/ARCHITECTURE.md` for the current dependency graph and module role tabl
 ## Agent System Philosophy
 
 - **Tiered Expertise**: OPUS for safety (plugin-lifecycle, surface-contract), SONNET for
-  domain/quality (layer-boundary, manifest-version, critics).
+  domain/quality (layer-boundary, critics).
 - **Mandatory Consultations**: Cross-surface changes require multiple agents (see
   `.claude/rules/agents.md`).
 - **Final validation**: `Skill(tier-review)` as the mandatory last step.

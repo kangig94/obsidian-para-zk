@@ -5,6 +5,12 @@ dist/
 *.log
 .claude/coral
 
+# Obsidian build outputs — the Obsidian deployment shape (main.js, manifest.json copy,
+# styles.css) is generated into build/ and shipped as GitHub Release assets, never
+# committed. The MCP bundle (clients/para-zk-mcp.mjs) stays committed: the Claude Code /
+# Codex marketplace ships clients/ via git clone with no install-time build.
+build/
+
 # docs-site (Quartz): commit ONLY our content + config; the CI workflow clones the
 # Quartz framework at build time, so the framework/deps/build output stay out of git.
 docs-site/*

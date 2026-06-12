@@ -50,7 +50,7 @@ Clients that accept an `mcpServers` JSON config can register the bundled server 
 Build the bundle before direct registration if you are using a local checkout:
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 ## Tools
