@@ -194,10 +194,10 @@ Important fields:
 - `surfaceTypes` — addressable/createable note types, including the derived
   `llm-wiki` surface.
 - `workflows` — named (non-surface) commands with their inputs:
-  `list`, `audit`, `create-child`, `read-child`, `update-child`, `rename-child`,
-  `delete-child`, `capture-journal`, `distill-spark`, `create-from-digest`,
-  `create-from-resource`, `attach-file`. This is how you discover those commands and args without a
-  separate help lookup.
+  `list`, `audit`, `wiki-ingest-candidates`, `create-child`, `read-child`,
+  `update-child`, `rename-child`, `delete-child`, `capture-journal`,
+  `distill-spark`, `create-from-digest`, `create-from-resource`, `attach-file`.
+  This is how you discover those commands and args without a separate help lookup.
 - `collectionFilters`
 - `surfaces` when `type` is provided. Each surface carries an `addressing` facet:
   - `addressable` — whether the type is reached directly (`true`) or only through
@@ -259,7 +259,7 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `check` | `broken_link`, `dangling_reference`, `idless_reference`, `orphan_note`, `unprocessed_spark`, `stale_draft_permanent` | Optional check-code filter. |
+| `check` | `broken_link`, `dangling_reference`, `idless_reference`, `orphan_note`, `upward_wiki_link`, `unprocessed_spark`, `stale_draft_permanent` | Optional check-code filter. |
 | `severity` | `high`, `medium`, `low` | Optional severity filter. |
 | `type` | stored note type | Optional frontmatter type filter, e.g. `resource` or `permanent`. |
 | `offset` | number | Zero-based finding offset (default `0`). |
@@ -274,6 +274,7 @@ Checks:
 | `dangling_reference` | `high` | A `references` registry entry points at a missing vault file. | Hint only: correct or remove the reference. |
 | `idless_reference` | `medium` | A reference has `id: null` and cannot be cited with `PZ[<id>]`. | Auto-fixable with `fix=true` or `key=references op=backfill`. |
 | `orphan_note` | `medium` | A resource, digest, or permanent note has no incoming backlinks and no outgoing resolved links, excluding templates, dashboards, archives, and folder main-notes. | Hint only: link it from an area, project, or hub. |
+| `upward_wiki_link` | `medium` | A non-`llm-wiki` note links into an `llm-wiki` note. Wiki pages cite canonical notes; canonical notes should not link back into the wiki. | Hint only: remove the reverse wiki link. |
 | `unprocessed_spark` | `low` | A `spark` with `processed: false` is older than 7 days by `created`. | Hint only: distill or discard it. |
 | `stale_draft_permanent` | `low` | A `permanent` with `maturity: draft` has not been updated for 14 days by `updated`. | Hint only: refine or promote maturity. |
 
@@ -296,6 +297,58 @@ JSON output fields:
 - `findings`: array of `{ code, severity, path, type, detail, fix }`.
 - `fixed`: present only when `fix=true`; each item is
   `{ code: "idless_reference", path, action: "backfillReferenceIds" }`.
+
+### `para-zk:wiki-ingest-candidates`
+
+Lists canonical source notes that should be folded into the LLM-Wiki. This is a
+body-read-free discovery primitive: it uses frontmatter, Obsidian's resolved-link
+graph, and the plugin-owned ingest ledger, but does not read canonical or wiki
+note bodies.
+
+Ingestable sources are active, non-template notes with `type` equal to
+`resource`, `digest`, `permanent`, or `subnote`.
+
+Options:
+
+| Option | Values | Notes |
+| --- | --- | --- |
+| `mode` | `per-import`, `delta`, `init`, `re-ingest` | Required candidate discovery mode. |
+| `source_path` | vault path | Single source note path. Required for `per-import` and `re-ingest` when `source_paths` is omitted; rejected for `delta` and `init`. |
+| `source_paths` | JSON array or comma list | Multiple source note paths. Required for `per-import` and `re-ingest` when `source_path` is omitted; rejected for `delta` and `init`. |
+| `offset` | number | Zero-based candidate offset (default `0`). |
+| `limit` | number or `all` | Maximum candidates to return (default `50`). |
+| `format` | `json`, `text` | Use `json` for automation. |
+
+```bash
+optsidian para-zk:wiki-ingest-candidates mode=init limit=all format=json
+optsidian para-zk:wiki-ingest-candidates mode=delta limit=50 format=json
+optsidian para-zk:wiki-ingest-candidates mode=per-import source_paths='["PARA/Resources/Source Paper.md","ZK/Permanent/Stable Interfaces.md"]' format=json
+optsidian para-zk:wiki-ingest-candidates mode=re-ingest source_path="PARA/Resources/Source Paper.md" format=json
+```
+
+JSON output fields:
+
+- `ok`: true on success.
+- `command`: `para-zk:wiki-ingest-candidates`.
+- `count`, `offset`, `limit`, `returned`, `has_more`: pagination envelope over
+  the candidate list.
+- `ledger_warnings`: parse or validation warnings from `LLM-Wiki/log.md`.
+- `candidates`: array of
+  `{ path, type, title, updated, updated_ms, last_source_updated_ms, last_completed_at, reason }`.
+
+Reason codes:
+
+- `missing_wiki_citation`: in `init` or `delta`, an ingestable source has no
+  incoming citation from an `llm-wiki` note.
+- `missing_ingest_record`: in `delta`, the source is cited by the wiki but has
+  no ledger row.
+- `stale_since_ingest`: in `delta`, the source is cited and its current
+  `updated` value is newer than its own latest ledger row's `source_updated_ms`.
+  This is per-source; there is no global watermark.
+- `per_import`: targeted `per-import` source requested by `source_path` or
+  `source_paths`.
+- `reingest_requested`: targeted `re-ingest` source requested by `source_path`
+  or `source_paths`.
 
 ### `para-zk:setup`
 
@@ -915,8 +968,20 @@ Result fields:
 - `matches`: present for `replace`.
 - `index`, `link`, and `added`: present for reference insert results; `index`
   and `link` are also present for reference field updates and deletes.
+- `ingest_logged`: present on `para-zk:update-llm-wiki key=references op=insert`;
+  `true` means the inserted reference resolved to an ingestable canonical source
+  and one ingest ledger row was appended.
 - `moved`, `fromPath`, and `toPath`: present when a project status update moved
   the project between active and archived folders.
+
+For `para-zk:update-llm-wiki key=references op=insert`, a successful insert whose
+reference resolves to an active, non-template `resource`, `digest`, `permanent`,
+or `subnote` appends one plugin-owned ingest row to `LLM-Wiki/log.md` and returns
+`ingest_logged: true`. URL, text, missing, archived, template, or otherwise
+non-ingestable references return `ingest_logged: false` or omit it. The ledger is
+a visible file, but setup excludes it from the Obsidian graph (`userIgnoreFilters`)
+and PARA-ZK excludes it from backlink, link, and audit queries. Do not edit it
+directly; the citation insert is the ingest event.
 
 The same update algorithm is used by the other domain update commands:
 

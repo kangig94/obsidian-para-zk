@@ -23,7 +23,8 @@ import {
   surfaceTypes,
   surfaceWriteKeys,
   type CollectionReadOptions,
-  type SurfaceDescription
+  type SurfaceDescription,
+  type WikiIngestCandidatesOptions
 } from "../workflows";
 
 type CliCapablePlugin = Plugin & {
@@ -166,7 +167,8 @@ type WorkflowFunctionName =
   | "updateProject"
   | "updateResource"
   | "updateRetro"
-  | "updateZk";
+  | "updateZk"
+  | "wikiIngestCandidates";
 
 type WorkflowRunFunction = (
   ctx: ReturnType<typeof workflowContext>,
@@ -837,7 +839,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     command: "para-zk:audit",
     description: "Audit the vault for deterministic PARA-ZK content-health findings",
     options: {
-      check: { value: "<broken_link|dangling_reference|idless_reference|orphan_note|unprocessed_spark|stale_draft_permanent>", description: "Optional check code filter." },
+      check: { value: "<broken_link|dangling_reference|idless_reference|orphan_note|upward_wiki_link|unprocessed_spark|stale_draft_permanent>", description: "Optional check code filter." },
       severity: { value: "<high|medium|low>", description: "Optional severity filter." },
       type: { value: "<note-type>", description: "Optional stored frontmatter type filter, e.g. resource or permanent." },
       offset: { value: "<number>", description: "Zero-based finding offset (default: 0)." },
@@ -851,6 +853,27 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       const result = await workflows.auditVault(workflowContext(plugin), readCliAuditOptions(args));
       return {
         command: "para-zk:audit",
+        ...result
+      };
+    }
+  },
+  {
+    command: "para-zk:wiki-ingest-candidates",
+    description: "List canonical source notes that should be folded into the LLM-Wiki",
+    options: {
+      mode: { value: "<per-import|delta|init|re-ingest>", description: "Candidate discovery mode." },
+      source_path: { value: "<vault-path>", description: "Single source note path. Required for per-import and re-ingest; rejected for delta and init." },
+      source_paths: { value: "<json|comma-list>", description: "Multiple source note paths. Required for per-import and re-ingest when source_path is omitted; rejected for delta and init." },
+      offset: { value: "<number>", description: "Zero-based candidate offset (default: 0)." },
+      limit: { value: "<number|all>", description: "Maximum candidates to return (default: 50)." },
+      format: FORMAT_OPTION
+    },
+    text: "wiki ingest candidates listed",
+    run: async (plugin, args) => {
+      const workflows = await loadWorkflows() as Record<WorkflowFunctionName, WorkflowRunFunction>;
+      const result = await workflows.wikiIngestCandidates(workflowContext(plugin), readCliWikiIngestCandidatesOptions(args));
+      return {
+        command: "para-zk:wiki-ingest-candidates",
         ...result
       };
     }
@@ -1343,6 +1366,7 @@ const UNIVERSAL_OPTIONS = new Set(["open", "format"]);
 const NAMED_WORKFLOW_COMMANDS = [
   "para-zk:list",
   "para-zk:audit",
+  "para-zk:wiki-ingest-candidates",
   "para-zk:create-child",
   "para-zk:read-child",
   "para-zk:update-child",
@@ -1866,6 +1890,29 @@ function readCliAuditSeverity(args: CliArgs): AuditOptions["severity"] {
   if (severity === undefined) return undefined;
   if (severity === "high" || severity === "medium" || severity === "low") return severity;
   throw new Error("severity must be one of high, medium, low");
+}
+
+function readCliWikiIngestCandidatesOptions(args: CliArgs): WikiIngestCandidatesOptions {
+  rejectCliAliases(args, {
+    sourcePath: "source_path",
+    sourcePaths: "source_paths",
+    source: "source_path",
+    sources: "source_paths",
+    path: "source_path",
+    paths: "source_paths",
+    start: "offset",
+    max: "limit"
+  });
+  const sourcePath = readCliString(args, "source_path");
+  const sourcePaths = parseList(readCliString(args, "source_paths"));
+  const options: WikiIngestCandidatesOptions = {
+    mode: readCliString(args, "mode") as WikiIngestCandidatesOptions["mode"],
+    offset: readCliInteger(args, "offset"),
+    limit: readCliCollectionLimit(args)
+  };
+  if (sourcePath !== undefined) options.source_path = sourcePath;
+  if (sourcePaths.length > 0) options.source_paths = sourcePaths;
+  return options;
 }
 
 function readCliCollectionOptions(args: CliArgs): CollectionReadOptions | undefined {

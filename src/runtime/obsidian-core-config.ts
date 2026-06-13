@@ -3,6 +3,7 @@ import { isRecord } from "../records";
 import { appendUniqueStrings } from "../text";
 import type { SetupResult, ParaZkSettings } from "../types";
 import { normalizeVaultPath } from "../vault/paths";
+import { wikiLedgerPath } from "../workflows/locations";
 
 const APP_CONFIG_PATH = ".obsidian/app.json";
 const TEMPLATES_CONFIG_PATH = ".obsidian/templates.json";
@@ -92,6 +93,7 @@ function mergeAppConfig(current: Record<string, unknown>, settings: ParaZkSettin
       ignoreFilterFolder(settings.paths.managedTemplatesFolder),
       ignoreFilterFolder(settings.paths.dashboardFolder),
       ignoreFilterFolder(settings.paths.tasksFolder),
+      wikiLedgerPath(settings),
       "README"
     ].map(cleanIgnoreFilter)),
     propertiesInDocument: "hidden"

@@ -92,6 +92,14 @@ export function folderForZkKind(settings: ParaZkSettings, kind: ZkKind): string 
   return settings.paths.sparkFolder;
 }
 
+export function wikiLedgerPath(settings: ParaZkSettings): string {
+  return joinVaultPath(settings.paths.wikiFolder, "log.md");
+}
+
+export function isWikiLedgerPath(settings: ParaZkSettings, path: string): boolean {
+  return normalizeVaultPath(path) === wikiLedgerPath(settings);
+}
+
 export function isUnderAnyFolder(path: string, folders: string[]): boolean {
   const normalized = normalizeVaultPath(path);
   return folders

@@ -7,6 +7,11 @@ export type {
   ReferenceRead,
   SurfaceDescription,
   TaskRead,
+  WikiIngestCandidate,
+  WikiIngestCandidatesOptions,
+  WikiIngestCandidatesResult,
+  WikiIngestLedgerRow,
+  WikiIngestMode,
   WorkflowContext,
 } from "./context";
 
@@ -41,6 +46,8 @@ export { renameArea, renameLlmWiki, renameProject, renameResource, renameZk } fr
 export { deleteArea, deleteJournal, deleteLlmWiki, deleteProject, deleteResource, deleteRetro, deleteZk } from "./delete";
 export { listNotes } from "./list";
 export { auditVault } from "./audit";
+export { INGESTABLE_TYPES, ingestableCanonicalSource, wikiIngestCandidates } from "./wiki-ingest-candidates";
+export { appendWikiIngestLedgerRow, readWikiLedgerRows } from "./wiki-ledger";
 export { captureJournal, openJournal, distillSpark, createFromDigest, createFromResource } from "./promote";
 export {
   addReference,

@@ -65,6 +65,15 @@ Notable changes for PARA-ZK are tracked here.
   `llm-wiki/<slug>` identity tags that rewrite on rename, list/describe/audit
   participation, MCP `type=llm-wiki` mutation mapping, and setup/smoke coverage
   for the no-props/no-managed wiki template shape.
+- Added the LLM-Wiki ingest loop: `para-zk:wiki-ingest-candidates` lists active,
+  non-template ingestable sources (`resource`, `digest`, `permanent`, `subnote`)
+  for `per-import`, `delta`, `init`, and `re-ingest`; `para-zk:audit` now includes
+  the `upward_wiki_link` check for reverse links from canonical notes into the
+  wiki; `update-llm-wiki key=references op=insert` appends a plugin-owned ingest
+  row to `LLM-Wiki/log.md` for qualifying canonical citations and reports it as
+  `ingest_logged`; and the bundled `wiki-ingest` skill plus `wiki-weaver` agent
+  orchestrate one bounded, serial direct-writer weave per ingest call over the
+  full returned source set.
 - Added a dedicated `para-zk:attach-file` CLI contract section covering local
   source options, single-file and multi-source result fields, unique-name
   collision behavior, directory recursion rules, desktop-local source paths,

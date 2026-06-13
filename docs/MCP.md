@@ -72,11 +72,32 @@ Build the bundle with `npm run build` before registering it.
 
 ### `describe`
 
-Returns a compact index with the preferred CLI invocation, help command, usage notes, and an `install` string describing how to install PARA-ZK into a vault. The envelope also carries `vault` in both running states — orienting context for a cold caller: the store is one user's private, local, single-user Obsidian "second brain", never published or shared, so saving source material into it is personal-use storage, not redistribution (a caller should not refuse content on public-distribution grounds). When a running PARA-ZK vault is reachable (`running: true`), it also returns a `scope` note (what PARA-ZK owns — typed PARA/ZK operations — versus raw file edits, free-form frontmatter, and full-text search, which route to the host), the supported surface types, the named `workflows` (non-surface commands such as `create-child`, `read-child`, `update-child`, `rename-child`, `delete-child`, `capture-journal`, `distill-spark`, `create-from-*`, `attach-file`, each with their inputs), and the `schema` drill-down command. Use `schema` (`para-zk:describe type=<t>`) to fetch a type's address selectors, `create` command + `createInputs`, and read/write keys (`writeKeys` carry each mutable key with its op; keys absent there, e.g. `created`/`updated`, are vault-managed) — enough to drive the vault by name without any separate help lookup.
+Returns a compact index with the preferred CLI invocation, help command, usage notes, and an `install` string describing how to install PARA-ZK into a vault. The envelope also carries `vault` in both running states — orienting context for a cold caller: the store is one user's private, local, single-user Obsidian "second brain", never published or shared, so saving source material into it is personal-use storage, not redistribution (a caller should not refuse content on public-distribution grounds). When a running PARA-ZK vault is reachable (`running: true`), it also returns a `scope` note (what PARA-ZK owns — typed PARA/ZK operations — versus raw file edits, free-form frontmatter, and full-text search, which route to the host), the supported surface types, the named `workflows` (non-surface commands such as `list`, `audit`, `wiki-ingest-candidates`, `create-child`, `read-child`, `update-child`, `rename-child`, `delete-child`, `capture-journal`, `distill-spark`, `create-from-*`, `attach-file`, each with their inputs), and the `schema` drill-down command. Use `schema` (`para-zk:describe type=<t>`) to fetch a type's address selectors, `create` command + `createInputs`, and read/write keys (`writeKeys` carry each mutable key with its op; keys absent there, e.g. `created`/`updated`, are vault-managed) — enough to drive the vault by name without any separate help lookup.
 
 When no running vault is reachable (`running: false`), it returns a `reason` and a `howto` for recovery — with `optsidian`, the `howto` points at `optsidian open-gui` to launch the last-opened vault, then retry.
 
 The `install` field is present in both states (the active vault running PARA-ZK does not mean a target vault has it) and gives the full two-step setup: (1) install the prebuilt plugin — with `optsidian`, `optsidian plugin:install url=<repo> enable` (add `vault-path=` for a non-active vault); without it, copy the committed `manifest.json`/`main.js`/`styles.css` into `<vault>/.obsidian/plugins/para-zk/` and enable it. (2) initialize the vault — `para-zk:setup installDeps=true` (creates the PARA/ZK layout and installs required community plugins).
+
+`para-zk:wiki-ingest-candidates` is surfaced through the `describe.workflows`
+array, not as a separate MCP tool, consistent with `list` and `audit`. Invoke it
+through the CLI when an agent needs the body-read-free source set for LLM-Wiki
+ingest: `mode=<per-import|delta|init|re-ingest>`, `source_path=<vault-path>` or
+`source_paths=<json|comma-list>` for targeted modes only, plus `offset`,
+`limit`, and `format`. Its envelope includes `{ ok, command, count, offset,
+limit, returned, has_more, ledger_warnings, candidates }`, where each candidate
+has `{ path, type, title, updated, updated_ms, last_source_updated_ms,
+last_completed_at, reason }`.
+
+Two related additions surface the same way:
+
+- **Audit check** — the `audit` workflow includes `upward_wiki_link` (`medium`),
+  which flags a non-`llm-wiki` note linking into an `llm-wiki` note.
+- **Ingest ledger (CLI-owned)** — `para-zk:update-llm-wiki key=references op=insert`
+  appends one plugin-owned ingest row to `LLM-Wiki/log.md` when the inserted
+  reference resolves to an active, non-template `resource`, `digest`, `permanent`,
+  or `subnote`, and reports the side effect as `ingest_logged: true` in the update
+  result. The ledger is visible but excluded from the Obsidian graph and PARA-ZK
+  backlink/link/audit queries, and should not be edited directly.
 
 ### `replace`
 

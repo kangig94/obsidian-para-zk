@@ -209,6 +209,53 @@ export type ListOptions = {
   limit?: number | "all";
 };
 
+export type WikiIngestMode = "per-import" | "delta" | "init" | "re-ingest";
+
+export type WikiIngestCandidateReason =
+  | "missing_wiki_citation"
+  | "missing_ingest_record"
+  | "stale_since_ingest"
+  | "per_import"
+  | "reingest_requested";
+
+export type WikiIngestCandidatesOptions = {
+  mode: WikiIngestMode;
+  source_path?: string;
+  source_paths?: string[];
+  offset?: number;
+  limit?: number | "all";
+};
+
+export type WikiIngestLedgerRow = {
+  event: "cited";
+  wiki_page: string;
+  source_path: string;
+  source_updated: unknown;
+  source_updated_ms: number | null;
+  at: string;
+};
+
+export type WikiIngestCandidate = {
+  path: string;
+  type: string;
+  title: string;
+  updated: unknown;
+  updated_ms: number | null;
+  last_source_updated_ms: number | null;
+  last_completed_at: string | null;
+  reason: WikiIngestCandidateReason;
+};
+
+export type WikiIngestCandidatesResult = {
+  count: number;
+  offset: number;
+  limit: number | "all";
+  returned: number;
+  has_more: boolean;
+  ledger_warnings: string[];
+  candidates: WikiIngestCandidate[];
+};
+
 export type AuditSeverity = "high" | "medium" | "low";
 
 export type AuditCheckCode =
@@ -216,6 +263,7 @@ export type AuditCheckCode =
   | "dangling_reference"
   | "idless_reference"
   | "orphan_note"
+  | "upward_wiki_link"
   | "unprocessed_spark"
   | "stale_draft_permanent";
 
@@ -290,6 +338,7 @@ export type UpdateSurfaceResult = {
   link?: string;
   added?: boolean;
   id?: string;
+  ingest_logged?: boolean;
   moved?: boolean;
   fromPath?: string;
   toPath?: string;

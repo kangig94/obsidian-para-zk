@@ -348,6 +348,74 @@ describe("audit", () => {
     expect(result.findings.some((finding) => finding.path === "LLM-Wiki/Normal Wiki.md")).toBe(false);
   });
 
+  it("flags a canonical note that links upward into an llm-wiki note", async () => {
+    await createNote("LLM-Wiki/Wiki Page.md", ["type: llm-wiki"], "Wiki body.");
+    await createNote(
+      "PARA/Resources/Upward Source.md",
+      ["type: resource", `created: ${dateDaysAgo(1)}`, "updated:"],
+      "Wrong direction: [[LLM-Wiki/Wiki Page.md]]."
+    );
+
+    const result = asAudit(await cli.run("para-zk:audit", { check: "upward_wiki_link", limit: "all" }));
+
+    expect(result).toMatchObject({
+      ok: true,
+      count: 1,
+      returned: 1
+    });
+    expect(result.findings[0]).toMatchObject({
+      code: "upward_wiki_link",
+      severity: "medium",
+      path: "PARA/Resources/Upward Source.md",
+      detail: { target: "LLM-Wiki/Wiki Page.md" }
+    });
+  });
+
+  it("does not flag a wiki page that cites a canonical note", async () => {
+    await createNote("PARA/Resources/Canonical Source.md", ["type: resource", `created: ${dateDaysAgo(1)}`, "updated:"]);
+    await createNote(
+      "LLM-Wiki/Wiki Page.md",
+      ["type: llm-wiki"],
+      "Correct direction: [[PARA/Resources/Canonical Source.md]]."
+    );
+
+    const result = asAudit(await cli.run("para-zk:audit", { check: "upward_wiki_link", limit: "all" }));
+
+    expect(result).toMatchObject({
+      ok: true,
+      count: 0,
+      returned: 0,
+      findings: []
+    });
+  });
+
+  it("keeps the wiki ingest ledger invisible to backlinks, orphan evidence, and candidates", async () => {
+    await createNote("PARA/Resources/Ledger Source.md", ["type: resource", `created: ${dateDaysAgo(1)}`, "updated:"]);
+    await cli.app.vault.create("LLM-Wiki/log.md", "[[PARA/Resources/Ledger Source.md]]\n");
+
+    const backlinks = await cli.run("para-zk:read-resource", {
+      title: "Ledger Source",
+      key: "backlinks",
+      limit: "all"
+    });
+    expect((backlinks.value as { count: number }).count).toBe(0);
+
+    const orphan = asAudit(await cli.run("para-zk:audit", { check: "orphan_note", limit: "all" }));
+    expect(orphan.findings).toEqual([
+      expect.objectContaining({
+        code: "orphan_note",
+        path: "PARA/Resources/Ledger Source.md"
+      })
+    ]);
+
+    const candidates = await cli.run("para-zk:wiki-ingest-candidates", { mode: "init", limit: "all" });
+    expect(candidates).toMatchObject({ ok: true, count: 1, returned: 1 });
+    expect((candidates.candidates as Array<Record<string, unknown>>)[0]).toMatchObject({
+      path: "PARA/Resources/Ledger Source.md",
+      reason: "missing_wiki_citation"
+    });
+  });
+
   it("rejects aliases and dryRun at the CLI boundary", async () => {
     const alias = await cli.run("para-zk:audit", { checkCode: "broken_link" });
     expect(alias.ok).toBe(false);

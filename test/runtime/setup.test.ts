@@ -79,6 +79,23 @@ async function prepareKnownUserModifiedFile(): Promise<{
 }
 
 describe("setup managed-file state machine", () => {
+  it("adds the wiki ingest ledger to Obsidian graph exclusions idempotently without creating the ledger", async () => {
+    const settings = baseSettings();
+    const app = createSetupApp();
+
+    const initial = await runSetup(app, settings);
+    const appConfig = JSON.parse(app.readPath(".obsidian/app.json") ?? "{}") as { userIgnoreFilters?: string[] };
+    expect(appConfig.userIgnoreFilters).toContain("LLM-Wiki/log.md");
+    expect(app.readPath("LLM-Wiki/log.md")).toBeUndefined();
+
+    const rerun = await runSetup(app, initial.settings);
+    expect(rerun.result.existing).toContain(".obsidian/app.json");
+    expect(rerun.result.updated).not.toContain(".obsidian/app.json");
+    const rerunConfig = JSON.parse(app.readPath(".obsidian/app.json") ?? "{}") as { userIgnoreFilters?: string[] };
+    expect(rerunConfig.userIgnoreFilters?.filter((item) => item === "LLM-Wiki/log.md")).toHaveLength(1);
+    expect(app.readPath("LLM-Wiki/log.md")).toBeUndefined();
+  });
+
   it("creates the LLM-Wiki folder for old saved layout folder arrays", async () => {
     const settings = baseSettings();
     settings.layoutFolders = settings.layoutFolders.filter((folder) => folder !== "LLM-Wiki");

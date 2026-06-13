@@ -15,6 +15,34 @@ export function localDateTimeSpace(date = new Date()): string {
   return `${localDate(date)} ${localTime(date)}`;
 }
 
+export function frontmatterTimeMs(value: unknown): number | undefined {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.getTime();
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? undefined : date.getTime();
+  }
+  if (typeof value === "object" && value !== null && "toMillis" in value && typeof value.toMillis === "function") {
+    const millis = value.toMillis();
+    return typeof millis === "number" && Number.isFinite(millis) ? millis : undefined;
+  }
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const dateParts = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  if (dateParts) {
+    return new Date(
+      Number(dateParts[1]),
+      Number(dateParts[2]) - 1,
+      Number(dateParts[3]),
+      Number(dateParts[4] ?? 0),
+      Number(dateParts[5] ?? 0),
+      Number(dateParts[6] ?? 0)
+    ).getTime();
+  }
+  const parsed = new Date(trimmed);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.getTime();
+}
+
 export function dateFromCli(value: string | undefined): Date {
   if (!value) return new Date();
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);

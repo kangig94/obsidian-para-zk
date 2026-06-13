@@ -180,6 +180,19 @@ confirm links via the origin note's `key=references` and the resource's `key=bac
 repeat if anything is still broken. For notes with math, confirm Obsidian delimiters are used:
 `$…$` for inline math and `$$…$$` for blocks; no `\(...\)` or `\[...\]` should remain.
 
+## 8. Launch wiki ingest
+
+After every resource in this import has been created, linked, and verified, call the `wiki-ingest`
+front door exactly once for the whole created set, background / session-scoped:
+
+```text
+wiki-ingest mode=per-import source_paths='["<created resource path>","<created resource path>"]'
+```
+
+Use the returned `path` from every `create-resource` result in this import. Do not spawn
+`wiki-weaver` directly, and do not call `wiki-ingest` once per file; one front door call starts
+one weaver that serially weaves the full imported set.
+
 ## Examples
 
 - `find the paper "Attention Is All You Need", add it as a resource, and add a ref from the AI area`
@@ -197,3 +210,5 @@ repeat if anything is still broken. For notes with math, confirm Obsidian delimi
 - `body=@<file>` is read by the plugin, so it works through optsidian and the native `obsidian`
   CLI alike; pass an **absolute** path.
 - Keep `title` stable — links and backlinks address notes by name.
+- The final wiki-ingest handoff is one background / session-scoped `per-import` call with all
+  created resource paths in `source_paths`.

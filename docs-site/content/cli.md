@@ -65,6 +65,25 @@ optsidian para-zk:list type=resource query=attention format=json
 
 It returns `{ title, type, path }` items and supports `archived`, `query`, and `offset`/`limit` paging. Full-text content search is left to the host CLI's own grep/search.
 
+## LLM-Wiki Ingest
+
+Use `para-zk:wiki-ingest-candidates` to list active, non-template canonical sources (`resource`, `digest`, `permanent`, `subnote`) that should be folded into `LLM-Wiki/` without reading source or wiki bodies:
+
+```bash
+optsidian para-zk:wiki-ingest-candidates mode=init limit=all format=json
+optsidian para-zk:wiki-ingest-candidates mode=delta limit=50 format=json
+optsidian para-zk:wiki-ingest-candidates mode=per-import source_paths='["PARA/Resources/Source Paper.md"]' format=json
+optsidian para-zk:wiki-ingest-candidates mode=re-ingest source_path="PARA/Resources/Source Paper.md" format=json
+```
+
+`mode` is one of `per-import`, `delta`, `init`, or `re-ingest`. `source_path` or `source_paths=<json|comma-list>` is required for `per-import` and `re-ingest`, and rejected for `delta` and `init`. The command also accepts `offset=<n>`, `limit=<n|all>` (default `50`), and `format`. Results include `{ ok, command, count, offset, limit, returned, has_more, ledger_warnings, candidates }`; each candidate has `{ path, type, title, updated, updated_ms, last_source_updated_ms, last_completed_at, reason }`.
+
+Reason codes are `missing_wiki_citation`, `missing_ingest_record`, `stale_since_ingest`, `per_import`, and `reingest_requested`. `stale_since_ingest` compares each source against its own latest ledger row; there is no global watermark.
+
+The audit check `upward_wiki_link` (`medium`) flags a non-`llm-wiki` note that links into an `llm-wiki` note. Wiki pages cite canonical notes; canonical notes should not link back into the wiki.
+
+`para-zk:update-llm-wiki key=references op=insert` auto-records an ingest row when the inserted reference resolves to an ingestable canonical source. The update result reports this with `ingest_logged: true`; non-ingestable inserts return `false` or omit it. The plugin-owned ledger is `LLM-Wiki/log.md`, visible but excluded from the Obsidian graph and PARA-ZK backlink/link/audit queries; do not edit it directly.
+
 ## Canonical Arguments
 
 PARA-ZK commands use one canonical argument name per concept.

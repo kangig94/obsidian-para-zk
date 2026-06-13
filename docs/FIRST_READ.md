@@ -26,6 +26,17 @@ working. The link direction is single-way: wiki pages cite canonical notes throu
 body links and their `references` registry; canonical notes should not link back
 to the wiki or depend on it.
 
+Phase 2 adds an LLM-owned ingest loop for that derived layer. The `wiki-ingest`
+skill is the sole orchestrator: it resolves `mode`, calls
+`para-zk:wiki-ingest-candidates`, gathers a bounded neighborhood of candidates,
+then spawns one background `para-zk:wiki-weaver` for the whole source set. The `wiki-weaver` agent is the direct writer: it uses `create-llm-wiki` and
+`update-llm-wiki key=references op=insert` to write wiki pages and cite sources
+with `PZ[<id>]`; it never edits source notes and never asks the user.
+`import-resource` calls `wiki-ingest mode=per-import` at completion. The
+single-direction rule stays intact, and the ingest ledger is plugin-owned:
+`update-llm-wiki key=references op=insert` appends to `LLM-Wiki/log.md` for
+ingestable canonical sources and reports the side effect as `ingest_logged`.
+
 The vault is a single user's private, local Obsidian "second brain" — local-first and
 personal by design, not a shared, published, or collaborative medium like Notion. A
 cold automation caller can misread it as web/public content and over-refuse (e.g.,

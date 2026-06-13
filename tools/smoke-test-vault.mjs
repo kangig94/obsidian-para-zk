@@ -179,6 +179,7 @@ function runLiveScenario() {
   assertRenameAreaLinkRewrite();
   assertBacklinkReadKeyScenario();
   assertLlmWikiRoundTrip();
+  assertWikiIngestCandidatesScenario();
 
   const reorderProject = cliJson("para-zk:create-project", [
     `title=Smoke Reorder ${stamp}`,
@@ -634,6 +635,66 @@ function assertLlmWikiRoundTrip() {
   ]);
   assert(read.ok === true, `llm-wiki read failed: ${JSON.stringify(read)}`);
   assert(read.value === body, `llm-wiki read body mismatch: ${JSON.stringify(read)}`);
+}
+
+function assertWikiIngestCandidatesScenario() {
+  const sourceTitle = `Smoke Wiki Ingest Source ${stamp}`;
+  const wikiTitle = `Smoke Wiki Ingest ${stamp}`;
+  const source = cliJson("para-zk:create-resource", [
+    `title=${sourceTitle}`,
+    "link=false",
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(source, "wiki ingest source");
+  assertGeneratedNoteTemplateShape(source.path, "resource");
+
+  const initCandidate = waitForWikiIngestCandidate(source.path, true);
+  assert(
+    initCandidate.reason === "missing_wiki_citation",
+    `uncited source should be an init candidate: ${JSON.stringify(initCandidate)}`
+  );
+
+  const wiki = cliJson("para-zk:create-llm-wiki", [
+    `title=${wikiTitle}`,
+    `body=Wiki ingest smoke for ${stamp}.`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(wiki, "wiki ingest wiki");
+
+  const insert = cliJson("para-zk:update-llm-wiki", [
+    `title=${wikiTitle}`,
+    "key=references",
+    "op=insert",
+    `value_json=${JSON.stringify({ link: `[[${source.path}]]` })}`,
+    "format=json"
+  ]);
+  assert(insert.ok === true, `wiki ingest reference insert failed: ${JSON.stringify(insert)}`);
+  assert(insert.ingest_logged === true, `wiki ingest reference insert did not log ingestion: ${JSON.stringify(insert)}`);
+  assert(waitForBacklink(source.path, wiki.path), "wiki ingest source did not resolve as cited by llm-wiki");
+
+  waitForWikiIngestCandidate(source.path, false);
+}
+
+function waitForWikiIngestCandidate(path, expectedPresent) {
+  const deadline = Date.now() + 3000;
+  let lastPayload = null;
+  let match = undefined;
+  while (Date.now() <= deadline) {
+    lastPayload = cliJson("para-zk:wiki-ingest-candidates", [
+      "mode=init",
+      "limit=all",
+      "format=json"
+    ]);
+    assert(lastPayload.ok === true, `wiki-ingest-candidates failed: ${JSON.stringify(lastPayload)}`);
+    assert(lastPayload.command === "para-zk:wiki-ingest-candidates", `wiki-ingest-candidates command field mismatch: ${JSON.stringify(lastPayload)}`);
+    assert(Array.isArray(lastPayload.candidates), `wiki-ingest-candidates returned no candidates array: ${JSON.stringify(lastPayload)}`);
+    match = lastPayload.candidates.find((candidate) => candidate.path === path);
+    if (expectedPresent ? Boolean(match) : !match) return match;
+    sleepMs(100);
+  }
+  throw new Error(`wiki-ingest-candidates did not ${expectedPresent ? "include" : "exclude"} ${path}: ${JSON.stringify(lastPayload)}`);
 }
 
 

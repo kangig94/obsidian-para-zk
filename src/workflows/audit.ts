@@ -1,4 +1,5 @@
 import type { TFile } from "obsidian";
+import { frontmatterTimeMs } from "../time";
 import { fileFrontmatter, readType, type Frontmatter } from "../vault/frontmatter";
 import type {
   AuditCheckCode,
@@ -10,7 +11,7 @@ import type {
   ReferenceRead,
   WorkflowContext
 } from "./context";
-import { isArchivedFile, isUnderAnyFolder, templateFolderPaths } from "./locations";
+import { isArchivedFile, isUnderAnyFolder, isWikiLedgerPath, templateFolderPaths } from "./locations";
 import { backfillReferenceIds, readReferenceItemsFresh } from "./references";
 
 type AuditableNote = {
@@ -33,6 +34,7 @@ const AUDIT_CHECKS: AuditCheckCode[] = [
   "dangling_reference",
   "idless_reference",
   "orphan_note",
+  "upward_wiki_link",
   "unprocessed_spark",
   "stale_draft_permanent"
 ];
@@ -42,6 +44,7 @@ const CHECK_SEVERITY: Record<AuditCheckCode, AuditSeverity> = {
   dangling_reference: "high",
   idless_reference: "medium",
   orphan_note: "medium",
+  upward_wiki_link: "medium",
   unprocessed_spark: "low",
   stale_draft_permanent: "low"
 };
@@ -127,6 +130,7 @@ function auditableNotes(ctx: WorkflowContext): AuditableNote[] {
   for (const file of ctx.host.getMarkdownFiles()) {
     if (isUnderAnyFolder(file.path, templateFolders)) continue;
     if (isArchivedFile(ctx, file)) continue;
+    if (isWikiLedgerPath(ctx.settings, file.path)) continue;
     const frontmatter = fileFrontmatter(ctx, file);
     notes.push({
       file,
@@ -148,6 +152,7 @@ async function collectAuditFindings(
     findings.push(...await referenceFindings(ctx, notes, enabledChecks));
   }
   if (enabledChecks.has("orphan_note")) findings.push(...orphanNoteFindings(ctx, notes));
+  if (enabledChecks.has("upward_wiki_link")) findings.push(...upwardWikiLinkFindings(ctx, notes));
   if (enabledChecks.has("unprocessed_spark")) findings.push(...unprocessedSparkFindings(notes));
   if (enabledChecks.has("stale_draft_permanent")) findings.push(...staleDraftPermanentFindings(notes));
   return findings;
@@ -235,8 +240,8 @@ function orphanNoteFindings(ctx: WorkflowContext, notes: AuditableNote[]): Audit
   const findings: AuditFinding[] = [];
   for (const note of notes) {
     if (!isOrphanCandidate(ctx, note)) continue;
-    const incoming = incomingResolvedLinks(resolvedLinks, note.file.path);
-    const outgoing = outgoingResolvedLinks(resolvedLinks, note.file.path);
+    const incoming = incomingResolvedLinks(ctx, resolvedLinks, note.file.path);
+    const outgoing = outgoingResolvedLinks(ctx, resolvedLinks, note.file.path);
     if (incoming > 0 || outgoing > 0) continue;
     findings.push({
       code: "orphan_note",
@@ -259,16 +264,43 @@ function isOrphanCandidate(ctx: WorkflowContext, note: AuditableNote): boolean {
   return true;
 }
 
+function upwardWikiLinkFindings(ctx: WorkflowContext, notes: AuditableNote[]): AuditFinding[] {
+  const resolvedLinks = ctx.host.resolvedLinks();
+  const findings: AuditFinding[] = [];
+  for (const note of notes) {
+    if (note.type === "llm-wiki") continue;
+    if (isWikiLedgerPath(ctx.settings, note.file.path)) continue;
+    const targets = resolvedLinks[note.file.path] ?? {};
+    for (const [targetPath, value] of Object.entries(targets).sort(([left], [right]) => left.localeCompare(right))) {
+      if (positiveCount(value) === 0) continue;
+      const targetFile = ctx.host.getFile(targetPath);
+      if (!targetFile) continue;
+      if (readType(fileFrontmatter(ctx, targetFile)) !== "llm-wiki") continue;
+      findings.push({
+        code: "upward_wiki_link",
+        severity: CHECK_SEVERITY.upward_wiki_link,
+        path: note.file.path,
+        type: note.type,
+        detail: { target: targetPath },
+        fix: "Remove the link; the wiki cites the note, not vice-versa."
+      });
+    }
+  }
+  return findings;
+}
+
 function isFolderMainNote(file: TFile): boolean {
   return file.parent?.name === file.basename;
 }
 
 function incomingResolvedLinks(
+  ctx: WorkflowContext,
   links: Record<string, Record<string, number>>,
   targetPath: string
 ): number {
   let count = 0;
   for (const [sourcePath, targets] of Object.entries(links)) {
+    if (isWikiLedgerPath(ctx.settings, sourcePath)) continue;
     if (sourcePath === targetPath) continue;
     count += positiveCount(targets[targetPath]);
   }
@@ -276,9 +308,11 @@ function incomingResolvedLinks(
 }
 
 function outgoingResolvedLinks(
+  ctx: WorkflowContext,
   links: Record<string, Record<string, number>>,
   sourcePath: string
 ): number {
+  if (isWikiLedgerPath(ctx.settings, sourcePath)) return 0;
   const targets = links[sourcePath] ?? {};
   let count = 0;
   for (const [targetPath, value] of Object.entries(targets)) {
@@ -297,7 +331,7 @@ function unprocessedSparkFindings(notes: AuditableNote[]): AuditFinding[] {
   return notes
     .filter((note) => note.type === "spark" && note.frontmatter.processed !== true)
     .filter((note) => {
-      const created = frontmatterTime(note.frontmatter.created);
+      const created = frontmatterTimeMs(note.frontmatter.created);
       return created !== undefined && created <= cutoff;
     })
     .map((note) => ({
@@ -315,7 +349,7 @@ function staleDraftPermanentFindings(notes: AuditableNote[]): AuditFinding[] {
   return notes
     .filter((note) => note.type === "permanent" && note.frontmatter.maturity === "draft")
     .filter((note) => {
-      const updated = frontmatterTime(note.frontmatter.updated);
+      const updated = frontmatterTimeMs(note.frontmatter.updated);
       return updated !== undefined && updated <= cutoff;
     })
     .map((note) => ({
@@ -326,34 +360,6 @@ function staleDraftPermanentFindings(notes: AuditableNote[]): AuditFinding[] {
       detail: { updated: note.frontmatter.updated, threshold_days: DRAFT_STALE_DAYS },
       fix: "Refine the permanent note or promote its maturity."
     }));
-}
-
-function frontmatterTime(value: unknown): number | undefined {
-  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.getTime();
-  if (typeof value === "number" && Number.isFinite(value)) {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? undefined : date.getTime();
-  }
-  if (typeof value === "object" && value !== null && "toMillis" in value && typeof value.toMillis === "function") {
-    const millis = value.toMillis();
-    return typeof millis === "number" && Number.isFinite(millis) ? millis : undefined;
-  }
-  if (typeof value !== "string") return undefined;
-  const trimmed = value.trim();
-  if (!trimmed) return undefined;
-  const dateParts = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/);
-  if (dateParts) {
-    return new Date(
-      Number(dateParts[1]),
-      Number(dateParts[2]) - 1,
-      Number(dateParts[3]),
-      Number(dateParts[4] ?? 0),
-      Number(dateParts[5] ?? 0),
-      Number(dateParts[6] ?? 0)
-    ).getTime();
-  }
-  const parsed = new Date(trimmed);
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed.getTime();
 }
 
 function days(value: number): number {

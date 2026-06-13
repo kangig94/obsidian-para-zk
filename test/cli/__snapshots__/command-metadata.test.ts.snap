@@ -38,7 +38,7 @@ exports[`native CLI command metadata is stable 1`] = `
     "options": {
       "check": {
         "description": "Optional check code filter.",
-        "value": "<broken_link|dangling_reference|idless_reference|orphan_note|unprocessed_spark|stale_draft_permanent>",
+        "value": "<broken_link|dangling_reference|idless_reference|orphan_note|upward_wiki_link|unprocessed_spark|stale_draft_permanent>",
       },
       "fix": {
         "description": "When true, backfill id-less reference ids vault-wide; no other finding is auto-fixed.",
@@ -1675,6 +1675,36 @@ exports[`native CLI command metadata is stable 1`] = `
       "with": {
         "description": "Replacement text for op=replace.",
         "value": "<text>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:wiki-ingest-candidates",
+    "description": "List canonical source notes that should be folded into the LLM-Wiki",
+    "options": {
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "limit": {
+        "description": "Maximum candidates to return (default: 50).",
+        "value": "<number|all>",
+      },
+      "mode": {
+        "description": "Candidate discovery mode.",
+        "value": "<per-import|delta|init|re-ingest>",
+      },
+      "offset": {
+        "description": "Zero-based candidate offset (default: 0).",
+        "value": "<number>",
+      },
+      "source_path": {
+        "description": "Single source note path. Required for per-import and re-ingest; rejected for delta and init.",
+        "value": "<vault-path>",
+      },
+      "source_paths": {
+        "description": "Multiple source note paths. Required for per-import and re-ingest when source_path is omitted; rejected for delta and init.",
+        "value": "<json|comma-list>",
       },
     },
   },
