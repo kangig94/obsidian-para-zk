@@ -6,6 +6,13 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Breaking
 
+- Identity-tag slugs are now kebab-case instead of snake_case, matching the common
+  Obsidian tag convention: `project/my_project` → `project/my-project`,
+  `리소스/some_paper` → `리소스/some-paper`, `llm-wiki/policy_wiki` →
+  `llm-wiki/policy-wiki`. `slugify` (used only to build the `<type>/<slug>` tags)
+  collapses spaces and underscores to hyphens; the `/` nested-tag separator is kept.
+  Affects the `tags:` frontmatter of newly created/renamed notes; existing notes keep
+  their old snake_case tags until rewritten (no in-product migration).
 - Dropped the `zk_` namespace prefix from ZK stored types: `zk_spark` → `spark`,
   `zk_digest` → `digest`, `zk_permanent` → `permanent`. A note's ZK-ness is carried
   by its folder (like a `resource` isn't typed `para_resource`), and the stored type

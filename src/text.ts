@@ -1,10 +1,12 @@
+// Tag-slug generator: kebab-case (the common Obsidian tag convention). Used only to
+// build the `<type>/<slug>` identity tags; underscores and spaces collapse to hyphens,
+// `/` is preserved for nested-area tag namespaces.
 export function slugify(value: string): string {
   const slug = value
     .toLowerCase()
-    .replace(/[^a-z0-9가-힣_\/]+/g, "_")
-    .replace(/-/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "");
+    .replace(/[^a-z0-9가-힣\/]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
   return slug || "untitled";
 }
 
