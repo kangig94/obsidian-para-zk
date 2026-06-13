@@ -28,7 +28,7 @@ the GUI by sharing `src/workflows/`, and their documented contracts must match t
 ## STRONG (must document if skipped)
 - New CLI command added to `NATIVE_CLI_COMMANDS` and exercised by a `test/cli/*` test.
 - Structured types (`project`/`area`/`journal`/`retro`) use load-bearing section keys
-  with the split guard; free-form types (`resource`/`doc`/`note`/`zk_*`) expose one
+  with the split guard; free-form types (`resource`/`doc`/`note`/`spark`/`digest`/`permanent`) expose one
   `body` key.
 - MCP `describe` fallback (`running:false` + recovery `howto`) preserved when Obsidian is
   not running.

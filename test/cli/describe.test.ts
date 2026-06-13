@@ -123,7 +123,7 @@ describe("describe", () => {
     });
     expect(resource.readKeys).not.toEqual(expect.arrayContaining(["overview"]));
 
-    const sourceResult = await cli.run("para-zk:describe", { type: "zk_digest" });
+    const sourceResult = await cli.run("para-zk:describe", { type: "digest" });
     const source = (sourceResult.surfaces as Array<Record<string, unknown>>)[0];
     const sourceAddressing = source.addressing as { createInputs: string[] };
     expect(sourceAddressing.createInputs).toEqual(expect.arrayContaining(["title", "alias", "kind"]));
@@ -147,12 +147,12 @@ describe("describe", () => {
       "evidence"
     ]));
 
-    const permanentResult = await cli.run("para-zk:describe", { type: "zk_permanent" });
+    const permanentResult = await cli.run("para-zk:describe", { type: "permanent" });
     const permanent = (permanentResult.surfaces as Array<Record<string, unknown>>)[0];
     const permanentAddressing = permanent.addressing as { createInputs: string[] };
     expect(permanentAddressing.createInputs).toEqual(expect.arrayContaining(["title", "alias", "kind"]));
 
-    const sparkResult = await cli.run("para-zk:describe", { type: "zk_spark" });
+    const sparkResult = await cli.run("para-zk:describe", { type: "spark" });
     const spark = (sparkResult.surfaces as Array<Record<string, unknown>>)[0];
     const sparkAddressing = spark.addressing as { createInputs: string[] };
     expect(sparkAddressing.createInputs).toEqual(expect.arrayContaining(["title", "alias", "kind"]));

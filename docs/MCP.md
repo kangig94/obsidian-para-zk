@@ -144,9 +144,9 @@ Required: `type`, `key`, `content`, and a valid selector for the type. `position
 | `resource` | `update-resource` | `title`; `/` addresses a Resources-relative path | |
 | `retro` | `update-retro` | `title` | optional `date` passes through |
 | `journal` | `update-journal` | `date` | no title selector |
-| `zk_spark` | `update-zk` | `title` | `kind=spark` |
-| `zk_digest` | `update-zk` | `title` | `kind=digest` |
-| `zk_permanent` | `update-zk` | `title` | `kind=permanent` |
+| `spark` | `update-zk` | `title` | `kind=spark` |
+| `digest` | `update-zk` | `title` | `kind=digest` |
+| `permanent` | `update-zk` | `title` | `kind=permanent` |
 
 All `*-resource` CLI commands accept a slash path in `title`; mutation tools proxy `update-resource`, which also honors Resources-relative slash paths.
 
@@ -160,8 +160,8 @@ type=area title="AI" child=["Generation","Vision"]
 The `key` is the addressed child's own key (for example `body` for subnotes/fallback notes or `overview` for nested areas). Child updates on non-project/area roots are rejected because the public CLI child family requires `root_type=project|area`.
 
 Structured types (`project`, `area`, `journal`, `retro`) use template section
-keys. Free-form types (`resource`, `zk_spark`, `zk_digest`,
-`zk_permanent`, child `subnote`, and fallback `note`) use `key=body` for prose;
+keys. Free-form types (`resource`, `spark`, `digest`,
+`permanent`, child `subnote`, and fallback `note`) use `key=body` for prose;
 their Markdown headings are content, not enforced keys. `describe` remains the
 source of truth for each type's read/write keys and collections.
 

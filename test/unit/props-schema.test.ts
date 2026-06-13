@@ -22,7 +22,7 @@ describe("props schema lead fields", () => {
     expect(findPropsField(resource, "aliases")).toBe(resource.lead);
     expect(findPropsField(resource, "url")?.control).toBe("url");
 
-    const permanent = propsSchemaForType("zk_permanent", "en");
+    const permanent = propsSchemaForType("permanent", "en");
     expect(permanent.lead?.id).toBe("aliases");
     expect(permanent.rows.map((row) => row.map((field) => field.id))).toEqual([
       ["created", "updated"],
@@ -32,12 +32,12 @@ describe("props schema lead fields", () => {
   });
 
   it("uses the URL control for digest source links", () => {
-    const digest = propsSchemaForType("zk_digest", "en");
+    const digest = propsSchemaForType("digest", "en");
     expect(findPropsField(digest, "url")?.control).toBe("url");
   });
 
   it("keeps vault-managed timestamps display-only wherever they are shown", () => {
-    for (const type of ["area", "resource", "subnote", "zk_spark", "zk_digest", "zk_permanent"] as const) {
+    for (const type of ["area", "resource", "subnote", "spark", "digest", "permanent"] as const) {
       const schema = propsSchemaForType(type, "en");
       expect(findPropsField(schema, "created")?.control).toBe("display");
       expect(findPropsField(schema, "updated")?.control).toBe("display");

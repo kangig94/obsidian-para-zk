@@ -48,9 +48,9 @@ const UPDATE_TYPE_VALUES = [
   "resource",
   "retro",
   "journal",
-  "zk_spark",
-  "zk_digest",
-  "zk_permanent"
+  "spark",
+  "digest",
+  "permanent"
 ] as const;
 const UPDATE_TOOL_NAMES = ["replace", "set", "add"] as const;
 const UPDATE_TYPES: Record<UpdateType, { command: string; kind?: string }> = {
@@ -59,9 +59,9 @@ const UPDATE_TYPES: Record<UpdateType, { command: string; kind?: string }> = {
   resource: { command: "update-resource" },
   retro: { command: "update-retro" },
   journal: { command: "update-journal" },
-  zk_spark: { command: "update-zk", kind: "spark" },
-  zk_digest: { command: "update-zk", kind: "digest" },
-  zk_permanent: { command: "update-zk", kind: "permanent" }
+  spark: { command: "update-zk", kind: "spark" },
+  digest: { command: "update-zk", kind: "digest" },
+  permanent: { command: "update-zk", kind: "permanent" }
 };
 const BASE_MUTATION_PROPERTIES = {
   type: {

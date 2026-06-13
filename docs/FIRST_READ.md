@@ -67,7 +67,8 @@ Child notes — subnotes, fallback notes, and nested areas — use the dedicated
 `create/read/update/rename/delete-child` CLI family with `root_type`,
 `root_title`, optional `relpath` (ancestor chain to the immediate parent), and
 `title` (the child). Parent CRUD commands do not accept `child=`.
-Free-form types (`resource`, child `subnote`, fallback `note`, and `zk_*`) expose
+Free-form types (`resource`, child `subnote`, fallback `note`, and the ZK kinds
+`spark`/`digest`/`permanent`) expose
 prose as one `body` key for the whole editable Markdown body before the managed
 tail. Literal `set`, `append`, `prepend`, and `replace` edits target that body;
 H1 headings are allowed there, and there are no enforced prose-section keys.

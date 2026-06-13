@@ -10,7 +10,7 @@ import { uniqueStrings } from "../text";
 import { readOptionalCode } from "./code-options";
 import type { ReadAreaOptions, ReadJournalOptions, ReadProjectOptions, ReadResourceOptions, ReadRetroOptions, ReadZkOptions, WorkflowContext } from "./context";
 import { stringReferencesAnyTarget } from "./references";
-import { ZK_KIND_CODE_HELP, parseZkKind } from "../zk/kinds";
+import { ZK_KIND_CODE_HELP, isZkType, parseZkKind, zkKindCode } from "../zk/kinds";
 
 
 export function folderStyleContainer(file: TFile): TFolder | undefined {
@@ -317,8 +317,8 @@ export async function resolveRequiredZk(ctx: WorkflowContext, options: ReadZkOpt
   if (!file) throw new Error(`ZK note not found: ${options.title}`);
 
   const type = await readFileTypeFresh(ctx, file);
-  if (!type.startsWith("zk_")) throw new Error(`file is not a ZK note: ${file.path}`);
-  if (kind && type !== typeForZkKind(kind)) throw new Error(`file is not a ${kind} ZK note: ${file.path}`);
+  if (!isZkType(type)) throw new Error(`file is not a ZK note: ${file.path}`);
+  if (kind && type !== zkKindCode(kind)) throw new Error(`file is not a ${kind} ZK note: ${file.path}`);
   return file;
 }
 
@@ -479,12 +479,12 @@ async function findZkByTitle(
     if (file) return file;
   }
 
-  const expectedType = kind ? typeForZkKind(kind) : undefined;
+  const expectedType = kind ? zkKindCode(kind) : undefined;
   return findUniqueNoteByTitle(ctx, {
     title,
     folders,
     type: expectedType,
-    typePrefix: expectedType ? undefined : "zk_",
+    typeMatch: expectedType ? undefined : isZkType,
     label: "ZK note"
   });
 }
@@ -498,7 +498,7 @@ async function findZkTitleMatches(ctx: WorkflowContext, title: string, folders: 
   for (const file of ctx.host.getMarkdownFiles()) {
     if (file.basename !== title || !folders.some((folder) => isInFolder(file, folder))) continue;
     const type = await readFileTypeFresh(ctx, file);
-    if (type.startsWith("zk_")) matchesByPath.set(file.path, file);
+    if (isZkType(type)) matchesByPath.set(file.path, file);
   }
   return Array.from(matchesByPath.values());
 }
@@ -526,7 +526,7 @@ function findUniqueNoteByTitle(
     title: string;
     folders: string[];
     type?: string;
-    typePrefix?: string;
+    typeMatch?: (type: string) => boolean;
     requireRootArea?: boolean;
     label: string;
   }
@@ -536,7 +536,7 @@ function findUniqueNoteByTitle(
     const type = readType(frontmatter);
     return options.folders.some((folder) => isInFolder(file, folder))
       && (!options.type || type === options.type)
-      && (!options.typePrefix || type.startsWith(options.typePrefix))
+      && (!options.typeMatch || options.typeMatch(type))
       // A nested area has a `parent`; bare-title area lookup must resolve only root areas
       // so name-based addressing stays unambiguous (nested areas are reached via *-child commands).
       && (!options.requireRootArea || frontmatterLinks(frontmatter.parent).length === 0);
@@ -556,10 +556,6 @@ function findUniqueNoteByTitle(
 function journalPath(ctx: WorkflowContext, date: string | undefined): string {
   const dateText = localDate(dateFromCli(date));
   return joinVaultPath(ctx.settings.paths.journalFolder, dateText.slice(0, 7), `${dateText}.md`);
-}
-
-function typeForZkKind(kind: ZkKind): string {
-  return `zk_${kind.toLowerCase()}`;
 }
 
 function zkSearchFolders(ctx: WorkflowContext, kind: ZkKind | undefined): string[] {

@@ -27,7 +27,7 @@ describe("create-from-resource", () => {
     expect(created.created).toBe(true);
     expect(created.kind).toBe("digest");
     const content = cli.app.readPath(String(created.path)) ?? "";
-    expect(content).toContain("type: zk_digest");
+    expect(content).toContain("type: digest");
     expect(content).toContain(`[[${resource.path}]]`);
 
     // Single-direction reference: the resource is preserved but gets no reverse
@@ -53,7 +53,7 @@ describe("create-from-digest", () => {
     expect(created.kind).toBe("permanent");
 
     const createdContent = cli.app.readPath(String(created.path)) ?? "";
-    expect(createdContent).toContain("type: zk_permanent");
+    expect(createdContent).toContain("type: permanent");
     expect(createdContent).toContain("maturity: refined");
     expect(createdContent).toContain(`[[${source.path}]]`);
 
@@ -78,7 +78,7 @@ describe("distill-spark", () => {
     expect(distilled.kind).toBe("permanent");
 
     const distilledContent = cli.app.readPath(String(distilled.path)) ?? "";
-    expect(distilledContent).toContain("type: zk_permanent");
+    expect(distilledContent).toContain("type: permanent");
     expect(distilledContent).toContain("maturity: evergreen");
     // The spark is ephemeral: the permanent does not reference it.
     expect(distilledContent).not.toContain(`[[${spark.path}]]`);
@@ -118,7 +118,7 @@ describe("distill-spark", () => {
       open: "false"
     });
     expect(distilled.created).toBe(true);
-    expect(cli.app.readPath(String(distilled.path)) ?? "").toContain("type: zk_permanent");
+    expect(cli.app.readPath(String(distilled.path)) ?? "").toContain("type: permanent");
 
     // The spark is gone (moved to trash), and the permanent never referenced it.
     expect(cli.app.readPath(String(spark.path)), "spark should be removed when discarded").toBeFalsy();

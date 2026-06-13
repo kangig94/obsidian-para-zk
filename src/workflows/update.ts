@@ -874,10 +874,10 @@ function normalizeFrontmatterUpdateValue(type: string, key: string, value: unkno
   if (type === "resource" && key === "kind") {
     return readOptionalCode(String(value), parseResourceKindCode, "kind", RESOURCE_KIND_CODE_HELP);
   }
-  if (type === "zk_permanent" && key === "maturity") {
+  if (type === "permanent" && key === "maturity") {
     return readOptionalCode(String(value), parseMaturityCode, "maturity", MATURITY_CODE_HELP);
   }
-  if (type === "zk_spark" && key === "processed") {
+  if (type === "spark" && key === "processed") {
     if (typeof value === "boolean") return value;
     const normalized = String(value).trim().toLowerCase();
     if (["true", "1", "yes", "on"].includes(normalized)) return true;

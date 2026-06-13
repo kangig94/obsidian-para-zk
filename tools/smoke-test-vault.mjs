@@ -219,9 +219,9 @@ function assertManagedTemplateFiles() {
     "journal",
     "retro",
     "subnote",
-    "zk_spark",
-    "zk_digest",
-    "zk_permanent"
+    "spark",
+    "digest",
+    "permanent"
   ];
 
   for (const name of templateNames) {
@@ -276,7 +276,7 @@ function assertGeneratedNoteTemplateShape(path, type, options = {}) {
 
     if (type === "resource") {
       assertResourceFreeFormTemplateShape(path, text);
-    } else if (type.startsWith("zk_")) {
+    } else if (["spark", "digest", "permanent"].includes(type)) {
       assertZkStarterTemplateShape(path, type, text);
     }
   });
@@ -299,11 +299,11 @@ function assertZkStarterTemplateShape(path, type, text) {
 
 function oldZkStarterHeadings(type) {
   switch (type) {
-    case "zk_spark":
+    case "spark":
       return ["# One-line thought summary", "# Memo"];
-    case "zk_digest":
+    case "digest":
       return ["## Highlights (quotes/evidence)", "# Summary", "# Key insights", "# Important quotes/evidence"];
-    case "zk_permanent":
+    case "permanent":
       return ["# One-sentence summary", "# Body", "## Limitations", "## Related questions"];
     default:
       return [];

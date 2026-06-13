@@ -11,6 +11,7 @@ describe("zk notes", () => {
   it("creates spark and permanent notes and reads/updates maturity", async () => {
     const spark = await cli.run("para-zk:create-zk", { title: "Spark", kind: "spark", open: "false" });
     expect(spark.created).toBe(true);
+    expect(cli.app.readPath(String(spark.path)) ?? "").toContain("type: spark");
 
     const permanent = await cli.run("para-zk:create-zk", {
       title: "Evergreen",
@@ -19,6 +20,7 @@ describe("zk notes", () => {
       open: "false"
     });
     expect(permanent.created).toBe(true);
+    expect(cli.app.readPath(String(permanent.path)) ?? "").toContain("type: permanent");
 
     const read = await cli.run("para-zk:read-zk", {
       title: "Evergreen",
@@ -37,7 +39,7 @@ describe("zk notes", () => {
     expect(update.changed).toBe(true);
   });
 
-  it("round-trips zk_digest frontmatter keys (first_author, url) through update and read", async () => {
+  it("round-trips digest frontmatter keys (first_author, url) through update and read", async () => {
     const digest = await cli.run("para-zk:create-zk", { title: "DDIM digest", kind: "digest", open: "false" });
     expect(digest.created).toBe(true);
 
@@ -656,14 +658,14 @@ describe("resource body updates", () => {
     ].join("\n");
     await cli.app.vault.modify(file!, [
       "---",
-      "type: zk_digest",
+      "type: digest",
       "sourceTitle:",
       "url:",
       "first_author:",
       "published:",
       "---",
       "```para-zk-props",
-      "type: zk_digest",
+      "type: digest",
       "```",
       body,
       "",

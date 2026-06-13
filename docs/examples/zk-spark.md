@@ -1,5 +1,5 @@
 ---
-type: zk_spark
+type: spark
 processed: false
 ---
 

@@ -44,7 +44,7 @@ type NativeCliCommand = {
   run: (plugin: ParaZkPluginContext, args: CliArgs) => Promise<Record<string, unknown>>;
 };
 
-const ZK_KEY_TYPES = ["zk_spark", "zk_digest", "zk_permanent"];
+const ZK_KEY_TYPES = ["spark", "digest", "permanent"];
 
 function readKeyOption(type: string, childAware = false): CliOptionSpec {
   const childNote = childAware ? " On child commands, the key belongs to the addressed child; see para-zk:describe for that child's type." : "";
@@ -63,7 +63,7 @@ function writeKeyOption(type: string, childAware = false): CliOptionSpec {
 }
 
 function zkKeyOption(keysFor: (type: string) => string[], verb: string): CliOptionSpec {
-  const byKind = ZK_KEY_TYPES.map((type) => `${type.replace("zk_", "")}: ${keysFor(type).join(", ")}`);
+  const byKind = ZK_KEY_TYPES.map((type) => `${type}: ${keysFor(type).join(", ")}`);
   return { value: "<map-path>", description: `Stable ${verb} key; depends on ZK kind. ${byKind.join("; ")}.` };
 }
 
@@ -777,7 +777,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     options: {
       check: { value: "<broken_link|dangling_reference|idless_reference|orphan_note|unprocessed_spark|stale_draft_permanent>", description: "Optional check code filter." },
       severity: { value: "<high|medium|low>", description: "Optional severity filter." },
-      type: { value: "<note-type>", description: "Optional stored frontmatter type filter, e.g. resource or zk_permanent." },
+      type: { value: "<note-type>", description: "Optional stored frontmatter type filter, e.g. resource or permanent." },
       offset: { value: "<number>", description: "Zero-based finding offset (default: 0)." },
       limit: { value: "<number|all>", description: "Maximum findings to return (default: 50)." },
       fix: { value: "<true|false>", description: "When true, backfill id-less reference ids vault-wide; no other finding is auto-fixed." },

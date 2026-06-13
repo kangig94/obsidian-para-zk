@@ -79,8 +79,8 @@ export async function openJournal(ctx: WorkflowContext, options: OpenJournalOpti
 // caller need only supply a title. Maps the stored type to an addressing token.
 function resolveOriginByName(ctx: WorkflowContext, expectedType: string, title: string | undefined): Promise<TFile> {
   if (expectedType === "resource") return resolveRequiredByType(ctx, "resource", { title });
-  if (expectedType === "zk_digest") return resolveRequiredByType(ctx, "zk", { title, kind: "digest" });
-  if (expectedType === "zk_spark") return resolveRequiredByType(ctx, "zk", { title, kind: "spark" });
+  if (expectedType === "digest") return resolveRequiredByType(ctx, "zk", { title, kind: "digest" });
+  if (expectedType === "spark") return resolveRequiredByType(ctx, "zk", { title, kind: "spark" });
   return resolveRequiredByType(ctx, expectedType, { title });
 }
 
@@ -122,7 +122,7 @@ export async function createFromResource(ctx: WorkflowContext, options: CreateFr
 }
 
 export async function createFromDigest(ctx: WorkflowContext, options: CreateFromDigestOptions = {}): Promise<PromotionResult> {
-  const { source, file } = await createZkFromOrigin(ctx, options, { label: "source digest note", expectedType: "zk_digest" }, "Permanent");
+  const { source, file } = await createZkFromOrigin(ctx, options, { label: "source digest note", expectedType: "digest" }, "Permanent");
   await insertReferenceItem(ctx, file, { link: wikiLink(source.path) });
   await applyBody(ctx, file, options.body);
   await openIfRequested(ctx, file, options.open);
@@ -134,7 +134,7 @@ export async function createFromDigest(ctx: WorkflowContext, options: CreateFrom
 // processed (discard is a separate, manual action — a spark may yield several
 // permanents before there is nothing left to extract).
 export async function distillSpark(ctx: WorkflowContext, options: DistillSparkOptions = {}): Promise<PromotionResult> {
-  const { source, file } = await createZkFromOrigin(ctx, options, { label: "source spark note", expectedType: "zk_spark" }, "Permanent");
+  const { source, file } = await createZkFromOrigin(ctx, options, { label: "source spark note", expectedType: "spark" }, "Permanent");
 
   if (options.discard) {
     // The whole point of the spark is fulfilled — drop it (to trash, recoverable).

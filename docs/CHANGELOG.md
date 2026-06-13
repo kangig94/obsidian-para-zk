@@ -6,6 +6,14 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Breaking
 
+- Dropped the `zk_` namespace prefix from ZK stored types: `zk_spark` → `spark`,
+  `zk_digest` → `digest`, `zk_permanent` → `permanent`. A note's ZK-ness is carried
+  by its folder (like a `resource` isn't typed `para_resource`), and the stored type
+  now equals the kind code that `create-zk kind=` / MCP already speak — removing the
+  prior `spark`↔`zk_spark` translation. Affects `type=` filters (`list`/`describe`/
+  `audit`/MCP `set|replace|add`) and the `type:` frontmatter of generated notes. No
+  migration is performed; any note written with a legacy `zk_<kind>` type reads as an
+  unknown type until its `type:` is rewritten.
 - Inline reference citations now use stable reference ids instead of positional
   indices. The citation token is `` `PZ[<id>]` `` or `` `PZ[<id>, <id>]` ``, where
   ids come from `read key=references` or the editor `PZ[` suggester; numeric

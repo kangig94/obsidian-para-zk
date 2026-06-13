@@ -1,6 +1,7 @@
 import type { ParaZkSettings } from "./types";
 import { localePack } from "./i18n";
 import type { PropsViewType } from "./props/schema";
+import { ZK_KIND_CODES } from "./zk/kinds";
 
 export type ManagedArtifact = {
   path: string;
@@ -14,9 +15,9 @@ export const TEMPLATE_NAMES = [
   "journal",
   "retro",
   "subnote",
-  "zk_spark",
-  "zk_digest",
-  "zk_permanent"
+  "spark",
+  "digest",
+  "permanent"
 ] as const;
 
 export type TemplateName = typeof TEMPLATE_NAMES[number];
@@ -228,26 +229,26 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         paraZkManagedBlock(),
         ""
       ].join("\n");
-    case "zk_spark":
+    case "spark":
       return [
         frontmatter([
-          "type: zk_spark",
+          "type: spark",
           "tags:",
           `  - ${tags.knowledge}/${slugPlaceholder}`,
           `created: ${nowPlaceholder}`,
           "updated:",
           "processed: false"
         ]),
-        paraZkPropsBlock("zk_spark"),
+        paraZkPropsBlock("spark"),
         "{{cursor}}",
         "",
         paraZkManagedBlock(),
         ""
       ].join("\n");
-    case "zk_digest":
+    case "digest":
       return [
         frontmatter([
-          "type: zk_digest",
+          "type: digest",
           "tags:",
           `  - ${tags.knowledge}/${slugPlaceholder}`,
           `created: ${nowPlaceholder}`,
@@ -257,16 +258,16 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "first_author:",
           "published:"
         ]),
-        paraZkPropsBlock("zk_digest"),
+        paraZkPropsBlock("digest"),
         "{{cursor}}",
         "",
         paraZkManagedBlock(),
         ""
       ].join("\n");
-    case "zk_permanent":
+    case "permanent":
       return [
         frontmatter([
-          "type: zk_permanent",
+          "type: permanent",
           "tags:",
           `  - ${tags.knowledge}/${slugPlaceholder}`,
           `created: ${nowPlaceholder}`,
@@ -274,7 +275,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "maturity: {{maturity}}",
           "aliases:"
         ]),
-        paraZkPropsBlock("zk_permanent"),
+        paraZkPropsBlock("permanent"),
         "{{cursor}}",
         "",
         paraZkManagedBlock(),
@@ -370,17 +371,17 @@ export function managedUiBlockForType(type: string, settings: ParaZkSettings): s
         paraZkTasksBlock("current", [], t.labels.tasks),
         paraZkReferencesBlock("current", t.labels.references)
       ]);
-    case "zk_spark":
+    case "spark":
       return joinManagedUiBlocks([
         paraZkViewBlock("spark-distill", t.labels.createdFromThis),
         paraZkReferencesBlock("current", t.labels.references)
       ]);
-    case "zk_digest":
+    case "digest":
       return joinManagedUiBlocks([
         paraZkViewBlock("digest-cited-by", t.labels.createdFromThis),
         paraZkReferencesBlock("current", t.labels.references)
       ]);
-    case "zk_permanent":
+    case "permanent":
       return joinManagedUiBlocks([
         paraZkViewBlock("permanent-cited-by", t.labels.citedBy),
         paraZkReferencesBlock("current", t.labels.references)
@@ -840,6 +841,9 @@ function dashboardDueProjects30(t: ReturnType<typeof localePack>, settings: Para
 }
 
 function dashboardRecentCoreNotes(t: ReturnType<typeof localePack>, settings: ParaZkSettings, limit: number): string[] {
+  const coreTypeClause = ["project", "area", "resource", ...ZK_KIND_CODES]
+    .map((type) => `type = "${type}"`)
+    .join(" OR ");
   return fenced("dataview", [
     `TABLE WITHOUT ID file.link AS "${t.labels.references}", type AS "${t.labels.kind}", file.mtime AS "${t.labels.updated}"`,
     `FROM ${dataviewSources([
@@ -848,7 +852,7 @@ function dashboardRecentCoreNotes(t: ReturnType<typeof localePack>, settings: Pa
       settings.paths.resourcesFolder,
       ...zkSourceFolders(settings)
     ])}`,
-    `WHERE (type = "project" OR type = "area" OR type = "resource" OR startswith(type, "zk_")) AND ${dataviewNotArchived(settings)}`,
+    `WHERE (${coreTypeClause}) AND ${dataviewNotArchived(settings)}`,
     "SORT file.mtime DESC",
     `LIMIT ${limit}`
   ]);

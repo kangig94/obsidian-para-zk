@@ -106,21 +106,21 @@ async function seedAuditVault(): Promise<{
   );
   await createNote(
     outgoingOnlyPermanentPath,
-    ["type: zk_permanent", `created: ${dateDaysAgo(20)}`, `updated: ${dateDaysAgo(20)}`, "maturity: refined"],
+    ["type: permanent", `created: ${dateDaysAgo(20)}`, `updated: ${dateDaysAgo(20)}`, "maturity: refined"],
     `Only outgoing, linked to [[${hubPath}]].`
   );
   await createNote(
     sparkPath,
-    ["type: zk_spark", `created: ${dateDaysAgo(10)}`, "updated:", "processed: false"]
+    ["type: spark", `created: ${dateDaysAgo(10)}`, "updated:", "processed: false"]
   );
   await createNote(
     permanentPath,
-    ["type: zk_permanent", `created: ${dateDaysAgo(20)}`, `updated: ${dateDaysAgo(15)}`, "maturity: draft"],
+    ["type: permanent", `created: ${dateDaysAgo(20)}`, `updated: ${dateDaysAgo(15)}`, "maturity: draft"],
     `Still draft, but linked to [[${hubPath}]].`
   );
   await createNote(
     recentDraftPermanentPath,
-    ["type: zk_permanent", `created: ${dateDaysAgo(20)}`, `updated: ${dateDaysAgo(1)}`, "maturity: draft"],
+    ["type: permanent", `created: ${dateDaysAgo(20)}`, `updated: ${dateDaysAgo(1)}`, "maturity: draft"],
     `Recent draft, linked to [[${hubPath}]].`
   );
   await createNote(
@@ -130,11 +130,11 @@ async function seedAuditVault(): Promise<{
   );
   await createNote(
     "Zettelkasten/Sparks/Fresh Spark.md",
-    ["type: zk_spark", `created: ${dateDaysAgo(1)}`, "updated:", "processed: false"]
+    ["type: spark", `created: ${dateDaysAgo(1)}`, "updated:", "processed: false"]
   );
   await createNote(
     "Zettelkasten/Permanent/Refined Permanent.md",
-    ["type: zk_permanent", `created: ${dateDaysAgo(20)}`, `updated: ${dateDaysAgo(20)}`, "maturity: refined"],
+    ["type: permanent", `created: ${dateDaysAgo(20)}`, `updated: ${dateDaysAgo(20)}`, "maturity: refined"],
     `Linked to [[${hubPath}]].`
   );
   await createNote(
@@ -213,12 +213,12 @@ describe("audit", () => {
     expect(result.findings.find((finding) => finding.code === "unprocessed_spark")).toMatchObject({
       severity: "low",
       path: paths.sparkPath,
-      type: "zk_spark"
+      type: "spark"
     });
     expect(result.findings.find((finding) => finding.code === "stale_draft_permanent")).toMatchObject({
       severity: "low",
       path: paths.permanentPath,
-      type: "zk_permanent"
+      type: "permanent"
     });
     expect(result.findings.some((finding) =>
       finding.code === "orphan_note" && finding.path === paths.outgoingOnlyPermanentPath
@@ -241,7 +241,7 @@ describe("audit", () => {
     expect(codes(high)).toEqual(["broken_link", "dangling_reference"]);
     expect(high.findings.every((finding) => finding.severity === "high")).toBe(true);
 
-    const spark = asAudit(await cli.run("para-zk:audit", { type: "zk_spark", limit: "all" }));
+    const spark = asAudit(await cli.run("para-zk:audit", { type: "spark", limit: "all" }));
     expect(spark.count).toBe(1);
     expect(spark.findings[0]).toMatchObject({ code: "unprocessed_spark", path: paths.sparkPath });
   });

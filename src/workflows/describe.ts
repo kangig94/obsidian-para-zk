@@ -47,9 +47,9 @@ const SURFACE_TYPES = [
   "journal",
   "retro",
   "subnote",
-  "zk_spark",
-  "zk_digest",
-  "zk_permanent",
+  "spark",
+  "digest",
+  "permanent",
   "note"
 ] as const;
 
@@ -163,9 +163,9 @@ export function specForType(type: string): ReadSurfaceSpec {
   if (type === "journal") return JOURNAL_READ_SPEC;
   if (type === "retro") return RETRO_READ_SPEC;
   if (type === "subnote") return SUBNOTE_READ_SPEC;
-  if (type === "zk_spark") return ZK_SPARK_READ_SPEC;
-  if (type === "zk_digest") return ZK_DIGEST_READ_SPEC;
-  if (type === "zk_permanent") return ZK_PERMANENT_READ_SPEC;
+  if (type === "spark") return ZK_SPARK_READ_SPEC;
+  if (type === "digest") return ZK_DIGEST_READ_SPEC;
+  if (type === "permanent") return ZK_PERMANENT_READ_SPEC;
   return NOTE_READ_SPEC;
 }
 
@@ -299,9 +299,6 @@ export function describeSurfaces(): SurfaceDescription[] {
 
 function normalizeSurfaceType(type: string): SurfaceType {
   const normalized = type.trim().toLocaleLowerCase();
-  if (normalized === "spark") return "zk_spark";
-  if (normalized === "digest") return "zk_digest";
-  if (normalized === "permanent") return "zk_permanent";
   if ((SURFACE_TYPES as readonly string[]).includes(normalized)) return normalized as SurfaceType;
   throw new Error(`unknown surface type: ${type} (valid: ${SURFACE_TYPES.join(", ")})`);
 }
@@ -340,9 +337,9 @@ function addressingForType(type: SurfaceType): SurfaceAddressing {
       return { addressable: true, selectors: ["date"], create: "para-zk:capture-journal", rename: false };
     case "subnote":
       return { addressable: false, addressVia: "not directly addressable — create/read/update/delete/rename it with the *-child commands: root_type (project|area) + root_title + relpath (ancestor chain to the immediate parent) + title", create: "para-zk:create-child", rename: true };
-    case "zk_spark":
-    case "zk_digest":
-    case "zk_permanent":
+    case "spark":
+    case "digest":
+    case "permanent":
       return { addressable: true, selectors: ["title", "kind"], create: "para-zk:create-zk", rename: true };
     case "note":
       return { addressable: false, addressVia: "not directly addressable — read/update/delete/rename it with the *-child commands: root_type (project|area) + root_title + relpath (ancestor chain to the immediate parent) + title", rename: true };

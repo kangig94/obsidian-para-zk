@@ -28,9 +28,9 @@ const PROPS_VIEW_TYPES = [
   "journal",
   "retro",
   "subnote",
-  "zk_spark",
-  "zk_digest",
-  "zk_permanent"
+  "spark",
+  "digest",
+  "permanent"
 ] as const;
 
 export type PropsViewType = typeof PROPS_VIEW_TYPES[number];
@@ -160,12 +160,12 @@ export function propsSchemaForType(type: PropsViewType, locale: Locale): PropsSc
         [selectField("subnote_type", "subnote_type", t.labels.kind, subnoteTypeOptions(locale))]
       ]
     },
-    zk_spark: {
-      type: "zk_spark",
+    spark: {
+      type: "spark",
       rows: [[created, updated]]
     },
-    zk_digest: {
-      type: "zk_digest",
+    digest: {
+      type: "digest",
       rows: [
         [created, updated],
         [
@@ -178,8 +178,8 @@ export function propsSchemaForType(type: PropsViewType, locale: Locale): PropsSc
         ]
       ]
     },
-    zk_permanent: {
-      type: "zk_permanent",
+    permanent: {
+      type: "permanent",
       lead: aliases,
       rows: [
         [created, updated],

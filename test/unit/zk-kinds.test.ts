@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   RESOURCE_CREATE_KIND_CODE_HELP,
   ZK_KIND_CODE_HELP,
+  isZkType,
   normalizeZkKind,
   parseResourceCreateKind,
   parseZkKind
@@ -33,6 +34,17 @@ describe("normalize helpers", () => {
   it("apply documented fallbacks", () => {
     expect(normalizeZkKind(undefined)).toBe("Spark");
     expect(normalizeZkKind("digest")).toBe("Digest");
+  });
+});
+
+describe("isZkType", () => {
+  it("matches the bare ZK kind codes and rejects the dropped zk_ prefix form", () => {
+    expect(isZkType("spark")).toBe(true);
+    expect(isZkType("digest")).toBe(true);
+    expect(isZkType("permanent")).toBe(true);
+    expect(isZkType("zk_spark")).toBe(false);
+    expect(isZkType("resource")).toBe(false);
+    expect(isZkType("")).toBe(false);
   });
 });
 

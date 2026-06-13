@@ -396,12 +396,7 @@ export async function createZkFile(
   options: { maturityCode?: MaturityCode; alias?: string } = {}
 ): Promise<TFile> {
   const createdAt = localDateTimeSpace();
-  let templateName: TemplateName = "zk_permanent";
-  if (kind === "Spark") {
-    templateName = "zk_spark";
-  } else if (kind === "Digest") {
-    templateName = "zk_digest";
-  }
+  const templateName: TemplateName = zkKindCode(kind);
   const maturity = options.maturityCode ?? "draft";
   const file = await createMarkdownFile(ctx, templateName, path, {
     created: createdAt,
@@ -412,7 +407,7 @@ export async function createZkFile(
 
   const tags = localePack(ctx.settings.locale).tags;
   await ctx.host.processFrontMatter(file, (fm) => {
-    fm.type = `zk_${kind.toLowerCase()}`;
+    fm.type = zkKindCode(kind);
     applyAlias(fm, options.alias);
     fm.tags = [`${tags.knowledge}/${slugify(title)}`];
     applyCreatedUpdatedDefaults(fm, createdAt);

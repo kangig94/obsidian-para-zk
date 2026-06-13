@@ -9,7 +9,7 @@ describe("MCP update arg builder", () => {
     expect(buildUpdateArgs({
       tool: "replace",
       params: {
-        type: "zk_spark",
+        type: "spark",
         title: "My Note",
         key: "body",
         old_string: oldString,

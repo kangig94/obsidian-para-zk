@@ -61,7 +61,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<high|medium|low>",
       },
       "type": {
-        "description": "Optional stored frontmatter type filter, e.g. resource or zk_permanent.",
+        "description": "Optional stored frontmatter type filter, e.g. resource or permanent.",
         "value": "<note-type>",
       },
     },
@@ -552,7 +552,7 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "type": {
         "description": "Optional surface type. Omit to describe all supported surfaces.",
-        "value": "<project|area|resource|journal|retro|subnote|zk_spark|zk_digest|zk_permanent|note>",
+        "value": "<project|area|resource|journal|retro|subnote|spark|digest|permanent|note>",
       },
     },
   },

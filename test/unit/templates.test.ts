@@ -10,9 +10,9 @@ describe("managed templates", () => {
     const journal = renderTemplate("journal", DEFAULT_SETTINGS);
     const retro = renderTemplate("retro", DEFAULT_SETTINGS);
     const subnote = renderTemplate("subnote", DEFAULT_SETTINGS);
-    const spark = renderTemplate("zk_spark", DEFAULT_SETTINGS);
-    const source = renderTemplate("zk_digest", DEFAULT_SETTINGS);
-    const permanent = renderTemplate("zk_permanent", DEFAULT_SETTINGS);
+    const spark = renderTemplate("spark", DEFAULT_SETTINGS);
+    const source = renderTemplate("digest", DEFAULT_SETTINGS);
+    const permanent = renderTemplate("permanent", DEFAULT_SETTINGS);
     const templates = [project, area, resource, journal, retro, subnote, spark, source, permanent];
 
     for (const content of templates) {
@@ -27,15 +27,15 @@ describe("managed templates", () => {
     expect(resource).toContain("```para-zk-props\ntype: resource\n```\n{{cursor}}\n\n```para-zk-managed");
     expect(resource).not.toContain("# Overview");
     expect(resource).not.toContain("# Body");
-    expect(spark).toContain("```para-zk-props\ntype: zk_spark\n```\n{{cursor}}\n\n```para-zk-managed");
+    expect(spark).toContain("```para-zk-props\ntype: spark\n```\n{{cursor}}\n\n```para-zk-managed");
     expect(spark).not.toContain("# One-line thought summary");
     expect(spark).not.toContain("# Memo");
-    expect(source).toContain("```para-zk-props\ntype: zk_digest\n```\n{{cursor}}\n\n```para-zk-managed");
+    expect(source).toContain("```para-zk-props\ntype: digest\n```\n{{cursor}}\n\n```para-zk-managed");
     expect(source).not.toContain("## Highlights (quotes/evidence)");
     expect(source).not.toContain("# Summary");
     expect(source).not.toContain("# Key insights");
     expect(source).not.toContain("# Important quotes/evidence");
-    expect(permanent).toContain("```para-zk-props\ntype: zk_permanent\n```\n{{cursor}}\n\n```para-zk-managed");
+    expect(permanent).toContain("```para-zk-props\ntype: permanent\n```\n{{cursor}}\n\n```para-zk-managed");
     expect(permanent).not.toContain("# One-sentence summary");
     expect(permanent).not.toContain("# Body");
     expect(permanent).not.toContain("## Limitations");
@@ -59,9 +59,9 @@ describe("managed templates", () => {
     const area = managedUiBlockForType("area", DEFAULT_SETTINGS) ?? "";
     const resource = managedUiBlockForType("resource", DEFAULT_SETTINGS) ?? "";
     const journal = managedUiBlockForType("journal", DEFAULT_SETTINGS) ?? "";
-    const spark = managedUiBlockForType("zk_spark", DEFAULT_SETTINGS) ?? "";
-    const source = managedUiBlockForType("zk_digest", DEFAULT_SETTINGS) ?? "";
-    const permanent = managedUiBlockForType("zk_permanent", DEFAULT_SETTINGS) ?? "";
+    const spark = managedUiBlockForType("spark", DEFAULT_SETTINGS) ?? "";
+    const source = managedUiBlockForType("digest", DEFAULT_SETTINGS) ?? "";
+    const permanent = managedUiBlockForType("permanent", DEFAULT_SETTINGS) ?? "";
 
     expect(project).not.toContain("para-zk-latest-retro-summary");
     expect(project).toMatch(/^\n---\n```para-zk-tasks/);

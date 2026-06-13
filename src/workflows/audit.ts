@@ -251,7 +251,7 @@ function orphanNoteFindings(ctx: WorkflowContext, notes: AuditableNote[]): Audit
 }
 
 function isOrphanCandidate(ctx: WorkflowContext, note: AuditableNote): boolean {
-  if (!["resource", "zk_digest", "zk_permanent"].includes(note.type)) return false;
+  if (!["resource", "digest", "permanent"].includes(note.type)) return false;
   if (isFolderMainNote(note.file)) return false;
   if (isUnderAnyFolder(note.file.path, [ctx.settings.paths.dashboardFolder])) {
     return false;
@@ -295,7 +295,7 @@ function positiveCount(value: number | undefined): number {
 function unprocessedSparkFindings(notes: AuditableNote[]): AuditFinding[] {
   const cutoff = Date.now() - days(SPARK_STALE_DAYS);
   return notes
-    .filter((note) => note.type === "zk_spark" && note.frontmatter.processed !== true)
+    .filter((note) => note.type === "spark" && note.frontmatter.processed !== true)
     .filter((note) => {
       const created = frontmatterTime(note.frontmatter.created);
       return created !== undefined && created <= cutoff;
@@ -313,7 +313,7 @@ function unprocessedSparkFindings(notes: AuditableNote[]): AuditFinding[] {
 function staleDraftPermanentFindings(notes: AuditableNote[]): AuditFinding[] {
   const cutoff = Date.now() - days(DRAFT_STALE_DAYS);
   return notes
-    .filter((note) => note.type === "zk_permanent" && note.frontmatter.maturity === "draft")
+    .filter((note) => note.type === "permanent" && note.frontmatter.maturity === "draft")
     .filter((note) => {
       const updated = frontmatterTime(note.frontmatter.updated);
       return updated !== undefined && updated <= cutoff;

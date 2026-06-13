@@ -1,9 +1,16 @@
 import type { ResourceCreateKind, ZkKind } from "../types";
 
-const ZK_KIND_CODES = ["spark", "digest", "permanent"] as const;
+export const ZK_KIND_CODES = ["spark", "digest", "permanent"] as const;
 const RESOURCE_CREATE_KIND_CODES = ["digest", "permanent"] as const;
 
 export type ZkKindCode = typeof ZK_KIND_CODES[number];
+
+// A ZK note's stored surface type equals its kind code (spark/digest/permanent).
+// There is no `zk_` namespace prefix: ZK-ness is carried by the folder, just as a
+// resource isn't typed `para_resource` for living under PARA/Resources.
+export function isZkType(type: string): boolean {
+  return (ZK_KIND_CODES as readonly string[]).includes(type);
+}
 
 export const ZK_KIND_CODE_HELP = codeHelp(ZK_KIND_CODES);
 export const RESOURCE_CREATE_KIND_CODE_HELP = codeHelp(RESOURCE_CREATE_KIND_CODES);

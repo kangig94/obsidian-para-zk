@@ -1,14 +1,15 @@
 import { fileFrontmatter, readType } from "../vault/frontmatter";
+import { isZkType } from "../zk/kinds";
 import type { ListOptions, WorkflowContext } from "./context";
 import { isArchivedFile, isUnderAnyFolder, templateFolderPaths } from "./locations";
 
 // Note types this command enumerates. `zk` is an addressing family spanning the
-// stored zk_<kind> surface types; everything else maps to its stored type.
+// stored ZK kind surface types (spark/digest/permanent); everything else maps to its stored type.
 const LISTABLE_TYPES = new Set(["project", "area", "resource", "journal", "retro", "subnote"]);
 
 function typeMatcher(type: string | undefined): (stored: string) => boolean {
-  if (!type) return (stored) => LISTABLE_TYPES.has(stored) || stored.startsWith("zk_");
-  if (type === "zk") return (stored) => stored.startsWith("zk_");
+  if (!type) return (stored) => LISTABLE_TYPES.has(stored) || isZkType(stored);
+  if (type === "zk") return (stored) => isZkType(stored);
   return (stored) => stored === type;
 }
 

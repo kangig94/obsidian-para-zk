@@ -1,5 +1,5 @@
 ---
-type: zk_permanent
+type: permanent
 maturity: evergreen
 ---
 

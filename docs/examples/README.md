@@ -1,7 +1,7 @@
 # PARA-ZK Free-Form Examples
 
-These are reference exemplars for PARA-ZK's **free-form** note types (`resource`, `zk_spark`,
-`zk_digest`, `zk_permanent`, child `doc`, fallback `note`). They are **not** templates — pressing
+These are reference exemplars for PARA-ZK's **free-form** note types (`resource`, `spark`,
+`digest`, `permanent`, child `doc`, fallback `note`). They are **not** templates — pressing
 *Create ZK* / *Create resource* gives a **blank slate** (frontmatter + props block + managed tail, empty
 body). These files show what a *well-formed* note of each kind looks like once you fill it in, so you (or an
 LLM) can learn the intended shape without baking a rigid form into every new note.
@@ -17,9 +17,9 @@ external) both feed the one durable output — **permanent**:
 
 | Kind | Role | Feel |
 | --- | --- | --- |
-| `zk_spark` | **Spark.** A thought caught the instant it strikes (internal). | Raw, partial, a question, a "process later" note. Capture friction ~0. **Transient** — discarded once distilled. |
-| `zk_digest` | **Digest.** *Your own-words digest* of an external source (paper, video, talk…). | Selective notes on what the source contributes, anchored to it. Durable input, not a verbatim copy. |
-| `zk_permanent` | **Permanent.** *Your* atomic, self-contained idea, connected to your other ideas. | Novel **to your own knowledge web** (not necessarily to the world). The heart of the system — should be common. |
+| `spark` | **Spark.** A thought caught the instant it strikes (internal). | Raw, partial, a question, a "process later" note. Capture friction ~0. **Transient** — discarded once distilled. |
+| `digest` | **Digest.** *Your own-words digest* of an external source (paper, video, talk…). | Selective notes on what the source contributes, anchored to it. Durable input, not a verbatim copy. |
+| `permanent` | **Permanent.** *Your* atomic, self-contained idea, connected to your other ideas. | Novel **to your own knowledge web** (not necessarily to the world). The heart of the system — should be common. |
 
 Two operations move notes here:
 
@@ -39,6 +39,9 @@ Free-form keeps the body a single `body` surface: write whatever the idea needs 
 not enforced keys), and edit it with literal `set`/`append`/`prepend`/`replace`.
 
 ## Files
+
+These file names use `zk-` as a doc-namespace prefix only; the stored frontmatter `type:`
+value is the plain code — `spark`, `digest`, `permanent`.
 
 - [`zk-spark.md`](zk-spark.md) — a raw spark.
 - [`zk-digest.md`](zk-digest.md) — a digest in your own words (references its origin).

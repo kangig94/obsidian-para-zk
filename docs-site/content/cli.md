@@ -43,7 +43,7 @@ Then drill into a surface type:
 ```bash
 optsidian para-zk:describe type=project format=json
 optsidian para-zk:describe type=resource format=json
-optsidian para-zk:describe type=zk_permanent format=json
+optsidian para-zk:describe type=permanent format=json
 ```
 
 `describe type=<surface>` returns selectors, create inputs, read keys, write keys, collections, and supported operations for that note type.

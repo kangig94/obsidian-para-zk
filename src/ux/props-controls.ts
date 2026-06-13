@@ -74,9 +74,9 @@ const FRONTMATTER_WORKFLOW_UPDATES: Record<WorkflowFrontmatterType, FrontmatterW
   resource: updateResource,
   journal: updateJournal,
   retro: updateRetro,
-  zk_spark: updateZk,
-  zk_digest: updateZk,
-  zk_permanent: updateZk
+  spark: updateZk,
+  digest: updateZk,
+  permanent: updateZk
 };
 
 const propsRerenderStates = new WeakMap<HTMLElement, PropsRerenderState>();

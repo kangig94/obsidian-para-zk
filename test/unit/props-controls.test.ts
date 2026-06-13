@@ -262,7 +262,7 @@ describe("props frontmatter workflow routing", () => {
     const app = new MockApp();
     const file = await app.vault.create("ZK/Spark/Seed.md", [
       "---",
-      "type: zk_spark",
+      "type: spark",
       "processed: false",
       "---",
       ""
@@ -277,7 +277,7 @@ describe("props frontmatter workflow routing", () => {
     const app = new MockApp();
     const file = await app.vault.create("ZK/Digest/Source.md", [
       "---",
-      "type: zk_digest",
+      "type: digest",
       "sourceTitle: Old source",
       "---",
       ""
@@ -292,7 +292,7 @@ describe("props frontmatter workflow routing", () => {
     const app = new MockApp();
     const file = await app.vault.create("ZK/Permanent/Claim.md", [
       "---",
-      "type: zk_permanent",
+      "type: permanent",
       "maturity: draft",
       "---",
       ""

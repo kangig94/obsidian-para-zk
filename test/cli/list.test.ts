@@ -37,7 +37,7 @@ describe("list", () => {
 
     const res = await cli.run("para-zk:list", { type: "zk" });
     expect(res.count).toBe(2);
-    expect((res.items as Array<{ type: string }>).map((i) => i.type).sort()).toEqual(["zk_permanent", "zk_spark"]);
+    expect((res.items as Array<{ type: string }>).map((i) => i.type).sort()).toEqual(["permanent", "spark"]);
   });
 
   it("filters by case-insensitive title query and paginates", async () => {
