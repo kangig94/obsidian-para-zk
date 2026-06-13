@@ -6,6 +6,16 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Breaking
 
+- Create is now get-or-create everywhere. A colliding title returns the existing note
+  with `created: false` instead of silently allocating a suffixed duplicate (`Foo 1`).
+  Affects every create command (`create-project`/`area`/`resource`/`zk`/`llm-wiki`) and
+  their workflows, plus `create-from-resource`/`create-from-digest`/`distill-spark`. An
+  existing note is returned untouched — the call's `body`/`alias`/provenance are NOT
+  applied (no clobber); to make a distinct note, re-create under an explicit title. This
+  removes the prior auto-suffix "unique folder-style container for duplicate titles"
+  behavior. (`create-child` and `create-retro` already returned the existing note on
+  their natural keys — subnote/nested-area path, and ISO-week + source — and are
+  unchanged.)
 - Identity-tag slugs are now kebab-case instead of snake_case, matching the common
   Obsidian tag convention: `project/my_project` → `project/my-project`,
   `리소스/some_paper` → `리소스/some-paper`, `llm-wiki/policy_wiki` →

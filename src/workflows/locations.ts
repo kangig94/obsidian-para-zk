@@ -63,44 +63,27 @@ export async function ensureFolderStyleParent(ctx: WorkflowContext, file: TFile)
   return { file: moved, childFolder };
 }
 
-export async function uniqueMarkdownPath(host: Pick<WorkflowHost, "getAbstractFile">, path: string): Promise<string> {
-  const normalized = ensureMdPath(path);
-  if (!host.getAbstractFile(normalized)) return normalized;
-
-  const dot = normalized.toLowerCase().lastIndexOf(".md");
-  const base = dot >= 0 ? normalized.slice(0, dot) : normalized;
-  let index = 1;
-  let candidate = "";
-  do {
-    candidate = `${base} ${index}.md`;
-    index += 1;
-  } while (host.getAbstractFile(candidate));
-  return candidate;
+// Create is get-or-create everywhere: a colliding title returns the existing note
+// (created: false) rather than silently allocating a suffixed duplicate. Disambiguation
+// is the caller's explicit choice (re-examine, then create under a distinct title).
+export function existingMarkdownFile(host: Pick<WorkflowHost, "getFile">, path: string): TFile | undefined {
+  return host.getFile(ensureMdPath(path)) ?? undefined;
 }
 
-export function uniqueFolderStyleMarkdownPath(
+// Deterministic folder-style target (no suffixing). `existing` is any note with this title
+// already under the root — the canonical folder-style path first, then a basename scan —
+// which get-or-create returns instead of allocating a suffixed duplicate.
+export function folderStyleMarkdownPath(
   ctx: WorkflowContext,
   rootFolder: string,
   title: string
-): { title: string; folder: string; path: string } {
-  let index = 0;
-  while (true) {
-    const candidateTitle = index === 0 ? title : `${title} ${index}`;
-    const folder = joinVaultPath(rootFolder, candidateTitle);
-    const path = joinVaultPath(folder, `${candidateTitle}.md`);
-    const titleExists = ctx.host.getMarkdownFiles().some((file) =>
-      file.basename === candidateTitle
-      && isDomainNotePathUnderRoot(file, rootFolder)
-    );
-    if (
-      !titleExists
-      && !ctx.host.getAbstractFile(folder)
-      && !ctx.host.getAbstractFile(path)
-    ) {
-      return { title: candidateTitle, folder, path };
-    }
-    index += 1;
-  }
+): { title: string; folder: string; path: string; existing?: TFile } {
+  const folder = joinVaultPath(rootFolder, title);
+  const path = joinVaultPath(folder, `${title}.md`);
+  const existing = ctx.host.getFile(path)
+    ?? ctx.host.getMarkdownFiles().find((file) =>
+      file.basename === title && isDomainNotePathUnderRoot(file, rootFolder));
+  return { title, folder, path, existing };
 }
 
 export function folderForZkKind(settings: ParaZkSettings, kind: ZkKind): string {

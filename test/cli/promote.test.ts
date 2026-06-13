@@ -37,6 +37,18 @@ describe("create-from-resource", () => {
     expect(resourceContent).not.toContain(`[[${created.path}`);
     expect(resourceContent).toContain("```para-zk-managed");
   });
+
+  it("returns the existing ZK note on a duplicate title without clobbering its body", async () => {
+    await cli.run("para-zk:create-resource", { title: "Src", open: "false" });
+    const first = await cli.run("para-zk:create-from-resource", { source_title: "Src", title: "Promoted", kind: "digest", body: "Original.", open: "false" });
+    expect(first.created).toBe(true);
+
+    const dup = await cli.run("para-zk:create-from-resource", { source_title: "Src", title: "Promoted", kind: "digest", body: "Replacement.", open: "false" });
+    expect(dup).toMatchObject({ created: false, path: first.path });
+    const content = cli.app.readPath(String(first.path)) ?? "";
+    expect(content).toContain("Original.");
+    expect(content).not.toContain("Replacement.");
+  });
 });
 
 describe("create-from-digest", () => {
@@ -122,5 +134,18 @@ describe("distill-spark", () => {
 
     // The spark is gone (moved to trash), and the permanent never referenced it.
     expect(cli.app.readPath(String(spark.path)), "spark should be removed when discarded").toBeFalsy();
+  });
+
+  it("does not discard the spark when the target permanent already exists", async () => {
+    await cli.run("para-zk:create-zk", { title: "Idea", kind: "spark", open: "false" });
+    const first = await cli.run("para-zk:distill-spark", { source_title: "Idea", title: "Evergreen Idea", open: "false" });
+    expect(first.created).toBe(true);
+    expect(cli.app.readPath("ZK/Spark/Idea.md")).toBeDefined();
+
+    // Re-distilling into the now-existing permanent with discard=true creates nothing new
+    // (created:false) and must NOT trash the spark — no new permanent was produced.
+    const second = await cli.run("para-zk:distill-spark", { source_title: "Idea", title: "Evergreen Idea", discard: "true", open: "false" });
+    expect(second.created).toBe(false);
+    expect(cli.app.readPath("ZK/Spark/Idea.md"), "spark must survive when no new permanent was created").toBeDefined();
   });
 });

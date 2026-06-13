@@ -26,6 +26,18 @@ describe("resource provenance frontmatter", () => {
     expect(content).not.toContain("resource/ai/foo");
   });
 
+  it("returns the existing resource on a duplicate title without suffixing or clobbering", async () => {
+    const first = await cli.run("para-zk:create-resource", { title: "AI/Dup", body: "Original.", open: "false" });
+    expect(first).toMatchObject({ ok: true, path: "PARA/Resources/AI/Dup.md", created: true });
+
+    const dup = await cli.run("para-zk:create-resource", { title: "AI/Dup", body: "Replacement.", open: "false" });
+    expect(dup).toMatchObject({ ok: true, path: "PARA/Resources/AI/Dup.md", created: false });
+    expect(cli.app.readPath("PARA/Resources/AI/Dup 1.md")).toBeUndefined();
+    const content = cli.app.readPath("PARA/Resources/AI/Dup.md") ?? "";
+    expect(content).toContain("Original.");
+    expect(content).not.toContain("Replacement.");
+  });
+
   it("creates a three-level resource title path using basename metadata", async () => {
     const created = await cli.run("para-zk:create-resource", {
       title: "AI/ML/Foo",

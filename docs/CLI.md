@@ -161,6 +161,13 @@ Errors return JSON like:
 LLMs should read `ok` first. If `ok` is false, correct the invalid option or
 missing file and retry.
 
+Create is **get-or-create**: every `create-*` command resolves a deterministic path
+from the title and, if a note already exists there, returns that existing note with
+`created: false` (untouched — the call's `body`/`alias`/provenance are not applied)
+rather than allocating a suffixed duplicate. Read `created` to tell a fresh note from
+an existing one; to make a genuinely separate note, re-create under an explicit,
+distinct title.
+
 ## Commands
 
 ### `para-zk:describe`

@@ -38,7 +38,7 @@ import type {
   CreateFromResourceOptions,
   WorkflowContext
 } from "./context";
-import { folderForZkKind, requireTitle, resolveRequiredByType, resolveRequiredFile, uniqueMarkdownPath } from "./locations";
+import { folderForZkKind, requireTitle, resolveRequiredByType, resolveRequiredFile } from "./locations";
 import { insertReferenceItem } from "./references";
 import { deleteZk } from "./delete";
 
@@ -92,7 +92,7 @@ async function createZkFromOrigin(
   options: { sourcePath?: string; sourceTitle?: string; title?: string; maturity?: string },
   origin: { label: string; expectedType: string },
   kind: ZkKind
-): Promise<{ source: TFile; file: TFile }> {
+): Promise<{ source: TFile; file: TFile; created: boolean }> {
   const source = options.sourcePath
     ? resolveRequiredFile(ctx, options.sourcePath, origin.label)
     : await resolveOriginByName(ctx, origin.expectedType, options.sourceTitle);
@@ -103,10 +103,9 @@ async function createZkFromOrigin(
   const maturityCode = readOptionalCode(options.maturity, parseMaturityCode, "maturity", MATURITY_CODE_HELP);
   const title = requireTitle(options.title || source.basename, "ZK title");
   const folder = folderForZkKind(ctx.settings, kind);
-  await ensureFolder(ctx.host, folder);
-  const path = await uniqueMarkdownPath(ctx.host, joinVaultPath(folder, `${title}.md`));
-  const file = await createZkFile(ctx, kind, path, title, { maturityCode });
-  return { source, file };
+  const path = joinVaultPath(folder, `${title}.md`);
+  const { file, created } = await createZkFile(ctx, kind, path, title, { maturityCode });
+  return { source, file, created };
 }
 
 // Create from a durable source. The new note references its origin (one
@@ -114,19 +113,23 @@ async function createZkFromOrigin(
 // written back into the origin (see ZK redesign: single-direction + derived backlinks).
 export async function createFromResource(ctx: WorkflowContext, options: CreateFromResourceOptions = {}): Promise<PromotionResult> {
   const kind = readOptionalCode(options.kind, parseResourceCreateKind, "kind", RESOURCE_CREATE_KIND_CODE_HELP) ?? "Permanent";
-  const { source, file } = await createZkFromOrigin(ctx, options, { label: "source resource", expectedType: "resource" }, kind);
-  await insertReferenceItem(ctx, file, { link: wikiLink(source.path) });
-  await applyBody(ctx, file, options.body);
+  const { source, file, created } = await createZkFromOrigin(ctx, options, { label: "source resource", expectedType: "resource" }, kind);
+  if (created) {
+    await insertReferenceItem(ctx, file, { link: wikiLink(source.path) });
+    await applyBody(ctx, file, options.body);
+  }
   await openIfRequested(ctx, file, options.open);
-  return { ...noteResult(file, true, options.open), sourcePath: source.path, kind: zkKindCode(kind) };
+  return { ...noteResult(file, created, options.open), sourcePath: source.path, kind: zkKindCode(kind) };
 }
 
 export async function createFromDigest(ctx: WorkflowContext, options: CreateFromDigestOptions = {}): Promise<PromotionResult> {
-  const { source, file } = await createZkFromOrigin(ctx, options, { label: "source digest note", expectedType: "digest" }, "Permanent");
-  await insertReferenceItem(ctx, file, { link: wikiLink(source.path) });
-  await applyBody(ctx, file, options.body);
+  const { source, file, created } = await createZkFromOrigin(ctx, options, { label: "source digest note", expectedType: "digest" }, "Permanent");
+  if (created) {
+    await insertReferenceItem(ctx, file, { link: wikiLink(source.path) });
+    await applyBody(ctx, file, options.body);
+  }
   await openIfRequested(ctx, file, options.open);
-  return { ...noteResult(file, true, options.open), sourcePath: source.path, kind: "permanent" };
+  return { ...noteResult(file, created, options.open), sourcePath: source.path, kind: "permanent" };
 }
 
 // Distill consumes a spark: its idea moves into a new permanent note. The spark
@@ -134,25 +137,30 @@ export async function createFromDigest(ctx: WorkflowContext, options: CreateFrom
 // processed (discard is a separate, manual action — a spark may yield several
 // permanents before there is nothing left to extract).
 export async function distillSpark(ctx: WorkflowContext, options: DistillSparkOptions = {}): Promise<PromotionResult> {
-  const { source, file } = await createZkFromOrigin(ctx, options, { label: "source spark note", expectedType: "spark" }, "Permanent");
+  const { source, file, created } = await createZkFromOrigin(ctx, options, { label: "source spark note", expectedType: "spark" }, "Permanent");
 
-  if (options.discard) {
-    // The whole point of the spark is fulfilled — drop it (to trash, recoverable).
-    await deleteZk(ctx, { path: source.path });
-  } else {
-    // Keep the spark for now; record what it became. The pointer lives on the
-    // disposable spark (not the permanent), so discarding it later — by any means —
-    // never leaves a dangling link in the permanent.
-    await ctx.host.processFrontMatter(source, (fm) => {
-      fm.processed = true;
-      fm.distilled_to = appendUniqueStrings(fm.distilled_to, [wikiLink(file.path)]);
-    });
+  // Only consume the spark when a NEW permanent was actually created. If the target
+  // permanent already existed (created: false), the distill produced nothing new — leave
+  // the spark untouched and let the caller re-examine rather than silently discarding it.
+  if (created) {
+    if (options.discard) {
+      // The whole point of the spark is fulfilled — drop it (to trash, recoverable).
+      await deleteZk(ctx, { path: source.path });
+    } else {
+      // Keep the spark for now; record what it became. The pointer lives on the
+      // disposable spark (not the permanent), so discarding it later — by any means —
+      // never leaves a dangling link in the permanent.
+      await ctx.host.processFrontMatter(source, (fm) => {
+        fm.processed = true;
+        fm.distilled_to = appendUniqueStrings(fm.distilled_to, [wikiLink(file.path)]);
+      });
+    }
+    await applyBody(ctx, file, options.body);
   }
-  await applyBody(ctx, file, options.body);
   await openIfRequested(ctx, file, options.open);
 
   return {
-    ...noteResult(file, true, options.open),
+    ...noteResult(file, created, options.open),
     sourcePath: source.path,
     kind: "permanent"
   };

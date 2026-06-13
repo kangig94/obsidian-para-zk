@@ -39,6 +39,18 @@ describe("zk notes", () => {
     expect(update.changed).toBe(true);
   });
 
+  it("returns the existing ZK note on a duplicate title without suffixing or clobbering", async () => {
+    const first = await cli.run("para-zk:create-zk", { title: "Dup Spark", kind: "spark", body: "Original.", open: "false" });
+    expect(first).toMatchObject({ ok: true, path: "ZK/Spark/Dup Spark.md", created: true });
+
+    const dup = await cli.run("para-zk:create-zk", { title: "Dup Spark", kind: "spark", body: "Replacement.", open: "false" });
+    expect(dup).toMatchObject({ ok: true, path: "ZK/Spark/Dup Spark.md", created: false });
+    expect(cli.app.readPath("ZK/Spark/Dup Spark 1.md")).toBeUndefined();
+    const content = cli.app.readPath("ZK/Spark/Dup Spark.md") ?? "";
+    expect(content).toContain("Original.");
+    expect(content).not.toContain("Replacement.");
+  });
+
   it("round-trips digest frontmatter keys (first_author, url) through update and read", async () => {
     const digest = await cli.run("para-zk:create-zk", { title: "DDIM digest", kind: "digest", open: "false" });
     expect(digest.created).toBe(true);
@@ -414,27 +426,13 @@ describe("subarea and child bodies", () => {
     expect(cli.app.readPath(String(nested.path))).toBeUndefined();
   });
 
-  it("allocates a unique folder-style container for duplicate area titles", async () => {
-    await cli.run("para-zk:create-area", { title: "Alpha", open: "false" });
+  it("returns the existing container on a duplicate area title (get-or-create, no suffixing)", async () => {
+    const first = await cli.run("para-zk:create-area", { title: "Alpha", open: "false" });
+    expect(first).toMatchObject({ ok: true, path: "PARA/Areas/Alpha/Alpha.md", created: true });
+
     const duplicate = await cli.run("para-zk:create-area", { title: "Alpha", open: "false" });
-    expect(duplicate.path).toBe("PARA/Areas/Alpha 1/Alpha 1.md");
-
-    const subarea = await cli.run("para-zk:create-child", {
-      type: "area",
-      title: "Nested",
-      root_type: "area",
-      root_title: "Alpha 1",
-      open: "false"
-    });
-    expect(subarea.path).toBe("PARA/Areas/Alpha 1/Nested/Nested.md");
-
-    const renamed = await cli.run("para-zk:rename-area", {
-      title: "Alpha 1",
-      new_title: "Beta"
-    });
-    expect(renamed.path).toBe("PARA/Areas/Beta/Beta.md");
-    expect(cli.app.readPath("PARA/Areas/Beta/Nested/Nested.md")).toBeDefined();
-    expect(cli.app.readPath("PARA/Areas/Alpha/Alpha 1.md")).toBeUndefined();
+    expect(duplicate).toMatchObject({ ok: true, path: "PARA/Areas/Alpha/Alpha.md", created: false });
+    expect(cli.app.readPath("PARA/Areas/Alpha 1/Alpha 1.md")).toBeUndefined();
   });
 
   it("appends to and reads a subnote body", async () => {

@@ -60,6 +60,19 @@ describe("llm-wiki workflows", () => {
     expect(body.value).toBe("Nested synthesis.");
   });
 
+  it("returns the existing note on a duplicate title without suffixing or clobbering (get-or-create)", async () => {
+    const { ctx, app } = createTestContext();
+    const first = await createLlmWiki(ctx, { title: "AI/Dup", body: "Original synthesis.", open: false });
+    expect(first.created).toBe(true);
+
+    const second = await createLlmWiki(ctx, { title: "AI/Dup", body: "Replacement that must NOT apply.", open: false });
+    expect(second).toMatchObject({ path: "LLM-Wiki/AI/Dup.md", created: false });
+    expect(app.readPath("LLM-Wiki/AI/Dup 1.md")).toBeUndefined();
+    const content = app.readPath("LLM-Wiki/AI/Dup.md") ?? "";
+    expect(content).toContain("Original synthesis.");
+    expect(content).not.toContain("Replacement");
+  });
+
   it("updates body, aliases, and references through the shared surface machinery", async () => {
     const { ctx, app } = createTestContext();
     await createResource(ctx, { title: "Canonical Source", open: false });

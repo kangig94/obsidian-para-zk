@@ -61,8 +61,8 @@ import {
   resolveRequiredByType,
   resolveRequiredFile,
   retroSourceType,
-  uniqueFolderStyleMarkdownPath,
-  uniqueMarkdownPath
+  existingMarkdownFile,
+  folderStyleMarkdownPath
 } from "./locations";
 import { insertReferenceItem } from "./references";
 import { ROOT_ID_FRONTMATTER_KEY, newRootId, rootIdFromFrontmatter } from "./tasks";
@@ -79,7 +79,11 @@ export async function applyBody(ctx: WorkflowContext, file: TFile, body: string 
 
 export async function createProject(ctx: WorkflowContext, options: CreateProjectOptions): Promise<CreateProjectResult> {
   const title = requireTitle(options.title, "project title");
-  const target = uniqueFolderStyleMarkdownPath(ctx, ctx.settings.paths.projectsFolder, title);
+  const target = folderStyleMarkdownPath(ctx, ctx.settings.paths.projectsFolder, title);
+  if (target.existing) {
+    await openIfRequested(ctx, target.existing, options.open);
+    return noteResult(target.existing, false, options.open);
+  }
   await ensureFolder(ctx.host, target.folder);
 
   const createdAt = localDateTimeSpace();
@@ -130,7 +134,11 @@ export async function createArea(ctx: WorkflowContext, options: CreateAreaOption
   // `parent` link, not a separate type, is what distinguishes the two everywhere else. The
   // two branches differ only in path strategy and frontmatter; ensureAreaNote is shared.
   if (options.parentTitle === undefined && options.sourcePath === undefined) {
-    const target = uniqueFolderStyleMarkdownPath(ctx, ctx.settings.paths.areasFolder, title);
+    const target = folderStyleMarkdownPath(ctx, ctx.settings.paths.areasFolder, title);
+    if (target.existing) {
+      await openIfRequested(ctx, target.existing, options.open);
+      return noteResult(target.existing, false, options.open);
+    }
     await ensureFolder(ctx.host, target.folder);
     const { file } = await ensureAreaNote(ctx, target.path, slugify(target.title), createdAt);
     await ctx.host.processFrontMatter(file, (fm) => {
@@ -213,10 +221,15 @@ async function resolveRequiredParent(
 
 export async function createResource(ctx: WorkflowContext, options: CreateResourceOptions): Promise<CreateResourceResult> {
   const title = resourceTitlePath(options.title);
+  const path = joinVaultPath(ctx.settings.paths.resourcesFolder, `${title.relpath}.md`);
+  const existing = existingMarkdownFile(ctx.host, path);
+  if (existing) {
+    await openIfRequested(ctx, existing, options.open);
+    return { ...noteResult(existing, false, options.open), linkedFromSource: false };
+  }
   const kind = readOptionalCode(options.kind, parseResourceKindCode, "kind", RESOURCE_KIND_CODE_HELP);
   const source = await resolveOptionalOrigin(ctx, options);
   const createdAt = localDateTimeSpace();
-  const path = await uniqueMarkdownPath(ctx.host, joinVaultPath(ctx.settings.paths.resourcesFolder, `${title.relpath}.md`));
   const file = await createMarkdownFile(ctx, "resource", path, {
     created: createdAt,
     slug: slugify(title.basename),
@@ -253,8 +266,13 @@ export async function createResource(ctx: WorkflowContext, options: CreateResour
 
 export async function createLlmWiki(ctx: WorkflowContext, options: CreateLlmWikiOptions): Promise<CreateLlmWikiResult> {
   const title = llmWikiTitlePath(options.title);
+  const path = joinVaultPath(ctx.settings.paths.wikiFolder, `${title.relpath}.md`);
+  const existing = existingMarkdownFile(ctx.host, path);
+  if (existing) {
+    await openIfRequested(ctx, existing, options.open);
+    return noteResult(existing, false, options.open);
+  }
   const createdAt = localDateTimeSpace();
-  const path = await uniqueMarkdownPath(ctx.host, joinVaultPath(ctx.settings.paths.wikiFolder, `${title.relpath}.md`));
   const file = await createMarkdownFile(ctx, "llm-wiki", path, {
     created: createdAt,
     slug: slugify(title.basename)
@@ -401,14 +419,13 @@ export async function createZk(ctx: WorkflowContext, options: CreateZkOptions): 
   const kind = readOptionalCode(options.kind, parseZkKind, "kind", ZK_KIND_CODE_HELP) ?? "Spark";
   const maturityCode = readOptionalCode(options.maturity, parseMaturityCode, "maturity", MATURITY_CODE_HELP);
   const folder = folderForZkKind(ctx.settings, kind);
-  await ensureFolder(ctx.host, folder);
-  const path = await uniqueMarkdownPath(ctx.host, joinVaultPath(folder, `${title}.md`));
-  const file = await createZkFile(ctx, kind, path, title, { maturityCode, alias: options.alias });
+  const path = joinVaultPath(folder, `${title}.md`);
+  const { file, created } = await createZkFile(ctx, kind, path, title, { maturityCode, alias: options.alias });
 
-  await applyBody(ctx, file, options.body);
+  if (created) await applyBody(ctx, file, options.body);
   await openIfRequested(ctx, file, options.open);
   return {
-    ...noteResult(file, true, options.open),
+    ...noteResult(file, created, options.open),
     kind: zkKindCode(kind)
   };
 }
@@ -419,7 +436,9 @@ export async function createZkFile(
   path: string,
   title: string,
   options: { maturityCode?: MaturityCode; alias?: string } = {}
-): Promise<TFile> {
+): Promise<{ file: TFile; created: boolean }> {
+  const existing = existingMarkdownFile(ctx.host, path);
+  if (existing) return { file: existing, created: false };
   const createdAt = localDateTimeSpace();
   const templateName: TemplateName = zkKindCode(kind);
   const maturity = options.maturityCode ?? "draft";
@@ -439,7 +458,7 @@ export async function createZkFile(
     if (kind === "Spark" && fm.processed === undefined) fm.processed = false;
     if (kind === "Permanent") fm.maturity = fm.maturity ?? maturity;
   });
-  return file;
+  return { file, created: true };
 }
 
 export async function createMarkdownFile(

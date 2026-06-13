@@ -89,27 +89,13 @@ describe("create-project", () => {
     expect(blank.value).toBeNull();
   });
 
-  it("allocates a unique folder-style container for duplicate titles", async () => {
-    await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
+  it("returns the existing container on a duplicate title (get-or-create, no suffixing)", async () => {
+    const first = await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
+    expect(first).toMatchObject({ ok: true, path: "PARA/Projects/Alpha/Alpha.md", created: true });
+
     const duplicate = await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
-    expect(duplicate.path).toBe("PARA/Projects/Alpha 1/Alpha 1.md");
-
-    const child = await cli.run("para-zk:create-child", {
-      type: "subnote",
-      title: "Child",
-      root_type: "project",
-      root_title: "Alpha 1",
-      open: "false"
-    });
-    expect(child.path).toBe("PARA/Projects/Alpha 1/Child.md");
-
-    const renamed = await cli.run("para-zk:rename-project", {
-      title: "Alpha 1",
-      new_title: "Beta"
-    });
-    expect(renamed.path).toBe("PARA/Projects/Beta/Beta.md");
-    expect(cli.app.readPath("PARA/Projects/Beta/Child.md")).toBeDefined();
-    expect(cli.app.readPath("PARA/Projects/Alpha/Alpha 1.md")).toBeUndefined();
+    expect(duplicate).toMatchObject({ ok: true, path: "PARA/Projects/Alpha/Alpha.md", created: false });
+    expect(cli.app.readPath("PARA/Projects/Alpha 1/Alpha 1.md")).toBeUndefined();
   });
 });
 
