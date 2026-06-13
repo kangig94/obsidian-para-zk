@@ -134,6 +134,7 @@ function createCustomSortBookmarksGroup(settings: ParaZkSettings): BookmarkItem 
       bookmarkGroup(folderName(settings.paths.digestFolder), nextCtime),
       bookmarkGroup(folderName(settings.paths.permanentFolder), nextCtime)
     ]),
+    bookmarkGroup(folderName(settings.paths.wikiFolder), nextCtime),
     bookmarkGroup(folderName(settings.paths.journalFolder), nextCtime),
     bookmarkGroup(folderName(settings.paths.tasksFolder), nextCtime),
     bookmarkGroup(folderName(settings.paths.templatesFolder), nextCtime),

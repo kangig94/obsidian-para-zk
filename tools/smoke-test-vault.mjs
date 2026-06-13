@@ -1937,9 +1937,17 @@ function assertCustomSortConfig() {
   const sortspec = bookmarks.items?.find((item) => item.type === "group" && item.title === "sortspec");
   assert(sortspec, "bookmarks.json is missing sortspec group");
   const topLevelTitles = sortspec.items?.map((item) => item.title);
-  for (const title of ["Dashboard", "PARA", "ZK", "Journal", "Templates"]) {
+  for (const title of ["Dashboard", "PARA", "ZK", "LLM-Wiki", "Journal", "Templates"]) {
     assert(topLevelTitles?.includes(title), `sortspec bookmark group is missing ${title}`);
   }
+  // LLM-Wiki (derived knowledge) sorts right after ZK and before Journal.
+  const zkIndex = topLevelTitles?.indexOf("ZK");
+  const wikiIndex = topLevelTitles?.indexOf("LLM-Wiki");
+  const journalIndex = topLevelTitles?.indexOf("Journal");
+  assert(
+    zkIndex < wikiIndex && wikiIndex < journalIndex,
+    `sortspec order must be ZK -> LLM-Wiki -> Journal, got ${JSON.stringify(topLevelTitles)}`
+  );
 }
 
 function assertHomepageConfig() {

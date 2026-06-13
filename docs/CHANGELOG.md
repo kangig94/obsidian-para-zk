@@ -80,6 +80,9 @@ Notable changes for PARA-ZK are tracked here.
   `created_by`/`updated_by` on create and `updated_by` on changed updates.
 - LLM-Wiki pages now use the managed template shape: props plus a managed tail
   rendering wiki-folder-scoped Cited-by and References.
+- The custom-sort baseline now orders `LLM-Wiki` right after `ZK` and before
+  `Journal` in the file explorer. Existing non-empty `sortspec` bookmark groups are
+  still preserved (re-initialize bookmarks to pick up the new order).
 - Added a dedicated `para-zk:attach-file` CLI contract section covering local
   source options, single-file and multi-source result fields, unique-name
   collision behavior, directory recursion rules, desktop-local source paths,
