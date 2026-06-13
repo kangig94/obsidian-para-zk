@@ -1,6 +1,6 @@
 ---
 name: wiki-ingest
-description: "Fold PARA-ZK canonical sources into the LLM-Wiki by resolving an ingest mode, discovering bounded source candidates, building a scoped WeavePacket, and spawning one direct-writer wiki-weaver agent. Use for per-import, delta, init, or targeted re-ingest LLM-Wiki ingestion."
+description: "Use when ingesting canonical PARA-ZK sources into the LLM-Wiki — per-import, delta, init, or targeted re-ingest."
 argument-hint: "mode=<per-import|delta|init|re-ingest> [source_path=<vault-path>|source_paths=<json-or-comma-list>] [limit=<n|all>] [offset=<n>]"
 ---
 
