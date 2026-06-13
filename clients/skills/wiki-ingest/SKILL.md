@@ -10,7 +10,7 @@ Orchestrate a bounded LLM-Wiki ingest run and hand one scoped packet to `para-zk
 
 ## Context
 
-LLM-Wiki pages are LLM-owned derived synthesis under `LLM-Wiki/`; canonical knowledge remains in Resources, PARA, and ZK notes. The wiki is a **compounding, interlinked web of concept pages** drawn from the WHOLE canonical base (resources, digests, permanents, subnotes): the weaver integrates each source into the concept pages it touches (one source commonly spans several) and cross-links related pages, rather than mirroring sources 1:1. This skill is the sole ingest orchestrator: it discovers the source set, gathers a bounded wiki neighborhood, and spawns one direct-writer weaver. It never writes wiki prose itself, never validates or commits a returned plan, and never edits source notes. The weaver writes pages directly via `create-llm-wiki`/`update-llm-wiki` with `by=<model-id>`, and the page-body re-weave is the freshness event. Wiki prose mirrors the user's OWN language register — the dominant language and the English/local code-mixing pattern evidenced by the sources — which the weaver derives from the material; the skill imposes no language.
+LLM-Wiki pages are LLM-owned derived synthesis under `LLM-Wiki/`; canonical knowledge remains in Resources, PARA, and ZK notes. The wiki is a **compounding, interlinked web of concept pages** drawn from the WHOLE canonical base (resources, digests, permanents, subnotes): the weaver integrates each source into the concept pages it touches (one source commonly spans several) and cross-links related pages, rather than mirroring sources 1:1. This skill is the sole ingest orchestrator: it discovers the source set and spawns one direct-writer weaver, which self-gathers the LLM-Wiki side (`list type=llm-wiki` + read-by-title) — the skill pre-gathers no wiki pages, so the loop never depends on search recall. It never writes wiki prose itself, never validates or commits a returned plan, and never edits source notes. The weaver writes pages directly via `create-llm-wiki`/`update-llm-wiki` with `by=<model-id>`, and the page-body re-weave is the freshness event. Wiki prose mirrors the user's OWN language register — the dominant language and the English/local code-mixing pattern evidenced by the sources — which the weaver derives from the material; the skill imposes no language.
 
 ## Argument Routing
 
@@ -48,32 +48,7 @@ LLM-Wiki pages are LLM-owned derived synthesis under `LLM-Wiki/`; canonical know
 
    Build each source object as `{path,type,title,updated,updated_ms,stale_pages,body}` using the candidate metadata for `type`, `title`, `updated`, `updated_ms`, and `stale_pages`. Feed the whole body; do not chase related canonical notes. A run is bounded by the NUMBER of sources (step 3's `limit`/`offset`), never by truncating any one body.
 
-5. **Gather neighborhood**: For each hydrated source, derive a compact query from its title, aliases/tags from frontmatter, headings, and a few distinctive body terms. Search only under `LLM-Wiki/` to find the related concept pages (search returns them ranked by relevance):
-
-   ```bash
-   optsidian search query="<source title/tags/key terms>" path=LLM-Wiki field=title,aliases,tags,headings,body format=json
-   optsidian grep query="<distinct key term>" path=LLM-Wiki context=1 format=json
-   ```
-
-   Seed the neighborhood with every path in each candidate's `stale_pages`; for a stale source, those pages are the exact re-weave targets for that source. Deduplicate paths across all sources, then read the FULL body of each related page (a touched page must be re-woven against its whole current content):
-
-   ```bash
-   optsidian read path="<wiki.path>" format=json
-   optsidian frontmatter read path="<wiki.path>" format=json
-   ```
-
-   Build `candidate_wiki_pages` as `{path,title,aliases,tags,body}` with full bodies. If no related page is found for a source, keep going; the weaver may create a new page.
-
-6. **Build the one-time index seed**: For `delta` and `init` only, build one compact shared wiki index slice before spawning the weaver. Use the combined source titles, tags, and key terms to run one bounded search under `LLM-Wiki/`, then read frontmatter only for the returned wiki paths:
-
-   ```bash
-   optsidian search query="<combined source terms>" path=LLM-Wiki field=title,aliases,tags format=json
-   optsidian frontmatter read path="<wiki.path>" format=json
-   ```
-
-   Store only `{path,title,aliases,tags}` in `wiki_index_seed`; never include bodies in the seed — that is what keeps it cheap even for the whole wiki, not a count cap. Build this slice once and do not refresh it mid-run, even as the weaver creates or updates pages. For `per-import` and `re-ingest`, set `wiki_index_seed` to `[]` and rely on the per-source neighborhood.
-
-7. **Assemble packet**: Create one hydrated `WeavePacket` for the whole returned source set:
+5. **Assemble packet**: The skill gathers only the SOURCE side; the weaver self-gathers the LLM-Wiki side (the skill pre-gathers no wiki pages and no index seed). Create one `WeavePacket` for the whole returned source set:
 
    ```json
    {
@@ -82,14 +57,9 @@ LLM-Wiki pages are LLM-owned derived synthesis under `LLM-Wiki/`; canonical know
      "sources": [
        {"path": "...", "type": "...", "title": "...", "updated": "...", "updated_ms": 0, "stale_pages": [{"path": "...", "title": "...", "updated_ms": 0}], "body": "..."}
      ],
-     "candidate_wiki_pages": [
-       {"path": "...", "title": "...", "aliases": [], "tags": [], "body": "..."}
-     ],
-     "wiki_index_seed": [
-       {"path": "...", "title": "...", "aliases": [], "tags": []}
-     ],
      "rules": {
-       "read_scope": "Read only packet sources, packet candidate_wiki_pages, the one-time wiki_index_seed, and bounded LLM-Wiki re-searches needed for touched pages.",
+       "read_scope": "Read the packet sources; self-gather the LLM-Wiki side. Never search or read PARA/ZK canonical notes beyond the packet sources.",
+       "discover_wiki": "Run `list type=llm-wiki` for the COMPLETE roster of concept pages (no search-recall dependency); pick related pages by judgment and read them by exact title (`read-llm-wiki title=...`). Use `search`/`grep` under LLM-Wiki ONLY as a body-level fallback. This list-first approach prevents creating duplicate concept pages when search is imperfect.",
        "writer": "The weaver writes directly with create-llm-wiki and update-llm-wiki, passing by=<model-id>; the skill applies no writes.",
        "citations": "Each touched page must cite source references with backtick `PZ[id]` code-spans from references op=insert, inserted only to obtain stable ids.",
        "freshness": "Re-integrating a source into a page body, which bumps page updated, is the freshness event.",
@@ -99,20 +69,22 @@ LLM-Wiki pages are LLM-owned derived synthesis under `LLM-Wiki/`; canonical know
    }
    ```
 
-   Inject `by` from the orchestrator's current model id; the weaver passes it to `create-llm-wiki` and `update-llm-wiki`. Do not add a commit plan or any direct-write instructions for the skill itself.
+   Inject `by` from the orchestrator's current model id; the weaver passes it to `create-llm-wiki` and `update-llm-wiki`. Do NOT pre-gather wiki pages or an index seed — the weaver discovers them via `list` so it never depends on search recall. Do not add a commit plan or any direct-write instructions for the skill itself.
 
-8. **Spawn one weaver**: Spawn exactly one agent for the entire packet, in background when the host supports it:
+6. **Spawn one weaver**: Spawn exactly one agent for the entire packet, in background when the host supports it:
 
    ```text
    Agent({
      subagent_type: "para-zk:wiki-weaver",
      run_in_background: true,
-     prompt: "Weave this WeavePacket serially. Read only these scoped packet objects and bounded LLM-Wiki re-search results. Write pages directly via the PARA-ZK CLI; do not return a plan.\n\n<WEAVE_PACKET_JSON>"
+     prompt: "Weave this WeavePacket serially. Read the packet sources, and self-gather the LLM-Wiki side: `list type=llm-wiki` for the full concept-page roster, read related pages by exact title, use bounded LLM-Wiki search/grep only as a fallback (never search PARA/ZK). Write pages directly via the PARA-ZK CLI; do not return a plan.\n\n<WEAVE_PACKET_JSON>"
    })
    ```
 
-   The weaver processes all `sources` serially in its own context, integrating each in full. Do not spawn once per source — one weaver builds the compounding web across the batch so it can cross-link related sources in a single pass. If the weaver approaches its context limit before finishing the batch, it stops after the last fully-integrated source and reports which sources it completed and which remain; spawn a FRESH weaver for the remaining sources (re-hydrate them per steps 4–5). Bound work by source count and by chaining weavers — never by truncating a body. Do not refresh the index seed after spawning. Do not post-process the weaver's writes.
+   The weaver processes all `sources` serially in its own context, integrating each in full. Do not spawn once per source — one weaver builds the compounding web across the batch so it can cross-link related sources in a single pass. If the weaver approaches its context limit before finishing the batch, it stops after the last fully-integrated source and reports which sources it completed and which remain; spawn a FRESH weaver for the remaining sources (re-hydrate them per step 4). Bound work by source count and by chaining weavers — never by truncating a body. Do not post-process the weaver's writes.
 
-9. **Report launch**: Return the mode, source count, candidate wiki page count, whether `has_more` was true (another candidate page remains), and the weaver launch handle if the host provides one. If the weaver later reports a context boundary with sources still remaining, spawn a fresh weaver for the remainder. The observable write contract is the weaver's direct page writes (`create-llm-wiki`/`update-llm-wiki` succeeding).
+7. **Report launch**: Return the mode, source count, whether `has_more` was true (another candidate page remains), and the weaver launch handle if the host provides one. If the weaver later reports a context boundary with sources still remaining, spawn a fresh weaver for the remainder. The observable write contract is the weaver's direct page writes (`create-llm-wiki`/`update-llm-wiki` succeeding).
 
-10. **Verify on weaver completion (clean-context pass)**: When the weaver reports completion, the MAIN agent (the orchestrator that ran this skill — NOT the weaver) reads the weaver's `touched_pages` (`read-llm-wiki key=body` each). This is a clean detection pass: the main agent never generated this prose, so it catches generation slips the weaver — still carrying its full generation context — misses (its own inline self-review is unreliable). Fix high-confidence orthographic/generation slips in place — malformed Korean syllables where a wrong 받침/jamo yields a well-formed but wrong word (궤적→궁적, 댄스→댓스, 앉기→앙기) — via `update-llm-wiki key=body op=replace by=<model-id>`. Surface ambiguous corrections and any semantic findings (contradictions, missing concept pages, missing cross-references) to the user for a decision; do not auto-rewrite prose. If the touched-page volume would bloat the main context, isolate this pass in a freshly spawned verifier sub-agent instead — but still report ambiguous fixes rather than auto-applying them. (A full whole-wiki health sweep is a separate, occasional, human-requested review — not part of ingest.)
+8. **Verify on weaver completion (clean-context pass)**: When the weaver reports completion, the MAIN agent (the orchestrator that ran this skill — NOT the weaver) reads the weaver's `touched_pages` (`read-llm-wiki key=body` each). This is a clean detection pass: the main agent never generated this prose, so it catches generation slips the weaver — still carrying its full generation context — misses (its own inline self-review is unreliable). Fix high-confidence orthographic/generation slips in place — malformed Korean syllables where a wrong 받침/jamo yields a well-formed but wrong word (궤적→궁적, 댄스→댓스, 앉기→앙기) — via `update-llm-wiki key=body op=replace by=<model-id>`. Surface ambiguous corrections and any semantic findings (contradictions, missing concept pages, missing cross-references) to the user for a decision; do not auto-rewrite prose. If the touched-page volume would bloat the main context, isolate this pass in a freshly spawned verifier sub-agent instead — but still report ambiguous fixes rather than auto-applying them. (A full whole-wiki health sweep is a separate, occasional, human-requested review — not part of ingest.)
+
+9. **Fold in conversation-derived insight (orchestrator, optional, human-judged)**: The background weaver only saw the WeavePacket — it has no access to this conversation. So if THIS conversation surfaced a genuine, wiki-worthy insight about the just-ingested sources that the source bodies alone do not capture (a synthesis, a key tension, a correction the user raised), the MAIN agent — which holds the conversation — folds it into the relevant touched page(s) via `update-llm-wiki key=body op=... by=<model-id>` after verification, citing any canonical source it draws on as a backtick `` `PZ[id]` `` and keeping links single-direction. This restores the gist's "discuss key takeaways → update pages" at the orchestrator level (the weaver cannot, having no conversation). Guardrails: ONLY genuine user-surfaced insight — never invent, embellish, or inject tangential conversation; if unsure whether it belongs, surface it to the user instead of writing it; if nothing genuine emerged, skip this step. Report what was folded in.
