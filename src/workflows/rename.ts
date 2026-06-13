@@ -4,7 +4,7 @@ import { frontmatterLinks, fileFrontmatter, readType, type Frontmatter } from ".
 import { ensureFolder, isInFolder, parentFolder } from "../vault/files";
 import { joinVaultPath, sanitizeFileName, sanitizeVaultRelativePath } from "../vault/paths";
 import { slugify, uniqueStrings } from "../text";
-import type { RenameByTitleOptions, RenameResult, RenameZkOptions, WorkflowContext } from "./context";
+import type { RenameByTitleOptions, RenameLlmWikiOptions, RenameResult, RenameZkOptions, WorkflowContext } from "./context";
 import {
   assertVacantPath,
   drillToChild,
@@ -12,6 +12,7 @@ import {
   folderStyleContainer,
   requireTitle,
   resolveRequiredArea,
+  resolveRequiredLlmWiki,
   resolveRequiredProject,
   resolveRequiredResource,
   resolveRequiredZk
@@ -45,6 +46,19 @@ export async function renameResource(ctx: WorkflowContext, options: RenameByTitl
   );
 }
 
+export async function renameLlmWiki(ctx: WorkflowContext, options: RenameLlmWikiOptions): Promise<RenameResult> {
+  const newTitleSegments = sanitizeVaultRelativePath(options.newTitle, "new_title");
+  if (newTitleSegments.length > 1) {
+    throw new Error("new_title for rename-llm-wiki must be a bare basename (use optsidian rename/move to change the folder).");
+  }
+  return renameFlatNote(
+    ctx,
+    await resolveRequiredLlmWiki(ctx, options),
+    newTitleSegments[0],
+    "llm-wiki"
+  );
+}
+
 export async function renameZk(ctx: WorkflowContext, options: RenameZkOptions): Promise<RenameResult> {
   return renameFlatNote(
     ctx,
@@ -70,7 +84,7 @@ async function renameChildTarget(
   return renameFlatNote(ctx, file, newTitle, type === "resource" ? "resource" : "knowledge");
 }
 
-type TagDomain = "project" | "area" | "resource" | "knowledge";
+type TagDomain = "project" | "area" | "resource" | "knowledge" | "llm-wiki";
 
 async function renameFolderStyleNote(
   ctx: WorkflowContext,
@@ -305,10 +319,10 @@ async function updateTitleDerivedTag(
   fromTitle: string,
   title: string
 ): Promise<{ namespaceMoves: TagNamespaceMove[] }> {
-  const activeTagPrefix = localePack(ctx.settings.locale).tags[domain];
+  const activeTagPrefix = tagPrefixForDomain(ctx.settings.locale, domain);
   const knownPrefixes = uniqueStrings([
-    localePack("en").tags[domain],
-    localePack("ko").tags[domain],
+    tagPrefixForDomain("en", domain),
+    tagPrefixForDomain("ko", domain),
     activeTagPrefix
   ]);
   const nextTag = `${activeTagPrefix}/${slugify(title)}`;
@@ -339,6 +353,11 @@ async function updateTitleDerivedTag(
   return {
     namespaceMoves: uniqueTagNamespaceMoves(namespaceMoves)
   };
+}
+
+function tagPrefixForDomain(locale: "en" | "ko", domain: TagDomain): string {
+  const tags = localePack(locale).tags;
+  return domain === "llm-wiki" ? tags.llmWiki : tags[domain];
 }
 
 function renamedTitleTag(

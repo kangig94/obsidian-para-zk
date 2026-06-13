@@ -7,13 +7,14 @@ describe("managed templates", () => {
     const project = renderTemplate("project", DEFAULT_SETTINGS);
     const area = renderTemplate("area", DEFAULT_SETTINGS);
     const resource = renderTemplate("resource", DEFAULT_SETTINGS);
+    const llmWiki = renderTemplate("llm-wiki", DEFAULT_SETTINGS);
     const journal = renderTemplate("journal", DEFAULT_SETTINGS);
     const retro = renderTemplate("retro", DEFAULT_SETTINGS);
     const subnote = renderTemplate("subnote", DEFAULT_SETTINGS);
     const spark = renderTemplate("spark", DEFAULT_SETTINGS);
     const source = renderTemplate("digest", DEFAULT_SETTINGS);
     const permanent = renderTemplate("permanent", DEFAULT_SETTINGS);
-    const templates = [project, area, resource, journal, retro, subnote, spark, source, permanent];
+    const templates = [project, area, resource, llmWiki, journal, retro, subnote, spark, source, permanent];
 
     for (const content of templates) {
       expect(content).not.toContain("PZ[");
@@ -27,6 +28,15 @@ describe("managed templates", () => {
     expect(resource).toContain("```para-zk-props\ntype: resource\n```\n{{cursor}}\n\n```para-zk-managed");
     expect(resource).not.toContain("# Overview");
     expect(resource).not.toContain("# Body");
+    expect(llmWiki).toContain("type: llm-wiki");
+    expect(llmWiki).toContain("  - llm-wiki/{{slug}}");
+    expect(llmWiki).toContain("updated:\naliases:");
+    expect(llmWiki).not.toContain("para-zk-props");
+    expect(llmWiki).not.toContain("para-zk-managed");
+    expect(llmWiki).not.toContain("url:");
+    expect(llmWiki).not.toContain("first_author:");
+    expect(llmWiki).not.toContain("license:");
+    expect(llmWiki).not.toContain("kind:");
     expect(spark).toContain("```para-zk-props\ntype: spark\n```\n{{cursor}}\n\n```para-zk-managed");
     expect(spark).not.toContain("# One-line thought summary");
     expect(spark).not.toContain("# Memo");
@@ -79,6 +89,7 @@ describe("managed templates", () => {
     expect(resource).toContain("title: Created from this");
     expect(journal).toContain("para-zk-tasks");
     expect(managedUiBlockForType("retro", DEFAULT_SETTINGS)).toBeUndefined();
+    expect(managedUiBlockForType("llm-wiki", DEFAULT_SETTINGS)).toBeUndefined();
     expect(spark).toContain("spark-distill");
     expect(source).toContain("digest-cited-by");
     expect(source).toContain("para-zk-references");

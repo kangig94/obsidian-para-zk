@@ -45,6 +45,12 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- Added the `llm-wiki` surface type for LLM-owned derived synthesis under
+  `LLM-Wiki/`: native CLI CRUD (`create/read/update/rename/delete-llm-wiki`),
+  slash-path title addressing, `body`/`frontmatter/aliases`/`references` editing,
+  `llm-wiki/<slug>` identity tags that rewrite on rename, list/describe/audit
+  participation, MCP `type=llm-wiki` mutation mapping, and setup/smoke coverage
+  for the no-props/no-managed wiki template shape.
 - Added a dedicated `para-zk:attach-file` CLI contract section covering local
   source options, single-file and multi-source result fields, unique-name
   collision behavior, directory recursion rules, desktop-local source paths,

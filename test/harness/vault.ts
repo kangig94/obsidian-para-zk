@@ -1,9 +1,10 @@
 // In-memory Obsidian App used by workflow unit tests. It backs the subset of
 // the vault / fileManager / metadataCache / workspace API that src/workflows.ts
 // touches, parsing and re-serializing YAML frontmatter on every read so reads
-// always reflect the latest write. Behaviors that depend on Obsidian's real
-// engine (link rewriting on rename, backlink resolution, metadataCache write
-// lag) are intentionally NOT reproduced — those stay in the live smoke test.
+// always reflect the latest write. It includes a narrow exact-wikilink rewrite
+// on rename so CLI/workflow tests can assert the same user-facing contract as
+// Obsidian's automatic link update. Metadata cache lag and renderer behavior
+// still stay in the live smoke test.
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import type { ParaZkPluginContext } from "../../src/plugin-interface";
 import { DEFAULT_SETTINGS, type ParaZkSettings } from "../../src/types";
@@ -105,7 +106,9 @@ export class MockApp {
       this.rewire();
     },
     renameFile: async (file: TAbstractFile, newPath: string): Promise<void> => {
-      this.relocate(file.path, newPath);
+      const oldPath = file.path;
+      this.relocate(oldPath, newPath);
+      this.rewriteLinksAfterRename(oldPath, newPath);
     }
   };
 
@@ -251,6 +254,17 @@ export class MockApp {
     this.rewire();
   }
 
+  private rewriteLinksAfterRename(oldPath: string, newPath: string): void {
+    for (const [path, content] of this.contents.entries()) {
+      const next = rewriteWikiLinks(content, oldPath, newPath);
+      if (next === content) continue;
+      this.contents.set(path, next);
+      const file = this.fileObjs.get(path);
+      if (file) file.stat.size = next.length;
+    }
+    this.rewire();
+  }
+
   private assignFileFields(file: TFile, path: string): void {
     file.path = path;
     file.name = baseName(path);
@@ -312,6 +326,34 @@ function wikiLinkTargets(content: string): string[] {
     if (target) targets.push(target);
   }
   return targets;
+}
+
+function rewriteWikiLinks(content: string, oldPath: string, newPath: string): string {
+  return content.replace(
+    /(!?\[\[)([^\]|]+)(\|[^\]]*)?(\]\])/g,
+    (_match, open: string, rawTarget: string, alias: string | undefined, close: string) => {
+      const rewritten = renamedWikiTarget(rawTarget, oldPath, newPath);
+      return `${open}${rewritten}${alias ?? ""}${close}`;
+    }
+  );
+}
+
+function renamedWikiTarget(target: string, oldPath: string, newPath: string): string {
+  const hashIndex = target.indexOf("#");
+  const base = hashIndex === -1 ? target : target.slice(0, hashIndex);
+  const subpath = hashIndex === -1 ? "" : target.slice(hashIndex);
+  const oldNoExt = stripMarkdownExtension(oldPath);
+  const newNoExt = stripMarkdownExtension(newPath);
+
+  if (base === oldPath) return `${newPath}${subpath}`;
+  if (base === oldNoExt) return `${newNoExt}${subpath}`;
+  if (base.startsWith(`${oldPath}/`)) return `${newPath}${base.slice(oldPath.length)}${subpath}`;
+  if (base.startsWith(`${oldNoExt}/`)) return `${newNoExt}${base.slice(oldNoExt.length)}${subpath}`;
+  return target;
+}
+
+function stripMarkdownExtension(path: string): string {
+  return path.endsWith(".md") ? path.slice(0, -3) : path;
 }
 
 function incrementLinkCount(

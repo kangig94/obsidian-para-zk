@@ -12,6 +12,7 @@ export const TEMPLATE_NAMES = [
   "project",
   "area",
   "resource",
+  "llm-wiki",
   "journal",
   "retro",
   "subnote",
@@ -152,6 +153,18 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         "{{cursor}}",
         "",
         paraZkManagedBlock(),
+        ""
+      ].join("\n");
+    case "llm-wiki":
+      return [
+        frontmatter([
+          "type: llm-wiki",
+          "tags:",
+          `  - ${tags.llmWiki}/${slugPlaceholder}`,
+          `created: ${nowPlaceholder}`,
+          "updated:",
+          "aliases:"
+        ]),
         ""
       ].join("\n");
     case "journal":

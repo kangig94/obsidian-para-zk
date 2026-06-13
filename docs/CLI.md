@@ -184,7 +184,8 @@ Important fields:
   surface types, addressed by name) versus what to route to the host: raw file edits,
   free-form frontmatter, and full-text search go to optsidian (`edit`/`apply_patch`/`write`,
   `grep`/`search`), not PARA-ZK.
-- `surfaceTypes` — addressable/createable note types.
+- `surfaceTypes` — addressable/createable note types, including the derived
+  `llm-wiki` surface.
 - `workflows` — named (non-surface) commands with their inputs:
   `list`, `audit`, `create-child`, `read-child`, `update-child`, `rename-child`,
   `delete-child`, `capture-journal`, `distill-spark`, `create-from-digest`,
@@ -200,7 +201,7 @@ Important fields:
   - `create` — the command that creates it, and `createInputs` — that command's
     arguments (so a caller learns the full create call from `describe` alone).
   - `addressVia` — for non-addressable types (`subnote`/`note`), nested areas,
-    and resource subdirectory addressing, how to reach existing ones.
+    and resource/llm-wiki subdirectory addressing, how to reach existing ones.
 
 `describe type=<t>` is the self-contained contract for one type: address selectors,
 create command + inputs, collections, and read/write keys. `readKeys` are the readable
@@ -220,7 +221,7 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `type` | `project`, `area`, `resource`, `zk`, `retro`, `journal`, `subnote` | Optional. Omit to list all PARA-ZK notes. `zk` spans all stored ZK kinds. `area` includes nested areas. |
+| `type` | `project`, `area`, `resource`, `llm-wiki`, `zk`, `retro`, `journal`, `subnote` | Optional. Omit to list all active PARA-ZK notes, including active `llm-wiki` notes. `zk` spans all stored ZK kinds. `area` includes nested areas. |
 | `archived` | boolean | `true` lists archived notes; default lists active notes. |
 | `query` | string | Optional case-insensitive title substring filter. |
 | `offset` | number | Zero-based item offset (default `0`). |
@@ -229,11 +230,13 @@ Options:
 ```bash
 optsidian para-zk:list type=project query=eval format=json
 optsidian para-zk:list type=zk limit=all format=json
+optsidian para-zk:list type=llm-wiki limit=all format=json
 ```
 
 Returns `{ count, offset, limit, returned, has_more, items }`; each item is
 `{ title, type, path }` (plus `archived: true` in archived listings). `type` is
-the stored type (e.g. `permanent` for a `type=zk` listing).
+the stored type (e.g. `permanent` for a `type=zk` listing). `llm-wiki` has no
+archived selector; active wiki notes live under `LLM-Wiki/`.
 
 ### `para-zk:audit`
 
@@ -674,11 +677,19 @@ invalid). `rename-resource` only changes the basename in the current folder;
 use the Obsidian/optsidian native `move` or `rename` file operation to move a
 resource between folders link-safely.
 
+For `*-llm-wiki` commands, `title` may be an LLM-Wiki-relative slash path.
+`title="AI/Foo"` addresses or creates `LLM-Wiki/AI/Foo.md`; the basename, tag
+slug, and visible title derive from `Foo`. There is no archived wiki selector:
+LLM-Wiki pages are active, LLM-owned derived synthesis under `LLM-Wiki/`, not
+canonical PARA/ZK records.
+
 Surface types fall into two groups. `project`, `area`, `journal`, and `retro`
 are structured: their load-bearing template sections are stable keys. `resource`,
-child `subnote`/fallback `note`, and the ZK kinds `spark`/`digest`/`permanent` are
+`llm-wiki`, child `subnote`/fallback `note`, and the ZK kinds
+`spark`/`digest`/`permanent` are
 free-form: prose is exposed as
-one `body` key for the whole editable Markdown body before the managed tail.
+one `body` key for the editable Markdown body (before the managed tail where
+one exists; `llm-wiki` has no managed tail).
 Free-form bodies may contain H1 headings; those headings are content, not extra
 stable keys.
 
@@ -686,6 +697,7 @@ stable keys.
 | --- | --- | --- |
 | `para-zk:read-area` | `title` | `frontmatter`, `overview`, `tasks`, `references`, `backlinks`, `children` |
 | `para-zk:read-resource` | `title`; `/` addresses a Resources-relative path | `frontmatter`, `body`, `references`, `backlinks` |
+| `para-zk:read-llm-wiki` | `title`; `/` addresses an LLM-Wiki-relative path | `frontmatter`, `body`, `references`, `backlinks` |
 | `para-zk:read-zk` | `title` plus optional `kind` | `frontmatter`, `body`, `references`, `backlinks` |
 | `para-zk:read-journal` | `date` | `frontmatter`, `focus`, `quick_memo`, `timeline`, `tasks`, `short_review`, `references`, `backlinks` |
 | `para-zk:read-retro` | `title` plus optional `date` | `frontmatter`, `week_progress`, `good`, `improve`, `risks`, `retro_summary`, `backlinks` |
@@ -694,6 +706,7 @@ Free-form top-level keys:
 
 ```text
 resource: frontmatter | body | references | backlinks
+llm-wiki: frontmatter | body | references | backlinks
 spark: frontmatter | body | references | backlinks
 digest: frontmatter | body | references | backlinks
 permanent: frontmatter | body | references | backlinks
@@ -713,6 +726,7 @@ optsidian para-zk:read-area title="AI" key=backlinks type=project format=json
 optsidian para-zk:read-project title="Finished Project" archived=true key=summary format=json
 optsidian para-zk:read-resource title="Source Paper" key=body format=json
 optsidian para-zk:read-resource title="AI/Source Paper" key=body format=json
+optsidian para-zk:read-llm-wiki title="AI/Policy" key=body format=json
 optsidian para-zk:read-zk title="Stable Interface Contracts" kind=permanent key=body format=json
 optsidian para-zk:read-zk title="Stable Interface Contracts" kind=permanent key=frontmatter/maturity format=json
 optsidian para-zk:read-journal date=2026-05-30 key=quick_memo format=json
@@ -746,9 +760,9 @@ also supports `append`/`prepend` (add one value) and `delete` (remove one), so y
 area without restating the whole list; `areas` accepts an area title (resolved to its canonical
 link) or an existing `[[link]]`. Section/body keys support `set`, `append`, `prepend`, and
 exact literal `replace`.
-For free-form resource, child subnote/note, and ZK prose, use `key=body`; old starter
-headings such as `summary`, `memo`, `insight`, or `limitations` are not writable
-map keys.
+For free-form resource, llm-wiki, child subnote/note, and ZK prose, use
+`key=body`; old starter headings such as `summary`, `memo`, `insight`, or
+`limitations` are not writable map keys.
 Task collections are structured and do not accept raw Markdown task lines.
 Insert one task with `key=tasks op=insert value_json='{...}'`, update one field
 with `key=tasks/<id>/<field> op=set value=...`, and delete one task with
@@ -851,6 +865,8 @@ optsidian para-zk:update-project title="Model Evaluation" key=tasks/a8f3k2m9/che
 optsidian para-zk:update-project title="Model Evaluation" key=tasks/a8f3k2m9 op=delete format=json
 optsidian para-zk:update-child root_type=project root_title="Model Evaluation" title="Planning Meeting" key=body op=append value="Decision: ship the baseline." format=json
 optsidian para-zk:update-child root_type=area root_title="AI" relpath='["Generation"]' title="Vision" key=overview op=set value=@/tmp/vision.md format=json
+optsidian para-zk:update-llm-wiki title="AI/Policy" key=body op=append value=@/tmp/wiki.md format=json
+optsidian para-zk:update-llm-wiki title="AI/Policy" key=references op=insert value_json='{"link":"[[PARA/Resources/Source Paper.md]]"}' format=json
 optsidian para-zk:update-project title="Model Evaluation" key=frontmatter/status op=set value=archived format=json
 ```
 
@@ -898,6 +914,7 @@ The same update algorithm is used by the other domain update commands:
 | --- | --- | --- |
 | `para-zk:update-area` | `title` | Supports root area surface keys. |
 | `para-zk:update-resource` | `title`; `/` addresses a Resources-relative path | Uses free-form `body`, `references`, and frontmatter keys. |
+| `para-zk:update-llm-wiki` | `title`; `/` addresses an LLM-Wiki-relative path | Uses free-form `body`, `references`, and `frontmatter/aliases`. No `archived`. |
 | `para-zk:update-zk` | `title` plus optional `kind` | Uses free-form `body`, `references`, and type-specific frontmatter keys. |
 | `para-zk:update-journal` | `date` | Supports journal surface keys such as `quick_memo` and `tasks`. |
 | `para-zk:update-retro` | `title` plus optional `date` | Uses retro writable keys: `frontmatter`, `week_progress`, `good`, `improve`, `risks`, and `retro_summary`; `backlinks` is read-only. |
@@ -925,6 +942,7 @@ retros are left in place.
 | `para-zk:rename-project` | `title`; optional `archived` | Renames the folder-style project folder and main note. Child notes move with the folder; default project-scoped retros are renamed with it. |
 | `para-zk:rename-area` | `title`; optional `archived` | Renames the folder-style area folder and main note. Child areas move with the folder; default area-scoped retros and area tag namespaces are updated without dropping inherited parent tags. |
 | `para-zk:rename-resource` | `title`; optional `archived`; `/` addresses a Resources-relative path | Renames the resource note file in its current folder. `new_title` must be a bare basename; use native `move`/`rename` to move folders. |
+| `para-zk:rename-llm-wiki` | `title`; `/` addresses an LLM-Wiki-relative path | Renames the wiki note file in its current folder and rewrites the `llm-wiki/<slug>` tag. `new_title` must be a bare basename; no `archived`. |
 | `para-zk:rename-zk` | `title` plus optional `kind` | Renames the selected ZK note file in place. |
 | `para-zk:rename-child` | `root_type` + `root_title` + optional `relpath` + `title` | Renames a subnote, fallback note, or nested area. `new_title` renames the addressed child. |
 
@@ -948,6 +966,7 @@ optsidian para-zk:rename-area title="AI" new_title="Applied AI" format=json
 optsidian para-zk:rename-child root_type=area root_title="AI" relpath='["Generation"]' title="Vision" new_title="Computer Vision" format=json
 optsidian para-zk:rename-resource title="Source Paper" new_title="Source Paper Notes" format=json
 optsidian para-zk:rename-resource title="AI/Source Paper" new_title="Source Paper Notes" format=json
+optsidian para-zk:rename-llm-wiki title="AI/Policy" new_title="Policy Wiki" format=json
 optsidian para-zk:rename-zk title="Stable Interface Contracts" kind=permanent new_title="Stable CLI Contracts" format=json
 ```
 
@@ -979,6 +998,7 @@ needed. PARA-ZK only cleans relationships it owns directly:
 | `para-zk:delete-project` | `title`; optional `archived` | Deletes the folder-style project container. Requires `force=true` if child files are inside. |
 | `para-zk:delete-area` | `title`; optional `archived` | Deletes the folder-style area container. Requires `force=true` if child files are inside. |
 | `para-zk:delete-resource` | `title`; optional `archived`; `/` addresses a Resources-relative path | Deletes the resource note and removes matching frontmatter reference items. |
+| `para-zk:delete-llm-wiki` | `title`; `/` addresses an LLM-Wiki-relative path | Deletes the wiki note and removes matching frontmatter reference items. No `archived`. |
 | `para-zk:delete-zk` | `title` plus optional `kind` | Deletes the selected ZK note and removes matching frontmatter reference items. |
 | `para-zk:delete-journal` | `date` | Deletes a daily journal note. |
 | `para-zk:delete-retro` | `title` plus optional `date` | Deletes a retro note. |
@@ -1002,6 +1022,7 @@ Examples:
 ```bash
 optsidian para-zk:delete-resource title="Source Paper" format=json
 optsidian para-zk:delete-resource title="AI/Source Paper" format=json
+optsidian para-zk:delete-llm-wiki title="AI/Policy" format=json
 optsidian para-zk:delete-area title="Unused Area" format=json
 optsidian para-zk:delete-child root_type=project root_title="Model Evaluation" title="Planning Meeting" format=json
 optsidian para-zk:delete-project title="Prototype" force=true format=json
@@ -1107,6 +1128,41 @@ Important fields:
 
 - `sourcePath`
 - `linkedFromSource`
+
+### `para-zk:create-llm-wiki`
+
+Creates an LLM-Wiki page under `LLM-Wiki/`. Use this for derived,
+LLM-owned synthesis that should be easy for future LLM calls to read and update.
+The canonical knowledge remains Resources, PARA, and ZK; wiki pages cite
+canonical notes through their own `references` registry and body links. Do not
+write reverse links from canonical notes back into the wiki.
+
+Options:
+
+| Option | Values | Notes |
+| --- | --- | --- |
+| `title` | string | Required. Use `/` to create under an LLM-Wiki-relative subdirectory, e.g. `AI/Policy`. |
+| `alias` | string or one-item string list | Optional single short Obsidian alias. Stored as a one-item `aliases` frontmatter list. Canonical create arg is `alias`. |
+| `body` | markdown | Optional initial free-form body content. Accepts `@<absolute-path>`. |
+| `open` | boolean | Default `false`. |
+
+The created note stores `type: llm-wiki` and exactly one identity tag
+`llm-wiki/<slug>` plus vault-managed timestamps/id. It intentionally has no
+resource provenance frontmatter (`url`, `first_author`, `license`, `kind`), no
+props block, and no managed UI tail. Writable keys are `body`,
+`frontmatter/aliases`, and the `references` collection:
+
+```bash
+optsidian para-zk:create-llm-wiki title="AI/Policy" body=@/tmp/wiki.md open=false format=json
+optsidian para-zk:create-llm-wiki title="Models/Attention" alias="Attention Wiki" format=json
+optsidian para-zk:update-llm-wiki title="AI/Policy" key=frontmatter/aliases op=set value="Policy Wiki" format=json
+optsidian para-zk:update-llm-wiki title="AI/Policy" key=references op=insert value_json='{"link":"[[PARA/Resources/Source Paper.md]]"}' format=json
+optsidian para-zk:read-llm-wiki title="AI/Policy" key=references limit=all format=json
+```
+
+`read-llm-wiki`, `update-llm-wiki`, `rename-llm-wiki`, and `delete-llm-wiki`
+all use `title`, accept the same slash-path addressing, and do not accept
+`archived`.
 
 ### `para-zk:create-retro`
 

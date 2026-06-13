@@ -119,6 +119,7 @@ function assertSetupEnvironment(setupPayload) {
   assertHomepageConfig();
   assertOpenTabSettingsConfig();
   assertHomepageRuntime();
+  assertFolderExists("LLM-Wiki", "setup did not create the LLM-Wiki folder");
 }
 
 function ensureDataviewIndexReady() {
@@ -177,6 +178,7 @@ function runLiveScenario() {
   assertObjectReferenceRenameSurvival();
   assertRenameAreaLinkRewrite();
   assertBacklinkReadKeyScenario();
+  assertLlmWikiRoundTrip();
 
   const reorderProject = cliJson("para-zk:create-project", [
     `title=Smoke Reorder ${stamp}`,
@@ -216,6 +218,7 @@ function assertManagedTemplateFiles() {
     "project",
     "area",
     "resource",
+    "llm-wiki",
     "journal",
     "retro",
     "subnote",
@@ -229,13 +232,17 @@ function assertManagedTemplateFiles() {
     const text = readVaultText(path);
     assertNoTemplateDrift(path, text);
 
-    if (name === "retro") {
+    if (name === "retro" || name === "llm-wiki") {
       assert(!text.includes("```para-zk-managed"), `${path} should not include managed UI`);
     } else {
       assert(countOccurrences(text, "```para-zk-managed") === 1, `${path} must include exactly one managed block`);
       assert(text.includes("```para-zk-managed\n```"), `${path} managed block must stay compact`);
     }
   }
+
+  const llmWiki = readVaultText("Templates/para-zk/template_llm-wiki.md");
+  assertLlmWikiFreeFormShape("Templates/para-zk/template_llm-wiki.md", llmWiki);
+  assert(llmWiki.includes("  - llm-wiki/{{slug}}"), "template_llm-wiki.md must include the llm-wiki identity tag placeholder");
 
   const project = readVaultText("Templates/para-zk/template_project.md");
   assert(
@@ -257,6 +264,10 @@ function assertManagedTemplateFiles() {
 function assertGeneratedNoteTemplateShape(path, type, options = {}) {
   assertVaultTextEventually(path, (text) => {
     assertNoTemplateDrift(path, text);
+    if (type === "llm-wiki") {
+      assertLlmWikiFreeFormShape(path, text);
+      return;
+    }
     assert(text.includes("```para-zk-props"), `${path} is missing para-zk props block`);
 
     if (type === "subnote" || type === "retro") {
@@ -280,6 +291,15 @@ function assertGeneratedNoteTemplateShape(path, type, options = {}) {
       assertZkStarterTemplateShape(path, type, text);
     }
   });
+}
+
+function assertLlmWikiFreeFormShape(path, text) {
+  assert(text.includes("type: llm-wiki"), `${path} is missing llm-wiki type frontmatter`);
+  assert(!text.includes("```para-zk-props"), `${path} should not include para-zk props block`);
+  assert(!text.includes("```para-zk-managed"), `${path} should not include managed UI`);
+  for (const key of ["url:", "first_author:", "license:", "kind:"]) {
+    assert(!text.includes(key), `${path} should not include resource provenance key ${key}`);
+  }
 }
 
 function assertResourceFreeFormTemplateShape(path, text) {
@@ -587,6 +607,33 @@ function assertBacklinkReadKeyScenario() {
   const projectItems = Object.values(projectBacklinks.value?.items ?? {});
   assert(projectItems.some((item) => item.path === project.path), "backlink type=project filter excluded the project source");
   assert(!projectItems.some((item) => item.path === area.path), "backlink type=project filter included a non-project source");
+}
+
+function assertLlmWikiRoundTrip() {
+  const title = `Smoke LLM Wiki ${stamp}`;
+  const body = `LLM-owned synthesis for ${stamp}.`;
+  const wiki = cliJson("para-zk:create-llm-wiki", [
+    `title=${title}`,
+    `body=${body}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(wiki, "llm-wiki create");
+  assert(wiki.path === `LLM-Wiki/${title}.md`, `llm-wiki path mismatch: ${wiki.path}`);
+  assertGeneratedNoteTemplateShape(wiki.path, "llm-wiki");
+  assertFileContains(wiki.path, [
+    "type: llm-wiki",
+    `  - llm-wiki/${slugForTitle(title)}`,
+    body
+  ]);
+
+  const read = cliJson("para-zk:read-llm-wiki", [
+    `title=${title}`,
+    "key=body",
+    "format=json"
+  ]);
+  assert(read.ok === true, `llm-wiki read failed: ${JSON.stringify(read)}`);
+  assert(read.value === body, `llm-wiki read body mismatch: ${JSON.stringify(read)}`);
 }
 
 
@@ -1793,6 +1840,16 @@ function countOccurrences(text, needle) {
   return text.split(needle).length - 1;
 }
 
+function slugForTitle(value) {
+  const slug = value
+    .toLowerCase()
+    .replace(/[^a-z0-9가-힣_\/]+/g, "_")
+    .replace(/-/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return slug || "untitled";
+}
+
 function assertCreated(payload, label) {
   assert(payload.ok === true, `${label} command failed`);
   assert(typeof payload.path === "string" && payload.path.length > 0, `${label} result has no path`);
@@ -1809,6 +1866,15 @@ function assertFileExists(path, message) {
   assert(false, `${message}: ${path}`);
 }
 
+function assertFolderExists(path, message) {
+  const absolute = join(vaultPath, path);
+  const deadline = Date.now() + 3000;
+  while (Date.now() <= deadline) {
+    if (existsSync(absolute) && statSync(absolute).isDirectory()) return;
+    sleepMs(100);
+  }
+  assert(false, `${message}: ${path}`);
+}
 
 function assertFileContains(path, needles) {
   const absolute = join(vaultPath, path);

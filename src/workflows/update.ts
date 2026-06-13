@@ -38,6 +38,7 @@ import type {
   TaskWritableField,
   UpdateAreaOptions,
   UpdateJournalOptions,
+  UpdateLlmWikiOptions,
   UpdateOperation,
   UpdatePayloadOptions,
   UpdateProjectOptions,
@@ -50,6 +51,7 @@ import type {
 import {
   AREA_READ_SPEC,
   JOURNAL_READ_SPEC,
+  LLM_WIKI_READ_SPEC,
   LIST_FRONTMATTER_KEYS,
   PROJECT_READ_SPEC,
   RESOURCE_READ_SPEC,
@@ -74,6 +76,7 @@ import {
   relativePathUnderRoot,
   resolveRequiredArea,
   resolveRequiredJournal,
+  resolveRequiredLlmWiki,
   resolveRequiredProject,
   resolveRequiredResource,
   resolveRequiredRetro,
@@ -106,6 +109,10 @@ export async function updateArea(ctx: WorkflowContext, options: UpdateAreaOption
 
 export async function updateResource(ctx: WorkflowContext, options: UpdateResourceOptions): Promise<UpdateSurfaceResult> {
   return updateSurface(ctx, await resolveRequiredResource(ctx, options), RESOURCE_READ_SPEC, options);
+}
+
+export async function updateLlmWiki(ctx: WorkflowContext, options: UpdateLlmWikiOptions): Promise<UpdateSurfaceResult> {
+  return updateSurface(ctx, await resolveRequiredLlmWiki(ctx, options), LLM_WIKI_READ_SPEC, options);
 }
 
 export async function updateZk(ctx: WorkflowContext, options: UpdateZkOptions): Promise<UpdateSurfaceResult> {

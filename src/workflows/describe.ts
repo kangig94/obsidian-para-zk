@@ -44,6 +44,7 @@ const SURFACE_TYPES = [
   "project",
   "area",
   "resource",
+  "llm-wiki",
   "journal",
   "retro",
   "subnote",
@@ -80,6 +81,15 @@ export const AREA_READ_SPEC: ReadSurfaceSpec = {
 
 export const RESOURCE_READ_SPEC: ReadSurfaceSpec = {
   frontmatter: ["aliases", "url", "first_author", "license", "kind"],
+  sections: [
+    { key: "references", labelKey: "references", transform: readReferences, collection: "reference" },
+    BACKLINK_READ_SECTION
+  ],
+  body: true
+};
+
+export const LLM_WIKI_READ_SPEC: ReadSurfaceSpec = {
+  frontmatter: ["aliases"],
   sections: [
     { key: "references", labelKey: "references", transform: readReferences, collection: "reference" },
     BACKLINK_READ_SECTION
@@ -160,6 +170,7 @@ export function specForType(type: string): ReadSurfaceSpec {
   if (type === "project") return PROJECT_READ_SPEC;
   if (type === "area") return AREA_READ_SPEC;
   if (type === "resource") return RESOURCE_READ_SPEC;
+  if (type === "llm-wiki") return LLM_WIKI_READ_SPEC;
   if (type === "journal") return JOURNAL_READ_SPEC;
   if (type === "retro") return RETRO_READ_SPEC;
   if (type === "subnote") return SUBNOTE_READ_SPEC;
@@ -329,6 +340,16 @@ function addressingForType(type: SurfaceType): SurfaceAddressing {
         selectors: ["title", "archived"],
         addressVia: "A resource title may be a Resources-relative path using /: title=\"AI/Foo\" addresses or creates <Resources>/AI/Foo.md. A bare title resolves anywhere under Resources and is ambiguous if duplicated.",
         create: "para-zk:create-resource",
+        rename: true
+      };
+    case "llm-wiki":
+      return {
+        addressable: true,
+        selectors: ["title"],
+        addressVia: "An llm-wiki title may be an LLM-Wiki-relative path using /: title=\"AI/Foo\" addresses or creates <LLM-Wiki>/AI/Foo.md. A bare title resolves anywhere under LLM-Wiki and is ambiguous if duplicated.",
+        create: "para-zk:create-llm-wiki",
+        read: "para-zk:read-llm-wiki",
+        update: "para-zk:update-llm-wiki",
         rename: true
       };
     case "retro":

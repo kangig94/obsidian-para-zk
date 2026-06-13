@@ -8,7 +8,7 @@ import type { WorkflowHost } from "../vault/host";
 import { joinVaultPath, normalizeVaultPath, sanitizeFileName, sanitizeVaultRelativePath, wikiLink } from "../vault/paths";
 import { uniqueStrings } from "../text";
 import { readOptionalCode } from "./code-options";
-import type { ReadAreaOptions, ReadJournalOptions, ReadProjectOptions, ReadResourceOptions, ReadRetroOptions, ReadZkOptions, WorkflowContext } from "./context";
+import type { ReadAreaOptions, ReadJournalOptions, ReadLlmWikiOptions, ReadProjectOptions, ReadResourceOptions, ReadRetroOptions, ReadZkOptions, WorkflowContext } from "./context";
 import { stringReferencesAnyTarget } from "./references";
 import { ZK_KIND_CODE_HELP, isZkType, parseZkKind, zkKindCode } from "../zk/kinds";
 
@@ -309,6 +309,17 @@ export async function resolveRequiredResource(ctx: WorkflowContext, options: Rea
   return file;
 }
 
+export async function resolveRequiredLlmWiki(ctx: WorkflowContext, options: ReadLlmWikiOptions): Promise<TFile> {
+  const file = options.path
+    ? resolveRequiredFile(ctx, options.path, "llm-wiki note")
+    : findLlmWikiByTitle(ctx, llmWikiTitlePath(options.title));
+  if (!file) throw new Error(`llm-wiki note not found: ${options.title}`);
+
+  const type = await readFileTypeFresh(ctx, file);
+  if (type !== "llm-wiki") throw new Error(`file is not an llm-wiki note: ${file.path}`);
+  return file;
+}
+
 export async function resolveRequiredZk(ctx: WorkflowContext, options: ReadZkOptions): Promise<TFile> {
   const kind = readOptionalCode(options.kind, parseZkKind, "kind", ZK_KIND_CODE_HELP);
   const file = options.path
@@ -428,13 +439,21 @@ export type ResourceTitlePath = {
   relpath: string;
 };
 
-export function resourceTitlePath(value: string | undefined): ResourceTitlePath {
-  const segments = sanitizeVaultRelativePath(value, "resource title");
+function titlePath(value: string | undefined, label: string): ResourceTitlePath {
+  const segments = sanitizeVaultRelativePath(value, label);
   return {
     basename: segments[segments.length - 1],
     qualified: segments.length > 1,
     relpath: segments.join("/")
   };
+}
+
+export function resourceTitlePath(value: string | undefined): ResourceTitlePath {
+  return titlePath(value, "resource title");
+}
+
+export function llmWikiTitlePath(value: string | undefined): ResourceTitlePath {
+  return titlePath(value, "llm-wiki title");
 }
 
 function findResourceByTitle(ctx: WorkflowContext, title: ResourceTitlePath, archived: boolean | undefined): TFile | undefined {
@@ -458,6 +477,24 @@ function findResourceByTitle(ctx: WorkflowContext, title: ResourceTitlePath, arc
     folders,
     type: "resource",
     label: "resource"
+  });
+}
+
+function findLlmWikiByTitle(ctx: WorkflowContext, title: ResourceTitlePath): TFile | undefined {
+  const folders = [ctx.settings.paths.wikiFolder];
+
+  if (title.qualified) {
+    return ctx.host.getFile(joinVaultPath(folders[0], `${title.relpath}.md`)) ?? undefined;
+  }
+
+  const flat = ctx.host.getFile(joinVaultPath(folders[0], `${title.basename}.md`));
+  if (flat) return flat;
+
+  return findUniqueNoteByTitle(ctx, {
+    title: title.basename,
+    folders,
+    type: "llm-wiki",
+    label: "llm-wiki note"
   });
 }
 

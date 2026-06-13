@@ -12,6 +12,7 @@ export type {
 
 export {
   createArea,
+  createLlmWiki,
   createProject,
   createResource,
   createRetro,
@@ -21,6 +22,7 @@ export {
 export {
   readArea,
   readJournal,
+  readLlmWiki,
   readProject,
   readResource,
   readRetro,
@@ -29,13 +31,14 @@ export {
 export {
   updateArea,
   updateJournal,
+  updateLlmWiki,
   updateProject,
   updateResource,
   updateRetro,
   updateZk
 } from "./update";
-export { renameArea, renameProject, renameResource, renameZk } from "./rename";
-export { deleteArea, deleteJournal, deleteProject, deleteResource, deleteRetro, deleteZk } from "./delete";
+export { renameArea, renameLlmWiki, renameProject, renameResource, renameZk } from "./rename";
+export { deleteArea, deleteJournal, deleteLlmWiki, deleteProject, deleteResource, deleteRetro, deleteZk } from "./delete";
 export { listNotes } from "./list";
 export { auditVault } from "./audit";
 export { captureJournal, openJournal, distillSpark, createFromDigest, createFromResource } from "./promote";

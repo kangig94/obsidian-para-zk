@@ -35,6 +35,7 @@ export async function setupVault(
   };
 
   await migrateLegacyTaskRootsFolder(app, nextSettings, result, dryRun);
+  addUnique(nextSettings.layoutFolders, nextSettings.paths.wikiFolder);
 
   const folders = Array.from(new Set(nextSettings.layoutFolders.map(normalizeVaultPath).filter(Boolean)));
   for (const folder of folders) {

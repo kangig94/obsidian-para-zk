@@ -71,7 +71,7 @@ describe("describe", () => {
     expect(String(all.scope)).toContain("PZ[<id>]");
     expect(String(all.scope)).not.toContain("PZ[n]");
     expect(all.surfaceTypes).toEqual(
-      expect.arrayContaining(["project", "area", "resource", "retro", "note"])
+      expect.arrayContaining(["project", "area", "resource", "llm-wiki", "retro", "note"])
     );
     expect((all.surfaceTypes as unknown[]).length).toBeGreaterThan(1);
     expect(all.collectionFilters).toMatchObject({
@@ -122,6 +122,39 @@ describe("describe", () => {
       backlinks: "backlink"
     });
     expect(resource.readKeys).not.toEqual(expect.arrayContaining(["overview"]));
+
+    const wikiResult = await cli.run("para-zk:describe", { type: "llm-wiki" });
+    const wiki = (wikiResult.surfaces as Array<Record<string, unknown>>)[0];
+    const wikiAddressing = wiki.addressing as {
+      selectors: string[];
+      create: string;
+      read: string;
+      update: string;
+      createInputs: string[];
+      rename: boolean;
+      addressVia?: string;
+    };
+    expect(wikiAddressing.selectors).toEqual(["title"]);
+    expect(wikiAddressing.create).toBe("para-zk:create-llm-wiki");
+    expect(wikiAddressing.read).toBe("para-zk:read-llm-wiki");
+    expect(wikiAddressing.update).toBe("para-zk:update-llm-wiki");
+    expect(wikiAddressing.createInputs).toEqual(expect.arrayContaining(["title", "alias", "body"]));
+    expect(wikiAddressing.rename).toBe(true);
+    expect(wikiAddressing.addressVia).toContain("LLM-Wiki-relative path");
+    expect(wikiAddressing.addressVia).toContain("title=\"AI/Foo\"");
+    expect(wiki.frontmatterKeys).toEqual(["aliases"]);
+    expect(wiki.readKeys).toEqual(["frontmatter", "references", "backlinks", "body"]);
+    expect(wiki.writeKeys).toEqual([
+      "frontmatter/{aliases}=set",
+      "references=insert|backfill",
+      "references/<i>=delete",
+      "references/<i>/{link|description}=set",
+      "body=set|append|prepend|replace"
+    ]);
+    expect(wiki.collections).toEqual({
+      references: "reference",
+      backlinks: "backlink"
+    });
 
     const sourceResult = await cli.run("para-zk:describe", { type: "digest" });
     const source = (sourceResult.surfaces as Array<Record<string, unknown>>)[0];

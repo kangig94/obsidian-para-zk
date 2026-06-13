@@ -8,6 +8,7 @@ import type {
   DeleteByTitleOptions,
   DeleteCleanupResult,
   DeleteJournalOptions,
+  DeleteLlmWikiOptions,
   DeleteResult,
   DeleteRetroOptions,
   DeleteZkOptions,
@@ -19,6 +20,7 @@ import {
   folderStyleContainer,
   resolveRequiredArea,
   resolveRequiredJournal,
+  resolveRequiredLlmWiki,
   resolveRequiredProject,
   resolveRequiredResource,
   resolveRequiredRetro,
@@ -37,6 +39,10 @@ export async function deleteArea(ctx: WorkflowContext, options: DeleteByTitleOpt
 
 export async function deleteResource(ctx: WorkflowContext, options: DeleteByTitleOptions): Promise<DeleteResult> {
   return deleteDomainNote(ctx, await resolveRequiredResource(ctx, options), options);
+}
+
+export async function deleteLlmWiki(ctx: WorkflowContext, options: DeleteLlmWikiOptions): Promise<DeleteResult> {
+  return deleteDomainNote(ctx, await resolveRequiredLlmWiki(ctx, options), options);
 }
 
 export async function deleteZk(ctx: WorkflowContext, options: DeleteZkOptions): Promise<DeleteResult> {

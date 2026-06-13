@@ -131,6 +131,7 @@ type WorkflowFunctionName =
   | "auditVault"
   | "captureJournal"
   | "createArea"
+  | "createLlmWiki"
   | "createProject"
   | "createResource"
   | "createRetro"
@@ -138,6 +139,7 @@ type WorkflowFunctionName =
   | "createZk"
   | "deleteArea"
   | "deleteJournal"
+  | "deleteLlmWiki"
   | "deleteProject"
   | "deleteResource"
   | "deleteRetro"
@@ -148,16 +150,19 @@ type WorkflowFunctionName =
   | "listNotes"
   | "readArea"
   | "readJournal"
+  | "readLlmWiki"
   | "readProject"
   | "readResource"
   | "readRetro"
   | "readZk"
   | "renameArea"
+  | "renameLlmWiki"
   | "renameProject"
   | "renameResource"
   | "renameZk"
   | "updateArea"
   | "updateJournal"
+  | "updateLlmWiki"
   | "updateProject"
   | "updateResource"
   | "updateRetro"
@@ -170,6 +175,7 @@ type WorkflowRunFunction = (
 
 type SelectorVariant =
   | { variant: "by-title"; label: string; type: string }
+  | { variant: "by-title-no-archive"; label: string; type: string }
   | { variant: "zk" }
   | { variant: "journal" }
   | { variant: "retro" };
@@ -219,6 +225,18 @@ const RESOURCE_SOURCE_TITLE_OPTION: CliOptionSpec = {
 const SOURCE_RESOURCE_TITLE_OPTION: CliOptionSpec = {
   value: "<title>",
   description: "Source resource title. Use / to address a Resources-relative path, e.g. AI/Foo."
+};
+const LLM_WIKI_CREATE_TITLE_OPTION: CliOptionSpec = {
+  value: "<title>",
+  description: "LLM-Wiki title. Use / to address/create an LLM-Wiki-relative path, e.g. AI/Foo."
+};
+const LLM_WIKI_TITLE_OPTION: CliOptionSpec = {
+  value: "<title>",
+  description: "LLM-Wiki title. Use / to address an LLM-Wiki-relative path, e.g. AI/Foo."
+};
+const LLM_WIKI_CURRENT_TITLE_OPTION: CliOptionSpec = {
+  value: "<title>",
+  description: "Current LLM-Wiki title. Use / to address an LLM-Wiki-relative path, e.g. AI/Foo."
 };
 const ARCHIVED_OPTION: CliOptionSpec = {
   value: "<true|false>",
@@ -278,6 +296,12 @@ const PARA_NOTE_COMMANDS: ParaNoteCommandConfig[] = [
   }
 ];
 
+const LLM_WIKI_SELECTOR: Extract<SelectorVariant, { variant: "by-title-no-archive" }> = {
+  variant: "by-title-no-archive",
+  label: "LLM-Wiki",
+  type: "llm-wiki"
+};
+
 let workflowsModulePromise: Promise<unknown> | undefined;
 
 function loadWorkflows(): Promise<unknown> {
@@ -300,6 +324,12 @@ function rejectPathAliases(args: CliArgs): void {
 function rejectChildOnCrudCommands(args: CliArgs): void {
   if (Object.prototype.hasOwnProperty.call(args, "child")) {
     throw new Error(CRUD_CHILD_MIGRATION_ERROR);
+  }
+}
+
+function rejectArchivedSelector(args: CliArgs, type: string): void {
+  if (Object.prototype.hasOwnProperty.call(args, "archived")) {
+    throw new Error(`archived is not accepted by ${type} commands — ${type} notes do not have an archive selector`);
   }
 }
 
@@ -373,7 +403,7 @@ function makeRenameCommand(config: {
   options: Record<string, CliOptionSpec>;
   text: string;
   workflow: WorkflowFunctionName;
-  selector: Extract<SelectorVariant, { variant: "by-title" | "zk" }>;
+  selector: Extract<SelectorVariant, { variant: "by-title" | "by-title-no-archive" | "zk" }>;
 }): NativeCliCommand {
   return {
     command: config.command,
@@ -461,6 +491,13 @@ function readCommandOptions(selector: SelectorVariant, key: CliOptionSpec): Reco
         ...READ_COLLECTION_OPTIONS,
         format: FORMAT_OPTION
       };
+    case "by-title-no-archive":
+      return {
+        title: titleOption(selector),
+        key,
+        ...READ_COLLECTION_OPTIONS,
+        format: FORMAT_OPTION
+      };
     case "zk":
       return {
         title: { value: "<title>", description: "ZK note title." },
@@ -497,6 +534,12 @@ function updateCommandOptions(selector: SelectorVariant, key: CliOptionSpec): Re
         key,
         ...UPDATE_OPTIONS
       };
+    case "by-title-no-archive":
+      return {
+        title: titleOption(selector),
+        key,
+        ...UPDATE_OPTIONS
+      };
     case "zk":
       return {
         title: { value: "<title>", description: "ZK note title." },
@@ -521,7 +564,7 @@ function updateCommandOptions(selector: SelectorVariant, key: CliOptionSpec): Re
   }
 }
 
-function renameCommandOptions(selector: Extract<SelectorVariant, { variant: "by-title" | "zk" }>): Record<string, CliOptionSpec> {
+function renameCommandOptions(selector: Extract<SelectorVariant, { variant: "by-title" | "by-title-no-archive" | "zk" }>): Record<string, CliOptionSpec> {
   switch (selector.variant) {
     case "by-title":
       return {
@@ -529,6 +572,12 @@ function renameCommandOptions(selector: Extract<SelectorVariant, { variant: "by-
         new_title: RENAME_OPTIONS.new_title,
         format: RENAME_OPTIONS.format,
         archived: ARCHIVED_OPTION
+      };
+    case "by-title-no-archive":
+      return {
+        title: titleOption(selector, true),
+        new_title: RENAME_OPTIONS.new_title,
+        format: RENAME_OPTIONS.format
       };
     case "zk":
       return {
@@ -547,6 +596,12 @@ function deleteCommandOptions(selector: Exclude<SelectorVariant, { variant: "jou
         format: DELETE_OPTIONS.format,
         archived: ARCHIVED_OPTION
       };
+    case "by-title-no-archive":
+      return {
+        title: titleOption(selector, true),
+        force: DELETE_OPTIONS.force,
+        format: DELETE_OPTIONS.format
+      };
     case "zk":
       return {
         ...DELETE_OPTIONS,
@@ -561,8 +616,9 @@ function deleteCommandOptions(selector: Exclude<SelectorVariant, { variant: "jou
   }
 }
 
-function titleOption(selector: Extract<SelectorVariant, { variant: "by-title" }>, current = false): CliOptionSpec {
+function titleOption(selector: Extract<SelectorVariant, { variant: "by-title" | "by-title-no-archive" }>, current = false): CliOptionSpec {
   if (selector.type === "resource") return current ? RESOURCE_CURRENT_TITLE_OPTION : RESOURCE_TITLE_OPTION;
+  if (selector.type === "llm-wiki") return current ? LLM_WIKI_CURRENT_TITLE_OPTION : LLM_WIKI_TITLE_OPTION;
   return current
     ? { value: "<title>", description: "Current note title." }
     : { value: "<title>", description: `${selector.label} title.` };
@@ -579,6 +635,12 @@ function selectorOptions(
       return {
         title: readCliTitle(args),
         archived: readCliBoolean(args, "archived")
+      };
+    case "by-title-no-archive":
+      rejectChildOnCrudCommands(args);
+      rejectArchivedSelector(args, selector.type);
+      return {
+        title: readCliTitle(args)
       };
     case "zk":
       return {
@@ -755,7 +817,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     command: "para-zk:list",
     description: "List PARA-ZK notes by type with optional filters (structured enumeration by name/frontmatter). For content/full-text search, use `optsidian grep` or `optsidian search`.",
     options: {
-      type: { value: "<project|area|resource|zk|retro|journal|subnote>", description: "Optional note-type filter. Omit to list all PARA-ZK notes; zk spans all ZK kinds." },
+      type: { value: "<project|area|resource|llm-wiki|zk|retro|journal|subnote>", description: "Optional note-type filter. Omit to list all PARA-ZK notes; zk spans all ZK kinds." },
       archived: { value: "<true|false>", description: "true lists archived notes; default lists active notes." },
       query: { value: "<text>", description: "Optional case-insensitive title substring filter." },
       offset: { value: "<number>", description: "Zero-based item offset (default: 0)." },
@@ -834,6 +896,14 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
   },
   ...PARA_NOTE_COMMANDS.map(makeParaReadCommand),
   makeReadCommand({
+    command: "para-zk:read-llm-wiki",
+    description: "Read an llm-wiki note's stable PARA-ZK surface, optionally by map key",
+    options: readCommandOptions(LLM_WIKI_SELECTOR, readKeyOption("llm-wiki")),
+    text: "llm-wiki read",
+    workflow: "readLlmWiki",
+    selector: LLM_WIKI_SELECTOR
+  }),
+  makeReadCommand({
     command: "para-zk:read-zk",
     description: "Read a ZK note's stable PARA-ZK surface, optionally by map key",
     options: readCommandOptions({ variant: "zk" }, zkKeyOption(surfaceReadKeys, "read")),
@@ -858,6 +928,14 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     selector: { variant: "retro" }
   }),
   ...PARA_NOTE_COMMANDS.map(makeParaUpdateCommand),
+  makeUpdateCommand({
+    command: "para-zk:update-llm-wiki",
+    description: "Update an llm-wiki note's stable PARA-ZK surface by map key",
+    options: updateCommandOptions(LLM_WIKI_SELECTOR, writeKeyOption("llm-wiki")),
+    text: "llm-wiki updated",
+    workflow: "updateLlmWiki",
+    selector: LLM_WIKI_SELECTOR
+  }),
   makeUpdateCommand({
     command: "para-zk:update-zk",
     description: "Update a ZK note's stable PARA-ZK surface by map key",
@@ -884,6 +962,14 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
   }),
   ...PARA_NOTE_COMMANDS.map(makeParaRenameCommand),
   makeRenameCommand({
+    command: "para-zk:rename-llm-wiki",
+    description: "Rename an llm-wiki note file",
+    options: renameCommandOptions(LLM_WIKI_SELECTOR),
+    text: "llm-wiki renamed",
+    workflow: "renameLlmWiki",
+    selector: LLM_WIKI_SELECTOR
+  }),
+  makeRenameCommand({
     command: "para-zk:rename-zk",
     description: "Rename a ZK note file",
     options: renameCommandOptions({ variant: "zk" }),
@@ -892,6 +978,14 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     selector: { variant: "zk" }
   }),
   ...PARA_NOTE_COMMANDS.map(makeParaDeleteCommand),
+  makeDeleteCommand({
+    command: "para-zk:delete-llm-wiki",
+    description: "Move an llm-wiki note to Obsidian trash and clean PARA-ZK-owned references",
+    options: deleteCommandOptions(LLM_WIKI_SELECTOR),
+    text: "llm-wiki deleted",
+    workflow: "deleteLlmWiki",
+    selector: LLM_WIKI_SELECTOR
+  }),
   makeDeleteCommand({
     command: "para-zk:delete-zk",
     description: "Move a ZK note to Obsidian trash and clean PARA-ZK-owned references",
@@ -1084,6 +1178,24 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
         open: readCliBoolean(args, "open") ?? false
       };
     })
+  },
+  {
+    command: "para-zk:create-llm-wiki",
+    description: "Create an llm-wiki note",
+    options: {
+      title: LLM_WIKI_CREATE_TITLE_OPTION,
+      alias: ALIAS_OPTION,
+      body: { value: "<markdown>", description: "Optional initial free-form body content." },
+      open: { value: "<true|false>", description: "Open the created note in Obsidian." },
+      format: { value: "<text|json>", description: "Output format (default: text)." }
+    },
+    text: "llm-wiki created",
+    run: workflowRun("createLlmWiki", (args) => ({
+      title: readCliTitle(args),
+      alias: readCliAlias(args),
+      body: readCliString(args, "body"),
+      open: readCliBoolean(args, "open") ?? false
+    }))
   },
   {
     command: "para-zk:create-retro",

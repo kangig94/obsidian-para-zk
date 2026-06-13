@@ -17,6 +17,7 @@ type ParaZkPaths = {
   projectsFolder: string;
   areasFolder: string;
   resourcesFolder: string;
+  wikiFolder: string;
   retrosFolder: string;
   archivesFolder: string;
   zkFolder: string;
@@ -109,6 +110,7 @@ const DEFAULT_PATHS: ParaZkPaths = {
   projectsFolder: "PARA/Projects",
   areasFolder: "PARA/Areas",
   resourcesFolder: "PARA/Resources",
+  wikiFolder: "LLM-Wiki",
   retrosFolder: "PARA/Retros",
   archivesFolder: "PARA/Archives",
   zkFolder: "ZK",
@@ -129,6 +131,7 @@ const DEFAULT_LAYOUT_FOLDERS = [
   "PARA/Resources",
   "PARA/Retros",
   "PARA/Archives",
+  "LLM-Wiki",
   "ZK",
   "ZK/Spark",
   "ZK/Digest",

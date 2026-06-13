@@ -53,6 +53,13 @@ export type CreateResourceOptions = {
   open?: boolean;
 };
 
+export type CreateLlmWikiOptions = {
+  title: string;
+  alias?: string;
+  body?: string;
+  open?: boolean;
+};
+
 export type AddReferenceOptions = {
   sourcePath: string;
   target: string;
@@ -159,6 +166,12 @@ type ByTitleSelectorOptions = {
   child?: string[];
 };
 
+type NoArchiveByTitleSelectorOptions = {
+  path?: string;
+  title?: string;
+  key?: string;
+};
+
 type ZkSelectorOptions = {
   path?: string;
   title?: string;
@@ -178,6 +191,7 @@ type ReadByTitleOptions = ReadOptionsWithCollection & ByTitleSelectorOptions;
 export type ReadProjectOptions = ReadByTitleOptions;
 export type ReadAreaOptions = ReadByTitleOptions;
 export type ReadResourceOptions = ReadByTitleOptions;
+export type ReadLlmWikiOptions = ReadOptionsWithCollection & NoArchiveByTitleSelectorOptions;
 
 export type ReadZkOptions = ReadOptionsWithCollection & ZkSelectorOptions;
 
@@ -257,6 +271,7 @@ type UpdateByTitleOptions = ByTitleSelectorOptions & UpdatePayloadOptions;
 export type UpdateProjectOptions = UpdateByTitleOptions;
 export type UpdateAreaOptions = UpdateByTitleOptions;
 export type UpdateResourceOptions = UpdateByTitleOptions;
+export type UpdateLlmWikiOptions = NoArchiveByTitleSelectorOptions & UpdatePayloadOptions;
 
 export type UpdateZkOptions = ZkSelectorOptions & UpdatePayloadOptions;
 export type UpdateJournalOptions = JournalSelectorOptions & UpdatePayloadOptions;
@@ -288,6 +303,12 @@ export type RenameByTitleOptions = {
   child?: string[];
 };
 
+export type RenameLlmWikiOptions = {
+  path?: string;
+  title?: string;
+  newTitle?: string;
+};
+
 export type RenameZkOptions = {
   path?: string;
   title?: string;
@@ -316,6 +337,12 @@ export type DeleteByTitleOptions = {
   archived?: boolean;
   force?: boolean;
   child?: string[];
+};
+
+export type DeleteLlmWikiOptions = {
+  path?: string;
+  title?: string;
+  force?: boolean;
 };
 
 export type DeleteZkOptions = {
@@ -420,6 +447,8 @@ export type SurfaceAddressing = {
   selectors?: string[];
   addressVia?: string;
   create?: string;
+  read?: string;
+  update?: string;
   createInputs?: string[];
   rename?: boolean;
 };
@@ -442,6 +471,7 @@ export type BacklinkRead = {
 
 export type CreateProjectResult = NoteResult & { areas?: ProjectAreaResult[] };
 export type CreateResourceResult = NoteResult & { sourcePath?: string; linkedFromSource: boolean };
+export type CreateLlmWikiResult = NoteResult;
 export type CreateSubnoteResult = NoteResult & { parentPath: string };
 export type CreateAreaResult = NoteResult & { parentPath?: string };
 export type CreateRetroResult = NoteResult & { sourcePath?: string; weekIso: string };

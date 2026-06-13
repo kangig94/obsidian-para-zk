@@ -78,8 +78,23 @@ describe("list", () => {
     await cli.run("para-zk:create-project", { title: "P", open: "false" });
     await cli.run("para-zk:create-area", { title: "A", open: "false" });
     await cli.run("para-zk:create-resource", { title: "R", open: "false" });
+    await cli.run("para-zk:create-llm-wiki", { title: "W", open: "false" });
 
     const res = await cli.run("para-zk:list", {});
-    expect(res.count).toBe(3);
+    expect(res.count).toBe(4);
+    expect(res.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ title: "W", type: "llm-wiki", path: "LLM-Wiki/W.md" })
+    ]));
+  });
+
+  it("lists active llm-wiki notes by type", async () => {
+    await cli.run("para-zk:create-llm-wiki", { title: "AI/Wiki", open: "false" });
+    await cli.app.vault.create("PARA/Archives/LLM-Wiki/Archived.md", "---\ntype: llm-wiki\n---\nArchived only\n");
+
+    const res = await cli.run("para-zk:list", { type: "llm-wiki" });
+    expect(res).toMatchObject({ ok: true, count: 1, returned: 1 });
+    expect(res.items).toEqual([
+      { title: "Wiki", type: "llm-wiki", path: "LLM-Wiki/AI/Wiki.md" }
+    ]);
   });
 });

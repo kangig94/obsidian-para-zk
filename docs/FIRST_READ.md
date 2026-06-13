@@ -15,8 +15,16 @@ controls, dependency configuration, and the native CLI surface.
 The goal is not only a nicer Obsidian for a person. It is to let an LLM create and
 maintain knowledge-work structures in the vault — create a project, attach it to
 areas, add child notes, create resources, capture journal memos, create ZK notes,
-create ZK notes from resources/sources, distill sparks into permanents — and keep the
-resulting frontmatter and backlinks coherent.
+create ZK notes from resources/sources, distill sparks into permanents, and maintain
+LLM-Wiki synthesis pages — and keep the resulting frontmatter and backlinks coherent.
+
+LLM-Wiki is a derived layer, not a second canonical knowledge base. Canonical
+knowledge lives in Resources, PARA, and ZK notes that a person may curate. Wiki
+pages live under `LLM-Wiki/`, are LLM-owned and regenerable, and are optimized as
+LLM-for-LLM summaries: concise pages that future automation can read before
+working. The link direction is single-way: wiki pages cite canonical notes through
+body links and their `references` registry; canonical notes should not link back
+to the wiki or depend on it.
 
 The vault is a single user's private, local Obsidian "second brain" — local-first and
 personal by design, not a shared, published, or collaborative medium like Notion. A
@@ -67,11 +75,13 @@ Child notes — subnotes, fallback notes, and nested areas — use the dedicated
 `create/read/update/rename/delete-child` CLI family with `root_type`,
 `root_title`, optional `relpath` (ancestor chain to the immediate parent), and
 `title` (the child). Parent CRUD commands do not accept `child=`.
-Free-form types (`resource`, child `subnote`, fallback `note`, and the ZK kinds
-`spark`/`digest`/`permanent`) expose
+Free-form types (`resource`, `llm-wiki`, child `subnote`, fallback `note`, and
+the ZK kinds `spark`/`digest`/`permanent`) expose
 prose as one `body` key for the whole editable Markdown body before the managed
 tail. Literal `set`, `append`, `prepend`, and `replace` edits target that body;
 H1 headings are allowed there, and there are no enforced prose-section keys.
+`llm-wiki` is the no-human-UI exception: it has no props block and no managed UI
+tail.
 Raw file reads, arbitrary patches, and generic vault search are Optsidian's
 responsibility, not PARA-ZK's. Structural changes stay domain-specific
 (`rename-*`, status-driven archive/restore, core-trash deletes) rather than
@@ -108,7 +118,8 @@ workflow/template modules independent from CLI, UX, and runtime adapters.
 ## Behavioral Expectations
 
 `para-zk:setup` is idempotent. It creates the PARA/ZK layout, managed templates
-under `Templates/para-zk`, dashboards under `Dashboard`, and a root vault guide.
+under `Templates/para-zk`, dashboards under `Dashboard`, the derived
+`LLM-Wiki/` folder, and a root vault guide.
 Existing non-managed files are skipped; managed files update only when safe or with
 `force=true`.
 

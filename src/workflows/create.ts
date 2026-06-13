@@ -31,6 +31,8 @@ import { readOptionalCode } from "./code-options";
 import type {
   CreateAreaOptions,
   CreateAreaResult,
+  CreateLlmWikiOptions,
+  CreateLlmWikiResult,
   CreateProjectOptions,
   CreateProjectResult,
   CreateResourceOptions,
@@ -52,6 +54,7 @@ import {
   findExistingSourceRetroForWeek,
   folderForZkKind,
   linkToFile,
+  llmWikiTitlePath,
   requireTitle,
   resourceTitlePath,
   resolveOptionalFile,
@@ -246,6 +249,28 @@ export async function createResource(ctx: WorkflowContext, options: CreateResour
     sourcePath: source?.path,
     linkedFromSource
   };
+}
+
+export async function createLlmWiki(ctx: WorkflowContext, options: CreateLlmWikiOptions): Promise<CreateLlmWikiResult> {
+  const title = llmWikiTitlePath(options.title);
+  const createdAt = localDateTimeSpace();
+  const path = await uniqueMarkdownPath(ctx.host, joinVaultPath(ctx.settings.paths.wikiFolder, `${title.relpath}.md`));
+  const file = await createMarkdownFile(ctx, "llm-wiki", path, {
+    created: createdAt,
+    slug: slugify(title.basename)
+  });
+
+  const tags = localePack(ctx.settings.locale).tags;
+  await ctx.host.processFrontMatter(file, (fm) => {
+    fm.type = "llm-wiki";
+    applyAlias(fm, options.alias);
+    fm.tags = [`${tags.llmWiki}/${slugify(title.basename)}`];
+    applyCreatedUpdatedDefaults(fm, createdAt);
+  });
+
+  await applyBody(ctx, file, options.body);
+  await openIfRequested(ctx, file, options.open);
+  return noteResult(file, true, options.open);
 }
 
 export async function createSubnote(ctx: WorkflowContext, options: CreateSubnoteOptions): Promise<CreateSubnoteResult> {

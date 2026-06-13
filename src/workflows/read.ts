@@ -15,6 +15,7 @@ import type {
   CollectionReadOptions,
   ReadAreaOptions,
   ReadJournalOptions,
+  ReadLlmWikiOptions,
   ReadProjectOptions,
   ReadResourceOptions,
   ReadRetroOptions,
@@ -24,6 +25,7 @@ import type {
 import { hasCollectionReadOptions, readCollectionPage } from "./collections";
 import {
   JOURNAL_READ_SPEC,
+  LLM_WIKI_READ_SPEC,
   PROJECT_READ_SPEC,
   AREA_READ_SPEC,
   RESOURCE_READ_SPEC,
@@ -36,7 +38,7 @@ import {
   unknownReadKeyError
 } from "./describe";
 import { countBacklinks, readBacklinks } from "./backlinks";
-import { childFiles, drillToChild, isArchivedFile, resolveRequiredArea, resolveRequiredJournal, resolveRequiredProject, resolveRequiredResource, resolveRequiredRetro, resolveRequiredZk } from "./locations";
+import { childFiles, drillToChild, isArchivedFile, resolveRequiredArea, resolveRequiredJournal, resolveRequiredLlmWiki, resolveRequiredProject, resolveRequiredResource, resolveRequiredRetro, resolveRequiredZk } from "./locations";
 import { parseWikiLink, pathBasenameWithoutExtension, splitObsidianSubpath } from "./references";
 
 type ReadMap = Record<string, unknown>;
@@ -52,6 +54,10 @@ export async function readArea(ctx: WorkflowContext, options: ReadAreaOptions): 
 
 export async function readResource(ctx: WorkflowContext, options: ReadResourceOptions): Promise<Record<string, unknown>> {
   return readSurface(ctx, await resolveRequiredResource(ctx, options), RESOURCE_READ_SPEC, options.key, options.collection, options.child);
+}
+
+export async function readLlmWiki(ctx: WorkflowContext, options: ReadLlmWikiOptions): Promise<Record<string, unknown>> {
+  return readSurface(ctx, await resolveRequiredLlmWiki(ctx, options), LLM_WIKI_READ_SPEC, options.key, options.collection);
 }
 
 export async function readZk(ctx: WorkflowContext, options: ReadZkOptions): Promise<Record<string, unknown>> {

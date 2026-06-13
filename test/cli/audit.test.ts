@@ -294,6 +294,60 @@ describe("audit", () => {
     expect(second.counts.idless_reference).toBe(0);
   });
 
+  it("audits llm-wiki links and references but excludes llm-wiki from orphan notes", async () => {
+    await cli.run("para-zk:create-resource", { title: "Canonical Source", open: "false" });
+    await cli.run("para-zk:create-llm-wiki", {
+      title: "Normal Wiki",
+      body: "[[PARA/Resources/Canonical Source.md]]",
+      open: "false"
+    });
+    await cli.run("para-zk:update-llm-wiki", {
+      title: "Normal Wiki",
+      key: "references",
+      op: "insert",
+      value_json: JSON.stringify({
+        link: "[[PARA/Resources/Canonical Source.md]]",
+        description: "Canonical source"
+      })
+    });
+    await createNote(
+      "LLM-Wiki/Broken Wiki.md",
+      [
+        "type: llm-wiki",
+        `created: ${dateDaysAgo(1)}`,
+        "updated:",
+        "references:",
+        "  - link: \"[[Missing Registry Target]]\"",
+        "    id: abc123",
+        "  - https://example.com/idless"
+      ],
+      "Body points at [[Missing Body Target]]."
+    );
+
+    const result = asAudit(await cli.run("para-zk:audit", { type: "llm-wiki", limit: "all" }));
+
+    expect(result).toMatchObject({
+      ok: true,
+      count: 3,
+      returned: 3
+    });
+    expect(codes(result)).toEqual([
+      "broken_link",
+      "dangling_reference",
+      "idless_reference"
+    ]);
+    expect(result.counts).toMatchObject({
+      broken_link: 1,
+      dangling_reference: 1,
+      idless_reference: 1
+    });
+    expect(result.counts.orphan_note ?? 0).toBe(0);
+    expect(result.findings.every((finding) => finding.path === "LLM-Wiki/Broken Wiki.md")).toBe(true);
+    expect(result.findings.every((finding) => finding.type === "llm-wiki")).toBe(true);
+    expect(result.findings.some((finding) => finding.code === "orphan_note")).toBe(false);
+    expect(result.findings.some((finding) => finding.path === "LLM-Wiki/Normal Wiki.md")).toBe(false);
+  });
+
   it("rejects aliases and dryRun at the CLI boundary", async () => {
     const alias = await cli.run("para-zk:audit", { checkCode: "broken_link" });
     expect(alias.ok).toBe(false);

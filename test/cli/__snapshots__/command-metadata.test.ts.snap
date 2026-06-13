@@ -225,6 +225,32 @@ exports[`native CLI command metadata is stable 1`] = `
     },
   },
   {
+    "command": "para-zk:create-llm-wiki",
+    "description": "Create an llm-wiki note",
+    "options": {
+      "alias": {
+        "description": "Optional single Obsidian alias to store in frontmatter.",
+        "value": "<text>",
+      },
+      "body": {
+        "description": "Optional initial free-form body content.",
+        "value": "<markdown>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "open": {
+        "description": "Open the created note in Obsidian.",
+        "value": "<true|false>",
+      },
+      "title": {
+        "description": "LLM-Wiki title. Use / to address/create an LLM-Wiki-relative path, e.g. AI/Foo.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
     "command": "para-zk:create-project",
     "description": "Create a PARA project note",
     "options": {
@@ -451,6 +477,24 @@ exports[`native CLI command metadata is stable 1`] = `
     },
   },
   {
+    "command": "para-zk:delete-llm-wiki",
+    "description": "Move an llm-wiki note to Obsidian trash and clean PARA-ZK-owned references",
+    "options": {
+      "force": {
+        "description": "Required when deleting a folder-style note that contains child files.",
+        "value": "<true|false>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "title": {
+        "description": "Current LLM-Wiki title. Use / to address an LLM-Wiki-relative path, e.g. AI/Foo.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
     "command": "para-zk:delete-project",
     "description": "Move a project note to Obsidian trash and clean PARA-ZK-owned references",
     "options": {
@@ -552,7 +596,7 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "type": {
         "description": "Optional surface type. Omit to describe all supported surfaces.",
-        "value": "<project|area|resource|journal|retro|subnote|spark|digest|permanent|note>",
+        "value": "<project|area|resource|llm-wiki|journal|retro|subnote|spark|digest|permanent|note>",
       },
     },
   },
@@ -616,7 +660,7 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "type": {
         "description": "Optional note-type filter. Omit to list all PARA-ZK notes; zk spans all ZK kinds.",
-        "value": "<project|area|resource|zk|retro|journal|subnote>",
+        "value": "<project|area|resource|llm-wiki|zk|retro|journal|subnote>",
       },
     },
   },
@@ -795,6 +839,60 @@ exports[`native CLI command metadata is stable 1`] = `
       "ref_kind": {
         "description": "Reference collection reads only: filter references by kind.",
         "value": "<url|note|file|wiki|text>",
+      },
+      "type": {
+        "description": "Backlink collection reads only: filter source notes by frontmatter type.",
+        "value": "<note-type>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:read-llm-wiki",
+    "description": "Read an llm-wiki note's stable PARA-ZK surface, optionally by map key",
+    "options": {
+      "checkbox": {
+        "description": "Task collection reads only: checkbox status character. Use space/blank/todo/open for [ ].",
+        "value": "<status>",
+      },
+      "due_after": {
+        "description": "Task collection reads only: include tasks due on or after this date.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "due_before": {
+        "description": "Task collection reads only: include tasks due on or before this date.",
+        "value": "<YYYY-MM-DD>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "key": {
+        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{aliases}, references, references/<i>, references/<i>/{id|link|description|kind|path|target}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body.",
+        "value": "<map-path>",
+      },
+      "limit": {
+        "description": "Collection key reads only: maximum items to return (default: 50).",
+        "value": "<number|all>",
+      },
+      "offset": {
+        "description": "Collection key reads only: zero-based item offset (default: 0).",
+        "value": "<number>",
+      },
+      "priority": {
+        "description": "Task collection reads only: parsed Tasks priority such as high or medium.",
+        "value": "<priority>",
+      },
+      "query": {
+        "description": "Collection key reads only: case-insensitive item text filter.",
+        "value": "<text>",
+      },
+      "ref_kind": {
+        "description": "Reference collection reads only: filter references by kind.",
+        "value": "<url|note|file|wiki|text>",
+      },
+      "title": {
+        "description": "LLM-Wiki title. Use / to address an LLM-Wiki-relative path, e.g. AI/Foo.",
+        "value": "<title>",
       },
       "type": {
         "description": "Backlink collection reads only: filter source notes by frontmatter type.",
@@ -1095,6 +1193,24 @@ exports[`native CLI command metadata is stable 1`] = `
     },
   },
   {
+    "command": "para-zk:rename-llm-wiki",
+    "description": "Rename an llm-wiki note file",
+    "options": {
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "new_title": {
+        "description": "New note title.",
+        "value": "<title>",
+      },
+      "title": {
+        "description": "Current LLM-Wiki title. Use / to address an LLM-Wiki-relative path, e.g. AI/Foo.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
     "command": "para-zk:rename-project",
     "description": "Rename a project note, including its folder-style parent folder",
     "options": {
@@ -1317,6 +1433,48 @@ exports[`native CLI command metadata is stable 1`] = `
       "op": {
         "description": "Update operation.",
         "value": "<set|insert|append|prepend|replace|delete|backfill>",
+      },
+      "value": {
+        "description": "Text value for scalar set, append, or prepend operations.",
+        "value": "<text>",
+      },
+      "value_json": {
+        "description": "Structured value for frontmatter updates and task inserts.",
+        "value": "<json>",
+      },
+      "with": {
+        "description": "Replacement text for op=replace.",
+        "value": "<text>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:update-llm-wiki",
+    "description": "Update an llm-wiki note's stable PARA-ZK surface by map key",
+    "options": {
+      "all": {
+        "description": "For op=replace, replace all matches instead of requiring a single match.",
+        "value": "<true|false>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "key": {
+        "description": "Stable writable key. Valid: frontmatter/{aliases}=set, references=insert|backfill, references/<i>=delete, references/<i>/{link|description}=set, body=set|append|prepend|replace.",
+        "value": "<map-path>",
+      },
+      "match": {
+        "description": "Exact text to match inside the selected key for op=replace.",
+        "value": "<text>",
+      },
+      "op": {
+        "description": "Update operation.",
+        "value": "<set|insert|append|prepend|replace|delete|backfill>",
+      },
+      "title": {
+        "description": "LLM-Wiki title. Use / to address an LLM-Wiki-relative path, e.g. AI/Foo.",
+        "value": "<title>",
       },
       "value": {
         "description": "Text value for scalar set, append, or prepend operations.",

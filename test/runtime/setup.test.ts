@@ -79,6 +79,22 @@ async function prepareKnownUserModifiedFile(): Promise<{
 }
 
 describe("setup managed-file state machine", () => {
+  it("creates the LLM-Wiki folder for old saved layout folder arrays", async () => {
+    const settings = baseSettings();
+    settings.layoutFolders = settings.layoutFolders.filter((folder) => folder !== "LLM-Wiki");
+    const app = createSetupApp();
+
+    const initial = await runSetup(app, settings);
+
+    expect(initial.result.created).toContain("LLM-Wiki");
+    expect(app.vault.getAbstractFileByPath("LLM-Wiki")).toBeTruthy();
+    expect(initial.settings.layoutFolders).toContain("LLM-Wiki");
+
+    const rerun = await runSetup(app, initial.settings);
+    expect(rerun.result.created).not.toContain("LLM-Wiki");
+    expect(rerun.result.existing).toContain("LLM-Wiki");
+  });
+
   it("creates missing managed files and previews them during dry-run", async () => {
     const settings = baseSettings();
     const target = targetArtifact(settings);

@@ -6,6 +6,7 @@ export type LocalePack = {
     project: string;
     area: string;
     resource: string;
+    llmWiki: string;
     knowledge: string;
     journal: string;
     retro: string;
@@ -44,6 +45,7 @@ const ko: LocalePack = {
     project: "프로젝트",
     area: "영역",
     resource: "리소스",
+    llmWiki: "llm-wiki",
     knowledge: "지식",
     journal: "일지",
     retro: "회고"
@@ -319,6 +321,7 @@ const en: LocalePack = {
     project: "project",
     area: "area",
     resource: "resource",
+    llmWiki: "llm-wiki",
     knowledge: "knowledge",
     journal: "journal",
     retro: "retro"

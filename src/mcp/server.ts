@@ -46,6 +46,7 @@ const UPDATE_TYPE_VALUES = [
   "project",
   "area",
   "resource",
+  "llm-wiki",
   "retro",
   "journal",
   "spark",
@@ -57,6 +58,7 @@ const UPDATE_TYPES: Record<UpdateType, { command: string; kind?: string }> = {
   project: { command: "update-project" },
   area: { command: "update-area" },
   resource: { command: "update-resource" },
+  "llm-wiki": { command: "update-llm-wiki" },
   retro: { command: "update-retro" },
   journal: { command: "update-journal" },
   spark: { command: "update-zk", kind: "spark" },
@@ -71,7 +73,7 @@ const BASE_MUTATION_PROPERTIES = {
   },
   title: {
     type: "string",
-    description: "Title selector (most types). For type=resource, / addresses a Resources-relative path, e.g. AI/Foo."
+    description: "Title selector (most types). For type=resource, / addresses a Resources-relative path; for type=llm-wiki, / addresses an LLM-Wiki-relative path, e.g. AI/Foo."
   },
   child: {
     type: "array",
@@ -84,7 +86,7 @@ const BASE_MUTATION_PROPERTIES = {
   },
   archived: {
     type: "boolean",
-    description: "When selecting a PARA/retro note by title, true selects the archived copy and false restricts lookup to active notes."
+    description: "Only project/area/resource/retro accept this. When selecting one of those by title, true selects the archived copy and false restricts lookup to active notes. Other types (journal, spark/digest/permanent, llm-wiki) reject it."
   },
   key: {
     type: "string",

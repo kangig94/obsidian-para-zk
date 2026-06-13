@@ -142,6 +142,38 @@ describe("MCP update arg builder", () => {
     ]);
   });
 
+  it("maps llm-wiki slash-path title selectors to update-llm-wiki", () => {
+    expect(buildUpdateArgs({
+      tool: "set",
+      params: {
+        type: "llm-wiki",
+        title: "AI/Policy",
+        key: "body",
+        content: "Updated wiki synthesis"
+      }
+    })).toEqual([
+      "para-zk:update-llm-wiki",
+      "title=AI/Policy",
+      "key=body",
+      "op=set",
+      "value=Updated wiki synthesis",
+      "format=json"
+    ]);
+  });
+
+  it("rejects archived selectors for llm-wiki mutation tools", () => {
+    expect(() => buildUpdateArgs({
+      tool: "set",
+      params: {
+        type: "llm-wiki",
+        title: "AI/Policy",
+        archived: true,
+        key: "body",
+        content: "Updated wiki synthesis"
+      }
+    })).toThrow(/llm-wiki does not support archived selector/);
+  });
+
   it("maps journal date selectors and retro date pass-through", () => {
     expect(buildUpdateArgs({
       tool: "set",

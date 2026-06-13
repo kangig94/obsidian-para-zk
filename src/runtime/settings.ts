@@ -75,6 +75,7 @@ function readLayoutFolders(value: unknown, paths: ParaZkSettings["paths"]): stri
     addUnique(folders, folder);
   }
 
+  addUnique(folders, paths.wikiFolder);
   return folders;
 }
 

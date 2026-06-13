@@ -78,6 +78,13 @@ mapping, not core changes.**
 `src/templates.ts` (also L2) generates managed templates, dashboards, and the vault
 guide; it imports only `types`, `i18n`, and `props/schema`.
 
+`llm-wiki` is a first-class workflow surface in the same L2 modules above:
+create/read/update/rename/delete, describe, locations, list, references, backlinks,
+and audit. It is not a seventh layer and it does not change the L-layer model.
+The `LLM-Wiki/` folder is a derived, LLM-owned synthesis layer in the vault:
+wiki pages cite canonical PARA/ZK/resource notes, but canonical notes should not
+depend on wiki pages.
+
 ## Extension Points (native `para-zk-*` blocks)
 
 Generated templates do not depend on Meta Bind, QuickAdd, or Templater. Native plugin
