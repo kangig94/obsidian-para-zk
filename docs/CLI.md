@@ -259,7 +259,7 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `check` | `broken_link`, `dangling_reference`, `idless_reference`, `orphan_note`, `upward_wiki_link`, `unprocessed_spark`, `stale_draft_permanent` | Optional check-code filter. |
+| `check` | `broken_link`, `dangling_reference`, `idless_reference`, `orphan_note`, `upward_wiki_link`, `orphan_wiki_page`, `unprocessed_spark`, `stale_draft_permanent` | Optional check-code filter. |
 | `severity` | `high`, `medium`, `low` | Optional severity filter. |
 | `type` | stored note type | Optional frontmatter type filter, e.g. `resource` or `permanent`. |
 | `offset` | number | Zero-based finding offset (default `0`). |
@@ -275,6 +275,7 @@ Checks:
 | `idless_reference` | `medium` | A reference has `id: null` and cannot be cited with `PZ[<id>]`. | Auto-fixable with `fix=true` or `key=references op=backfill`. |
 | `orphan_note` | `medium` | A resource, digest, or permanent note has no incoming backlinks and no outgoing resolved links, excluding templates, dashboards, archives, and folder main-notes. | Hint only: link it from an area, project, or hub. |
 | `upward_wiki_link` | `medium` | A non-`llm-wiki` note links into an `llm-wiki` note. Wiki pages cite canonical notes; canonical notes should not link back into the wiki. | Hint only: remove the reverse wiki link. |
+| `orphan_wiki_page` | `low` | An `llm-wiki` page has no incoming links from other `llm-wiki` pages (canonical→wiki links do not count). Usually an under-woven concept, but a genuinely standalone topic is legitimate. | Hint only: cross-link it from a related wiki page, or leave it if standalone. |
 | `unprocessed_spark` | `low` | A `spark` with `processed: false` is older than 7 days by `created`. | Hint only: distill or discard it. |
 | `stale_draft_permanent` | `low` | A `permanent` with `maturity: draft` has not been updated for 14 days by `updated`. | Hint only: refine or promote maturity. |
 

@@ -35,6 +35,7 @@ const AUDIT_CHECKS: AuditCheckCode[] = [
   "idless_reference",
   "orphan_note",
   "upward_wiki_link",
+  "orphan_wiki_page",
   "unprocessed_spark",
   "stale_draft_permanent"
 ];
@@ -45,6 +46,7 @@ const CHECK_SEVERITY: Record<AuditCheckCode, AuditSeverity> = {
   idless_reference: "medium",
   orphan_note: "medium",
   upward_wiki_link: "medium",
+  orphan_wiki_page: "low",
   unprocessed_spark: "low",
   stale_draft_permanent: "low"
 };
@@ -152,6 +154,7 @@ async function collectAuditFindings(
   }
   if (enabledChecks.has("orphan_note")) findings.push(...orphanNoteFindings(ctx, notes));
   if (enabledChecks.has("upward_wiki_link")) findings.push(...upwardWikiLinkFindings(ctx, notes));
+  if (enabledChecks.has("orphan_wiki_page")) findings.push(...orphanWikiPageFindings(ctx, notes));
   if (enabledChecks.has("unprocessed_spark")) findings.push(...unprocessedSparkFindings(notes));
   if (enabledChecks.has("stale_draft_permanent")) findings.push(...staleDraftPermanentFindings(notes));
   return findings;
@@ -283,6 +286,40 @@ function upwardWikiLinkFindings(ctx: WorkflowContext, notes: AuditableNote[]): A
         fix: "Remove the link; the wiki cites the note, not vice-versa."
       });
     }
+  }
+  return findings;
+}
+
+// An llm-wiki page whose only legitimate inbound links are from OTHER wiki pages
+// (canonical->wiki links are the upward_wiki_link anti-pattern). A page no wiki page
+// links to is usually a concept the weaver left stranded outside the interlinked web —
+// but a genuinely standalone topic is legitimate, so this is a low-severity hint, never forced.
+function orphanWikiPageFindings(ctx: WorkflowContext, notes: AuditableNote[]): AuditFinding[] {
+  const wikiPaths = new Set(notes.filter((note) => note.type === "llm-wiki").map((note) => note.file.path));
+  if (wikiPaths.size === 0) return [];
+
+  const resolvedLinks = ctx.host.resolvedLinks();
+  const inboundFromWiki = new Map<string, number>();
+  for (const [sourcePath, targets] of Object.entries(resolvedLinks)) {
+    if (!wikiPaths.has(sourcePath)) continue;
+    for (const [targetPath, value] of Object.entries(targets)) {
+      if (targetPath === sourcePath || !wikiPaths.has(targetPath)) continue;
+      inboundFromWiki.set(targetPath, (inboundFromWiki.get(targetPath) ?? 0) + positiveCount(value));
+    }
+  }
+
+  const findings: AuditFinding[] = [];
+  for (const note of notes) {
+    if (note.type !== "llm-wiki") continue;
+    if ((inboundFromWiki.get(note.file.path) ?? 0) > 0) continue;
+    findings.push({
+      code: "orphan_wiki_page",
+      severity: CHECK_SEVERITY.orphan_wiki_page,
+      path: note.file.path,
+      type: note.type,
+      detail: { inbound_wiki_links: 0 },
+      fix: "Hint only: cross-link it from a related wiki page if it belongs to the interlinked web; a genuinely standalone topic can be left as-is."
+    });
   }
   return findings;
 }

@@ -38,7 +38,7 @@ exports[`native CLI command metadata is stable 1`] = `
     "options": {
       "check": {
         "description": "Optional check code filter.",
-        "value": "<broken_link|dangling_reference|idless_reference|orphan_note|upward_wiki_link|unprocessed_spark|stale_draft_permanent>",
+        "value": "<broken_link|dangling_reference|idless_reference|orphan_note|upward_wiki_link|orphan_wiki_page|unprocessed_spark|stale_draft_permanent>",
       },
       "fix": {
         "description": "When true, backfill id-less reference ids vault-wide; no other finding is auto-fixed.",

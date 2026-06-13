@@ -94,7 +94,9 @@ as `{ path, title, updated_ms }`.
 Related surface notes:
 
 - **Audit check** — the `audit` workflow includes `upward_wiki_link` (`medium`),
-  which flags a non-`llm-wiki` note linking into an `llm-wiki` note.
+  which flags a non-`llm-wiki` note linking into an `llm-wiki` note, and
+  `orphan_wiki_page` (`low`), an advisory hint for an `llm-wiki` page no other wiki
+  page links to (a standalone topic is legitimate; never forced).
 - **LLM-Wiki authorship** — direct CLI `create-llm-wiki` and `update-llm-wiki`
   accept `by=<model-id>`; create stamps `created_by` and `updated_by`, while
   changed updates stamp `updated_by`.

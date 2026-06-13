@@ -83,6 +83,10 @@ Notable changes for PARA-ZK are tracked here.
 - The custom-sort baseline now orders `LLM-Wiki` right after `ZK` and before
   `Journal` in the file explorer. Existing non-empty `sortspec` bookmark groups are
   still preserved (re-initialize bookmarks to pick up the new order).
+- Added the `orphan_wiki_page` audit check (`low`, advisory): flags an `llm-wiki`
+  page with no incoming links from other wiki pages (canonical→wiki links do not
+  count). It is a hint for an under-woven concept — report-only, never forced, and a
+  genuinely standalone topic is fine.
 - Added a dedicated `para-zk:attach-file` CLI contract section covering local
   source options, single-file and multi-source result fields, unique-name
   collision behavior, directory recursion rules, desktop-local source paths,

@@ -298,7 +298,7 @@ describe("audit", () => {
     await cli.run("para-zk:create-resource", { title: "Canonical Source", open: "false" });
     await cli.run("para-zk:create-llm-wiki", {
       title: "Normal Wiki",
-      body: "[[PARA/Resources/Canonical Source.md]]",
+      body: "[[PARA/Resources/Canonical Source.md]] [[LLM-Wiki/Broken Wiki.md]]",
       open: "false"
     });
     await cli.run("para-zk:update-llm-wiki", {
@@ -321,7 +321,7 @@ describe("audit", () => {
         "    id: abc123",
         "  - https://example.com/idless"
       ],
-      "Body points at [[Missing Body Target]]."
+      "Body points at [[Missing Body Target]]. [[LLM-Wiki/Normal Wiki.md]]"
     );
 
     const result = asAudit(await cli.run("para-zk:audit", { type: "llm-wiki", limit: "all" }));
@@ -387,6 +387,32 @@ describe("audit", () => {
       returned: 0,
       findings: []
     });
+  });
+
+  it("flags an llm-wiki page no other wiki page links to (orphan_wiki_page, advisory only)", async () => {
+    // Hub <-> Member are cross-linked (the web). Stranded has no links at all. Upward Only is
+    // linked only by a canonical note, which does NOT count (canonical->wiki is the anti-pattern).
+    await createNote("LLM-Wiki/Hub.md", ["type: llm-wiki"], "Hub links to [[LLM-Wiki/Member.md]].");
+    await createNote("LLM-Wiki/Member.md", ["type: llm-wiki"], "Member links back to [[LLM-Wiki/Hub.md]].");
+    await createNote("LLM-Wiki/Stranded.md", ["type: llm-wiki"], "No wiki page links here.");
+    await createNote(
+      "PARA/Resources/Citing Note.md",
+      ["type: resource", `created: ${dateDaysAgo(1)}`, "updated:"],
+      "Upward link [[LLM-Wiki/Upward Only.md]]."
+    );
+    await createNote("LLM-Wiki/Upward Only.md", ["type: llm-wiki"], "Only a canonical note points here.");
+
+    const result = asAudit(await cli.run("para-zk:audit", { check: "orphan_wiki_page", limit: "all" }));
+
+    // Cross-linked Hub/Member are NOT orphans; a canonical inbound link does not rescue Upward Only.
+    expect(result.findings.map((finding) => finding.path)).toEqual([
+      "LLM-Wiki/Stranded.md",
+      "LLM-Wiki/Upward Only.md"
+    ]);
+    expect(result.findings.every((finding) =>
+      finding.code === "orphan_wiki_page" && finding.severity === "low" && finding.type === "llm-wiki"
+    )).toBe(true);
+    expect(result.findings[0].detail).toMatchObject({ inbound_wiki_links: 0 });
   });
 
   it("rejects aliases and dryRun at the CLI boundary", async () => {

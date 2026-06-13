@@ -80,7 +80,7 @@ optsidian para-zk:wiki-ingest-candidates mode=re-ingest source_path="PARA/Resour
 
 Reason codes are `missing_wiki_citation`, `source_newer_than_wiki`, `per_import`, and `reingest_requested`. `source_newer_than_wiki` derives staleness from page `updated`: the source is newer than at least one citing wiki page, listed in `stale_pages` as `{ path, title, updated_ms }`.
 
-The audit check `upward_wiki_link` (`medium`) flags a non-`llm-wiki` note that links into an `llm-wiki` note. Wiki pages cite canonical notes; canonical notes should not link back into the wiki.
+The audit check `upward_wiki_link` (`medium`) flags a non-`llm-wiki` note that links into an `llm-wiki` note. Wiki pages cite canonical notes; canonical notes should not link back into the wiki. The `orphan_wiki_page` (`low`) check is an advisory hint for an `llm-wiki` page that no other wiki page links to (canonical→wiki links do not count) — usually an under-woven concept, though a genuinely standalone topic is fine and never forced.
 
 `create-llm-wiki` and `update-llm-wiki` accept `by=<model-id>` for authorship: create stamps `created_by` and `updated_by`, while changed updates stamp `updated_by`. LLM-Wiki pages include managed props plus Cited-by scoped to `LLM-Wiki/`, then References. Cross-link wiki concept pages with body `[[link]]`; use `references` plus backtick code-span `` `PZ[<id>]` `` citations only for canonical sources outside LLM-Wiki. Bare `PZ[<id>]` text does not render.
 

@@ -259,6 +259,7 @@ export type AuditCheckCode =
   | "idless_reference"
   | "orphan_note"
   | "upward_wiki_link"
+  | "orphan_wiki_page"
   | "unprocessed_spark"
   | "stale_draft_permanent";
 
