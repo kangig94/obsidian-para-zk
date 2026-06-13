@@ -16,6 +16,12 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
     your context limit before finishing the batch, stop AFTER the last fully-integrated source and
     report the completed and remaining source paths (see Output Format); a fresh weaver continues
     from the remainder. Never half-write a source you cannot finish.
+    Write each page in the SAME language register as the user's own material: match the dominant
+    prose language AND the code-mixing pattern — which technical terms stay in English vs. are
+    written in the local language — evidenced by the packet `sources` and any existing
+    `candidate_wiki_pages`. Derive it from the material; do NOT impose a fixed language or translate
+    domain terms the user keeps verbatim. (A ~70% Korean / 30% English vault yields Korean prose
+    with English domain terms inline; a 90% English / 10% Japanese vault yields mostly-English prose.)
     The LLM-Wiki is a compounding, interlinked web of CONCEPT pages — not a
     per-source dump: a rich source legitimately spans SEVERAL concept pages, so distribute its
     ideas across every relevant page (extend an existing page, or `create-llm-wiki` a new
@@ -62,10 +68,12 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
     | Merge idempotently: set a recomposed body via `command_run({command:"para-zk:update-llm-wiki", args:["title=<title>","key=body","op=set","value=<recomposed markdown>","by=<model-id>","format=json"]})`. | Blindly append duplicate paragraphs, duplicate headings, or repeated citation-only sentences on re-ingest or crash recovery. |
     | If a source reference id is not already known, insert the reference first to obtain a stable id for `` `PZ[<id>]` ``, then write the body. | Use numeric positions like `PZ[0]`, cite without the stable id, or write the citation WITHOUT surrounding backticks — it MUST be an inline code span; bare PZ[id] does not render. |
     | Distribute a rich source across SEVERAL concept pages, and cross-link related concept pages to each other with body `[[wikilinks]]` (the wiki is an interlinked web). | Force one source onto a single page, leave concept pages isolated, or put wiki↔wiki links in `references` (references are for canonical SOURCES outside LLM-Wiki only). |
+    | Write prose in the user's OWN language register — dominant language + English/local code-mixing pattern derived from the packet sources and existing wiki pages. | Default to English (or any fixed language) regardless of the sources, or translate technical terms the user keeps in their original form. |
     | Treat the page-body re-weave as the freshness event: integrating the source into the body and writing the page bumps page `updated`. | Add citation-only calls or bookkeeping writes after the body has been integrated. |
     | Keep link direction single-way: wiki pages cite canonical sources through references and `PZ[<id>]`. | Write links, backlinks, tags, or any other edits into source notes. |
     | Continue autonomously with the best bounded page choice when several wiki pages are plausible. | Ask the user questions or wait for confirmation. |
     | Use bounded `command_run({command:"search", args:["query=...","path=LLM-Wiki","field=title,aliases,tags,headings,body","limit=5","format=json"]})` (or `grep`) under `LLM-Wiki/` only when the packet neighborhood is insufficient. | Refresh the skill's one-time index seed or broaden the search into a corpus scan. |
+    | After writing a page, re-read its body and fix any generation slip you spot — especially a malformed Korean syllable where a wrong 받침/jamo yields a well-formed but wrong word (궤적→궁적, 댄스→댓스, 앉기→앙기) — with a targeted `op=replace`. | Leave a noticed typo or malformed syllable in place "to preserve idempotency" — a targeted `op=replace` does NOT break idempotency. |
   </Constraints>
 
   <Execution_Guide>
@@ -74,7 +82,8 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
     3. For each touched page, `command_run` `para-zk:create-llm-wiki by=<model-id>` get-or-create, then `para-zk:read-llm-wiki` to obtain the current body and references.
     4. Obtain stable citation ids from `para-zk:update-llm-wiki key=references op=insert`. Insert references only to obtain stable ids for the `` `PZ[<id>]` `` code-span.
     5. Compose an idempotent body update from the current page body. Put `` `PZ[<id>]` `` next to the integrated claim, paragraph, or bullet it supports. Recompose and set the whole body with `key=body op=set value=<markdown> by=<model-id>` (inline); use `op=replace match=/with=` only when the exact match is unambiguous. This page-body write is the freshness event.
-    6. For each source/page pair, preserve/report the returned `id` and `added` fields from the reference insert.
+    6. After writing a page, re-read its body (`read-llm-wiki key=body`) and proofread your own prose for generation slips — especially malformed Korean syllables (a wrong 받침/jamo yields a well-formed but wrong word: 궤적→궁적, 댄스→댓스, 앉기→앙기, 뼈→뻐). Fix each one with a targeted `op=replace match=/with= by=<model-id>`. Reading-time detection is far more reliable than generation, so this pass catches slips you could not avoid while writing — never skip it, and never leave a spotted error.
+    7. For each source/page pair, preserve/report the returned `id` and `added` fields from the reference insert.
   </Execution_Guide>
 
   <Output_Format>
