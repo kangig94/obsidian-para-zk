@@ -812,10 +812,13 @@ and the same references without writing. This is the CLI path for making an
 intentional assignment automatically when a reference is selected for citation.
 
 Reference insert values accept `link`, optional `description`, and
-optional 0-based `position`. Insert returns `index`, `link`, `changed`, and
-`added`. If the canonical `link` already exists, insert is a no-op: requested
-`position` is ignored and the existing `index` and `link` are returned with
-`changed: false` and `added: false`. Wikilinks may include Obsidian display
+optional 0-based `position`. Insert returns `index`, `link`, `changed`,
+`added`, and the reference's stable `id` — so you can cite it inline as
+`` `PZ[<id>]` `` in the same flow without re-reading. If the canonical `link`
+already exists, insert is a no-op: requested `position` is ignored and the
+existing `index`, `link`, and `id` are returned with `changed: false` and
+`added: false` (an id-less match is backfilled with a fresh id so it stays
+citable). Wikilinks may include Obsidian display
 text, for example `[[Note Path|PMG]]`; the target is resolved to the real vault
 file while `PMG` is preserved as the displayed link text.
 

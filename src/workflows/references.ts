@@ -90,6 +90,7 @@ export async function addReference(ctx: WorkflowContext, options: AddReferenceOp
     index: reference.index,
     link: reference.link,
     added: reference.added === true,
+    id: reference.id,
     opened: options.open || undefined
   };
 }
@@ -182,20 +183,32 @@ async function insertReferenceItemUnlocked(
     : undefined;
   const read = referenceItemsReadFromFrontmatter(await readFileFrontmatterFresh(ctx, file));
   const items = read.items;
+  const newId = generateUniqueReferenceId(referenceIdsInUse(items));
   const item = normalizeReferenceItem({
-    id: generateUniqueReferenceId(referenceIdsInUse(items)),
+    id: newId,
     link: canonical.link,
     description
   });
   const itemKey = referenceDedupeKey(ctx, file, item.link);
   const duplicateIndex = items.findIndex((candidate) => referenceDedupeKey(ctx, file, candidate.link) === itemKey);
   if (duplicateIndex !== -1) {
-    if (read.needsBackfill) await writeReferenceItems(ctx, file, items);
+    // Re-inserting an existing link is a no-op, but still return a citable id: reuse the
+    // existing reference's id, or backfill an id-less match with a fresh one so the caller
+    // can cite it immediately.
+    const existing = items[duplicateIndex];
+    const id = existing.id ?? newId;
+    if (existing.id === null) {
+      items[duplicateIndex] = { ...existing, id };
+      await writeReferenceItems(ctx, file, items);
+    } else if (read.needsBackfill) {
+      await writeReferenceItems(ctx, file, items);
+    }
     return {
       changed: false,
       index: duplicateIndex,
-      link: items[duplicateIndex].link,
-      added: false
+      link: existing.link,
+      added: false,
+      id
     };
   }
 
@@ -207,7 +220,8 @@ async function insertReferenceItemUnlocked(
     changed: true,
     index: position,
     link: item.link,
-    added: true
+    added: true,
+    id: newId
   };
 }
 

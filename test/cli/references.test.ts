@@ -171,6 +171,8 @@ describe("reference collection insert", () => {
     });
     expect(ref.added).toBe(true);
     expect(ref.link).toBe(`[[${targetPath}|PMG]]`);
+    // insert returns the generated stable id, so a caller can cite PZ[<id>] without re-reading.
+    expectGeneratedReferenceId(ref.id);
 
     const duplicate = await insertProjectReference({
       link: targetPath
@@ -178,6 +180,8 @@ describe("reference collection insert", () => {
     expect(duplicate.added).toBe(false);
     expect(duplicate.index).toBe(ref.index);
     expect(duplicate.link).toBe(`[[${targetPath}|PMG]]`);
+    // a no-op duplicate insert returns the existing reference's id (same id).
+    expect(duplicate.id).toBe(ref.id);
 
     const read = await cli.run("para-zk:read-project", { title: "Alpha", key: "references", limit: "all" });
     const value = read.value as { count: number; items?: Record<string, ReferenceRead> };

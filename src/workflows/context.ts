@@ -289,6 +289,7 @@ export type UpdateSurfaceResult = {
   index?: number;
   link?: string;
   added?: boolean;
+  id?: string;
   moved?: boolean;
   fromPath?: string;
   toPath?: string;
@@ -440,6 +441,9 @@ export type ReferenceMutationResult = {
   index: number;
   link: string;
   added?: boolean;
+  // The reference's stable id. insert always returns it (so a caller can cite `PZ[<id>]`
+  // immediately); other ops omit it.
+  id?: string;
 };
 
 export type SurfaceAddressing = {
@@ -483,5 +487,6 @@ export type AddReferenceResult = {
   index: number;
   link: string;
   added: boolean;
+  id?: string;
   opened?: boolean;
 };

@@ -169,6 +169,7 @@ type TextUpdateResult = {
   index?: number;
   link?: string;
   added?: boolean;
+  id?: string;
   file?: TFile;
   moved?: boolean;
   fromPath?: string;
@@ -241,6 +242,7 @@ async function updateSurfaceUnlocked(
     index: result.index,
     link: result.link,
     added: result.added,
+    id: result.id,
     moved: result.moved,
     fromPath: result.fromPath,
     toPath: result.toPath,
@@ -566,7 +568,8 @@ async function updateReferenceCollectionSurface(
     changed: result.changed,
     index: result.index,
     link: result.link,
-    added: result.added
+    added: result.added,
+    id: result.id
   };
 }
 

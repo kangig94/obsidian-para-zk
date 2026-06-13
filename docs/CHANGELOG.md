@@ -55,6 +55,10 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- `key=references op=insert` now returns the reference's stable `id` in its result, so a
+  caller can cite it inline as `` `PZ[<id>]` `` in the same flow without a follow-up
+  `read key=references`. A no-op duplicate insert returns the existing reference's id, and
+  an id-less match is backfilled with a fresh id so it stays citable.
 - Added the `llm-wiki` surface type for LLM-owned derived synthesis under
   `LLM-Wiki/`: native CLI CRUD (`create/read/update/rename/delete-llm-wiki`),
   slash-path title addressing, `body`/`frontmatter/aliases`/`references` editing,
