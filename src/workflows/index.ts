@@ -10,8 +10,8 @@ export type {
   WikiIngestCandidate,
   WikiIngestCandidatesOptions,
   WikiIngestCandidatesResult,
-  WikiIngestLedgerRow,
   WikiIngestMode,
+  WikiIngestStalePage,
   WorkflowContext,
 } from "./context";
 
@@ -47,7 +47,6 @@ export { deleteArea, deleteJournal, deleteLlmWiki, deleteProject, deleteResource
 export { listNotes } from "./list";
 export { auditVault } from "./audit";
 export { INGESTABLE_TYPES, ingestableCanonicalSource, wikiIngestCandidates } from "./wiki-ingest-candidates";
-export { appendWikiIngestLedgerRow, readWikiLedgerRows } from "./wiki-ledger";
 export { captureJournal, openJournal, distillSpark, createFromDigest, createFromResource } from "./promote";
 export {
   addReference,

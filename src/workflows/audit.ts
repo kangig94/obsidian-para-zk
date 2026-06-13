@@ -11,7 +11,7 @@ import type {
   ReferenceRead,
   WorkflowContext
 } from "./context";
-import { isArchivedFile, isUnderAnyFolder, isWikiLedgerPath, templateFolderPaths } from "./locations";
+import { isArchivedFile, isUnderAnyFolder, templateFolderPaths } from "./locations";
 import { backfillReferenceIds, readReferenceItemsFresh } from "./references";
 
 type AuditableNote = {
@@ -130,7 +130,6 @@ function auditableNotes(ctx: WorkflowContext): AuditableNote[] {
   for (const file of ctx.host.getMarkdownFiles()) {
     if (isUnderAnyFolder(file.path, templateFolders)) continue;
     if (isArchivedFile(ctx, file)) continue;
-    if (isWikiLedgerPath(ctx.settings, file.path)) continue;
     const frontmatter = fileFrontmatter(ctx, file);
     notes.push({
       file,
@@ -240,8 +239,8 @@ function orphanNoteFindings(ctx: WorkflowContext, notes: AuditableNote[]): Audit
   const findings: AuditFinding[] = [];
   for (const note of notes) {
     if (!isOrphanCandidate(ctx, note)) continue;
-    const incoming = incomingResolvedLinks(ctx, resolvedLinks, note.file.path);
-    const outgoing = outgoingResolvedLinks(ctx, resolvedLinks, note.file.path);
+    const incoming = incomingResolvedLinks(resolvedLinks, note.file.path);
+    const outgoing = outgoingResolvedLinks(resolvedLinks, note.file.path);
     if (incoming > 0 || outgoing > 0) continue;
     findings.push({
       code: "orphan_note",
@@ -269,7 +268,6 @@ function upwardWikiLinkFindings(ctx: WorkflowContext, notes: AuditableNote[]): A
   const findings: AuditFinding[] = [];
   for (const note of notes) {
     if (note.type === "llm-wiki") continue;
-    if (isWikiLedgerPath(ctx.settings, note.file.path)) continue;
     const targets = resolvedLinks[note.file.path] ?? {};
     for (const [targetPath, value] of Object.entries(targets).sort(([left], [right]) => left.localeCompare(right))) {
       if (positiveCount(value) === 0) continue;
@@ -293,26 +291,16 @@ function isFolderMainNote(file: TFile): boolean {
   return file.parent?.name === file.basename;
 }
 
-function incomingResolvedLinks(
-  ctx: WorkflowContext,
-  links: Record<string, Record<string, number>>,
-  targetPath: string
-): number {
+function incomingResolvedLinks(links: Record<string, Record<string, number>>, targetPath: string): number {
   let count = 0;
   for (const [sourcePath, targets] of Object.entries(links)) {
-    if (isWikiLedgerPath(ctx.settings, sourcePath)) continue;
     if (sourcePath === targetPath) continue;
     count += positiveCount(targets[targetPath]);
   }
   return count;
 }
 
-function outgoingResolvedLinks(
-  ctx: WorkflowContext,
-  links: Record<string, Record<string, number>>,
-  sourcePath: string
-): number {
-  if (isWikiLedgerPath(ctx.settings, sourcePath)) return 0;
+function outgoingResolvedLinks(links: Record<string, Record<string, number>>, sourcePath: string): number {
   const targets = links[sourcePath] ?? {};
   let count = 0;
   for (const [targetPath, value] of Object.entries(targets)) {

@@ -208,6 +208,7 @@ type ChildAddress = {
 
 const FORMAT_OPTION: CliOptionSpec = { value: "<text|json>", description: "Output format (default: text)." };
 const ALIAS_OPTION: CliOptionSpec = { value: "<text>", description: "Optional single Obsidian alias to store in frontmatter." };
+const BY_OPTION: CliOptionSpec = { value: "<model-id>", description: "Locale-neutral model id to stamp as llm-wiki authorship." };
 const RESOURCE_CREATE_TITLE_OPTION: CliOptionSpec = {
   value: "<title>",
   description: "Resource title. Use / to address/create a Resources-relative path, e.g. AI/Foo."
@@ -264,6 +265,16 @@ const CHILD_ADDRESS_OPTIONS: Record<string, CliOptionSpec> = {
 const CHILD_COMMANDS_HINT = "para-zk:read-child|update-child|delete-child|rename-child";
 const CRUD_CHILD_MIGRATION_ERROR = `child= is not accepted here — address a child note with ${CHILD_COMMANDS_HINT} (root_type/root_title/relpath/title)`;
 const CREATE_AREA_CHILD_MIGRATION_ERROR = "parent_title, parentTitle, and child are not accepted by para-zk:create-area — create a nested area with para-zk:create-child type=area root_type=area root_title=<root> relpath=<ancestors> title=<child>";
+const LLM_WIKI_BY_ALIASES: Record<string, string> = {
+  author: "by",
+  created_by: "by",
+  createdBy: "by",
+  model: "by",
+  model_id: "by",
+  modelId: "by",
+  updated_by: "by",
+  updatedBy: "by"
+};
 
 const PARA_NOTE_COMMANDS: ParaNoteCommandConfig[] = [
   {
@@ -951,14 +962,20 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     selector: { variant: "retro" }
   }),
   ...PARA_NOTE_COMMANDS.map(makeParaUpdateCommand),
-  makeUpdateCommand({
+  {
     command: "para-zk:update-llm-wiki",
     description: "Update an llm-wiki note's stable PARA-ZK surface by map key",
-    options: updateCommandOptions(LLM_WIKI_SELECTOR, writeKeyOption("llm-wiki")),
+    options: {
+      ...updateCommandOptions(LLM_WIKI_SELECTOR, writeKeyOption("llm-wiki")),
+      by: BY_OPTION
+    },
     text: "llm-wiki updated",
-    workflow: "updateLlmWiki",
-    selector: LLM_WIKI_SELECTOR
-  }),
+    run: workflowRun("updateLlmWiki", (args) => ({
+      ...selectorOptions(args, LLM_WIKI_SELECTOR, "write"),
+      ...readCliUpdateOptions(args),
+      by: readCliBy(args)
+    }))
+  },
   makeUpdateCommand({
     command: "para-zk:update-zk",
     description: "Update a ZK note's stable PARA-ZK surface by map key",
@@ -1209,6 +1226,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       title: LLM_WIKI_CREATE_TITLE_OPTION,
       alias: ALIAS_OPTION,
       body: { value: "<markdown>", description: "Optional initial free-form body content." },
+      by: BY_OPTION,
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
     },
@@ -1217,6 +1235,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       title: readCliTitle(args),
       alias: readCliAlias(args),
       body: readCliString(args, "body"),
+      by: readCliBy(args),
       open: readCliBoolean(args, "open") ?? false
     }))
   },
@@ -1452,11 +1471,19 @@ export function registerNativeCliHandlers(plugin: ParaZkPluginContext): void {
         if (isHelpRequest(args)) return renderCommandHelp(command, args);
         return withCliErrors(args, async () => {
           command.preResolve?.(args);
+          rejectUnsupportedByArg(command, args);
           const resolved = await resolveFileBackedArgs(args, command.options);
           return command.run(plugin, resolved);
         }, command.text);
       }
     );
+  }
+}
+
+function rejectUnsupportedByArg(command: NativeCliCommand, args: CliArgs): void {
+  if (Object.prototype.hasOwnProperty.call(command.options, "by")) return;
+  if (Object.prototype.hasOwnProperty.call(args, "by")) {
+    throw new Error(`by is not accepted by ${command.command}`);
   }
 }
 
@@ -1848,6 +1875,14 @@ function readCliNewTitle(args: CliArgs): string {
     newName: "new_title"
   });
   return readCliString(args, "new_title") ?? "";
+}
+
+function readCliBy(args: CliArgs): string | undefined {
+  rejectCliAliases(args, LLM_WIKI_BY_ALIASES);
+  if (!Object.prototype.hasOwnProperty.call(args, "by")) return undefined;
+  const by = readCliString(args, "by")?.trim();
+  if (!by) throw new Error("by must be a model id");
+  return by;
 }
 
 function readCliRenameKind(args: CliArgs): string | undefined {

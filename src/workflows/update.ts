@@ -82,16 +82,12 @@ import {
   resolveRequiredRetro,
   resolveRequiredZk
 } from "./locations";
-import { appendWikiIngestLedgerRow } from "./wiki-ledger";
-import { ingestableCanonicalSource } from "./wiki-ingest-candidates";
 import {
   backfillReferenceIds,
   deleteReferenceItem,
   insertReferenceItem,
-  parseWikiLink,
   readReferenceWritableField,
   setReferenceItemField,
-  splitObsidianSubpath
 } from "./references";
 import {
   assertRootTaskExists,
@@ -118,11 +114,20 @@ export async function updateResource(ctx: WorkflowContext, options: UpdateResour
 export async function updateLlmWiki(ctx: WorkflowContext, options: UpdateLlmWikiOptions): Promise<UpdateSurfaceResult> {
   const file = await resolveRequiredLlmWiki(ctx, options);
   const result = await updateSurface(ctx, file, LLM_WIKI_READ_SPEC, options);
-  if (result.key !== "references" || result.operation !== "insert") return result;
-  return {
-    ...result,
-    ingest_logged: await maybeAppendWikiIngestLedgerRow(ctx, file, result)
-  };
+  const by = llmWikiBy(options.by);
+  if (!result.changed || !by) return result;
+
+  const resultFile = ctx.host.getFile(result.path);
+  if (!resultFile) throw new Error(`updated llm-wiki file not found: ${result.path}`);
+  await ctx.host.processFrontMatter(resultFile, (fm) => {
+    fm.updated_by = by;
+  });
+  return result;
+}
+
+function llmWikiBy(value: string | undefined): string | undefined {
+  const by = value?.trim();
+  return by || undefined;
 }
 
 export async function updateZk(ctx: WorkflowContext, options: UpdateZkOptions): Promise<UpdateSurfaceResult> {
@@ -137,37 +142,6 @@ export async function updateJournal(ctx: WorkflowContext, options: UpdateJournal
 
 export async function updateRetro(ctx: WorkflowContext, options: UpdateRetroOptions): Promise<UpdateSurfaceResult> {
   return updateSurface(ctx, await resolveRequiredRetro(ctx, options), RETRO_READ_SPEC, options);
-}
-
-async function maybeAppendWikiIngestLedgerRow(
-  ctx: WorkflowContext,
-  wikiFile: TFile,
-  result: UpdateSurfaceResult
-): Promise<boolean> {
-  if (!result.link) return false;
-  const sourceFile = resolveReferenceLinkFile(ctx, wikiFile, result.link);
-  if (!sourceFile) return false;
-  const frontmatter = await readFileFrontmatterFresh(ctx, sourceFile);
-  const source = ingestableCanonicalSource(ctx, sourceFile, frontmatter);
-  if (!source) return false;
-
-  await appendWikiIngestLedgerRow(ctx, {
-    wikiPath: wikiFile.path,
-    sourcePath: source.file.path,
-    sourceUpdated: source.updated,
-    sourceUpdatedMs: source.updatedMs
-  });
-  return true;
-}
-
-function resolveReferenceLinkFile(ctx: WorkflowContext, source: TFile, link: string): TFile | undefined {
-  const wiki = parseWikiLink(link);
-  if (!wiki) return undefined;
-  const split = splitObsidianSubpath(wiki.target);
-  const withSubpath = `${split.base}${split.subpath}`;
-  return ctx.host.getFirstLinkpathDest(withSubpath, source.path)
-    ?? (split.base ? ctx.host.getFirstLinkpathDest(split.base, source.path) : null)
-    ?? undefined;
 }
 
 type WritableSurfaceTarget =

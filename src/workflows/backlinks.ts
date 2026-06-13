@@ -3,7 +3,6 @@ import { hasOwn, isRecord } from "../records";
 import { fileFrontmatter, readType } from "../vault/frontmatter";
 import { wikiLink } from "../vault/paths";
 import type { BacklinkRead, WorkflowContext } from "./context";
-import { isWikiLedgerPath } from "./locations";
 
 type BacklinkSourceVisitor = (sourceFile: TFile, index: number) => void;
 
@@ -40,7 +39,6 @@ function enumerateBacklinkSources(
 ): number {
   const sourcePaths = Object.entries(ctx.host.resolvedLinks())
     .filter(([sourcePath, targets]) => sourcePath !== targetFile.path
-      && !isWikiLedgerPath(ctx.settings, sourcePath)
       && isRecord(targets)
       && hasOwn(targets, targetFile.path))
     .map(([sourcePath]) => sourcePath)

@@ -236,6 +236,10 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Optional initial free-form body content.",
         "value": "<markdown>",
       },
+      "by": {
+        "description": "Locale-neutral model id to stamp as llm-wiki authorship.",
+        "value": "<model-id>",
+      },
       "format": {
         "description": "Output format (default: text).",
         "value": "<text|json>",
@@ -867,7 +871,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<text|json>",
       },
       "key": {
-        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{aliases}, references, references/<i>, references/<i>/{id|link|description|kind|path|target}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body.",
+        "description": "Optional stable read key. Valid: frontmatter, frontmatter/{aliases|created_by|updated_by}, references, references/<i>, references/<i>/{id|link|description|kind|path|target}, backlinks, backlinks/<i>, backlinks/<i>/{link|path|title|type}, body.",
         "value": "<map-path>",
       },
       "limit": {
@@ -1455,6 +1459,10 @@ exports[`native CLI command metadata is stable 1`] = `
       "all": {
         "description": "For op=replace, replace all matches instead of requiring a single match.",
         "value": "<true|false>",
+      },
+      "by": {
+        "description": "Locale-neutral model id to stamp as llm-wiki authorship.",
+        "value": "<model-id>",
       },
       "format": {
         "description": "Output format (default: text).",

@@ -28,6 +28,7 @@ export type ReadSectionSpec = {
 
 export type ReadSurfaceSpec = {
   frontmatter: string[];
+  readonlyFrontmatter?: string[];
   sections?: ReadSectionSpec[];
   body?: boolean;
   children?: boolean;
@@ -90,6 +91,7 @@ export const RESOURCE_READ_SPEC: ReadSurfaceSpec = {
 
 export const LLM_WIKI_READ_SPEC: ReadSurfaceSpec = {
   frontmatter: ["aliases"],
+  readonlyFrontmatter: ["created_by", "updated_by"],
   sections: [
     { key: "references", labelKey: "references", transform: readReferences, collection: "reference" },
     BACKLINK_READ_SECTION
@@ -190,7 +192,8 @@ export function readSurfaceTopLevelKeys(spec: ReadSurfaceSpec): string[] {
 
 function readKeyHints(spec: ReadSurfaceSpec): string[] {
   const keys: string[] = [];
-  if (spec.frontmatter.length > 0) keys.push("frontmatter", `frontmatter/{${spec.frontmatter.join("|")}}`);
+  const frontmatterKeys = readableFrontmatterKeys(spec);
+  if (frontmatterKeys.length > 0) keys.push("frontmatter", `frontmatter/{${frontmatterKeys.join("|")}}`);
   for (const section of spec.sections ?? []) {
     if (section.collection === "task") {
       keys.push("tasks", "tasks/<id>", "tasks/<id>/{checkbox|name|due|scheduled|start|created|done|cancelled|priority}");
@@ -209,7 +212,7 @@ function readKeyHints(spec: ReadSurfaceSpec): string[] {
 
 function compactReadKeys(spec: ReadSurfaceSpec): string[] {
   const keys: string[] = [];
-  if (spec.frontmatter.length > 0) keys.push("frontmatter");
+  if (readableFrontmatterKeys(spec).length > 0) keys.push("frontmatter");
   for (const section of spec.sections ?? []) keys.push(section.key);
   if (spec.body) keys.push("body");
   if (spec.children) keys.push("children");
@@ -368,7 +371,7 @@ function addressingForType(type: SurfaceType): SurfaceAddressing {
 }
 
 function describeSurfaceSpec(type: SurfaceType, spec: ReadSurfaceSpec): SurfaceDescription {
-  const frontmatterKeys = [...spec.frontmatter];
+  const frontmatterKeys = readableFrontmatterKeys(spec);
   return {
     type,
     addressing: addressingForType(type),
@@ -380,6 +383,10 @@ function describeSurfaceSpec(type: SurfaceType, spec: ReadSurfaceSpec): SurfaceD
     ...(frontmatterKeys.length > 0 ? { frontmatterKeys } : {}),
     collections: collectionMap(spec)
   };
+}
+
+export function readableFrontmatterKeys(spec: ReadSurfaceSpec): string[] {
+  return uniqueStrings([...spec.frontmatter, ...(spec.readonlyFrontmatter ?? [])]);
 }
 
 export function keyParts(key: string): string[] {

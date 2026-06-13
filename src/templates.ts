@@ -163,8 +163,14 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           `  - ${tags.llmWiki}/${slugPlaceholder}`,
           `created: ${nowPlaceholder}`,
           "updated:",
+          "created_by:",
+          "updated_by:",
           "aliases:"
         ]),
+        paraZkPropsBlock("llm-wiki"),
+        "{{cursor}}",
+        "",
+        paraZkManagedBlock(),
         ""
       ].join("\n");
     case "journal":
@@ -379,6 +385,11 @@ export function managedUiBlockForType(type: string, settings: ParaZkSettings): s
         paraZkViewBlock("resource-cited-by", t.labels.createdFromThis),
         paraZkReferencesBlock("current", t.labels.references)
       ]);
+    case "llm-wiki":
+      return joinManagedUiBlocks([
+        paraZkViewBlock("llm-wiki-cited-by", t.labels.citedBy),
+        paraZkReferencesBlock("current", t.labels.references)
+      ]);
     case "journal":
       return joinManagedUiBlocks([
         paraZkTasksBlock("current", [], t.labels.tasks),
@@ -468,9 +479,17 @@ function dataviewAreaRetros(t: ReturnType<typeof localePack>, settings: ParaZkSe
 // over Obsidian's link graph — the single-direction reference made on the citing
 // side surfaces here without any reverse link being stored (see ZK redesign).
 function dataviewCitedBy(t: ReturnType<typeof localePack>, settings: ParaZkSettings, sourcePath?: string): string[] {
+  return dataviewCitedByFromFolders(t, zkSourceFolders(settings), sourcePath);
+}
+
+function dataviewWikiCitedBy(t: ReturnType<typeof localePack>, settings: ParaZkSettings, sourcePath?: string): string[] {
+  return dataviewCitedByFromFolders(t, [settings.paths.wikiFolder], sourcePath);
+}
+
+function dataviewCitedByFromFolders(t: ReturnType<typeof localePack>, folders: string[], sourcePath?: string): string[] {
   return fenced("dataview", [
     `TABLE WITHOUT ID file.link AS "${t.labels.filename}", file.mtime AS "${t.labels.updated}"`,
-    `FROM ${dataviewSources(zkSourceFolders(settings))}`,
+    `FROM ${dataviewSources(folders)}`,
     `WHERE contains(file.outlinks, ${dataviewCurrentFileLink(sourcePath)})`,
     "SORT file.mtime DESC"
   ]);
@@ -494,6 +513,7 @@ export const DATAVIEW_VIEW_KEYS = [
   "area-subnotes",
   "area-retros",
   "resource-cited-by",
+  "llm-wiki-cited-by",
   "permanent-cited-by",
   "spark-distill",
   "digest-cited-by"
@@ -519,6 +539,7 @@ export function dataviewViewBlock(key: string, settings: ParaZkSettings, sourceP
     case "permanent-cited-by":
     case "digest-cited-by":
       return dataviewCitedBy(t, settings, sourcePath).join("\n");
+    case "llm-wiki-cited-by": return dataviewWikiCitedBy(t, settings, sourcePath).join("\n");
     case "spark-distill": return dataviewDistilledInto(t).join("\n");
     default: return undefined;
   }

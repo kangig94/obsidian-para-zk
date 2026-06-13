@@ -25,6 +25,7 @@ const PROPS_VIEW_TYPES = [
   "project",
   "area",
   "resource",
+  "llm-wiki",
   "journal",
   "retro",
   "subnote",
@@ -89,6 +90,8 @@ export function propsSchemaForType(type: PropsViewType, locale: Locale): PropsSc
   const aliases = field("aliases", "aliases", t.labels.aliases, "text-list");
   const created = displayField("created", "created", t.labels.created);
   const updated = displayField("updated", "updated", t.labels.updated);
+  const createdBy = displayField("created_by", "created_by", t.labels.createdBy);
+  const updatedBy = displayField("updated_by", "updated_by", t.labels.updatedBy);
 
   const schemas: Record<PropsViewType, PropsSchema> = {
     project: {
@@ -129,6 +132,13 @@ export function propsSchemaForType(type: PropsViewType, locale: Locale): PropsSc
           field("license", "license", t.labels.license, "text"),
           selectField("kind", "kind", t.labels.kind, resourceKindOptions(locale))
         ]
+      ]
+    },
+    "llm-wiki": {
+      type: "llm-wiki",
+      rows: [
+        [created, updated],
+        [createdBy, updatedBy]
       ]
     },
     journal: {

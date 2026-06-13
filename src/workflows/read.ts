@@ -30,6 +30,7 @@ import {
   AREA_READ_SPEC,
   RESOURCE_READ_SPEC,
   RETRO_READ_SPEC,
+  readableFrontmatterKeys,
   readSurfaceTopLevelKeys,
   sectionHeadingCandidates,
   specForType,
@@ -113,7 +114,7 @@ async function readSurfaceMap(ctx: WorkflowContext, file: TFile, spec: ReadSurfa
   const content = await ctx.host.read(file);
   const frontmatter = await readFileFrontmatterFresh(ctx, file);
   const surface: ReadMap = {
-    frontmatter: pickFrontmatter(frontmatter, spec.frontmatter)
+    frontmatter: pickFrontmatter(frontmatter, readableFrontmatterKeys(spec))
   };
 
   if (spec.body) surface.body = stripManagedPrelude(content);
@@ -324,7 +325,7 @@ function readSurfaceMapKey(
   if (!readSurfaceTopLevelKeys(spec).includes(parts[0])) {
     throw unknownReadKeyError(spec, originalKey);
   }
-  if (parts[0] === "frontmatter" && parts.length >= 2 && !spec.frontmatter.includes(parts[1])) {
+  if (parts[0] === "frontmatter" && parts.length >= 2 && !readableFrontmatterKeys(spec).includes(parts[1])) {
     throw unknownReadKeyError(spec, originalKey);
   }
 

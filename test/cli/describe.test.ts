@@ -138,11 +138,11 @@ describe("describe", () => {
     expect(wikiAddressing.create).toBe("para-zk:create-llm-wiki");
     expect(wikiAddressing.read).toBe("para-zk:read-llm-wiki");
     expect(wikiAddressing.update).toBe("para-zk:update-llm-wiki");
-    expect(wikiAddressing.createInputs).toEqual(expect.arrayContaining(["title", "alias", "body"]));
+    expect(wikiAddressing.createInputs).toEqual(expect.arrayContaining(["title", "alias", "body", "by"]));
     expect(wikiAddressing.rename).toBe(true);
     expect(wikiAddressing.addressVia).toContain("LLM-Wiki-relative path");
     expect(wikiAddressing.addressVia).toContain("title=\"AI/Foo\"");
-    expect(wiki.frontmatterKeys).toEqual(["aliases"]);
+    expect(wiki.frontmatterKeys).toEqual(["aliases", "created_by", "updated_by"]);
     expect(wiki.readKeys).toEqual(["frontmatter", "references", "backlinks", "body"]);
     expect(wiki.writeKeys).toEqual([
       "frontmatter/{aliases}=set",

@@ -22,10 +22,11 @@ const runLocale = resolveRunLocale(args.locale);
 // labels are covered separately by guiLocaleExpectations; these mirror the
 // template section headings and managed-toolbar titles that differ by locale.
 const LOCALIZED = {
-  en: { summary: "Summary", goals: "Goals", retroSummary: "Retro summary (required)", references: "References", subnotes: "Subnotes", createRetro: "Create retro", updated: "Updated", aliases: "Aliases" },
-  ko: { summary: "요약", goals: "목표", retroSummary: "회고 요약 (필수)", references: "참고 자료", subnotes: "하위노트", createRetro: "새 회고 만들기", updated: "수정", aliases: "별칭" }
+  en: { summary: "Summary", goals: "Goals", retroSummary: "Retro summary (required)", references: "References", subnotes: "Subnotes", citedBy: "Cited by", createRetro: "Create retro", updated: "Updated", aliases: "Aliases" },
+  ko: { summary: "요약", goals: "목표", retroSummary: "회고 요약 (필수)", references: "참고 자료", subnotes: "하위노트", citedBy: "인용된 곳", createRetro: "새 회고 만들기", updated: "수정", aliases: "별칭" }
 };
 const L = LOCALIZED[runLocale];
+const smokeModelId = "smoke-test-model";
 const requiredDependencyIds = [
   "dataview",
   "obsidian-tasks-plugin",
@@ -179,6 +180,7 @@ function runLiveScenario() {
   assertRenameAreaLinkRewrite();
   assertBacklinkReadKeyScenario();
   assertLlmWikiRoundTrip();
+  assertLlmWikiCitedByRenderer();
   assertWikiIngestCandidatesScenario();
 
   const reorderProject = cliJson("para-zk:create-project", [
@@ -233,7 +235,7 @@ function assertManagedTemplateFiles() {
     const text = readVaultText(path);
     assertNoTemplateDrift(path, text);
 
-    if (name === "retro" || name === "llm-wiki") {
+    if (name === "retro") {
       assert(!text.includes("```para-zk-managed"), `${path} should not include managed UI`);
     } else {
       assert(countOccurrences(text, "```para-zk-managed") === 1, `${path} must include exactly one managed block`);
@@ -242,7 +244,7 @@ function assertManagedTemplateFiles() {
   }
 
   const llmWiki = readVaultText("Templates/para-zk/template_llm-wiki.md");
-  assertLlmWikiFreeFormShape("Templates/para-zk/template_llm-wiki.md", llmWiki);
+  assertLlmWikiManagedShape("Templates/para-zk/template_llm-wiki.md", llmWiki);
   assert(llmWiki.includes("  - llm-wiki/{{slug}}"), "template_llm-wiki.md must include the llm-wiki identity tag placeholder");
 
   const project = readVaultText("Templates/para-zk/template_project.md");
@@ -265,13 +267,9 @@ function assertManagedTemplateFiles() {
 function assertGeneratedNoteTemplateShape(path, type, options = {}) {
   assertVaultTextEventually(path, (text) => {
     assertNoTemplateDrift(path, text);
-    if (type === "llm-wiki") {
-      assertLlmWikiFreeFormShape(path, text);
-      return;
-    }
     assert(text.includes("```para-zk-props"), `${path} is missing para-zk props block`);
 
-    if (type === "subnote" || type === "retro") {
+    if (type === "retro") {
       assert(!text.includes("```para-zk-managed"), `${path} should not include managed UI`);
     } else {
       assert(countOccurrences(text, "```para-zk-managed") === 1, `${path} must include exactly one managed block`);
@@ -288,16 +286,19 @@ function assertGeneratedNoteTemplateShape(path, type, options = {}) {
 
     if (type === "resource") {
       assertResourceFreeFormTemplateShape(path, text);
+    } else if (type === "llm-wiki") {
+      assertLlmWikiManagedShape(path, text);
     } else if (["spark", "digest", "permanent"].includes(type)) {
       assertZkStarterTemplateShape(path, type, text);
     }
   });
 }
 
-function assertLlmWikiFreeFormShape(path, text) {
+function assertLlmWikiManagedShape(path, text) {
   assert(text.includes("type: llm-wiki"), `${path} is missing llm-wiki type frontmatter`);
-  assert(!text.includes("```para-zk-props"), `${path} should not include para-zk props block`);
-  assert(!text.includes("```para-zk-managed"), `${path} should not include managed UI`);
+  assert(text.includes("```para-zk-props\ntype: llm-wiki\n```"), `${path} is missing llm-wiki props block`);
+  assert(countOccurrences(text, "```para-zk-managed") === 1, `${path} must include exactly one managed block`);
+  assert(text.match(/\s*```para-zk-managed\r?\n```\s*$/), `${path} managed block must be the compact tail`);
   for (const key of ["url:", "first_author:", "license:", "kind:"]) {
     assert(!text.includes(key), `${path} should not include resource provenance key ${key}`);
   }
@@ -616,6 +617,7 @@ function assertLlmWikiRoundTrip() {
   const wiki = cliJson("para-zk:create-llm-wiki", [
     `title=${title}`,
     `body=${body}`,
+    `by=${smokeModelId}`,
     "open=false",
     "format=json"
   ]);
@@ -635,6 +637,69 @@ function assertLlmWikiRoundTrip() {
   ]);
   assert(read.ok === true, `llm-wiki read failed: ${JSON.stringify(read)}`);
   assert(read.value === body, `llm-wiki read body mismatch: ${JSON.stringify(read)}`);
+}
+
+function assertLlmWikiCitedByRenderer() {
+  const targetTitle = `Smoke Wiki Concept A ${stamp}`;
+  const citingTitle = `Smoke Wiki Concept B ${stamp}`;
+  const target = cliJson("para-zk:create-llm-wiki", [
+    `title=${targetTitle}`,
+    `body=Target wiki concept for ${stamp}.`,
+    `by=${smokeModelId}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(target, "llm-wiki cited-by target");
+  assertGeneratedNoteTemplateShape(target.path, "llm-wiki");
+
+  const citing = cliJson("para-zk:create-llm-wiki", [
+    `title=${citingTitle}`,
+    `body=Citing wiki concept for ${stamp}: [[${target.path}]].`,
+    `by=${smokeModelId}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(citing, "llm-wiki cited-by source");
+  assertGeneratedNoteTemplateShape(citing.path, "llm-wiki");
+  assert(waitForBacklink(target.path, citing.path), "wiki-to-wiki body link did not resolve as a backlink");
+
+  const snapshot = guiJson(`(async () => {
+    const path = ${JSON.stringify(target.path)};
+    const citingPath = ${JSON.stringify(citing.path)};
+    const citingTitle = ${JSON.stringify(citingTitle)};
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const leaf = app.workspace.getLeaf(false);
+    await leaf.setViewState({ type: "markdown", state: { file: path, mode: "preview" }, active: true });
+    let block = null;
+    let title = "";
+    let text = "";
+    let links = [];
+    let hasCiting = false;
+    for (let index = 0; index < 60; index += 1) {
+      block = leaf.view.containerEl.querySelector(".para-zk-block--view-llm-wiki-cited-by");
+      title = block?.querySelector(".para-zk-block__title")?.textContent?.trim() ?? "";
+      text = block?.textContent ?? "";
+      links = block ? Array.from(block.querySelectorAll("a.internal-link")).map((link) => ({
+        text: link.textContent ?? "",
+        href: link.getAttribute("data-href") || link.getAttribute("href") || ""
+      })) : [];
+      hasCiting = text.includes(citingTitle) || links.some((link) => link.href.includes(citingPath) || link.text.includes(citingTitle));
+      if (block && hasCiting) break;
+      await sleep(200);
+    }
+    console.log(JSON.stringify({
+      ok: true,
+      hasBlock: Boolean(block),
+      title,
+      text,
+      links,
+      hasCiting
+    }));
+  })()`);
+
+  assert(snapshot.hasBlock === true, `llm-wiki cited-by block did not render: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.title === L.citedBy, `llm-wiki cited-by title mismatch: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.hasCiting === true, `llm-wiki cited-by block did not include citing wiki page: ${JSON.stringify(snapshot)}`);
 }
 
 function assertWikiIngestCandidatesScenario() {
@@ -658,6 +723,7 @@ function assertWikiIngestCandidatesScenario() {
   const wiki = cliJson("para-zk:create-llm-wiki", [
     `title=${wikiTitle}`,
     `body=Wiki ingest smoke for ${stamp}.`,
+    `by=${smokeModelId}`,
     "open=false",
     "format=json"
   ]);
@@ -671,19 +737,47 @@ function assertWikiIngestCandidatesScenario() {
     "format=json"
   ]);
   assert(insert.ok === true, `wiki ingest reference insert failed: ${JSON.stringify(insert)}`);
-  assert(insert.ingest_logged === true, `wiki ingest reference insert did not log ingestion: ${JSON.stringify(insert)}`);
+  assert(typeof insert.id === "string" && insert.id.length > 0, `wiki ingest reference insert did not return a stable id: ${JSON.stringify(insert)}`);
+  assert(insert.added === true, `wiki ingest reference insert did not add the source reference: ${JSON.stringify(insert)}`);
   assert(waitForBacklink(source.path, wiki.path), "wiki ingest source did not resolve as cited by llm-wiki");
 
   waitForWikiIngestCandidate(source.path, false);
+  waitForNextMinuteBoundary();
+
+  const wikiTouch = cliJson("para-zk:update-llm-wiki", [
+    `title=${wikiTitle}`,
+    "key=body",
+    "op=append",
+    `value=Wiki freshness baseline for ${stamp}.`,
+    `by=${smokeModelId}`,
+    "format=json"
+  ]);
+  assert(wikiTouch.ok === true && wikiTouch.changed === true, `wiki ingest citing page freshness baseline failed: ${JSON.stringify(wikiTouch)}`);
+  waitForNextMinuteBoundary();
+
+  const sourceBump = cliJson("para-zk:update-resource", [
+    `title=${sourceTitle}`,
+    "key=body",
+    "op=append",
+    `value=Source freshness bump for ${stamp}.`,
+    "format=json"
+  ]);
+  assert(sourceBump.ok === true && sourceBump.changed === true, `wiki ingest source freshness bump failed: ${JSON.stringify(sourceBump)}`);
+  const stale = waitForWikiIngestStaleCandidate(source.path, wiki.path);
+  assert(stale.reason === "source_newer_than_wiki", `wiki ingest stale source reason mismatch: ${JSON.stringify(stale)}`);
+  assert(
+    Array.isArray(stale.stale_pages) && stale.stale_pages.some((page) => page.path === wiki.path),
+    `wiki ingest stale source did not include citing wiki page: ${JSON.stringify(stale)}`
+  );
 }
 
-function waitForWikiIngestCandidate(path, expectedPresent) {
-  const deadline = Date.now() + 3000;
+function waitForWikiIngestCandidate(path, expectedPresent, mode = "init", timeoutMs = 3000) {
+  const deadline = Date.now() + timeoutMs;
   let lastPayload = null;
   let match = undefined;
   while (Date.now() <= deadline) {
     lastPayload = cliJson("para-zk:wiki-ingest-candidates", [
-      "mode=init",
+      `mode=${mode}`,
       "limit=all",
       "format=json"
     ]);
@@ -694,7 +788,50 @@ function waitForWikiIngestCandidate(path, expectedPresent) {
     if (expectedPresent ? Boolean(match) : !match) return match;
     sleepMs(100);
   }
-  throw new Error(`wiki-ingest-candidates did not ${expectedPresent ? "include" : "exclude"} ${path}: ${JSON.stringify(lastPayload)}`);
+  throw new Error(`wiki-ingest-candidates mode=${mode} did not ${expectedPresent ? "include" : "exclude"} ${path}: ${JSON.stringify(lastPayload)}`);
+}
+
+function waitForWikiIngestStaleCandidate(sourcePath, wikiPath) {
+  const deadline = Date.now() + 10000;
+  let lastCandidate = undefined;
+  let lastError = undefined;
+  while (Date.now() <= deadline) {
+    try {
+      const candidate = waitForWikiIngestCandidate(sourcePath, true, "delta", 1000);
+      lastCandidate = candidate;
+      if (
+        candidate.reason === "source_newer_than_wiki"
+        && Array.isArray(candidate.stale_pages)
+        && candidate.stale_pages.some((page) => page.path === wikiPath)
+      ) {
+        return candidate;
+      }
+    } catch (error) {
+      lastError = error;
+    }
+    sleepMs(250);
+  }
+  throw new Error(`wiki-ingest-candidates did not report source_newer_than_wiki for ${sourcePath}: ${JSON.stringify(lastCandidate)} ${lastError ? String(lastError) : ""}`);
+}
+
+function waitForNextMinuteBoundary() {
+  const started = new Date();
+  const deadline = Date.now() + 70000;
+  while (Date.now() <= deadline) {
+    const now = new Date();
+    if (
+      now.getFullYear() !== started.getFullYear()
+      || now.getMonth() !== started.getMonth()
+      || now.getDate() !== started.getDate()
+      || now.getHours() !== started.getHours()
+      || now.getMinutes() !== started.getMinutes()
+    ) {
+      sleepMs(1500);
+      return;
+    }
+    sleepMs(250);
+  }
+  throw new Error("timed out waiting for the next minute before source freshness bump");
 }
 
 

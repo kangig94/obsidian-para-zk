@@ -84,20 +84,22 @@ through the CLI when an agent needs the body-read-free source set for LLM-Wiki
 ingest: `mode=<per-import|delta|init|re-ingest>`, `source_path=<vault-path>` or
 `source_paths=<json|comma-list>` for targeted modes only, plus `offset`,
 `limit`, and `format`. Its envelope includes `{ ok, command, count, offset,
-limit, returned, has_more, ledger_warnings, candidates }`, where each candidate
-has `{ path, type, title, updated, updated_ms, last_source_updated_ms,
-last_completed_at, reason }`.
+limit, returned, has_more, candidates }`, where each candidate has
+`{ path, type, title, updated, updated_ms, stale_pages, reason }`. Reasons are
+`missing_wiki_citation`, `source_newer_than_wiki`, `per_import`, and
+`reingest_requested`; `source_newer_than_wiki` means the source `updated`
+timestamp is newer than at least one citing wiki page, listed in `stale_pages`
+as `{ path, title, updated_ms }`.
 
-Two related additions surface the same way:
+Related surface notes:
 
 - **Audit check** — the `audit` workflow includes `upward_wiki_link` (`medium`),
   which flags a non-`llm-wiki` note linking into an `llm-wiki` note.
-- **Ingest ledger (CLI-owned)** — `para-zk:update-llm-wiki key=references op=insert`
-  appends one plugin-owned ingest row to `LLM-Wiki/log.md` when the inserted
-  reference resolves to an active, non-template `resource`, `digest`, `permanent`,
-  or `subnote`, and reports the side effect as `ingest_logged: true` in the update
-  result. The ledger is visible but excluded from the Obsidian graph and PARA-ZK
-  backlink/link/audit queries, and should not be edited directly.
+- **LLM-Wiki authorship** — direct CLI `create-llm-wiki` and `update-llm-wiki`
+  accept `by=<model-id>`; create stamps `created_by` and `updated_by`, while
+  changed updates stamp `updated_by`.
+- **LLM-Wiki managed sections** — generated wiki pages include props and a
+  managed tail rendering wiki-folder-scoped Cited-by, then References.
 
 ### `replace`
 
@@ -163,7 +165,7 @@ Required: `type`, `key`, `content`, and a valid selector for the type. `position
 | `project` | `update-project` | `title` | |
 | `area` | `update-area` | `title` | |
 | `resource` | `update-resource` | `title`; `/` addresses a Resources-relative path | |
-| `llm-wiki` | `update-llm-wiki` | `title`; `/` addresses an LLM-Wiki-relative path | no `archived` selector |
+| `llm-wiki` | `update-llm-wiki` | `title`; `/` addresses an LLM-Wiki-relative path | no `archived` selector; direct CLI accepts `by=<model-id>` |
 | `retro` | `update-retro` | `title` | optional `date` passes through |
 | `journal` | `update-journal` | `date` | no title selector |
 | `spark` | `update-zk` | `title` | `kind=spark` |
@@ -193,7 +195,10 @@ stable id returned by `read key=references`; `` `PZ[<id>, <id>]` `` cites severa
 references. Obsidian authors can type `PZ[` and search the registry by
 title/alias, description, or link with the editor suggester. Citations render as
 the reference's current 0-based registry position `[n]`; positional input such as
-`` `PZ[0]` `` is not supported. The `describe` scope note states this too.
+`` `PZ[0]` `` is not supported, and bare `PZ[<id>]` text does not render. For
+LLM-Wiki, cross-link concept pages with body `[[link]]`; `references` and
+`` `PZ[<id>]` `` cite only canonical notes outside LLM-Wiki. The `describe`
+scope note states this too.
 
 ## Shell Safety
 

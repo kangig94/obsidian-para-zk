@@ -45,7 +45,7 @@ import {
 import { parseCodeBlockKeyValues } from "./code-block-args";
 
 type Frontmatter = Record<string, unknown>;
-type WorkflowFrontmatterType = Exclude<PropsViewType, "subnote">;
+type WorkflowFrontmatterType = Exclude<PropsViewType, "subnote" | "llm-wiki">;
 type FrontmatterWorkflowUpdate = (
   workflow: ReturnType<typeof workflowContext>,
   options: { path: string; key: string; operation: "set"; value: string | string[] }
@@ -823,7 +823,7 @@ function normalizePropsWorkflowType(type: string): PropsViewType | undefined {
 }
 
 function isWorkflowFrontmatterType(type: PropsViewType | undefined): type is WorkflowFrontmatterType {
-  return type !== undefined && type !== "subnote";
+  return type !== undefined && type !== "subnote" && type !== "llm-wiki";
 }
 
 function latestPropsRerender(container: HTMLElement, render: () => void): PropsRerender {

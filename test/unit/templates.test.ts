@@ -30,9 +30,8 @@ describe("managed templates", () => {
     expect(resource).not.toContain("# Body");
     expect(llmWiki).toContain("type: llm-wiki");
     expect(llmWiki).toContain("  - llm-wiki/{{slug}}");
-    expect(llmWiki).toContain("updated:\naliases:");
-    expect(llmWiki).not.toContain("para-zk-props");
-    expect(llmWiki).not.toContain("para-zk-managed");
+    expect(llmWiki).toContain("updated:\ncreated_by:\nupdated_by:\naliases:");
+    expect(llmWiki).toContain("```para-zk-props\ntype: llm-wiki\n```\n{{cursor}}\n\n```para-zk-managed\n```");
     expect(llmWiki).not.toContain("url:");
     expect(llmWiki).not.toContain("first_author:");
     expect(llmWiki).not.toContain("license:");
@@ -53,12 +52,13 @@ describe("managed templates", () => {
     expect(subnote).toContain("```para-zk-props\ntype: subnote\n```\n{{cursor}}\n\n```para-zk-managed");
     expect(retro).not.toContain("para-zk-managed");
 
-    for (const content of [project, area, resource, journal, spark, source, permanent, subnote]) {
+    for (const content of [project, area, resource, llmWiki, journal, spark, source, permanent, subnote]) {
       expect(content.match(/```para-zk-managed/g)).toHaveLength(1);
       expect(content).not.toContain("---\n```para-zk-managed");
       expect(content).not.toContain("project-subnotes");
       expect(content).not.toContain("area-subareas");
       expect(content).not.toContain("resource-cited-by");
+      expect(content).not.toContain("llm-wiki-cited-by");
       expect(content).not.toContain("spark-distill");
       expect(content).not.toContain("digest-cited-by");
     }
@@ -68,6 +68,7 @@ describe("managed templates", () => {
     const project = managedUiBlockForType("project", DEFAULT_SETTINGS) ?? "";
     const area = managedUiBlockForType("area", DEFAULT_SETTINGS) ?? "";
     const resource = managedUiBlockForType("resource", DEFAULT_SETTINGS) ?? "";
+    const llmWiki = managedUiBlockForType("llm-wiki", DEFAULT_SETTINGS) ?? "";
     const journal = managedUiBlockForType("journal", DEFAULT_SETTINGS) ?? "";
     const spark = managedUiBlockForType("spark", DEFAULT_SETTINGS) ?? "";
     const source = managedUiBlockForType("digest", DEFAULT_SETTINGS) ?? "";
@@ -87,9 +88,12 @@ describe("managed templates", () => {
     expect(area).toContain("area-retros");
     expect(resource).toContain("resource-cited-by");
     expect(resource).toContain("title: Created from this");
+    expect(llmWiki).toContain("llm-wiki-cited-by");
+    expect(llmWiki).toContain("title: Cited by");
+    expect(llmWiki).toContain("para-zk-references");
+    expect(llmWiki).toContain("title: References");
     expect(journal).toContain("para-zk-tasks");
     expect(managedUiBlockForType("retro", DEFAULT_SETTINGS)).toBeUndefined();
-    expect(managedUiBlockForType("llm-wiki", DEFAULT_SETTINGS)).toBeUndefined();
     expect(spark).toContain("spark-distill");
     expect(source).toContain("digest-cited-by");
     expect(source).toContain("para-zk-references");
@@ -106,7 +110,22 @@ describe("managed templates", () => {
     expect(dataviewViewBlock("permanent-cited-by", DEFAULT_SETTINGS)).toContain("contains(file.outlinks");
     expect(dataviewViewBlock("resource-cited-by", DEFAULT_SETTINGS)).toContain("contains(file.outlinks");
     expect(dataviewViewBlock("digest-cited-by", DEFAULT_SETTINGS)).toContain("contains(file.outlinks");
+    expect(dataviewViewBlock("llm-wiki-cited-by", DEFAULT_SETTINGS)).toContain("contains(file.outlinks");
     expect(dataviewViewBlock("spark-distill", DEFAULT_SETTINGS)).toContain("distilled_to");
+
+    for (const key of ["resource-cited-by", "permanent-cited-by", "digest-cited-by"]) {
+      const block = dataviewViewBlock(key, DEFAULT_SETTINGS) ?? "";
+      expect(block).toContain('FROM "ZK"');
+      expect(block).not.toContain('FROM "LLM-Wiki"');
+    }
+
+    const wikiBlock = dataviewViewBlock("llm-wiki-cited-by", DEFAULT_SETTINGS) ?? "";
+    expect(wikiBlock).toContain('FROM "LLM-Wiki"');
+    expect(wikiBlock).not.toContain('FROM "ZK"');
+
+    const customSettings = structuredClone(DEFAULT_SETTINGS);
+    customSettings.paths.wikiFolder = "Generated/Wiki";
+    expect(dataviewViewBlock("llm-wiki-cited-by", customSettings)).toContain('FROM "Generated/Wiki"');
   });
 
   it("matches Dataview relationship views against the source note link", () => {
@@ -127,6 +146,8 @@ describe("managed templates", () => {
     expect(dataviewViewBlock("area-subnotes", DEFAULT_SETTINGS, sourcePath)).toContain("file.link AS \"Filename\", file.mtime AS \"Updated\"");
     expect(dataviewViewBlock("resource-cited-by", DEFAULT_SETTINGS, sourcePath)).toContain(`contains(file.outlinks, ${sourceLink})`);
     expect(dataviewViewBlock("resource-cited-by", DEFAULT_SETTINGS, sourcePath)).toContain("file.link AS \"Filename\", file.mtime AS \"Updated\"");
+    expect(dataviewViewBlock("llm-wiki-cited-by", DEFAULT_SETTINGS, sourcePath)).toContain(`contains(file.outlinks, ${sourceLink})`);
+    expect(dataviewViewBlock("llm-wiki-cited-by", DEFAULT_SETTINGS, sourcePath)).toContain("file.link AS \"Filename\", file.mtime AS \"Updated\"");
   });
 
   it("keeps the retro areas placeholder valid YAML", () => {

@@ -301,9 +301,8 @@ JSON output fields:
 ### `para-zk:wiki-ingest-candidates`
 
 Lists canonical source notes that should be folded into the LLM-Wiki. This is a
-body-read-free discovery primitive: it uses frontmatter, Obsidian's resolved-link
-graph, and the plugin-owned ingest ledger, but does not read canonical or wiki
-note bodies.
+body-read-free discovery primitive: it uses frontmatter and Obsidian's
+resolved-link graph, but does not read canonical or wiki note bodies.
 
 Ingestable sources are active, non-template notes with `type` equal to
 `resource`, `digest`, `permanent`, or `subnote`.
@@ -332,23 +331,24 @@ JSON output fields:
 - `command`: `para-zk:wiki-ingest-candidates`.
 - `count`, `offset`, `limit`, `returned`, `has_more`: pagination envelope over
   the candidate list.
-- `ledger_warnings`: parse or validation warnings from `LLM-Wiki/log.md`.
 - `candidates`: array of
-  `{ path, type, title, updated, updated_ms, last_source_updated_ms, last_completed_at, reason }`.
+  `{ path, type, title, updated, updated_ms, stale_pages, reason }`.
 
 Reason codes:
 
 - `missing_wiki_citation`: in `init` or `delta`, an ingestable source has no
   incoming citation from an `llm-wiki` note.
-- `missing_ingest_record`: in `delta`, the source is cited by the wiki but has
-  no ledger row.
-- `stale_since_ingest`: in `delta`, the source is cited and its current
-  `updated` value is newer than its own latest ledger row's `source_updated_ms`.
-  This is per-source; there is no global watermark.
+- `source_newer_than_wiki`: in `delta`, the source is cited and its current
+  `updated` value is newer than the minimum `updated` value of the LLM-Wiki
+  pages citing it.
 - `per_import`: targeted `per-import` source requested by `source_path` or
   `source_paths`.
 - `reingest_requested`: targeted `re-ingest` source requested by `source_path`
   or `source_paths`.
+
+`stale_pages` is always present. For `source_newer_than_wiki` it lists the older
+citing wiki pages as `{ path, title, updated_ms }`; for every other reason it is
+an empty array.
 
 ### `para-zk:setup`
 
@@ -748,8 +748,7 @@ are structured: their load-bearing template sections are stable keys. `resource`
 `llm-wiki`, child `subnote`/fallback `note`, and the ZK kinds
 `spark`/`digest`/`permanent` are
 free-form: prose is exposed as
-one `body` key for the editable Markdown body (before the managed tail where
-one exists; `llm-wiki` has no managed tail).
+one `body` key for the editable Markdown body before any managed tail.
 Free-form bodies may contain H1 headings; those headings are content, not extra
 stable keys.
 
@@ -812,6 +811,11 @@ Options:
 | `match` | text | Required for `replace`. Exact literal text inside the selected key. |
 | `with` | text | Replacement text for `replace`. Empty is allowed. |
 | `all` | boolean | For `replace`, replace all matches. Without it, multiple matches fail. |
+
+Only `para-zk:update-llm-wiki` additionally accepts `by=<model-id>`. A changed
+write stamps `updated_by`; `created_by` and `updated_by` are readable through
+`read-llm-wiki` and `describe`, but are not writable keys. Use `by` as the only
+mutation path for those fields.
 
 Writable keys are a subset of read keys. A scalar `frontmatter/<key>` supports `op=set`
 only and uses Obsidian frontmatter mutation. A multi-value list frontmatter key — shown in a
@@ -943,6 +947,10 @@ the reference suggester, search by title/alias, description, or link, and select
 the reference; the suggester inserts the full inline-code citation token.
 If a hand-authored reference reads as `id: null`, run
 `update ... key=references op=backfill` first; pure reads never assign ids.
+The backticks are required: bare `PZ[<id>]` text does not render as a citation.
+For LLM-Wiki pages, cross-link concept pages with body `[[link]]`; `references`
+and `` `PZ[<id>]` `` citations are only for canonical source notes outside
+LLM-Wiki.
 
 At render time, the citation displays the reference's current 0-based registry
 position as `[n]`, matching `key=references/<i>`. Use `` `PZ[<id>, <id>]` `` for
@@ -967,21 +975,11 @@ Result fields:
 - `changed`: false when the requested `set` value already matched.
 - `matches`: present for `replace`.
 - `index`, `link`, and `added`: present for reference insert results; `index`
-  and `link` are also present for reference field updates and deletes.
-- `ingest_logged`: present on `para-zk:update-llm-wiki key=references op=insert`;
-  `true` means the inserted reference resolved to an ingestable canonical source
-  and one ingest ledger row was appended.
+  and `link` are also present for reference field updates and deletes. Reference
+  insert results also include the stable `id` (used to cite the reference with a
+  `` `PZ[<id>]` `` backtick code-span).
 - `moved`, `fromPath`, and `toPath`: present when a project status update moved
   the project between active and archived folders.
-
-For `para-zk:update-llm-wiki key=references op=insert`, a successful insert whose
-reference resolves to an active, non-template `resource`, `digest`, `permanent`,
-or `subnote` appends one plugin-owned ingest row to `LLM-Wiki/log.md` and returns
-`ingest_logged: true`. URL, text, missing, archived, template, or otherwise
-non-ingestable references return `ingest_logged: false` or omit it. The ledger is
-a visible file, but setup excludes it from the Obsidian graph (`userIgnoreFilters`)
-and PARA-ZK excludes it from backlink, link, and audit queries. Do not edit it
-directly; the citation insert is the ingest event.
 
 The same update algorithm is used by the other domain update commands:
 
@@ -989,7 +987,7 @@ The same update algorithm is used by the other domain update commands:
 | --- | --- | --- |
 | `para-zk:update-area` | `title` | Supports root area surface keys. |
 | `para-zk:update-resource` | `title`; `/` addresses a Resources-relative path | Uses free-form `body`, `references`, and frontmatter keys. |
-| `para-zk:update-llm-wiki` | `title`; `/` addresses an LLM-Wiki-relative path | Uses free-form `body`, `references`, and `frontmatter/aliases`. No `archived`. |
+| `para-zk:update-llm-wiki` | `title`; `/` addresses an LLM-Wiki-relative path | Uses free-form `body`, `references`, and `frontmatter/aliases`; accepts `by=<model-id>` to stamp `updated_by` on changed writes. No `archived`. |
 | `para-zk:update-zk` | `title` plus optional `kind` | Uses free-form `body`, `references`, and type-specific frontmatter keys. |
 | `para-zk:update-journal` | `date` | Supports journal surface keys such as `quick_memo` and `tasks`. |
 | `para-zk:update-retro` | `title` plus optional `date` | Uses retro writable keys: `frontmatter`, `week_progress`, `good`, `improve`, `risks`, and `retro_summary`; `backlinks` is read-only. |
@@ -1209,7 +1207,8 @@ Important fields:
 Creates an LLM-Wiki page under `LLM-Wiki/`. Use this for derived,
 LLM-owned synthesis that should be easy for future LLM calls to read and update.
 The canonical knowledge remains Resources, PARA, and ZK; wiki pages cite
-canonical notes through their own `references` registry and body links. Do not
+canonical notes through their own `references` registry and `` `PZ[<id>]` ``
+code-span citations. Cross-link wiki concept pages with body `[[link]]`. Do not
 write reverse links from canonical notes back into the wiki.
 
 Options:
@@ -1219,19 +1218,22 @@ Options:
 | `title` | string | Required. Use `/` to create under an LLM-Wiki-relative subdirectory, e.g. `AI/Policy`. |
 | `alias` | string or one-item string list | Optional single short Obsidian alias. Stored as a one-item `aliases` frontmatter list. Canonical create arg is `alias`. |
 | `body` | markdown | Optional initial free-form body content. Accepts `@<absolute-path>`. |
+| `by` | model id | Optional. On a newly created page, stamps `created_by` and `updated_by`. |
 | `open` | boolean | Default `false`. |
 
 The created note stores `type: llm-wiki` and exactly one identity tag
-`llm-wiki/<slug>` plus vault-managed timestamps/id. It intentionally has no
-resource provenance frontmatter (`url`, `first_author`, `license`, `kind`), no
-props block, and no managed UI tail. Writable keys are `body`,
-`frontmatter/aliases`, and the `references` collection:
+`llm-wiki/<slug>` plus vault-managed timestamps/id. `created_by` and
+`updated_by` are readable when set through `by`, but not writable directly. It
+intentionally has no resource provenance frontmatter (`url`, `first_author`,
+`license`, `kind`). The template includes `para-zk-props` plus a managed tail
+that renders Cited-by scoped to the LLM-Wiki folder, then References. Writable
+keys are `body`, `frontmatter/aliases`, and the `references` collection:
 
 ```bash
-optsidian para-zk:create-llm-wiki title="AI/Policy" body=@/tmp/wiki.md open=false format=json
-optsidian para-zk:create-llm-wiki title="Models/Attention" alias="Attention Wiki" format=json
-optsidian para-zk:update-llm-wiki title="AI/Policy" key=frontmatter/aliases op=set value="Policy Wiki" format=json
-optsidian para-zk:update-llm-wiki title="AI/Policy" key=references op=insert value_json='{"link":"[[PARA/Resources/Source Paper.md]]"}' format=json
+optsidian para-zk:create-llm-wiki title="AI/Policy" body=@/tmp/wiki.md by=claude-opus-4-8 open=false format=json
+optsidian para-zk:create-llm-wiki title="Models/Attention" alias="Attention Wiki" by=gpt-5.5 format=json
+optsidian para-zk:update-llm-wiki title="AI/Policy" key=frontmatter/aliases op=set value="Policy Wiki" by=gpt-5.5 format=json
+optsidian para-zk:update-llm-wiki title="AI/Policy" key=references op=insert value_json='{"link":"[[PARA/Resources/Source Paper.md]]"}' by=gpt-5.5 format=json
 optsidian para-zk:read-llm-wiki title="AI/Policy" key=references limit=all format=json
 ```
 

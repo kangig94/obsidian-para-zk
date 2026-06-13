@@ -37,6 +37,11 @@ Notable changes for PARA-ZK are tracked here.
   positional input such as `` `PZ[0]` `` is no longer supported. Existing
   positional `PZ[n]` tokens render as unresolved `[?]`; no automatic migration is
   performed.
+- Removed the LLM-Wiki ingest ledger (`LLM-Wiki/log.md`, `ingest_logged`, and
+  `wiki-ledger.ts`). LLM-Wiki candidate staleness now derives from page `updated`
+  timestamps: uncited sources use `missing_wiki_citation`, sources newer than
+  citing wiki pages use `source_newer_than_wiki`, and candidates include
+  `stale_pages` with the older citing wiki pages.
 - Removed the redundant `para-zk:add-reference` CLI command. Add references via
   `para-zk:update-* key=references op=insert value_json='{"link":"..."}'`;
   child-note receivers use `para-zk:update-child ... key=references op=insert`.
@@ -63,17 +68,18 @@ Notable changes for PARA-ZK are tracked here.
   `LLM-Wiki/`: native CLI CRUD (`create/read/update/rename/delete-llm-wiki`),
   slash-path title addressing, `body`/`frontmatter/aliases`/`references` editing,
   `llm-wiki/<slug>` identity tags that rewrite on rename, list/describe/audit
-  participation, MCP `type=llm-wiki` mutation mapping, and setup/smoke coverage
-  for the no-props/no-managed wiki template shape.
+  participation, MCP `type=llm-wiki` mutation mapping, and setup/smoke coverage.
 - Added the LLM-Wiki ingest loop: `para-zk:wiki-ingest-candidates` lists active,
   non-template ingestable sources (`resource`, `digest`, `permanent`, `subnote`)
   for `per-import`, `delta`, `init`, and `re-ingest`; `para-zk:audit` now includes
   the `upward_wiki_link` check for reverse links from canonical notes into the
-  wiki; `update-llm-wiki key=references op=insert` appends a plugin-owned ingest
-  row to `LLM-Wiki/log.md` for qualifying canonical citations and reports it as
-  `ingest_logged`; and the bundled `wiki-ingest` skill plus `wiki-weaver` agent
-  orchestrate one bounded, serial direct-writer weave per ingest call over the
-  full returned source set.
+  wiki; and the bundled `wiki-ingest` skill plus `wiki-weaver` agent orchestrate
+  one bounded, serial direct-writer weave per ingest call over the full returned
+  source set.
+- Added `by=<model-id>` to `create-llm-wiki` and `update-llm-wiki`, stamping
+  `created_by`/`updated_by` on create and `updated_by` on changed updates.
+- LLM-Wiki pages now use the managed template shape: props plus a managed tail
+  rendering wiki-folder-scoped Cited-by and References.
 - Added a dedicated `para-zk:attach-file` CLI contract section covering local
   source options, single-file and multi-source result fields, unique-name
   collision behavior, directory recursion rules, desktop-local source paths,

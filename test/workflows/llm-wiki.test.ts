@@ -14,7 +14,7 @@ import { expectGeneratedReferenceId } from "../unit/reference-id-test-helpers";
 import { createTestContext } from "../harness/vault";
 
 describe("llm-wiki workflows", () => {
-  it("creates and reads flat and slash-path wiki notes without provenance or managed UI", async () => {
+  it("creates and reads flat and slash-path wiki notes with managed props and tail", async () => {
     const { ctx, app } = createTestContext();
 
     const flat = await createLlmWiki(ctx, {
@@ -36,7 +36,7 @@ describe("llm-wiki workflows", () => {
     const file = app.vault.getFileByPath(flat.path);
     if (!file) throw new Error(`missing created wiki note: ${flat.path}`);
     const frontmatter = await readFileFrontmatterFresh(ctx, file);
-    expect(Object.keys(frontmatter).sort()).toEqual(["aliases", "created", "id", "tags", "type", "updated"]);
+    expect(Object.keys(frontmatter).sort()).toEqual(["aliases", "created", "created_by", "id", "tags", "type", "updated", "updated_by"]);
     expect(frontmatter).toMatchObject({
       type: "llm-wiki",
       tags: ["llm-wiki/attention-wiki"],
@@ -48,8 +48,8 @@ describe("llm-wiki workflows", () => {
 
     const content = app.readPath(flat.path) ?? "";
     expect(content).toContain("Machine-owned synthesis.");
-    expect(content).not.toContain("para-zk-props");
-    expect(content).not.toContain("para-zk-managed");
+    expect(content).toContain("```para-zk-props\ntype: llm-wiki\n```");
+    expect(content).toContain("```para-zk-managed\n```");
     expect(content).not.toContain("url:");
     expect(content).not.toContain("first_author:");
     expect(content).not.toContain("license:");

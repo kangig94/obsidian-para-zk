@@ -76,13 +76,13 @@ optsidian para-zk:wiki-ingest-candidates mode=per-import source_paths='["PARA/Re
 optsidian para-zk:wiki-ingest-candidates mode=re-ingest source_path="PARA/Resources/Source Paper.md" format=json
 ```
 
-`mode` is one of `per-import`, `delta`, `init`, or `re-ingest`. `source_path` or `source_paths=<json|comma-list>` is required for `per-import` and `re-ingest`, and rejected for `delta` and `init`. The command also accepts `offset=<n>`, `limit=<n|all>` (default `50`), and `format`. Results include `{ ok, command, count, offset, limit, returned, has_more, ledger_warnings, candidates }`; each candidate has `{ path, type, title, updated, updated_ms, last_source_updated_ms, last_completed_at, reason }`.
+`mode` is one of `per-import`, `delta`, `init`, or `re-ingest`. `source_path` or `source_paths=<json|comma-list>` is required for `per-import` and `re-ingest`, and rejected for `delta` and `init`. The command also accepts `offset=<n>`, `limit=<n|all>` (default `50`), and `format`. Results include `{ ok, command, count, offset, limit, returned, has_more, candidates }`; each candidate has `{ path, type, title, updated, updated_ms, stale_pages, reason }`.
 
-Reason codes are `missing_wiki_citation`, `missing_ingest_record`, `stale_since_ingest`, `per_import`, and `reingest_requested`. `stale_since_ingest` compares each source against its own latest ledger row; there is no global watermark.
+Reason codes are `missing_wiki_citation`, `source_newer_than_wiki`, `per_import`, and `reingest_requested`. `source_newer_than_wiki` derives staleness from page `updated`: the source is newer than at least one citing wiki page, listed in `stale_pages` as `{ path, title, updated_ms }`.
 
 The audit check `upward_wiki_link` (`medium`) flags a non-`llm-wiki` note that links into an `llm-wiki` note. Wiki pages cite canonical notes; canonical notes should not link back into the wiki.
 
-`para-zk:update-llm-wiki key=references op=insert` auto-records an ingest row when the inserted reference resolves to an ingestable canonical source. The update result reports this with `ingest_logged: true`; non-ingestable inserts return `false` or omit it. The plugin-owned ledger is `LLM-Wiki/log.md`, visible but excluded from the Obsidian graph and PARA-ZK backlink/link/audit queries; do not edit it directly.
+`create-llm-wiki` and `update-llm-wiki` accept `by=<model-id>` for authorship: create stamps `created_by` and `updated_by`, while changed updates stamp `updated_by`. LLM-Wiki pages include managed props plus Cited-by scoped to `LLM-Wiki/`, then References. Cross-link wiki concept pages with body `[[link]]`; use `references` plus backtick code-span `` `PZ[<id>]` `` citations only for canonical sources outside LLM-Wiki. Bare `PZ[<id>]` text does not render.
 
 ## Canonical Arguments
 

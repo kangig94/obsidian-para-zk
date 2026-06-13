@@ -23,19 +23,22 @@ knowledge lives in Resources, PARA, and ZK notes that a person may curate. Wiki
 pages live under `LLM-Wiki/`, are LLM-owned and regenerable, and are optimized as
 LLM-for-LLM summaries: concise pages that future automation can read before
 working. The link direction is single-way: wiki pages cite canonical notes through
-body links and their `references` registry; canonical notes should not link back
-to the wiki or depend on it.
+their `references` registry and `` `PZ[<id>]` `` code-span citations, while
+wiki-to-wiki concept links use body `[[link]]`; canonical notes should not link
+back to the wiki or depend on it.
 
 Phase 2 adds an LLM-owned ingest loop for that derived layer. The `wiki-ingest`
 skill is the sole orchestrator: it resolves `mode`, calls
 `para-zk:wiki-ingest-candidates`, gathers a bounded neighborhood of candidates,
 then spawns one background `para-zk:wiki-weaver` for the whole source set. The `wiki-weaver` agent is the direct writer: it uses `create-llm-wiki` and
 `update-llm-wiki key=references op=insert` to write wiki pages and cite sources
-with `PZ[<id>]`; it never edits source notes and never asks the user.
+with `` `PZ[<id>]` ``; it never edits source notes and never asks the user.
 `import-resource` calls `wiki-ingest mode=per-import` at completion. The
-single-direction rule stays intact, and the ingest ledger is plugin-owned:
-`update-llm-wiki key=references op=insert` appends to `LLM-Wiki/log.md` for
-ingestable canonical sources and reports the side effect as `ingest_logged`.
+single-direction rule stays intact. The page-body re-weave is the freshness
+event: re-integrating a source updates the wiki page body and bumps the page
+`updated` timestamp. References are inserted to obtain stable ids for
+`` `PZ[<id>]` `` code-span citations, and `by=<model-id>` stamps
+`created_by`/`updated_by`.
 
 The vault is a single user's private, local Obsidian "second brain" — local-first and
 personal by design, not a shared, published, or collaborative medium like Notion. A
@@ -91,8 +94,8 @@ the ZK kinds `spark`/`digest`/`permanent`) expose
 prose as one `body` key for the whole editable Markdown body before the managed
 tail. Literal `set`, `append`, `prepend`, and `replace` edits target that body;
 H1 headings are allowed there, and there are no enforced prose-section keys.
-`llm-wiki` is the no-human-UI exception: it has no props block and no managed UI
-tail.
+`llm-wiki` is LLM-owned but still managed: its template includes props and a
+compact tail rendering Cited-by scoped to `LLM-Wiki/`, then References.
 Raw file reads, arbitrary patches, and generic vault search are Optsidian's
 responsibility, not PARA-ZK's. Structural changes stay domain-specific
 (`rename-*`, status-driven archive/restore, core-trash deletes) rather than
@@ -150,7 +153,10 @@ plugin blocks replace those mechanisms:
   0-based registry position `[n]`; citing the second and third references renders
   as `[1, 2]`, in both reading view and Live Preview. The stored `<id>` is stable
   across reference reorders; only the rendered `[n]` follows the current position.
-  Positional input such as `` `PZ[0]` `` is not supported.
+  The token must be a backtick inline code span; bare `PZ[<id>]` text does not
+  render. Positional input such as `` `PZ[0]` `` is not supported. In LLM-Wiki,
+  use body `[[link]]` for wiki-to-wiki concept links; use `references` plus
+  `` `PZ[<id>]` `` only for canonical sources outside LLM-Wiki.
 
 Required community plugins, configured during setup: Dataview (query engine, with
 DataviewJS enabled for dashboards), Tasks (status/metadata syntax), Folder Notes
@@ -207,5 +213,5 @@ Always run `npm run lint` and `npm run build` before considering a change comple
 - Prefer extending existing workflow functions and adapters over parallel logic. If
   GUI and CLI drift, move shared behavior down into `src/workflows/` and keep each
   adapter focused on input/output shape.
-- Update [CHANGELOG.md](CHANGELOG.md) for notable behavior, workflow, CLI, template,
+- Update the changelog for notable behavior, workflow, CLI, template,
   dashboard, or dependency changes.

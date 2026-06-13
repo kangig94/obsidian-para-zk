@@ -2,8 +2,7 @@ import type { App } from "obsidian";
 import { isRecord } from "../records";
 import { appendUniqueStrings } from "../text";
 import type { SetupResult, ParaZkSettings } from "../types";
-import { normalizeVaultPath } from "../vault/paths";
-import { wikiLedgerPath } from "../workflows/locations";
+import { joinVaultPath, normalizeVaultPath } from "../vault/paths";
 
 const APP_CONFIG_PATH = ".obsidian/app.json";
 const TEMPLATES_CONFIG_PATH = ".obsidian/templates.json";
@@ -81,19 +80,24 @@ async function writeConfig(
 }
 
 function mergeAppConfig(current: Record<string, unknown>, settings: ParaZkSettings): Record<string, unknown> {
+  const legacyLogFilter = cleanIgnoreFilter(joinVaultPath(settings.paths.wikiFolder, "log.md"));
+  const prunedIgnoreFilters = Array.isArray(current.userIgnoreFilters)
+    ? current.userIgnoreFilters.filter((item): item is string =>
+      typeof item === "string" && item !== legacyLogFilter)
+    : current.userIgnoreFilters;
+
   return {
     ...current,
     alwaysUpdateLinks: true,
     attachmentFolderPath: ATTACHMENT_FOLDER,
     trashOption: "local",
-    userIgnoreFilters: appendUniqueStrings(current.userIgnoreFilters, [
+    userIgnoreFilters: appendUniqueStrings(prunedIgnoreFilters, [
       ignoreFilterFolder(settings.paths.templatesFolder),
       // Obsidian's excluded-files filters are not recursive, so the nested managed
       // templates folder needs its own entry even though it sits under templatesFolder.
       ignoreFilterFolder(settings.paths.managedTemplatesFolder),
       ignoreFilterFolder(settings.paths.dashboardFolder),
       ignoreFilterFolder(settings.paths.tasksFolder),
-      wikiLedgerPath(settings),
       "README"
     ].map(cleanIgnoreFilter)),
     propertiesInDocument: "hidden"

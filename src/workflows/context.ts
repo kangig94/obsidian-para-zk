@@ -57,6 +57,7 @@ export type CreateLlmWikiOptions = {
   title: string;
   alias?: string;
   body?: string;
+  by?: string;
   open?: boolean;
 };
 
@@ -213,8 +214,7 @@ export type WikiIngestMode = "per-import" | "delta" | "init" | "re-ingest";
 
 export type WikiIngestCandidateReason =
   | "missing_wiki_citation"
-  | "missing_ingest_record"
-  | "stale_since_ingest"
+  | "source_newer_than_wiki"
   | "per_import"
   | "reingest_requested";
 
@@ -226,13 +226,10 @@ export type WikiIngestCandidatesOptions = {
   limit?: number | "all";
 };
 
-export type WikiIngestLedgerRow = {
-  event: "cited";
-  wiki_page: string;
-  source_path: string;
-  source_updated: unknown;
-  source_updated_ms: number | null;
-  at: string;
+export type WikiIngestStalePage = {
+  path: string;
+  title: string;
+  updated_ms: number;
 };
 
 export type WikiIngestCandidate = {
@@ -241,8 +238,7 @@ export type WikiIngestCandidate = {
   title: string;
   updated: unknown;
   updated_ms: number | null;
-  last_source_updated_ms: number | null;
-  last_completed_at: string | null;
+  stale_pages: WikiIngestStalePage[];
   reason: WikiIngestCandidateReason;
 };
 
@@ -252,7 +248,6 @@ export type WikiIngestCandidatesResult = {
   limit: number | "all";
   returned: number;
   has_more: boolean;
-  ledger_warnings: string[];
   candidates: WikiIngestCandidate[];
 };
 
@@ -319,7 +314,9 @@ type UpdateByTitleOptions = ByTitleSelectorOptions & UpdatePayloadOptions;
 export type UpdateProjectOptions = UpdateByTitleOptions;
 export type UpdateAreaOptions = UpdateByTitleOptions;
 export type UpdateResourceOptions = UpdateByTitleOptions;
-export type UpdateLlmWikiOptions = NoArchiveByTitleSelectorOptions & UpdatePayloadOptions;
+export type UpdateLlmWikiOptions = NoArchiveByTitleSelectorOptions & UpdatePayloadOptions & {
+  by?: string;
+};
 
 export type UpdateZkOptions = ZkSelectorOptions & UpdatePayloadOptions;
 export type UpdateJournalOptions = JournalSelectorOptions & UpdatePayloadOptions;
@@ -338,7 +335,6 @@ export type UpdateSurfaceResult = {
   link?: string;
   added?: boolean;
   id?: string;
-  ingest_logged?: boolean;
   moved?: boolean;
   fromPath?: string;
   toPath?: string;

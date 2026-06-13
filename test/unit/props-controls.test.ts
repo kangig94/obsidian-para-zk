@@ -169,6 +169,27 @@ describe("props timestamp display controls", () => {
     expect(updated.textContent).toBe("2026-06-11 09:45");
     expect(updated.querySelector("input.para-zk-block__input")).toBeNull();
   });
+
+  it("renders llm-wiki authorship as readonly display values", async () => {
+    const { root } = await renderPropsBlock("llm-wiki", "LLM-Wiki/AI/Policy.md", [
+      "---",
+      "type: llm-wiki",
+      "created: 2026-06-10 08:30",
+      "updated: 2026-06-11 09:45",
+      "created_by: claude-opus-4-8",
+      "updated_by: gpt-5.5",
+      "---",
+      ""
+    ].join("\n"));
+
+    const createdBy = propsFieldControl(root, "Created by");
+    expect(createdBy.textContent).toBe("claude-opus-4-8");
+    expect(createdBy.querySelector("input.para-zk-block__input")).toBeNull();
+
+    const updatedBy = propsFieldControl(root, "Updated by");
+    expect(updatedBy.textContent).toBe("gpt-5.5");
+    expect(updatedBy.querySelector("input.para-zk-block__input")).toBeNull();
+  });
 });
 
 describe("props frontmatter workflow routing", () => {
@@ -316,6 +337,21 @@ describe("props frontmatter workflow routing", () => {
     await writePropsFrontmatter(app, file, "subnote_type", "meeting");
 
     expect(app.metadataCache.getFileCache(file)?.frontmatter?.subnote_type).toBe("meeting");
+  });
+
+  it("keeps llm-wiki props display-only with no workflow write route", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("LLM-Wiki/AI/Policy.md", [
+      "---",
+      "type: llm-wiki",
+      "created_by: claude-opus-4-8",
+      "---",
+      ""
+    ].join("\n"));
+
+    await expectConsoleErrorDuring(() => writePropsFrontmatter(app, file, "created_by", "gpt-5.5"));
+
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.created_by).toBe("claude-opus-4-8");
   });
 });
 

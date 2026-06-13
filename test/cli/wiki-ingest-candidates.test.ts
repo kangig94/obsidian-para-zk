@@ -18,17 +18,6 @@ async function createNote(app: MockApp, path: string, frontmatter: string[], bod
   await app.vault.create(path, markdown(frontmatter, body));
 }
 
-function ledgerRow(sourcePath: string, sourceUpdated: string, at: string): string {
-  return `- ${JSON.stringify({
-    event: "cited",
-    wiki_page: "LLM-Wiki/Index.md",
-    source_path: sourcePath,
-    source_updated: sourceUpdated,
-    source_updated_ms: frontmatterTimeMs(sourceUpdated) ?? null,
-    at
-  })}`;
-}
-
 async function seedCandidateVault(app: MockApp): Promise<void> {
   await createNote(
     app,
@@ -38,8 +27,8 @@ async function seedCandidateVault(app: MockApp): Promise<void> {
   );
   await createNote(
     app,
-    "PARA/Resources/Cited Missing.md",
-    ["type: resource", "updated: 2026-01-02 09:00"],
+    "PARA/Resources/Cited Null Wiki Only.md",
+    ["type: resource", "updated: 2026-04-01 09:00"],
     "This body must not be read."
   );
   await createNote(
@@ -59,26 +48,49 @@ async function seedCandidateVault(app: MockApp): Promise<void> {
   await createNote(app, "Notes/Plain.md", ["type: note", "updated: 2026-01-01 09:00"]);
   await createNote(
     app,
-    "LLM-Wiki/Index.md",
-    ["type: llm-wiki"],
+    "LLM-Wiki/Old Concept.md",
+    ["type: llm-wiki", "updated: 2026-01-15 09:00"],
     [
-      "[[PARA/Resources/Cited Missing.md]]",
-      "[[PARA/Resources/Cited Stale.md]]",
+      "[[PARA/Resources/Cited Stale.md]]"
+    ].join("\n")
+  );
+  await createNote(
+    app,
+    "LLM-Wiki/Fresh Concept.md",
+    ["type: llm-wiki", "updated: 2026-03-02 09:00"],
+    [
       "[[PARA/Resources/Cited Fresh.md]]"
     ].join("\n")
   );
-  await app.vault.create(
-    "LLM-Wiki/log.md",
+  await createNote(
+    app,
+    "LLM-Wiki/No Updated Concept.md",
+    ["type: llm-wiki", "updated:"],
     [
-      ledgerRow("PARA/Resources/Cited Stale.md", "2026-01-01 09:00", "2026-04-01T00:00:00.000Z"),
-      ledgerRow("PARA/Resources/Cited Fresh.md", "2026-03-01 09:00", "2026-05-01T00:00:00.000Z"),
-      "- {malformed"
+      "[[PARA/Resources/Cited Null Wiki Only.md]]",
+      "[[PARA/Resources/Cited Stale.md]]"
+    ].join("\n")
+  );
+  // A cited source with NO updated timestamp is never stale, regardless of how new the
+  // citing page is — guards the `sourceUpdatedMs === null` early return in stalePagesForSource.
+  await createNote(
+    app,
+    "PARA/Resources/Null Updated Source.md",
+    ["type: resource", "updated:"],
+    "This body must not be read."
+  );
+  await createNote(
+    app,
+    "LLM-Wiki/Cites Null Source.md",
+    ["type: llm-wiki", "updated: 2026-05-01 09:00"],
+    [
+      "[[PARA/Resources/Null Updated Source.md]]"
     ].join("\n")
   );
 }
 
 describe("wiki ingest candidates", () => {
-  it("classifies init, delta, per-import, and re-ingest without reading canonical or wiki bodies", async () => {
+  it("classifies init, delta, per-import, and re-ingest from page updated timestamps without body reads", async () => {
     const { ctx, app } = createTestContext();
     await seedCandidateVault(app);
 
@@ -96,17 +108,23 @@ describe("wiki ingest candidates", () => {
 
     const delta = await wikiIngestCandidates(ctx, { mode: "delta", limit: "all" });
     expect(delta.candidates.map((candidate) => [candidate.path, candidate.reason])).toEqual([
-      ["PARA/Resources/Cited Missing.md", "missing_ingest_record"],
-      ["PARA/Resources/Cited Stale.md", "stale_since_ingest"],
+      ["PARA/Resources/Cited Stale.md", "source_newer_than_wiki"],
       ["PARA/Resources/Uncited.md", "missing_wiki_citation"]
     ]);
-    // Per-source watermark discriminator: "Cited Stale" is stale against its OWN row
-    // (source_updated 2026-01-01) even though "Cited Fresh" completed LATER (at 2026-05-01).
-    // A global max-`at` watermark would wrongly exclude it (2026-02 < 2026-05) — so its
-    // presence above proves stale detection is per-source, not global.
+    expect(delta).not.toHaveProperty("ledger_warnings");
     const stale = delta.candidates.find((candidate) => candidate.path === "PARA/Resources/Cited Stale.md");
-    expect(stale?.updated_ms).toBeGreaterThan(stale?.last_source_updated_ms ?? 0);
-    expect(stale?.last_completed_at).toBe("2026-04-01T00:00:00.000Z");
+    expect(stale).not.toHaveProperty("last_source_updated_ms");
+    expect(stale).not.toHaveProperty("last_completed_at");
+    expect(stale?.stale_pages).toEqual([
+      {
+        path: "LLM-Wiki/Old Concept.md",
+        title: "Old Concept",
+        updated_ms: frontmatterTimeMs("2026-01-15 09:00")
+      }
+    ]);
+    // Cited, but its own `updated` is null → never stale even though a 2026-05 page cites it.
+    expect(delta.candidates.find((candidate) => candidate.path === "PARA/Resources/Null Updated Source.md"))
+      .toBeUndefined();
 
     const perImport = await wikiIngestCandidates(ctx, {
       mode: "per-import",
@@ -127,8 +145,7 @@ describe("wiki ingest candidates", () => {
       ["PARA/Resources/Cited Stale.md", "reingest_requested"]
     ]);
 
-    expect(delta.ledger_warnings.length).toBeGreaterThan(0);
-    expect(new Set(readPaths)).toEqual(new Set(["LLM-Wiki/log.md"]));
+    expect(new Set(readPaths)).toEqual(new Set());
   });
 
   it("surfaces the stable CLI envelope and rejects targeted paths in init and delta modes", async () => {
@@ -144,9 +161,11 @@ describe("wiki ingest candidates", () => {
       has_more: false
     });
     expect(result).not.toHaveProperty("ledger_watermark");
+    expect(result).not.toHaveProperty("ledger_warnings");
     expect((result.candidates as Array<Record<string, unknown>>)[0]).toMatchObject({
       path: "PARA/Resources/Source.md",
-      reason: "missing_wiki_citation"
+      reason: "missing_wiki_citation",
+      stale_pages: []
     });
 
     const rejected = await cli.run("para-zk:wiki-ingest-candidates", {

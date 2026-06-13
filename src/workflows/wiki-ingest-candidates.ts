@@ -7,12 +7,11 @@ import type {
   WikiIngestCandidateReason,
   WikiIngestCandidatesOptions,
   WikiIngestCandidatesResult,
-  WikiIngestLedgerRow,
   WikiIngestMode,
+  WikiIngestStalePage,
   WorkflowContext
 } from "./context";
-import { isArchivedFile, isUnderAnyFolder, isWikiLedgerPath, templateFolderPaths } from "./locations";
-import { ledgerJsonValue, readWikiLedgerRows } from "./wiki-ledger";
+import { isArchivedFile, isUnderAnyFolder, templateFolderPaths } from "./locations";
 
 export const INGESTABLE_TYPES = ["resource", "digest", "permanent", "subnote"] as const;
 
@@ -33,16 +32,22 @@ type NormalizedWikiIngestOptions = {
   limit: number | "all";
 };
 
+type CitingWikiPage = {
+  path: string;
+  title: string;
+  updatedMs: number | null;
+};
+
 export async function wikiIngestCandidates(
   ctx: WorkflowContext,
   options: WikiIngestCandidatesOptions
 ): Promise<WikiIngestCandidatesResult> {
   const normalized = normalizeWikiIngestOptions(options);
   const sources = ingestableCanonicalSources(ctx);
-  const ledger = await readWikiLedgerRows(ctx);
+  const citationsBySource = llmWikiCitationsBySource(ctx);
   const candidates = normalized.sourcePaths.length > 0
-    ? targetedCandidates(ctx, normalized.mode, normalized.sourcePaths, ledger.latestRowsBySource)
-    : sourceCandidates(normalized.mode, sources, citedSourcePaths(ctx), ledger.latestRowsBySource);
+    ? targetedCandidates(ctx, normalized.mode, normalized.sourcePaths, citationsBySource)
+    : sourceCandidates(normalized.mode, sources, citationsBySource);
   const page = pageCandidates(candidates, normalized);
 
   return {
@@ -51,7 +56,6 @@ export async function wikiIngestCandidates(
     limit: normalized.limit,
     returned: page.length,
     has_more: normalized.offset + page.length < candidates.length,
-    ledger_warnings: ledger.ledger_warnings,
     candidates: page
   };
 }
@@ -61,7 +65,6 @@ export function ingestableCanonicalSource(
   file: TFile,
   frontmatter: Frontmatter = fileFrontmatter(ctx, file)
 ): IngestableCanonicalSource | undefined {
-  if (isWikiLedgerPath(ctx.settings, file.path)) return undefined;
   if (isUnderAnyFolder(file.path, templateFolderPaths(ctx))) return undefined;
   if (isArchivedFile(ctx, file)) return undefined;
 
@@ -72,7 +75,7 @@ export function ingestableCanonicalSource(
     file,
     type,
     frontmatter,
-    updated: ledgerJsonValue(updated),
+    updated: updatedJsonValue(updated),
     updatedMs: frontmatterTimeMs(updated) ?? null
   };
 }
@@ -134,34 +137,48 @@ function ingestableCanonicalSources(ctx: WorkflowContext): IngestableCanonicalSo
   return sources.sort((left, right) => left.file.path.localeCompare(right.file.path));
 }
 
-function citedSourcePaths(ctx: WorkflowContext): Set<string> {
-  const cited = new Set<string>();
+function llmWikiCitationsBySource(ctx: WorkflowContext): Map<string, CitingWikiPage[]> {
+  const bySource = new Map<string, CitingWikiPage[]>();
   for (const [sourcePath, targets] of Object.entries(ctx.host.resolvedLinks())) {
-    if (isWikiLedgerPath(ctx.settings, sourcePath)) continue;
     const sourceFile = ctx.host.getFile(sourcePath);
     if (!sourceFile) continue;
-    if (readType(fileFrontmatter(ctx, sourceFile)) !== "llm-wiki") continue;
+    const frontmatter = fileFrontmatter(ctx, sourceFile);
+    if (readType(frontmatter) !== "llm-wiki") continue;
+
+    const citingPage: CitingWikiPage = {
+      path: sourceFile.path,
+      title: sourceFile.basename,
+      updatedMs: frontmatterTimeMs(frontmatter.updated) ?? null
+    };
 
     for (const [targetPath, count] of Object.entries(targets)) {
-      if (count > 0) cited.add(normalizeVaultPath(targetPath));
+      if (!positiveCount(count)) continue;
+      const normalizedTarget = normalizeVaultPath(targetPath);
+      const pages = bySource.get(normalizedTarget) ?? [];
+      pages.push(citingPage);
+      bySource.set(normalizedTarget, pages);
     }
   }
-  return cited;
+
+  for (const pages of bySource.values()) {
+    pages.sort((left, right) => left.path.localeCompare(right.path));
+  }
+  return bySource;
 }
 
 function sourceCandidates(
   mode: WikiIngestMode,
   sources: IngestableCanonicalSource[],
-  cited: Set<string>,
-  latestRowsBySource: Map<string, WikiIngestLedgerRow>
+  citationsBySource: Map<string, CitingWikiPage[]>
 ): WikiIngestCandidate[] {
   const candidates: WikiIngestCandidate[] = [];
   for (const source of sources) {
     const path = source.file.path;
-    const lastRow = latestRowsBySource.get(path);
-    const reason = candidateReason(mode, source, cited.has(path), lastRow);
+    const citingPages = citationsBySource.get(path) ?? [];
+    const stalePages = stalePagesForSource(source, citingPages);
+    const reason = candidateReason(mode, citingPages.length > 0, stalePages.length > 0);
     if (!reason) continue;
-    candidates.push(candidateFromSource(source, lastRow, reason));
+    candidates.push(candidateFromSource(source, stalePages, reason));
   }
   return candidates;
 }
@@ -170,7 +187,7 @@ function targetedCandidates(
   ctx: WorkflowContext,
   mode: WikiIngestMode,
   sourcePaths: string[],
-  latestRowsBySource: Map<string, WikiIngestLedgerRow>
+  citationsBySource: Map<string, CitingWikiPage[]>
 ): WikiIngestCandidate[] {
   const reason = mode === "per-import" ? "per_import" : "reingest_requested";
   return sourcePaths.map((path) => {
@@ -179,31 +196,43 @@ function targetedCandidates(
 
     const source = ingestableCanonicalSource(ctx, file);
     if (!source) throw new Error(`source_path is not an active non-template ingestable source: ${path}`);
-    return candidateFromSource(source, latestRowsBySource.get(path), reason);
+    return candidateFromSource(source, stalePagesForSource(source, citationsBySource.get(source.file.path) ?? []), reason);
   });
 }
 
 function candidateReason(
   mode: WikiIngestMode,
-  source: IngestableCanonicalSource,
   cited: boolean,
-  lastRow: WikiIngestLedgerRow | undefined
+  stale: boolean
 ): WikiIngestCandidateReason | undefined {
   if (mode === "init") {
     return cited ? undefined : "missing_wiki_citation";
   }
   if (mode !== "delta") return undefined;
   if (!cited) return "missing_wiki_citation";
-  if (!lastRow) return "missing_ingest_record";
-  if (source.updatedMs !== null && lastRow.source_updated_ms !== null && source.updatedMs > lastRow.source_updated_ms) {
-    return "stale_since_ingest";
-  }
+  if (stale) return "source_newer_than_wiki";
   return undefined;
+}
+
+function stalePagesForSource(
+  source: IngestableCanonicalSource,
+  citingPages: CitingWikiPage[]
+): WikiIngestStalePage[] {
+  const sourceUpdatedMs = source.updatedMs;
+  if (sourceUpdatedMs === null) return [];
+  return citingPages
+    .filter((page): page is CitingWikiPage & { updatedMs: number } =>
+      page.updatedMs !== null && page.updatedMs < sourceUpdatedMs)
+    .map((page) => ({
+      path: page.path,
+      title: page.title,
+      updated_ms: page.updatedMs
+    }));
 }
 
 function candidateFromSource(
   source: IngestableCanonicalSource,
-  lastRow: WikiIngestLedgerRow | undefined,
+  stalePages: WikiIngestStalePage[],
   reason: WikiIngestCandidateReason
 ): WikiIngestCandidate {
   return {
@@ -212,8 +241,7 @@ function candidateFromSource(
     title: source.file.basename,
     updated: source.updated,
     updated_ms: source.updatedMs,
-    last_source_updated_ms: lastRow?.source_updated_ms ?? null,
-    last_completed_at: lastRow?.at ?? null,
+    stale_pages: stalePages,
     reason
   };
 }
@@ -226,4 +254,19 @@ function pageCandidates(candidates: WikiIngestCandidate[], options: NormalizedWi
 
 function isIngestableType(value: string): value is IngestableType {
   return (INGESTABLE_TYPES as readonly string[]).includes(value);
+}
+
+function positiveCount(value: unknown): boolean {
+  return typeof value === "number" && value > 0;
+}
+
+function updatedJsonValue(value: unknown): unknown {
+  if (value === undefined) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString();
+  // Luxon DateTime (the metadataCache shape for date frontmatter): toISO() returns string | null.
+  if (typeof value === "object" && value !== null && "toISO" in value && typeof value.toISO === "function") {
+    const iso = value.toISO();
+    return typeof iso === "string" ? iso : null;
+  }
+  return value;
 }

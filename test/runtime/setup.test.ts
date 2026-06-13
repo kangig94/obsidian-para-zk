@@ -15,11 +15,14 @@ function baseSettings(): ParaZkSettings {
   return structuredClone(DEFAULT_SETTINGS);
 }
 
-function targetArtifact(settings: ParaZkSettings): ManagedArtifact {
-  const path = `${settings.paths.managedTemplatesFolder}/template_project.md`;
+function managedArtifactAt(settings: ParaZkSettings, path: string): ManagedArtifact {
   const artifact = managedArtifacts(settings).find((candidate) => candidate.path === path);
   if (!artifact) throw new Error(`Missing managed artifact ${path}`);
   return artifact;
+}
+
+function targetArtifact(settings: ParaZkSettings): ManagedArtifact {
+  return managedArtifactAt(settings, `${settings.paths.managedTemplatesFolder}/template_project.md`);
 }
 
 function createSetupApp(): MockApp {
@@ -79,20 +82,30 @@ async function prepareKnownUserModifiedFile(): Promise<{
 }
 
 describe("setup managed-file state machine", () => {
-  it("adds the wiki ingest ledger to Obsidian graph exclusions idempotently without creating the ledger", async () => {
+  it("prunes a legacy LLM-Wiki log graph exclusion idempotently without creating the log", async () => {
     const settings = baseSettings();
     const app = createSetupApp();
+    await app.vault.create(".obsidian/app.json", JSON.stringify({
+      userIgnoreFilters: [
+        "LLM-Wiki/log.md",
+        "Notes/log.md",
+        "LLM-Wiki/log.md.backup"
+      ]
+    }, null, 2));
 
     const initial = await runSetup(app, settings);
     const appConfig = JSON.parse(app.readPath(".obsidian/app.json") ?? "{}") as { userIgnoreFilters?: string[] };
-    expect(appConfig.userIgnoreFilters).toContain("LLM-Wiki/log.md");
+    expect(initial.result.updated).toContain(".obsidian/app.json");
+    expect(appConfig.userIgnoreFilters).not.toContain("LLM-Wiki/log.md");
+    expect(appConfig.userIgnoreFilters).toContain("Notes/log.md");
+    expect(appConfig.userIgnoreFilters).toContain("LLM-Wiki/log.md.backup");
     expect(app.readPath("LLM-Wiki/log.md")).toBeUndefined();
 
     const rerun = await runSetup(app, initial.settings);
     expect(rerun.result.existing).toContain(".obsidian/app.json");
     expect(rerun.result.updated).not.toContain(".obsidian/app.json");
     const rerunConfig = JSON.parse(app.readPath(".obsidian/app.json") ?? "{}") as { userIgnoreFilters?: string[] };
-    expect(rerunConfig.userIgnoreFilters?.filter((item) => item === "LLM-Wiki/log.md")).toHaveLength(1);
+    expect(rerunConfig.userIgnoreFilters).toEqual(appConfig.userIgnoreFilters);
     expect(app.readPath("LLM-Wiki/log.md")).toBeUndefined();
   });
 
@@ -110,6 +123,24 @@ describe("setup managed-file state machine", () => {
     const rerun = await runSetup(app, initial.settings);
     expect(rerun.result.created).not.toContain("LLM-Wiki");
     expect(rerun.result.existing).toContain("LLM-Wiki");
+  });
+
+  it("reports the llm-wiki managed template as existing on a second setup run", async () => {
+    const settings = baseSettings();
+    const target = managedArtifactAt(settings, `${settings.paths.managedTemplatesFolder}/template_llm-wiki.md`);
+    const app = createSetupApp();
+
+    const initial = await runSetup(app, settings);
+
+    expect(initial.result.created).toContain(target.path);
+    expect(app.readPath(target.path)).toBe(target.content);
+    expect(target.content).toContain("```para-zk-props\ntype: llm-wiki\n```");
+    expect(target.content).toContain("```para-zk-managed\n```");
+
+    const rerun = await runSetup(app, initial.settings);
+    expect(rerun.result.existing).toContain(target.path);
+    expect(rerun.result.created).not.toContain(target.path);
+    expect(rerun.result.updated).not.toContain(target.path);
   });
 
   it("creates missing managed files and previews them during dry-run", async () => {

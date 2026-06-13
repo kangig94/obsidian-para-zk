@@ -279,16 +279,26 @@ export async function createLlmWiki(ctx: WorkflowContext, options: CreateLlmWiki
   });
 
   const tags = localePack(ctx.settings.locale).tags;
+  const by = llmWikiBy(options.by);
   await ctx.host.processFrontMatter(file, (fm) => {
     fm.type = "llm-wiki";
     applyAlias(fm, options.alias);
     fm.tags = [`${tags.llmWiki}/${slugify(title.basename)}`];
     applyCreatedUpdatedDefaults(fm, createdAt);
+    if (by) {
+      fm.created_by = by;
+      fm.updated_by = by;
+    }
   });
 
   await applyBody(ctx, file, options.body);
   await openIfRequested(ctx, file, options.open);
   return noteResult(file, true, options.open);
+}
+
+function llmWikiBy(value: string | undefined): string | undefined {
+  const by = value?.trim();
+  return by || undefined;
 }
 
 export async function createSubnote(ctx: WorkflowContext, options: CreateSubnoteOptions): Promise<CreateSubnoteResult> {

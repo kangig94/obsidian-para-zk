@@ -36,8 +36,27 @@ describe("props schema lead fields", () => {
     expect(findPropsField(digest, "url")?.control).toBe("url");
   });
 
+  it("surfaces llm-wiki authorship as display-only props", () => {
+    const llmWiki = propsSchemaForType("llm-wiki", "en");
+
+    expect(llmWiki.rows.map((row) => row.map((field) => field.id))).toEqual([
+      ["created", "updated"],
+      ["created_by", "updated_by"]
+    ]);
+    expect(findPropsField(llmWiki, "created_by")).toMatchObject({
+      key: "created_by",
+      label: "Created by",
+      control: "display"
+    });
+    expect(findPropsField(llmWiki, "updated_by")).toMatchObject({
+      key: "updated_by",
+      label: "Updated by",
+      control: "display"
+    });
+  });
+
   it("keeps vault-managed timestamps display-only wherever they are shown", () => {
-    for (const type of ["area", "resource", "subnote", "spark", "digest", "permanent"] as const) {
+    for (const type of ["area", "resource", "llm-wiki", "subnote", "spark", "digest", "permanent"] as const) {
       const schema = propsSchemaForType(type, "en");
       expect(findPropsField(schema, "created")?.control).toBe("display");
       expect(findPropsField(schema, "updated")?.control).toBe("display");
