@@ -39,45 +39,44 @@ LLM-Wiki pages are LLM-owned derived synthesis under `LLM-Wiki/`; canonical know
 
    Gate on the response envelope. Candidate reasons are `missing_wiki_citation` or `source_newer_than_wiki`; candidates may include `stale_pages: [{path,title,updated_ms}]`, the citing LLM-Wiki pages older than the source. For `delta` and any returned candidate with `stale_pages`, preserve that list so the weaver gets exactly which pages to re-weave for that source. If `ok` is false or the command errors, stop. If `returned` is `0`, report that no source candidates were returned and do not spawn the weaver. If `has_more` is true, weave only the returned page of candidates and report that another bounded page remains; do not auto-page into a full scan.
 
-4. **Hydrate sources**: For each returned candidate, read only that vault-relative path with a strict cap, and strip frontmatter before placing prose in the packet:
+4. **Hydrate sources**: For each returned candidate, read its FULL body — never truncate a source; a cut body degrades the synthesis — and strip frontmatter before placing prose in the packet:
 
    ```bash
-   optsidian read path="<candidate.path>" max-chars=<source_body_max_chars> format=json
+   optsidian read path="<candidate.path>" format=json
    optsidian frontmatter read path="<candidate.path>" format=json
    ```
 
-   Build each source object as `{path,type,title,updated,updated_ms,stale_pages,body}` using the candidate metadata for `type`, `title`, `updated`, `updated_ms`, and `stale_pages`. Default `source_body_max_chars` to `24000`; lower it when many sources are returned. If the read is truncated, keep the truncated body and note the cap in `limits`; do not chase related canonical notes.
+   Build each source object as `{path,type,title,updated,updated_ms,stale_pages,body}` using the candidate metadata for `type`, `title`, `updated`, `updated_ms`, and `stale_pages`. Feed the whole body; do not chase related canonical notes. A run is bounded by the NUMBER of sources (step 3's `limit`/`offset`), never by truncating any one body.
 
-5. **Gather neighborhood**: For each hydrated source, derive a compact query from its title, aliases/tags from frontmatter, headings, and a few distinctive body terms. Search only under `LLM-Wiki/`, with a per-source top-N cap:
+5. **Gather neighborhood**: For each hydrated source, derive a compact query from its title, aliases/tags from frontmatter, headings, and a few distinctive body terms. Search only under `LLM-Wiki/` to find the related concept pages (search returns them ranked by relevance):
 
    ```bash
-   optsidian search query="<source title/tags/key terms>" path=LLM-Wiki field=title,aliases,tags,headings,body limit=<candidate_top_n> format=json
-   optsidian grep query="<distinct key term>" path=LLM-Wiki context=1 limit=<candidate_top_n> format=json
+   optsidian search query="<source title/tags/key terms>" path=LLM-Wiki field=title,aliases,tags,headings,body format=json
+   optsidian grep query="<distinct key term>" path=LLM-Wiki context=1 format=json
    ```
 
-   Default `candidate_top_n` to `5`. Seed the neighborhood with every path in each candidate's `stale_pages`; for a stale source, those pages are the exact re-weave targets for that source. Deduplicate paths across all sources, and read bodies only for the deduplicated top candidates:
+   Seed the neighborhood with every path in each candidate's `stale_pages`; for a stale source, those pages are the exact re-weave targets for that source. Deduplicate paths across all sources, then read the FULL body of each related page (a touched page must be re-woven against its whole current content):
 
    ```bash
-   optsidian read path="<wiki.path>" max-chars=<candidate_body_max_chars> format=json
+   optsidian read path="<wiki.path>" format=json
    optsidian frontmatter read path="<wiki.path>" format=json
    ```
 
-   Build `candidate_wiki_pages` as `{path,title,aliases,tags,body}`. Default `candidate_body_max_chars` to `12000`. If no candidate page is found for a source, keep going; the weaver may create a new page.
+   Build `candidate_wiki_pages` as `{path,title,aliases,tags,body}` with full bodies. If no related page is found for a source, keep going; the weaver may create a new page.
 
 6. **Build the one-time index seed**: For `delta` and `init` only, build one compact shared wiki index slice before spawning the weaver. Use the combined source titles, tags, and key terms to run one bounded search under `LLM-Wiki/`, then read frontmatter only for the returned wiki paths:
 
    ```bash
-   optsidian search query="<combined source terms>" path=LLM-Wiki field=title,aliases,tags limit=<wiki_index_seed_limit> format=json
+   optsidian search query="<combined source terms>" path=LLM-Wiki field=title,aliases,tags format=json
    optsidian frontmatter read path="<wiki.path>" format=json
    ```
 
-   Store only `{path,title,aliases,tags}` in `wiki_index_seed`; never include bodies in the seed. Default `wiki_index_seed_limit` to `100`. Build this slice once and do not refresh it mid-run, even as the weaver creates or updates pages. For `per-import` and `re-ingest`, set `wiki_index_seed` to `[]` and rely on the per-source neighborhood.
+   Store only `{path,title,aliases,tags}` in `wiki_index_seed`; never include bodies in the seed — that is what keeps it cheap even for the whole wiki, not a count cap. Build this slice once and do not refresh it mid-run, even as the weaver creates or updates pages. For `per-import` and `re-ingest`, set `wiki_index_seed` to `[]` and rely on the per-source neighborhood.
 
 7. **Assemble packet**: Create one hydrated `WeavePacket` for the whole returned source set:
 
    ```json
    {
-     "job_id": "wiki-ingest-<utc timestamp>-<short nonce>",
      "mode": "<per-import|delta|init|re-ingest>",
      "by": "<model-id>",
      "sources": [
@@ -89,12 +88,6 @@ LLM-Wiki pages are LLM-owned derived synthesis under `LLM-Wiki/`; canonical know
      "wiki_index_seed": [
        {"path": "...", "title": "...", "aliases": [], "tags": []}
      ],
-     "limits": {
-       "source_body_max_chars": 24000,
-       "candidate_top_n_per_source": 5,
-       "candidate_body_max_chars": 12000,
-       "wiki_index_seed_limit": 100
-     },
      "rules": {
        "read_scope": "Read only packet sources, packet candidate_wiki_pages, the one-time wiki_index_seed, and bounded LLM-Wiki re-searches needed for touched pages.",
        "writer": "The weaver writes directly with create-llm-wiki and update-llm-wiki, passing by=<model-id>; the skill applies no writes.",
@@ -118,6 +111,6 @@ LLM-Wiki pages are LLM-owned derived synthesis under `LLM-Wiki/`; canonical know
    })
    ```
 
-   The weaver processes all `sources` serially in its own context. Do not spawn once per source. Do not refresh the index seed after spawning. Do not post-process the weaver's writes.
+   The weaver processes all `sources` serially in its own context, integrating each in full. Do not spawn once per source — one weaver builds the compounding web across the batch so it can cross-link related sources in a single pass. If the weaver approaches its context limit before finishing the batch, it stops after the last fully-integrated source and reports which sources it completed and which remain; spawn a FRESH weaver for the remaining sources (re-hydrate them per steps 4–5). Bound work by source count and by chaining weavers — never by truncating a body. Do not refresh the index seed after spawning. Do not post-process the weaver's writes.
 
-9. **Report launch**: Return the `job_id`, mode, source count, candidate wiki page count, whether `has_more` was true, and the weaver launch handle if the host provides one. The observable write contract is the weaver's direct page writes (`create-llm-wiki`/`update-llm-wiki` succeeding).
+9. **Report launch**: Return the mode, source count, candidate wiki page count, whether `has_more` was true (another candidate page remains), and the weaver launch handle if the host provides one. If the weaver later reports a context boundary with sources still remaining, spawn a fresh weaver for the remainder. The observable write contract is the weaver's direct page writes (`create-llm-wiki`/`update-llm-wiki` succeeding).
