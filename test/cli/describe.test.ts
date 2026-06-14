@@ -67,8 +67,10 @@ describe("describe", () => {
     // and names created/updated as not writable here.
     expect(String(all.scope)).toContain("optsidian");
     expect(String(all.scope)).toContain("created");
-    // A cold caller learns the inline-citation convention from scope alone.
+    // A cold caller learns the inline-citation convention from scope alone — including the
+    // section form, so an agent knows it can cite one heading of a reference.
     expect(String(all.scope)).toContain("PZ[<id>]");
+    expect(String(all.scope)).toContain("PZ[<id>#<section>]");
     expect(String(all.scope)).not.toContain("PZ[n]");
     expect(all.surfaceTypes).toEqual(
       expect.arrayContaining(["project", "area", "resource", "llm-wiki", "retro", "note"])

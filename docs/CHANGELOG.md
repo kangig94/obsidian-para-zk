@@ -87,7 +87,8 @@ Notable changes for PARA-ZK are tracked here.
   The editor citation suggester now triggers only inside a backtick code span (bare `PZ[`
   is left alone), places the cursor before the `]` after picking a reference, and — when the
   user then types `#` — completes the reference target's headings and blocks. This also fixes
-  the nested-backtick insertion when a code span was already open.
+  the nested-backtick insertion when a code span was already open. The CLI/MCP `describe`
+  scope note advertises the `PZ[<id>#<section>]` form so automation surfaces know it.
 - The HomePage dashboard summary now includes an LLM-Wiki count card (📖), counting pages
   with `type: llm-wiki` under the `LLM-Wiki/` folder — the same identification the rest of
   the plugin uses. Rendered after the PARA/ZK cards; localized label `llmWiki` ("LLM-Wiki").
