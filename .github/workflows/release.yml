@@ -1,9 +1,10 @@
 name: Release Obsidian plugin
 
-# Builds the plugin and creates a DRAFT GitHub release with the BRAT-required assets
-# (main.js, manifest.json, styles.css) whenever a version tag is pushed.
+# Builds the plugin and publishes the BRAT/optsidian-required assets (main.js,
+# manifest.json, styles.css) whenever a version tag is pushed. A NEW tag creates a
+# DRAFT release (review, then publish); re-pushing an EXISTING tag refreshes that
+# release's assets in place (a retag re-releases the same version with a fresh build).
 # Tag name must equal manifest.json "version" exactly, no "v" prefix (e.g. 0.0.2).
-# Review the draft, then publish it — BRAT can only see published releases.
 on:
   push:
     tags:
@@ -29,7 +30,7 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build
         run: pnpm run build
-      - name: Create draft release
+      - name: Create or refresh release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -39,8 +40,12 @@ jobs:
             echo "::error::Tag '$tag' does not match manifest.json version '$manifest_version' (Obsidian requires an exact match, no 'v' prefix)."
             exit 1
           fi
-          gh release create "$tag" \
-            --title "$tag" \
-            --draft \
-            --notes "Beta release $tag — install via BRAT (see README)." \
-            build/main.js build/manifest.json build/styles.css
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" build/main.js build/manifest.json build/styles.css --clobber
+          else
+            gh release create "$tag" \
+              --title "$tag" \
+              --draft \
+              --notes "Beta release $tag — install via BRAT (see README)." \
+              build/main.js build/manifest.json build/styles.css
+          fi
