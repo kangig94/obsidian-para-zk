@@ -19,7 +19,7 @@ export function renderCliText(command: string, payload: Envelope, summary: strin
 function renderBody(command: string, payload: Envelope, summary: string): string {
   switch (command) {
     case "para-zk:audit": return renderAudit(payload);
-    case "para-zk:list": return renderNoteList(payload, "notes");
+    case "para-zk:list": return renderNoteList(payload);
     case "para-zk:wiki-ingest-candidates": return renderCandidates(payload);
     case "para-zk:describe": return renderSchema(payload, summary);
     default:
@@ -175,13 +175,23 @@ function findingLine(finding: Envelope, showCode: boolean): string {
 
 // --- list / candidates ---
 
-function renderNoteList(payload: Envelope, noun: string): string {
+function renderNoteList(payload: Envelope): string {
   const items = Array.isArray(payload.items) ? payload.items : [];
-  const lines = [listHeader(payload, noun)];
-  for (const item of items) {
-    if (!isRecord(item)) continue;
-    const archived = item.archived === true ? "  [archived]" : "";
-    lines.push(`  ${strOf(item.type)}  ${strOf(item.title)}${archived}  (${strOf(item.path)})`);
+  const count = typeof payload.count === "number" ? payload.count : items.length;
+  const lines: string[] = [];
+
+  if (typeof payload.root === "string") {
+    // Single-type listing: items are root-relative name strings; type and root stated once.
+    const type = strOf(payload.type) || "note";
+    lines.push(`${count} ${type}${count === 1 ? "" : "s"} · root: ${payload.root}`);
+    for (const item of items) lines.push(`  ${strOf(item)}`);
+  } else {
+    // Mixed/multi-root/archived listing: each item is {name, type}.
+    const archived = payload.archived === true ? " (archived)" : "";
+    lines.push(`${count} notes${archived}`);
+    for (const item of items) {
+      if (isRecord(item)) lines.push(`  ${strOf(item.type)}  ${strOf(item.name)}`);
+    }
   }
   const hint = paginationHint(payload);
   if (hint) lines.push(hint);
@@ -231,8 +241,8 @@ function paginationHint(page: Envelope): string | undefined {
   const shown = offset + returned;
   const count = typeof page.count === "number" ? page.count : undefined;
   return count !== undefined
-    ? `… +${count - shown} more (showing ${shown}/${count}; pass offset/limit or limit=all)`
-    : "… more (pass offset/limit or limit=all)";
+    ? `… +${count - shown} more (${shown}/${count}; offset/limit or limit=all)`
+    : "… more (offset/limit or limit=all)";
 }
 
 function indentValue(value: unknown, indent: string): string[] {

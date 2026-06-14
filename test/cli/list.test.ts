@@ -8,36 +8,36 @@ beforeEach(() => {
 });
 
 describe("list", () => {
-  it("lists notes of a type with title/type/path and a pagination envelope", async () => {
+  it("lists a single type as root-relative names with the root stated once", async () => {
     await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
     await cli.run("para-zk:create-project", { title: "Beta", open: "false" });
     await cli.run("para-zk:create-area", { title: "Ops", open: "false" });
 
     const res = await cli.run("para-zk:list", { type: "project" });
-    const items = res.items as Array<{ title: string; type: string; path: string }>;
-    expect(res).toMatchObject({ ok: true, count: 2, offset: 0, returned: 2, has_more: false });
-    expect(items.map((i) => i.title).sort()).toEqual(["Alpha", "Beta"]);
-    expect(items.every((i) => i.type === "project")).toBe(true);
-    expect(items.every((i) => typeof i.path === "string")).toBe(true);
+    expect(res).toMatchObject({ ok: true, count: 2, offset: 0, returned: 2, has_more: false, type: "project", root: "PARA/Projects" });
+    // Folder-style notes (PARA/Projects/Alpha/Alpha.md) collapse to their address name.
+    expect((res.items as string[]).slice().sort()).toEqual(["Alpha", "Beta"]);
   });
 
-  it("includes nested areas in `list type=area` (nested areas store type=area)", async () => {
+  it("includes nested areas as tree-relative names (nested areas store type=area)", async () => {
     await cli.run("para-zk:create-area", { title: "AI", open: "false" });
     await cli.run("para-zk:create-child", { type: "area", root_type: "area", root_title: "AI", title: "Vision", open: "false" });
 
     const res = await cli.run("para-zk:list", { type: "area" });
-    const items = res.items as Array<{ title: string; type: string }>;
-    expect(items.map((i) => i.title).sort()).toEqual(["AI", "Vision"]);
-    expect(items.every((i) => i.type === "area")).toBe(true);
+    expect(res.root).toBe("PARA/Areas");
+    expect((res.items as string[]).slice().sort()).toEqual(["AI", "AI/Vision"]);
   });
 
-  it("treats zk as the family spanning all stored ZK kinds", async () => {
+  it("treats zk as a multi-root family, keeping {name,type} per item", async () => {
     await cli.run("para-zk:create-zk", { title: "S", kind: "spark", open: "false" });
     await cli.run("para-zk:create-zk", { title: "P", kind: "permanent", open: "false" });
 
     const res = await cli.run("para-zk:list", { type: "zk" });
     expect(res.count).toBe(2);
-    expect((res.items as Array<{ type: string }>).map((i) => i.type).sort()).toEqual(["permanent", "spark"]);
+    expect(res.root).toBeUndefined();
+    const items = res.items as Array<{ name: string; type: string }>;
+    expect(items.map((i) => i.type).sort()).toEqual(["permanent", "spark"]);
+    expect(items.every((i) => i.name.startsWith("ZK/"))).toBe(true);
   });
 
   it("filters by case-insensitive title query and paginates", async () => {
@@ -52,16 +52,22 @@ describe("list", () => {
     expect(page).toMatchObject({ count: 3, offset: 1, limit: 1, returned: 1, has_more: true });
   });
 
-  it("excludes archived by default and lists archived with archived=true", async () => {
+  it("excludes archived by default; archived notes list under their archive location", async () => {
     await cli.run("para-zk:create-project", { title: "Live", open: "false" });
     await cli.run("para-zk:create-project", { title: "Old", open: "false" });
     await cli.run("para-zk:update-project", { title: "Old", key: "frontmatter/status", op: "set", value: "archived" });
 
     const active = await cli.run("para-zk:list", { type: "project" });
-    expect((active.items as Array<{ title: string }>).map((i) => i.title)).toEqual(["Live"]);
+    expect(active.items).toEqual(["Live"]);
 
+    // Archived notes move under archivesFolder (not the type root), so they list as {name,type}.
     const archived = await cli.run("para-zk:list", { type: "project", archived: "true" });
-    expect((archived.items as Array<{ title: string }>).map((i) => i.title)).toEqual(["Old"]);
+    expect(archived.archived).toBe(true);
+    expect(archived.root).toBeUndefined();
+    const old = (archived.items as Array<{ name: string; type: string }>)[0];
+    expect(old.type).toBe("project");
+    expect(old.name.startsWith("PARA/Archives")).toBe(true);
+    expect(old.name.split("/").pop()).toBe("Old");
   });
 
   it("excludes managed template files even though they carry a type frontmatter", async () => {
@@ -69,12 +75,10 @@ describe("list", () => {
     await cli.app.vault.create("Templates/para-zk/template_resource.md", "---\ntype: resource\n---\n# Template\n");
 
     const res = await cli.run("para-zk:list", { type: "resource" });
-    const items = res.items as Array<{ title: string; path: string }>;
-    expect(items.map((i) => i.title)).toEqual(["Real"]);
-    expect(items.some((i) => i.path.startsWith("Templates/"))).toBe(false);
+    expect(res.items).toEqual(["Real"]);
   });
 
-  it("lists all PARA-ZK notes when type is omitted", async () => {
+  it("lists all PARA-ZK notes as {name,type} when type is omitted", async () => {
     await cli.run("para-zk:create-project", { title: "P", open: "false" });
     await cli.run("para-zk:create-area", { title: "A", open: "false" });
     await cli.run("para-zk:create-resource", { title: "R", open: "false" });
@@ -82,19 +86,50 @@ describe("list", () => {
 
     const res = await cli.run("para-zk:list", {});
     expect(res.count).toBe(4);
+    expect(res.root).toBeUndefined();
+    expect((res.items as Array<{ type: string }>).map((i) => i.type).sort()).toEqual(["area", "llm-wiki", "project", "resource"]);
     expect(res.items).toEqual(expect.arrayContaining([
-      expect.objectContaining({ title: "W", type: "llm-wiki", path: "LLM-Wiki/AI/W.md" })
+      expect.objectContaining({ name: "LLM-Wiki/AI/W", type: "llm-wiki" })
     ]));
   });
 
-  it("lists active llm-wiki notes by type", async () => {
+  it("lists active llm-wiki notes relative to the wiki root", async () => {
     await cli.run("para-zk:create-llm-wiki", { title: "AI/Wiki", open: "false" });
     await cli.app.vault.create("PARA/Archives/LLM-Wiki/Archived.md", "---\ntype: llm-wiki\n---\nArchived only\n");
 
     const res = await cli.run("para-zk:list", { type: "llm-wiki" });
-    expect(res).toMatchObject({ ok: true, count: 1, returned: 1 });
-    expect(res.items).toEqual([
-      { title: "Wiki", type: "llm-wiki", path: "LLM-Wiki/AI/Wiki.md" }
-    ]);
+    expect(res).toMatchObject({ ok: true, count: 1, returned: 1, type: "llm-wiki", root: "LLM-Wiki" });
+    expect(res.items).toEqual(["AI/Wiki"]);
+  });
+
+  it("reports an empty single-type listing with root and empty items", async () => {
+    const res = await cli.run("para-zk:list", { type: "project" });
+    expect(res).toMatchObject({ ok: true, count: 0, returned: 0, type: "project", root: "PARA/Projects" });
+    expect(res.items).toEqual([]);
+  });
+
+  it("lists subnotes as {name,type} (folder-spanning, no single root)", async () => {
+    await cli.app.vault.create("PARA/Projects/Proj/Meeting.md", "---\ntype: subnote\n---\nbody\n");
+
+    const res = await cli.run("para-zk:list", { type: "subnote" });
+    expect(res.root).toBeUndefined();
+    expect(res.items).toEqual([{ name: "PARA/Projects/Proj/Meeting", type: "subnote" }]);
+  });
+
+  it("lists journals as {name,type} (addressed by date, not title)", async () => {
+    await cli.app.vault.create("Journal/2026-06-15.md", "---\ntype: journal\n---\nentry\n");
+
+    const res = await cli.run("para-zk:list", { type: "journal" });
+    expect(res.root).toBeUndefined();
+    expect(res.items).toEqual([{ name: "Journal/2026-06-15", type: "journal" }]);
+  });
+
+  it("round-trips a single-type name straight back as title=", async () => {
+    await cli.run("para-zk:create-resource", { title: "Round Trip", open: "false" });
+
+    const res = await cli.run("para-zk:list", { type: "resource" });
+    const name = (res.items as string[])[0];
+    const read = await cli.run("para-zk:read-resource", { title: name });
+    expect(read.ok).toBe(true);
   });
 });

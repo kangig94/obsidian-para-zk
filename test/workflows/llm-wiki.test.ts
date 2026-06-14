@@ -217,10 +217,8 @@ describe("llm-wiki workflows", () => {
     await app.vault.create("PARA/Archives/LLM-Wiki/Archived.md", "---\ntype: llm-wiki\n---\nArchived only\n");
 
     const filtered = await listNotes(ctx, { type: "llm-wiki" });
-    expect(filtered).toMatchObject({ count: 1, returned: 1 });
-    expect(filtered.items).toEqual([
-      { title: "Foo", type: "llm-wiki", path: "LLM-Wiki/AI/Foo.md" }
-    ]);
+    expect(filtered).toMatchObject({ count: 1, returned: 1, type: "llm-wiki", root: "LLM-Wiki" });
+    expect(filtered.items).toEqual(["AI/Foo"]);
 
     const all = await listNotes(ctx);
     expect(all.count).toBe(1);

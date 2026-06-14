@@ -354,6 +354,13 @@ Notable changes for PARA-ZK are tracked here.
   The bundled skills and the MCP describe-surface guidance (`invoke`/`schema`/`install`
   strings) no longer prescribe `format=json`; the wiki-weaver agent (where MCP/structured
   output is the primary surface) and the MCP server's own internal JSON parsing keep it.
+- `para-zk:list` output is leaner (text and `json`): a `project`/`area`/`resource`/`llm-wiki`
+  listing states `type` + `root` (e.g. `PARA/Resources`) once and returns `items` as
+  root-relative names without `.md` (e.g. `Paper/ASAP`; folder-style notes collapse to `Demo`,
+  not `Demo/Demo`) — for those types that name is the `title=` to address the note — dropping
+  the redundant per-item basename title and full path. Mixed, `type=zk`, `type=journal`/
+  `type=retro`, `type=subnote`, and archived listings keep `{name, type}`; archived listings
+  carry top-level `archived: true`.
 - The `para-zk-props` block now renders `created`/`updated` as PARA-ZK-formatted
   read-only timestamps instead of raw frontmatter text. `created` shows an absolute
   `YYYY-MM-DD HH:MM` (the ISO `T` and any seconds dropped); `updated` shows a relative

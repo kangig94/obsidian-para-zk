@@ -29,14 +29,14 @@ describe("CLI text output (default format)", () => {
     expect(text).toBe("no findings");
   });
 
-  it("list renders each note with its path", async () => {
+  it("list renders root-relative names with the root stated once", async () => {
     await cli.run("para-zk:create-project", { title: "Demo" });
 
     const text = await cli.runText("para-zk:list", { type: "project" });
 
-    expect(text).toContain("1 notes");
-    expect(text).toContain("Demo");
-    expect(text).toContain("PARA/Projects/Demo/Demo.md");
+    expect(text).not.toContain("notes listed");
+    expect(text.split("\n")[0]).toBe("1 project · root: PARA/Projects");
+    expect(text).toContain("\n  Demo");
   });
 
   it("mutation renders the summary and the resulting path", async () => {

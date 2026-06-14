@@ -248,10 +248,20 @@ optsidian para-zk:list type=zk limit=all
 optsidian para-zk:list type=llm-wiki limit=all
 ```
 
-Returns `{ count, offset, limit, returned, has_more, items }`; each item is
-`{ title, type, path }` (plus `archived: true` in archived listings). `type` is
-the stored type (e.g. `permanent` for a `type=zk` listing). `llm-wiki` has no
-archived selector; active wiki notes live under `LLM-Wiki/`.
+Returns `{ count, offset, limit, returned, has_more, items }`. A `project`,
+`area`, `resource`, or `llm-wiki` listing adds `type` and `root` (e.g.
+`PARA/Resources`), and `items` are **root-relative names** without `.md` — e.g.
+`Paper/ASAP`; a folder-style note collapses to its address (`Demo`, not
+`Demo/Demo`). For `project`/`resource`/`llm-wiki` and a top-level `area`, that
+name is exactly the `title=` you pass back to address the note (nested areas and
+subnotes are addressed through the `*-child` commands). An empty such listing
+still reports `type`/`root` with `items: []`. Every other listing — a mixed (no
+`type`) one, the multi-root `type=zk` family, the date/basename-addressed
+`type=journal`/`type=retro`, a folder-spanning `type=subnote`, or any archived
+listing (archived notes live outside the type root) — returns `items` as
+`{ name, type }` with `name` the full address path and `type` the stored type
+(e.g. `permanent` in a `type=zk` listing). Archived listings carry top-level
+`archived: true`.
 
 ### `para-zk:audit`
 

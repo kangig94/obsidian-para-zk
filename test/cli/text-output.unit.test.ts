@@ -69,7 +69,7 @@ describe("renderCliText", () => {
         ]
       }, "vault audited");
 
-      expect(text).toContain("… +3 more (showing 2/5; pass offset/limit or limit=all)");
+      expect(text).toContain("… +3 more (2/5; offset/limit or limit=all)");
     });
 
     it("reports a clean vault as 'no findings'", () => {
@@ -121,19 +121,39 @@ describe("renderCliText", () => {
   });
 
   describe("list and candidates", () => {
-    it("renders a paginated note list", () => {
+    it("renders a single-type list as root-relative names with a pagination hint", () => {
       const text = renderCliText("para-zk:list", {
-        ok: true, count: 5, offset: 0, limit: 2, returned: 2, has_more: true,
+        ok: true, count: 19, offset: 0, limit: 2, returned: 2, has_more: true,
+        type: "resource", root: "PARA/Resources",
+        items: ["Paper/ASAP", "Paper/BeyondMimic"]
+      }, "notes listed");
+
+      expect(text.split("\n")[0]).toBe("19 resources · root: PARA/Resources");
+      expect(text).toContain("\n  Paper/ASAP");
+      expect(text).toContain("\n  Paper/BeyondMimic");
+      expect(text).toContain("… +17 more (2/19; offset/limit or limit=all)");
+    });
+
+    it("renders a mixed list as {name, type} items", () => {
+      const text = renderCliText("para-zk:list", {
+        ok: true, count: 2, offset: 0, limit: 50, returned: 2, has_more: false,
         items: [
-          { title: "A", type: "project", path: "P/A.md" },
-          { title: "B", type: "area", path: "Ar/B.md", archived: true }
+          { name: "PARA/Projects/Demo", type: "project" },
+          { name: "ZK/Spark/Idea", type: "spark" }
         ]
       }, "notes listed");
 
-      expect(text).toContain("2 of 5 notes");
-      expect(text).toContain("project  A  (P/A.md)");
-      expect(text).toContain("area  B  [archived]  (Ar/B.md)");
-      expect(text).toContain("… +3 more (showing 2/5; pass offset/limit or limit=all)");
+      expect(text.split("\n")[0]).toBe("2 notes");
+      expect(text).toContain("  project  PARA/Projects/Demo");
+      expect(text).toContain("  spark  ZK/Spark/Idea");
+    });
+
+    it("renders an empty single-type list as just the root header", () => {
+      const text = renderCliText("para-zk:list", {
+        ok: true, count: 0, offset: 0, limit: 50, returned: 0, has_more: false,
+        type: "project", root: "PARA/Projects", items: []
+      }, "notes listed");
+      expect(text).toBe("0 projects · root: PARA/Projects");
     });
 
     it("renders candidates with reason and stale wikis", () => {
