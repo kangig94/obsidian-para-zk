@@ -11,10 +11,7 @@ export function localTime(date = new Date()): string {
   return `${hh}:${mm}`;
 }
 
-export function localDateTimeSpace(date = new Date()): string {
-  return `${localDate(date)} ${localTime(date)}`;
-}
-
+// Must stay tolerant of update-time-on-edit ISO timestamps in created/updated frontmatter.
 export function frontmatterTimeMs(value: unknown): number | undefined {
   if (value instanceof Date && !Number.isNaN(value.getTime())) return value.getTime();
   if (typeof value === "number" && Number.isFinite(value)) {

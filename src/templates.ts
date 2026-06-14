@@ -83,7 +83,6 @@ export function managedArtifacts(settings: ParaZkSettings): ManagedArtifact[] {
 export function renderTemplate(name: TemplateName, settings: ParaZkSettings): string {
   const t = localePack(settings.locale);
   const tags = t.tags;
-  const nowPlaceholder = "{{created}}";
   const slugPlaceholder = "{{slug}}";
 
   switch (name) {
@@ -93,7 +92,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "type: project",
           "tags:",
           `  - ${tags.project}/${slugPlaceholder}`,
-          `created: ${nowPlaceholder}`,
+          "created:",
           "updated:",
           "aliases:",
           "areas:",
@@ -123,7 +122,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "type: area",
           "tags:",
           `  - ${tags.area}/${slugPlaceholder}`,
-          `created: ${nowPlaceholder}`,
+          "created:",
           "updated:",
           "parent:"
         ]),
@@ -141,7 +140,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "type: resource",
           "tags:",
           `  - ${tags.resource}/${slugPlaceholder}`,
-          `created: ${nowPlaceholder}`,
+          "created:",
           "updated:",
           "aliases:",
           "url:",
@@ -161,7 +160,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "type: llm-wiki",
           "tags:",
           `  - ${tags.llmWiki}/${slugPlaceholder}`,
-          `created: ${nowPlaceholder}`,
+          "created:",
           "updated:",
           "created_by:",
           "updated_by:",
@@ -179,7 +178,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "type: journal",
           "tags:",
           `  - ${tags.journal}`,
-          `created: ${nowPlaceholder}`,
+          "created:",
           "updated:",
           "date: {{date}}",
           "energy: {{energy}}"
@@ -207,7 +206,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "type: retro",
           "tags:",
           `  - ${tags.retro}`,
-          `created: ${nowPlaceholder}`,
+          "created:",
           "updated:",
           "project: {{project_frontmatter}}",
           "date: {{date}}",
@@ -237,7 +236,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
       return [
         frontmatter([
           "type: subnote",
-          `created: ${nowPlaceholder}`,
+          "created:",
           "updated:",
           "subnote_type: {{subnote_type}}",
           "parent:"
@@ -254,7 +253,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "type: spark",
           "tags:",
           `  - ${tags.knowledge}/${slugPlaceholder}`,
-          `created: ${nowPlaceholder}`,
+          "created:",
           "updated:",
           "processed: false"
         ]),
@@ -270,7 +269,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "type: digest",
           "tags:",
           `  - ${tags.knowledge}/${slugPlaceholder}`,
-          `created: ${nowPlaceholder}`,
+          "created:",
           "updated:",
           "sourceTitle:",
           "url:",
@@ -289,7 +288,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "type: permanent",
           "tags:",
           `  - ${tags.knowledge}/${slugPlaceholder}`,
-          `created: ${nowPlaceholder}`,
+          "created:",
           "updated:",
           "maturity: {{maturity}}",
           "aliases:"

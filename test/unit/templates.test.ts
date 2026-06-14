@@ -18,6 +18,8 @@ describe("managed templates", () => {
 
     for (const content of templates) {
       expect(content).not.toContain("PZ[");
+      expect(content).toContain("created:\nupdated:");
+      expect(content).not.toContain("{{created}}");
     }
 
     expect(project).not.toContain("dataviewjs");

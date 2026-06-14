@@ -57,7 +57,6 @@ function mergeUpdateTimeOnEditSettings(
 ): Record<string, unknown> {
   return {
     ...current,
-    dateFormat: "yyyy-MM-dd'T'HH:mm",
     enableCreateTime: true,
     headerUpdated: "updated",
     headerCreated: "created",

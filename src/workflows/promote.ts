@@ -3,7 +3,6 @@ import { localePack } from "../i18n";
 import {
   dateFromCli,
   localDate,
-  localDateTimeSpace,
   localTime
 } from "../time";
 import type { CaptureResult, PromotionResult, ZkKind } from "../types";
@@ -232,7 +231,6 @@ async function ensureJournal(ctx: WorkflowContext, options: OpenJournalOptions):
 }> {
   const date = dateFromCli(options.date);
   const dateText = localDate(date);
-  const createdAt = localDateTimeSpace();
   const energyCode = readOptionalCode(options.energy, parseEnergyCode, "energy", ENERGY_CODE_HELP);
   const energy = energyCode ?? "normal";
   const folder = joinVaultPath(ctx.settings.paths.journalFolder, dateText.slice(0, 7));
@@ -244,7 +242,6 @@ async function ensureJournal(ctx: WorkflowContext, options: OpenJournalOptions):
   if (!file) {
     created = true;
     file = await createMarkdownFile(ctx, "journal", path, {
-      created: createdAt,
       date: dateText,
       energy,
       cursor: ""
@@ -257,7 +254,7 @@ async function ensureJournal(ctx: WorkflowContext, options: OpenJournalOptions):
     fm.date = fm.date || dateText;
     fm.energy = fm.energy ?? energy;
     fm.tags = fm.tags || [tags.journal];
-    applyCreatedUpdatedDefaults(fm, createdAt);
+    applyCreatedUpdatedDefaults(fm);
   });
   const storedFrontmatter = await readFileFrontmatterFresh(ctx, file);
 

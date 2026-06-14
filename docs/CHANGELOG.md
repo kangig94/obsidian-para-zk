@@ -307,6 +307,12 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Changed
 
+- PARA-ZK no longer writes the `created` timestamp. New notes keep both
+  `created:` and `updated:` as empty frontmatter keys, and update-time-on-edit
+  owns filling them on create/update in its ISO timestamp format. Setup still
+  enables create time and the `created`/`updated` headers, but no longer
+  force-sets the plugin `dateFormat`; user/plugin formatting now remains
+  authoritative.
 - The plugin version is now single-sourced from `package.json`. The build injects
   it into the MCP server bundle (esbuild `__VERSION__`) and propagates it into
   `manifest.json`, `versions.json`, and the Claude Code / Codex plugin manifests,

@@ -66,6 +66,8 @@ describe("llm-wiki CLI adapters", () => {
       tags: ["llm-wiki/attention-wiki"],
       aliases: ["Attention"]
     });
+    expect(frontmatter.created === "" || frontmatter.created === null).toBe(true);
+    expect(frontmatter.updated === "" || frontmatter.updated === null).toBe(true);
     expect(frontmatter).not.toHaveProperty("url");
     expect(frontmatter).not.toHaveProperty("first_author");
     expect(frontmatter).not.toHaveProperty("license");

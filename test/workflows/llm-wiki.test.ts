@@ -43,7 +43,7 @@ describe("llm-wiki workflows", () => {
       aliases: ["Attention"]
     });
     expect(frontmatter.updated === "" || frontmatter.updated === null).toBe(true);
-    expect(frontmatter.created).toEqual(expect.any(String));
+    expect(frontmatter.created === "" || frontmatter.created === null).toBe(true);
     expect(frontmatter.id).toEqual(expect.any(String));
 
     const content = app.readPath(flat.path) ?? "";

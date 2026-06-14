@@ -1904,7 +1904,7 @@ function assertUpdateTimeOnEditConfig() {
   if (!installDeps) return;
 
   const config = readVaultJson(".obsidian/plugins/update-time-on-edit/data.json");
-  assert(config.dateFormat === "yyyy-MM-dd'T'HH:mm", "update-time-on-edit dateFormat is not configured");
+  // dateFormat is intentionally plugin/user-owned; PARA-ZK only ensures ownership of the headers.
   assert(config.enableCreateTime === true, "update-time-on-edit enableCreateTime is not enabled");
   assert(config.headerUpdated === "updated", "update-time-on-edit headerUpdated is not updated");
   assert(config.headerCreated === "created", "update-time-on-edit headerCreated is not created");

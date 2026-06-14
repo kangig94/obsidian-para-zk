@@ -4,8 +4,7 @@ import { renderTemplate, type TemplateName } from "../templates";
 import {
   dateFromCli,
   isoWeekInfo,
-  localDate,
-  localDateTimeSpace
+  localDate
 } from "../time";
 import type { NoteResult, ZkKind } from "../types";
 import { frontmatterLinks, parseFrontmatterFromContent, readFileFrontmatterFresh, yamlScalar } from "../vault/frontmatter";
@@ -86,7 +85,6 @@ export async function createProject(ctx: WorkflowContext, options: CreateProject
   }
   await ensureFolder(ctx.host, target.folder);
 
-  const createdAt = localDateTimeSpace();
   const statusCode = readOptionalCode(options.status, parseProjectStatusCode, "status", PROJECT_STATUS_CODE_HELP);
   const priorityCode = readOptionalCode(options.priority, parsePriorityCode, "priority", PRIORITY_CODE_HELP);
   const status = statusCode ?? "idea";
@@ -97,7 +95,6 @@ export async function createProject(ctx: WorkflowContext, options: CreateProject
     ...resolvedAreas.map((area) => area.link)
   ]);
   const file = await createMarkdownFile(ctx, "project", target.path, {
-    created: createdAt,
     slug: slugify(target.title),
     areas: inlineList(areaLinks),
     status,
@@ -113,7 +110,7 @@ export async function createProject(ctx: WorkflowContext, options: CreateProject
     fm.status = fm.status ?? status;
     fm.priority = fm.priority ?? priority;
     fm.tags = [`${tags.project}/${slugify(target.title)}`];
-    applyCreatedUpdatedDefaults(fm, createdAt);
+    applyCreatedUpdatedDefaults(fm);
   });
 
   await openIfRequested(ctx, file, options.open);
@@ -125,7 +122,6 @@ export async function createProject(ctx: WorkflowContext, options: CreateProject
 
 export async function createArea(ctx: WorkflowContext, options: CreateAreaOptions): Promise<CreateAreaResult> {
   const title = requireTitle(options.title, "area title");
-  const createdAt = localDateTimeSpace();
   const tags = localePack(ctx.settings.locale).tags;
 
   // A nested area (a parent is given) is an ordinary area that merely has a parent — same
@@ -140,11 +136,11 @@ export async function createArea(ctx: WorkflowContext, options: CreateAreaOption
       return noteResult(target.existing, false, options.open);
     }
     await ensureFolder(ctx.host, target.folder);
-    const { file } = await ensureAreaNote(ctx, target.path, slugify(target.title), createdAt);
+    const { file } = await ensureAreaNote(ctx, target.path, slugify(target.title));
     await ctx.host.processFrontMatter(file, (fm) => {
       fm.type = "area";
       fm.tags = [`${tags.area}/${slugify(target.title)}`];
-      applyCreatedUpdatedDefaults(fm, createdAt);
+      applyCreatedUpdatedDefaults(fm);
     });
     await openIfRequested(ctx, file, options.open);
     return noteResult(file, true, options.open);
@@ -153,7 +149,7 @@ export async function createArea(ctx: WorkflowContext, options: CreateAreaOption
   const parent = await ensureFolderStyleParent(ctx, await resolveRequiredParent(ctx, options, "area"));
   const childFolder = joinVaultPath(parent.childFolder, title);
   await ensureFolder(ctx.host, childFolder);
-  const { file, created } = await ensureAreaNote(ctx, joinVaultPath(childFolder, `${title}.md`), slugify(title), createdAt);
+  const { file, created } = await ensureAreaNote(ctx, joinVaultPath(childFolder, `${title}.md`), slugify(title));
 
   const parentTags = frontmatterLinks(parseFrontmatterFromContent(await ctx.host.read(parent.file)).tags)
     .filter((tag) => tag.startsWith(`${tags.area}/`));
@@ -171,7 +167,7 @@ export async function createArea(ctx: WorkflowContext, options: CreateAreaOption
     fm.tags = options.inheritParentTag === false
       ? [childNamespace]
       : Array.from(new Set([parentNamespace, childNamespace]));
-    applyCreatedUpdatedDefaults(fm, createdAt);
+    applyCreatedUpdatedDefaults(fm);
   });
 
   await openIfRequested(ctx, file, options.open);
@@ -187,12 +183,11 @@ export async function createArea(ctx: WorkflowContext, options: CreateAreaOption
 async function ensureAreaNote(
   ctx: WorkflowContext,
   path: string,
-  slug: string,
-  createdAt: string
+  slug: string
 ): Promise<{ file: TFile; created: boolean }> {
   const existing = ctx.host.getFile(path);
   if (existing) return { file: existing, created: false };
-  const file = await createMarkdownFile(ctx, "area", path, { created: createdAt, slug, cursor: "" });
+  const file = await createMarkdownFile(ctx, "area", path, { slug, cursor: "" });
   return { file, created: true };
 }
 
@@ -229,9 +224,7 @@ export async function createResource(ctx: WorkflowContext, options: CreateResour
   }
   const kind = readOptionalCode(options.kind, parseResourceKindCode, "kind", RESOURCE_KIND_CODE_HELP);
   const source = await resolveOptionalOrigin(ctx, options);
-  const createdAt = localDateTimeSpace();
   const file = await createMarkdownFile(ctx, "resource", path, {
-    created: createdAt,
     slug: slugify(title.basename),
     cursor: ""
   });
@@ -241,7 +234,7 @@ export async function createResource(ctx: WorkflowContext, options: CreateResour
     fm.type = "resource";
     applyAlias(fm, options.alias);
     fm.tags = [`${tags.resource}/${slugify(title.basename)}`];
-    applyCreatedUpdatedDefaults(fm, createdAt);
+    applyCreatedUpdatedDefaults(fm);
     // Provenance: write only what was provided. url/first_author/license are free text;
     // kind is already validated to a code (or undefined) by readOptionalCode above.
     if (options.url?.trim()) fm.url = options.url.trim();
@@ -272,9 +265,7 @@ export async function createLlmWiki(ctx: WorkflowContext, options: CreateLlmWiki
     await openIfRequested(ctx, existing, options.open);
     return noteResult(existing, false, options.open);
   }
-  const createdAt = localDateTimeSpace();
   const file = await createMarkdownFile(ctx, "llm-wiki", path, {
-    created: createdAt,
     slug: slugify(title.basename)
   });
 
@@ -284,7 +275,7 @@ export async function createLlmWiki(ctx: WorkflowContext, options: CreateLlmWiki
     fm.type = "llm-wiki";
     applyAlias(fm, options.alias);
     fm.tags = [`${tags.llmWiki}/${slugify(title.basename)}`];
-    applyCreatedUpdatedDefaults(fm, createdAt);
+    applyCreatedUpdatedDefaults(fm);
     if (by) {
       fm.created_by = by;
       fm.updated_by = by;
@@ -308,7 +299,6 @@ export async function createSubnote(ctx: WorkflowContext, options: CreateSubnote
     throw new Error(`subnote title conflicts with parent note: ${title}`);
   }
   const parent = await ensureFolderStyleParent(ctx, source);
-  const createdAt = localDateTimeSpace();
   const subnoteTypeCode = readOptionalCode(options.subnoteType, parseSubnoteTypeCode, "subnote_type", SUBNOTE_TYPE_CODE_HELP);
   const subnoteType = subnoteTypeCode ?? "free";
   const path = joinVaultPath(parent.childFolder, `${title}.md`);
@@ -320,7 +310,6 @@ export async function createSubnote(ctx: WorkflowContext, options: CreateSubnote
 
   if (!file) {
     file = await createMarkdownFile(ctx, "subnote", path, {
-      created: createdAt,
       subnote_type: subnoteType,
       cursor: ""
     });
@@ -328,7 +317,7 @@ export async function createSubnote(ctx: WorkflowContext, options: CreateSubnote
       fm.type = fm.type || "subnote";
       fm.parent = linkToFile(parent.file);
       fm.subnote_type = fm.subnote_type ?? subnoteType;
-      applyCreatedUpdatedDefaults(fm, createdAt);
+      applyCreatedUpdatedDefaults(fm);
     });
     await applyBody(ctx, file, options.body);
   } else {
@@ -346,7 +335,6 @@ export async function createRetro(ctx: WorkflowContext, options: CreateRetroOpti
   const source = await resolveOptionalOrigin(ctx, options);
   const date = dateFromCli(options.date);
   const dateText = localDate(date);
-  const createdAt = localDateTimeSpace();
   const week = isoWeekInfo(date);
   const weekSegment = week.weekIso.replace("-", "_");
   const sourceFm = source ? await readFileFrontmatterFresh(ctx, source) : {};
@@ -388,7 +376,6 @@ export async function createRetro(ctx: WorkflowContext, options: CreateRetroOpti
   let file = ctx.host.getFile(path);
   if (!file) {
     file = await createMarkdownFile(ctx, "retro", path, {
-      created: createdAt,
       date: dateText,
       week_iso: week.weekIso,
       week_start: week.weekStart,
@@ -413,7 +400,7 @@ export async function createRetro(ctx: WorkflowContext, options: CreateRetroOpti
     fm.week_start = fm.week_start || week.weekStart;
     fm.week_end = fm.week_end || week.weekEnd;
     fm.tags = fm.tags || [tags.retro];
-    applyCreatedUpdatedDefaults(fm, createdAt);
+    applyCreatedUpdatedDefaults(fm);
   });
 
   await openIfRequested(ctx, file, options.open);
@@ -449,11 +436,9 @@ export async function createZkFile(
 ): Promise<{ file: TFile; created: boolean }> {
   const existing = existingMarkdownFile(ctx.host, path);
   if (existing) return { file: existing, created: false };
-  const createdAt = localDateTimeSpace();
   const templateName: TemplateName = zkKindCode(kind);
   const maturity = options.maturityCode ?? "draft";
   const file = await createMarkdownFile(ctx, templateName, path, {
-    created: createdAt,
     slug: slugify(title),
     maturity,
     cursor: ""
@@ -464,7 +449,7 @@ export async function createZkFile(
     fm.type = zkKindCode(kind);
     applyAlias(fm, options.alias);
     fm.tags = [`${tags.knowledge}/${slugify(title)}`];
-    applyCreatedUpdatedDefaults(fm, createdAt);
+    applyCreatedUpdatedDefaults(fm);
     if (kind === "Spark" && fm.processed === undefined) fm.processed = false;
     if (kind === "Permanent") fm.maturity = fm.maturity ?? maturity;
   });
@@ -499,6 +484,7 @@ async function readTemplate(ctx: WorkflowContext, templateName: TemplateName): P
 function applyTemplateVariables(content: string, variables: TemplateVariables): string {
   let result = content;
   for (const [key, value] of Object.entries(variables)) {
+    if (key === "created") continue;
     result = result.replace(new RegExp(`{{\\s*${escapeRegExp(key)}\\s*}}`, "g"), () => value ?? "");
   }
   return normalizeTemplateOutput(collapseExcessBlankLines(result.replace(/{{\s*[A-Za-z0-9_]+\s*}}/g, "")));
@@ -522,11 +508,9 @@ export function noteResult(file: TFile, created: boolean, open?: boolean): NoteR
 }
 
 export function applyCreatedUpdatedDefaults(frontmatter: {
-  created?: unknown;
   updated?: unknown;
   [ROOT_ID_FRONTMATTER_KEY]?: unknown;
-}, createdAt: string): void {
-  frontmatter.created = frontmatter.created || createdAt;
+}): void {
   if (frontmatter.updated === undefined) frontmatter.updated = "";
   if (!rootIdFromFrontmatter(frontmatter)) frontmatter[ROOT_ID_FRONTMATTER_KEY] = newRootId();
 }

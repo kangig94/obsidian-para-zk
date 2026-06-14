@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { dateFromCli, isoWeekInfo, localDate, localDateTimeSpace, localTime } from "../../src/time";
+import { dateFromCli, isoWeekInfo, localDate, localTime } from "../../src/time";
 
-describe("localDate / localTime / localDateTimeSpace", () => {
+describe("localDate / localTime", () => {
   it("zero-pads date and time fields", () => {
     const date = new Date(2026, 0, 5, 9, 7);
     expect(localDate(date)).toBe("2026-01-05");
     expect(localTime(date)).toBe("09:07");
-    expect(localDateTimeSpace(date)).toBe("2026-01-05 09:07");
   });
 });
 
