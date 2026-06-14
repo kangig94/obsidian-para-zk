@@ -1,7 +1,7 @@
 ---
 name: wiki-ingest
 description: "Use when ingesting canonical PARA-ZK sources into the LLM-Wiki — per-import, delta, init, or targeted re-ingest."
-argument-hint: "mode=<per-import|delta|init|re-ingest> [source_path=<vault-path>|source_paths=<json-or-comma-list>] [limit=<n|all>] [offset=<n>]"
+argument-hint: "mode=<init|delta|per-import|re-ingest>"
 ---
 
 # Wiki Ingest
@@ -14,16 +14,16 @@ LLM-Wiki pages are LLM-owned derived synthesis under `LLM-Wiki/`; canonical know
 
 ## Argument Routing
 
-| Argument | Mode | Routing |
-|----------|------|---------|
-| `mode=per-import source_path=<path>` | `per-import` | Target exactly the imported source path; pass `source_path` through to `para-zk:wiki-ingest-candidates`. |
-| `mode=per-import source_paths=<json-or-comma-list>` | `per-import` | Target the imported source set; pass `source_paths` through unchanged. |
-| `mode=delta` | `delta` | Discover new/uncited sources and sources whose `updated` is newer than the LLM-Wiki pages citing them (page-`updated` staleness), via the citation graph. Reject `source_path` and `source_paths`. |
-| `mode=init` | `init` | Discover all ingestable sources missing an incoming LLM-Wiki citation. Reject `source_path` and `source_paths`. |
-| `mode=re-ingest source_path=<path>` | `re-ingest` | Target exactly the requested source path regardless of current citation/staleness state; pass `source_path` through. |
-| `mode=re-ingest source_paths=<json-or-comma-list>` | `re-ingest` | Target the requested source set regardless of current citation/staleness state; pass `source_paths` through unchanged. |
+`mode` (required) selects what to discover. `init`/`delta` take no source args; `per-import`/`re-ingest` require one of `source_path` or `source_paths`, passed through to `para-zk:wiki-ingest-candidates`.
 
-`mode` is required. For `per-import` and `re-ingest`, require at least one targeted source argument. For `delta` and `init`, do not accept targeted source arguments. Do not ask the user to resolve invalid arguments; stop with the concrete routing error.
+| `mode` | Targets |
+|--------|---------|
+| `init` | all ingestable sources missing an incoming LLM-Wiki citation |
+| `delta` | new/uncited sources + sources whose `updated` is newer than the LLM-Wiki pages citing them |
+| `per-import` | exactly the given `source_path`/`source_paths` |
+| `re-ingest` | exactly the given `source_path`/`source_paths`, even if already cited/fresh |
+
+On invalid args (source args with `init`/`delta`, or none with `per-import`/`re-ingest`), stop with the concrete routing error — do not ask the user.
 
 ## Execution
 

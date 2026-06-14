@@ -1,7 +1,7 @@
 ---
 name: wiki-lint
 description: "Use only when the user explicitly asks to lint or health-check the LLM-Wiki. Never run it as part of ingest or normal wiki work."
-argument-hint: "[mode=<full|scoped>] [paths=<json-or-comma-list>]"
+argument-hint: "[mode=<full|scoped>]"
 ---
 
 # Wiki Lint

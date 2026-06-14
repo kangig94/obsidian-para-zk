@@ -1,7 +1,7 @@
 ---
 name: import-resource
 description: "Use when asked to import, translate, research, or compile something into the vault as a PARA-ZK resource note (file, URL, web, or synthesis)."
-argument-hint: "<what to create> [from a file/URL/the web] [+ where to link it]"
+argument-hint: "<what to import> [from file/URL/web]"
 ---
 
 # Import Resource
