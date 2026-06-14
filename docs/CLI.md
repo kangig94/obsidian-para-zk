@@ -738,11 +738,20 @@ invalid). `rename-resource` only changes the basename in the current folder;
 use the Obsidian/optsidian native `move` or `rename` file operation to move a
 resource between folders link-safely.
 
-For `*-llm-wiki` commands, `title` may be an LLM-Wiki-relative slash path.
-`title="AI/Foo"` addresses or creates `LLM-Wiki/AI/Foo.md`; the basename, tag
-slug, and visible title derive from `Foo`. There is no archived wiki selector:
-LLM-Wiki pages are active, LLM-owned derived synthesis under `LLM-Wiki/`, not
-canonical PARA/ZK records.
+For `*-llm-wiki` commands, `title` is an LLM-Wiki-relative slash path. Every wiki
+page is filed under exactly one domain folder, so **`create-llm-wiki` requires
+`title="<domain>/<concept>"`** (exactly one level, e.g. `AI/Diffusion Policy`) and
+rejects a bare concept or a deeper path. It creates `LLM-Wiki/<domain>/<concept>.md`;
+the visible title and tag slug derive from `<concept>`, and the identity tag carries
+the domain as `llm-wiki/<domain>/<concept>`. The domain is the page's file-tree home,
+not a relationship — cross-domain links live in the body, and folders do not change the
+link graph. A concept is a single page across the whole wiki: `create-llm-wiki` is
+get-or-create by concept, so re-creating it under a different domain returns the existing
+page (no duplicate); re-filing to another domain is a deliberate `move`/`rename`, not a
+re-create. `read`/`update`/`rename`/`delete-llm-wiki` accept either the full
+`<domain>/<concept>` path or a bare concept (resolved across domains by basename). There
+is no archived wiki selector: LLM-Wiki pages are active, LLM-owned derived synthesis under
+`LLM-Wiki/`, not canonical PARA/ZK records.
 
 Surface types fall into two groups. `project`, `area`, `journal`, and `retro`
 are structured: their load-bearing template sections are stable keys. `resource`,
@@ -1016,7 +1025,7 @@ retros are left in place.
 | `para-zk:rename-project` | `title`; optional `archived` | Renames the folder-style project folder and main note. Child notes move with the folder; default project-scoped retros are renamed with it. |
 | `para-zk:rename-area` | `title`; optional `archived` | Renames the folder-style area folder and main note. Child areas move with the folder; default area-scoped retros and area tag namespaces are updated without dropping inherited parent tags. |
 | `para-zk:rename-resource` | `title`; optional `archived`; `/` addresses a Resources-relative path | Renames the resource note file in its current folder. `new_title` must be a bare basename; use native `move`/`rename` to move folders. |
-| `para-zk:rename-llm-wiki` | `title`; `/` addresses an LLM-Wiki-relative path | Renames the wiki note file in its current folder and rewrites the `llm-wiki/<slug>` tag. `new_title` must be a bare basename; no `archived`. |
+| `para-zk:rename-llm-wiki` | `title`; `/` addresses an LLM-Wiki-relative path | Renames the wiki note's concept in its current domain folder and rewrites the `llm-wiki/<domain>/<concept>` tag (the domain is preserved). `new_title` must be a bare basename; re-file to another domain with native `move`/`rename`. No `archived`. |
 | `para-zk:rename-zk` | `title` plus optional `kind` | Renames the selected ZK note file in place. |
 | `para-zk:rename-child` | `root_type` + `root_title` + optional `relpath` + `title` | Renames a subnote, fallback note, or nested area. `new_title` renames the addressed child. |
 
@@ -1216,14 +1225,14 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `title` | string | Required. Use `/` to create under an LLM-Wiki-relative subdirectory, e.g. `AI/Policy`. |
+| `title` | `<domain>/<concept>` | Required. Exactly one domain folder, e.g. `AI/Diffusion Policy`. A bare concept or a deeper path is rejected. Get-or-create by concept: reused if it already exists under any domain. |
 | `alias` | string or one-item string list | Optional single short Obsidian alias. Stored as a one-item `aliases` frontmatter list. Canonical create arg is `alias`. |
 | `body` | markdown | Optional initial free-form body content. Accepts `@<absolute-path>`. |
 | `by` | model id | Optional. On a newly created page, stamps `created_by` and `updated_by`. |
 | `open` | boolean | Default `false`. |
 
 The created note stores `type: llm-wiki` and exactly one identity tag
-`llm-wiki/<slug>` plus vault-managed timestamps/id. `created_by` and
+`llm-wiki/<domain>/<concept>` plus vault-managed timestamps/id. `created_by` and
 `updated_by` are readable when set through `by`, but not writable directly. It
 intentionally has no resource provenance frontmatter (`url`, `first_author`,
 `license`, `kind`). The template includes `para-zk-props` plus a managed tail

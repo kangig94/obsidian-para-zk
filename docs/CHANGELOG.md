@@ -6,6 +6,17 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Breaking
 
+- LLM-Wiki pages are now filed under a one-level domain folder. `create-llm-wiki` requires
+  `title="<domain>/<concept>"` (exactly one domain folder, e.g. `AI/Diffusion Policy`) and
+  rejects a bare concept or a deeper path; it writes `LLM-Wiki/<domain>/<concept>.md` with the
+  identity tag `llm-wiki/<domain>/<concept>` (was the flat `llm-wiki/<concept>`). The domain is
+  the page's file-tree home, not a relationship — cross-domain links stay in the body and the
+  link graph is unchanged. `create-llm-wiki` is get-or-create by concept across the whole wiki:
+  re-creating a concept under a different domain returns the existing page (no duplicate);
+  re-filing to another domain is a deliberate `move`/`rename`. `read`/`update`/`rename`/`delete`
+  still accept either the `<domain>/<concept>` path or a bare concept (resolved by basename), so
+  existing flat pages keep resolving until re-filed. The wiki-weaver/wiki-ingest prompts now emit
+  `<domain>/<concept>` and reuse an existing domain from the `list type=llm-wiki` roster.
 - Create is now get-or-create everywhere. A colliding title returns the existing note
   with `created: false` instead of silently allocating a suffixed duplicate (`Foo 1`).
   Affects every create command (`create-project`/`area`/`resource`/`zk`/`llm-wiki`) and
@@ -67,7 +78,7 @@ Notable changes for PARA-ZK are tracked here.
 - Added the `llm-wiki` surface type for LLM-owned derived synthesis under
   `LLM-Wiki/`: native CLI CRUD (`create/read/update/rename/delete-llm-wiki`),
   slash-path title addressing, `body`/`frontmatter/aliases`/`references` editing,
-  `llm-wiki/<slug>` identity tags that rewrite on rename, list/describe/audit
+  `llm-wiki/<domain>/<concept>` identity tags that rewrite on rename, list/describe/audit
   participation, MCP `type=llm-wiki` mutation mapping, and setup/smoke coverage.
 - Added the LLM-Wiki ingest loop: `para-zk:wiki-ingest-candidates` lists active,
   non-template ingestable sources (`resource`, `digest`, `permanent`, `subnote`)

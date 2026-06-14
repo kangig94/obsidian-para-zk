@@ -230,8 +230,8 @@ const SOURCE_RESOURCE_TITLE_OPTION: CliOptionSpec = {
   description: "Source resource title. Use / to address a Resources-relative path, e.g. AI/Foo."
 };
 const LLM_WIKI_CREATE_TITLE_OPTION: CliOptionSpec = {
-  value: "<title>",
-  description: "LLM-Wiki title. Use / to address/create an LLM-Wiki-relative path, e.g. AI/Foo."
+  value: "<domain>/<concept>",
+  description: "LLM-Wiki page as <domain>/<concept> — exactly one domain folder (e.g. AI/Diffusion Policy). The concept is reused if it already exists under any domain."
 };
 const LLM_WIKI_TITLE_OPTION: CliOptionSpec = {
   value: "<title>",

@@ -35,7 +35,7 @@ describe("llm-wiki updates", () => {
   it("inserts references without writing a log or returning ingest_logged", async () => {
     const { ctx, app } = createTestContext();
     await createNote(app, "PARA/Resources/Canonical Source.md", ["type: resource", "updated: 2026-02-03 04:05"]);
-    await createLlmWiki(ctx, { title: "Source Wiki", open: false });
+    await createLlmWiki(ctx, { title: "AI/Source Wiki", open: false });
 
     const inserted = await updateLlmWiki(ctx, {
       title: "Source Wiki",
@@ -54,13 +54,13 @@ describe("llm-wiki updates", () => {
   it("stamps by-created authorship, updates updated_by only after changed writes, and keeps it read-only", async () => {
     const { ctx, app } = createTestContext();
     await createLlmWiki(ctx, {
-      title: "Authored Wiki",
+      title: "AI/Authored Wiki",
       body: "Initial synthesis.",
       by: "claude-opus-4-8",
       open: false
     });
 
-    let fm = await frontmatter(ctx, app, "LLM-Wiki/Authored Wiki.md");
+    let fm = await frontmatter(ctx, app, "LLM-Wiki/AI/Authored Wiki.md");
     expect(fm.created_by).toBe("claude-opus-4-8");
     expect(fm.updated_by).toBe("claude-opus-4-8");
 
@@ -80,7 +80,7 @@ describe("llm-wiki updates", () => {
       by: "gpt-5.5"
     });
     expect(changed.changed).toBe(true);
-    fm = await frontmatter(ctx, app, "LLM-Wiki/Authored Wiki.md");
+    fm = await frontmatter(ctx, app, "LLM-Wiki/AI/Authored Wiki.md");
     expect(fm.created_by).toBe("claude-opus-4-8");
     expect(fm.updated_by).toBe("gpt-5.5");
 
@@ -92,7 +92,7 @@ describe("llm-wiki updates", () => {
       by: "claude-opus-4-8"
     });
     expect(noOp.changed).toBe(false);
-    fm = await frontmatter(ctx, app, "LLM-Wiki/Authored Wiki.md");
+    fm = await frontmatter(ctx, app, "LLM-Wiki/AI/Authored Wiki.md");
     expect(fm.created_by).toBe("claude-opus-4-8");
     expect(fm.updated_by).toBe("gpt-5.5");
 
@@ -103,7 +103,7 @@ describe("llm-wiki updates", () => {
       value: "Changed again without by."
     });
     expect(noBy.changed).toBe(true);
-    fm = await frontmatter(ctx, app, "LLM-Wiki/Authored Wiki.md");
+    fm = await frontmatter(ctx, app, "LLM-Wiki/AI/Authored Wiki.md");
     expect(fm.created_by).toBe("claude-opus-4-8");
     expect(fm.updated_by).toBe("gpt-5.5");
 

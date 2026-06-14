@@ -53,6 +53,7 @@ import {
   findExistingSourceRetroForWeek,
   folderForZkKind,
   linkToFile,
+  findLlmWikiConcept,
   llmWikiTitlePath,
   requireTitle,
   resourceTitlePath,
@@ -259,14 +260,26 @@ export async function createResource(ctx: WorkflowContext, options: CreateResour
 
 export async function createLlmWiki(ctx: WorkflowContext, options: CreateLlmWikiOptions): Promise<CreateLlmWikiResult> {
   const title = llmWikiTitlePath(options.title);
-  const path = joinVaultPath(ctx.settings.paths.wikiFolder, `${title.relpath}.md`);
-  const existing = existingMarkdownFile(ctx.host, path);
+  // Every wiki page is filed under exactly one domain folder: `<domain>/<concept>` (1 level).
+  // The domain is its file-tree home; cross-domain relationships live in links, not folders.
+  const segments = title.relpath.split("/");
+  if (segments.length !== 2) {
+    throw new Error(
+      `llm-wiki title must be "<domain>/<concept>" (exactly one domain folder): ${options.title ?? ""}`
+    );
+  }
+  const [domain, concept] = segments;
+  // A concept is a single page across the whole wiki — reuse it regardless of domain, so the
+  // same concept is never duplicated into a second folder. Re-filing a page to another domain
+  // is a deliberate move (optsidian rename/move), not a re-create.
+  const existing = findLlmWikiConcept(ctx, concept);
   if (existing) {
     await openIfRequested(ctx, existing, options.open);
     return noteResult(existing, false, options.open);
   }
+  const path = joinVaultPath(ctx.settings.paths.wikiFolder, `${title.relpath}.md`);
   const file = await createMarkdownFile(ctx, "llm-wiki", path, {
-    slug: slugify(title.basename)
+    slug: slugify(concept)
   });
 
   const tags = localePack(ctx.settings.locale).tags;
@@ -274,7 +287,7 @@ export async function createLlmWiki(ctx: WorkflowContext, options: CreateLlmWiki
   await ctx.host.processFrontMatter(file, (fm) => {
     fm.type = "llm-wiki";
     applyAlias(fm, options.alias);
-    fm.tags = [`${tags.llmWiki}/${slugify(title.basename)}`];
+    fm.tags = [`${tags.llmWiki}/${slugify(domain)}/${slugify(concept)}`];
     applyCreatedUpdatedDefaults(fm);
     if (by) {
       fm.created_by = by;

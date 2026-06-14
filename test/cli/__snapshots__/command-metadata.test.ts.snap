@@ -249,8 +249,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<true|false>",
       },
       "title": {
-        "description": "LLM-Wiki title. Use / to address/create an LLM-Wiki-relative path, e.g. AI/Foo.",
-        "value": "<title>",
+        "description": "LLM-Wiki page as <domain>/<concept> — exactly one domain folder (e.g. AI/Diffusion Policy). The concept is reused if it already exists under any domain.",
+        "value": "<domain>/<concept>",
       },
     },
   },

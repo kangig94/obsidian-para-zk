@@ -31,39 +31,39 @@ function frontmatterAt(path: string): Record<string, unknown> {
 }
 
 describe("llm-wiki CLI adapters", () => {
-  it("creates flat and slash-path notes with managed props and tail", async () => {
-    const flat = await cli.run("para-zk:create-llm-wiki", {
-      title: "Attention Wiki",
+  it("creates domain/concept notes with managed props and tail", async () => {
+    const first = await cli.run("para-zk:create-llm-wiki", {
+      title: "AI/Attention Wiki",
       alias: "Attention",
       body: "Machine-owned synthesis.",
       open: "false"
     });
-    const nested = await cli.run("para-zk:create-llm-wiki", {
-      title: "AI/Foo",
-      body: "Nested synthesis.",
+    const other = await cli.run("para-zk:create-llm-wiki", {
+      title: "ML/Foo",
+      body: "Other-domain synthesis.",
       open: "false"
     });
 
-    expect(flat).toMatchObject({
+    expect(first).toMatchObject({
       ok: true,
-      path: "LLM-Wiki/Attention Wiki.md",
+      path: "LLM-Wiki/AI/Attention Wiki.md",
       title: "Attention Wiki",
       created: true
     });
-    expect(nested).toMatchObject({
+    expect(other).toMatchObject({
       ok: true,
-      path: "LLM-Wiki/AI/Foo.md",
+      path: "LLM-Wiki/ML/Foo.md",
       title: "Foo",
       created: true
     });
     expect(cli.app.readPath("LLM-Wiki/Foo.md")).toBeUndefined();
 
-    const content = cli.app.readPath("LLM-Wiki/Attention Wiki.md") ?? "";
-    const frontmatter = frontmatterAt("LLM-Wiki/Attention Wiki.md");
+    const content = cli.app.readPath("LLM-Wiki/AI/Attention Wiki.md") ?? "";
+    const frontmatter = frontmatterAt("LLM-Wiki/AI/Attention Wiki.md");
     expect(Object.keys(frontmatter).sort()).toEqual(["aliases", "created", "created_by", "id", "tags", "type", "updated", "updated_by"]);
     expect(frontmatter).toMatchObject({
       type: "llm-wiki",
-      tags: ["llm-wiki/attention-wiki"],
+      tags: ["llm-wiki/ai/attention-wiki"],
       aliases: ["Attention"]
     });
     expect(frontmatter.created === "" || frontmatter.created === null).toBe(true);
@@ -73,7 +73,7 @@ describe("llm-wiki CLI adapters", () => {
     expect(frontmatter).not.toHaveProperty("license");
     expect(frontmatter).not.toHaveProperty("kind");
     expect(content).toContain("type: llm-wiki");
-    expect(content).toContain("tags:\n  - llm-wiki/attention-wiki");
+    expect(content).toContain("tags:\n  - llm-wiki/ai/attention-wiki");
     expect(content).toContain("aliases:\n  - Attention");
     expect(content).toContain("Machine-owned synthesis.");
     expect(content).toContain("```para-zk-props\ntype: llm-wiki\n```");
@@ -150,9 +150,9 @@ describe("llm-wiki CLI adapters", () => {
     expect(cli.app.readPath("LLM-Wiki/AI/Policy.md")).toBeUndefined();
     const renamedContent = cli.app.readPath("LLM-Wiki/AI/Policy Wiki.md") ?? "";
     const renamedFrontmatter = frontmatterAt("LLM-Wiki/AI/Policy Wiki.md");
-    expect(renamedFrontmatter.tags).toEqual(["llm-wiki/policy-wiki"]);
+    expect(renamedFrontmatter.tags).toEqual(["llm-wiki/ai/policy-wiki"]);
     expect(renamedContent).not.toMatch(/llm-wiki\/policy(?:\s|$)/);
-    expect(renamedContent).toContain("llm-wiki/policy-wiki");
+    expect(renamedContent).toContain("llm-wiki/ai/policy-wiki");
     const consumerContent = cli.app.readPath("PARA/Resources/Wiki Consumer.md") ?? "";
     expect(consumerContent).toContain("[[LLM-Wiki/AI/Policy Wiki.md]]");
     expect(consumerContent).not.toContain("[[LLM-Wiki/AI/Policy.md]]");
@@ -173,13 +173,13 @@ describe("llm-wiki CLI adapters", () => {
   it("updates aliases and references, then reads references and backlinks collections", async () => {
     await cli.run("para-zk:create-resource", { title: "Canonical Source", open: "false" });
     await cli.run("para-zk:create-llm-wiki", {
-      title: "Source Wiki",
+      title: "AI/Source Wiki",
       body: "[[PARA/Resources/Canonical Source.md]]",
       open: "false"
     });
     await cli.run("para-zk:create-resource", {
       title: "Wiki Index",
-      body: "[[LLM-Wiki/Source Wiki.md]]",
+      body: "[[LLM-Wiki/AI/Source Wiki.md]]",
       open: "false"
     });
 
@@ -254,7 +254,8 @@ describe("llm-wiki CLI adapters", () => {
     expect(aliasList.ok).toBe(false);
     expect(String(aliasList.error)).toContain("Use alias instead of alias_list");
 
-    await cli.run("para-zk:create-llm-wiki", { title: "Rename Wiki", open: "false" });
+    const renameSetup = await cli.run("para-zk:create-llm-wiki", { title: "AI/Rename Wiki", open: "false" });
+    expect(renameSetup.ok).toBe(true);
     const newTitle = await cli.run("para-zk:rename-llm-wiki", {
       title: "Rename Wiki",
       newTitle: "Renamed Wiki"
@@ -265,13 +266,13 @@ describe("llm-wiki CLI adapters", () => {
 
   it("accepts only by for llm-wiki authorship and keeps created_by/updated_by read-only", async () => {
     const created = await cli.run("para-zk:create-llm-wiki", {
-      title: "Authored Wiki",
+      title: "AI/Authored Wiki",
       body: "Initial synthesis.",
       by: "claude-opus-4-8",
       open: "false"
     });
     expect(created).toMatchObject({ ok: true, created: true });
-    expect(frontmatterAt("LLM-Wiki/Authored Wiki.md")).toMatchObject({
+    expect(frontmatterAt("LLM-Wiki/AI/Authored Wiki.md")).toMatchObject({
       created_by: "claude-opus-4-8",
       updated_by: "claude-opus-4-8"
     });
@@ -284,7 +285,7 @@ describe("llm-wiki CLI adapters", () => {
       by: "gpt-5.5"
     });
     expect(updated).toMatchObject({ ok: true, changed: true });
-    expect(frontmatterAt("LLM-Wiki/Authored Wiki.md")).toMatchObject({
+    expect(frontmatterAt("LLM-Wiki/AI/Authored Wiki.md")).toMatchObject({
       created_by: "claude-opus-4-8",
       updated_by: "gpt-5.5"
     });
@@ -299,7 +300,7 @@ describe("llm-wiki CLI adapters", () => {
       by: "should-not-apply"
     });
     expect(noOp).toMatchObject({ ok: true, changed: false });
-    expect(frontmatterAt("LLM-Wiki/Authored Wiki.md")).toMatchObject({
+    expect(frontmatterAt("LLM-Wiki/AI/Authored Wiki.md")).toMatchObject({
       created_by: "claude-opus-4-8",
       updated_by: "gpt-5.5"
     });
@@ -311,7 +312,7 @@ describe("llm-wiki CLI adapters", () => {
       value: "More synthesis."
     });
     expect(noBy).toMatchObject({ ok: true, changed: true });
-    expect(frontmatterAt("LLM-Wiki/Authored Wiki.md")).toMatchObject({
+    expect(frontmatterAt("LLM-Wiki/AI/Authored Wiki.md")).toMatchObject({
       created_by: "claude-opus-4-8",
       updated_by: "gpt-5.5"
     });
@@ -378,7 +379,7 @@ describe("llm-wiki CLI adapters", () => {
 
   it("does not expose archived in help and explicitly rejects archived selectors", async () => {
     await cli.run("para-zk:create-llm-wiki", {
-      title: "No Archive",
+      title: "AI/No Archive",
       body: "Active only.",
       open: "false"
     });
@@ -429,13 +430,13 @@ describe("llm-wiki CLI adapters", () => {
     expect(String(deleted.error)).toContain("archived is not accepted");
   });
 
-  it("advertises slash-path title creation and list type discovery", async () => {
+  it("advertises domain/concept title creation and list type discovery", async () => {
     const createHelp = await cli.run("para-zk:create-llm-wiki", { help: "true" });
     expect(optionNames(createHelp)).toContain("by");
     const createTitle = (createHelp.options as Array<{ name: string; description: string }>)
       .find((option) => option.name === "title");
-    expect(createTitle?.description).toContain("LLM-Wiki-relative path");
-    expect(createTitle?.description).toContain("AI/Foo");
+    expect(createTitle?.description).toContain("<domain>/<concept>");
+    expect(createTitle?.description).toContain("AI/Diffusion Policy");
 
     const updateHelp = await cli.run("para-zk:update-llm-wiki", { help: "true" });
     expect(optionNames(updateHelp)).toContain("by");

@@ -297,7 +297,7 @@ describe("audit", () => {
   it("audits llm-wiki links and references but excludes llm-wiki from orphan notes", async () => {
     await cli.run("para-zk:create-resource", { title: "Canonical Source", open: "false" });
     await cli.run("para-zk:create-llm-wiki", {
-      title: "Normal Wiki",
+      title: "AI/Normal Wiki",
       body: "[[PARA/Resources/Canonical Source.md]] [[LLM-Wiki/Broken Wiki.md]]",
       open: "false"
     });
@@ -321,7 +321,7 @@ describe("audit", () => {
         "    id: abc123",
         "  - https://example.com/idless"
       ],
-      "Body points at [[Missing Body Target]]. [[LLM-Wiki/Normal Wiki.md]]"
+      "Body points at [[Missing Body Target]]. [[LLM-Wiki/AI/Normal Wiki.md]]"
     );
 
     const result = asAudit(await cli.run("para-zk:audit", { type: "llm-wiki", limit: "all" }));
@@ -345,7 +345,7 @@ describe("audit", () => {
     expect(result.findings.every((finding) => finding.path === "LLM-Wiki/Broken Wiki.md")).toBe(true);
     expect(result.findings.every((finding) => finding.type === "llm-wiki")).toBe(true);
     expect(result.findings.some((finding) => finding.code === "orphan_note")).toBe(false);
-    expect(result.findings.some((finding) => finding.path === "LLM-Wiki/Normal Wiki.md")).toBe(false);
+    expect(result.findings.some((finding) => finding.path === "LLM-Wiki/AI/Normal Wiki.md")).toBe(false);
   });
 
   it("flags a canonical note that links upward into an llm-wiki note", async () => {

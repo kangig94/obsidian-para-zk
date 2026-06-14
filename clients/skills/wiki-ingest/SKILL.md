@@ -61,6 +61,7 @@ LLM-Wiki pages are LLM-owned derived synthesis under `LLM-Wiki/`; canonical know
        "read_scope": "Read the packet sources; self-gather the LLM-Wiki side. Never search or read PARA/ZK canonical notes beyond the packet sources.",
        "discover_wiki": "Run `list type=llm-wiki` for the COMPLETE roster of concept pages (no search-recall dependency); pick related pages by judgment and read them by exact title (`read-llm-wiki title=...`). Use `search`/`grep` under LLM-Wiki ONLY as a body-level fallback. This list-first approach prevents creating duplicate concept pages when search is imperfect.",
        "writer": "The weaver writes directly with create-llm-wiki and update-llm-wiki, passing by=<model-id>; the skill applies no writes.",
+       "domain_filing": "Create each page as title=<domain>/<concept> — exactly one domain folder (the page's file-tree home, not a relationship). Reuse an existing domain from the `list type=llm-wiki` roster paths when the concept fits one; mint a new domain only for a genuinely new area, never a near-synonym. A concept is one page across the whole wiki: get-or-create returns it if it already exists under any domain (read by bare concept title), so never duplicate it into a second domain.",
        "citations": "Each touched page must cite source references with backtick `PZ[id]` code-spans from references op=insert, inserted only to obtain stable ids.",
        "freshness": "Re-integrating a source into a page body, which bumps page updated, is the freshness event.",
        "single_direction": "Never write links into source notes.",
@@ -77,7 +78,7 @@ LLM-Wiki pages are LLM-owned derived synthesis under `LLM-Wiki/`; canonical know
    Agent({
      subagent_type: "para-zk:wiki-weaver",
      run_in_background: true,
-     prompt: "Weave this WeavePacket serially. Read the packet sources, and self-gather the LLM-Wiki side: `list type=llm-wiki` for the full concept-page roster, read related pages by exact title, use bounded LLM-Wiki search/grep only as a fallback (never search PARA/ZK). Write pages directly via the PARA-ZK CLI; do not return a plan.\n\n<WEAVE_PACKET_JSON>"
+     prompt: "Weave this WeavePacket serially. Read the packet sources, and self-gather the LLM-Wiki side: `list type=llm-wiki` for the full concept-page roster, read related pages by exact title, use bounded LLM-Wiki search/grep only as a fallback (never search PARA/ZK). Create each page as title=<domain>/<concept> (exactly one domain folder; reuse an existing domain from the roster paths). Write pages directly via the PARA-ZK CLI; do not return a plan.\n\n<WEAVE_PACKET_JSON>"
    })
    ```
 

@@ -14,39 +14,39 @@ import { expectGeneratedReferenceId } from "../unit/reference-id-test-helpers";
 import { createTestContext } from "../harness/vault";
 
 describe("llm-wiki workflows", () => {
-  it("creates and reads flat and slash-path wiki notes with managed props and tail", async () => {
+  it("creates and reads domain/concept wiki notes with managed props and tail", async () => {
     const { ctx, app } = createTestContext();
 
-    const flat = await createLlmWiki(ctx, {
-      title: "Attention Wiki",
+    const first = await createLlmWiki(ctx, {
+      title: "AI/Attention Wiki",
       alias: "Attention",
       body: "Machine-owned synthesis.",
       open: false
     });
-    const nested = await createLlmWiki(ctx, {
-      title: "AI/Foo",
-      body: "Nested synthesis.",
+    const other = await createLlmWiki(ctx, {
+      title: "ML/Foo",
+      body: "Other-domain synthesis.",
       open: false
     });
 
-    expect(flat).toMatchObject({ path: "LLM-Wiki/Attention Wiki.md", title: "Attention Wiki", created: true });
-    expect(nested).toMatchObject({ path: "LLM-Wiki/AI/Foo.md", title: "Foo", created: true });
+    expect(first).toMatchObject({ path: "LLM-Wiki/AI/Attention Wiki.md", title: "Attention Wiki", created: true });
+    expect(other).toMatchObject({ path: "LLM-Wiki/ML/Foo.md", title: "Foo", created: true });
     expect(app.readPath("LLM-Wiki/Foo.md")).toBeUndefined();
 
-    const file = app.vault.getFileByPath(flat.path);
-    if (!file) throw new Error(`missing created wiki note: ${flat.path}`);
+    const file = app.vault.getFileByPath(first.path);
+    if (!file) throw new Error(`missing created wiki note: ${first.path}`);
     const frontmatter = await readFileFrontmatterFresh(ctx, file);
     expect(Object.keys(frontmatter).sort()).toEqual(["aliases", "created", "created_by", "id", "tags", "type", "updated", "updated_by"]);
     expect(frontmatter).toMatchObject({
       type: "llm-wiki",
-      tags: ["llm-wiki/attention-wiki"],
+      tags: ["llm-wiki/ai/attention-wiki"],
       aliases: ["Attention"]
     });
     expect(frontmatter.updated === "" || frontmatter.updated === null).toBe(true);
     expect(frontmatter.created === "" || frontmatter.created === null).toBe(true);
     expect(frontmatter.id).toEqual(expect.any(String));
 
-    const content = app.readPath(flat.path) ?? "";
+    const content = app.readPath(first.path) ?? "";
     expect(content).toContain("Machine-owned synthesis.");
     expect(content).toContain("```para-zk-props\ntype: llm-wiki\n```");
     expect(content).toContain("```para-zk-managed\n```");
@@ -55,9 +55,9 @@ describe("llm-wiki workflows", () => {
     expect(content).not.toContain("license:");
     expect(content).not.toContain("kind:");
 
-    const body = await readLlmWiki(ctx, { title: "AI/Foo", key: "body" });
-    expect(body).toMatchObject({ path: "LLM-Wiki/AI/Foo.md", type: "llm-wiki", key: "body" });
-    expect(body.value).toBe("Nested synthesis.");
+    const body = await readLlmWiki(ctx, { title: "ML/Foo", key: "body" });
+    expect(body).toMatchObject({ path: "LLM-Wiki/ML/Foo.md", type: "llm-wiki", key: "body" });
+    expect(body.value).toBe("Other-domain synthesis.");
   });
 
   it("returns the existing note on a duplicate title without suffixing or clobbering (get-or-create)", async () => {
@@ -125,14 +125,14 @@ describe("llm-wiki workflows", () => {
 
   it("backfills id-less references for a wiki note through the shared surface", async () => {
     const { ctx, app } = createTestContext();
-    await createLlmWiki(ctx, { title: "Backfill", open: false });
-    const file = app.vault.getFileByPath("LLM-Wiki/Backfill.md");
+    await createLlmWiki(ctx, { title: "AI/Backfill", open: false });
+    const file = app.vault.getFileByPath("LLM-Wiki/AI/Backfill.md");
     if (!file) throw new Error("missing wiki note");
     await app.vault.modify(file, [
       "---",
       "type: llm-wiki",
       "tags:",
-      "  - llm-wiki/backfill",
+      "  - llm-wiki/ai/backfill",
       "references:",
       "  - https://example.com/bare",
       "  - link: https://example.com/object",
@@ -173,7 +173,7 @@ describe("llm-wiki workflows", () => {
     const file = app.vault.getFileByPath("LLM-Wiki/AI/New Name.md");
     if (!file) throw new Error("missing renamed wiki note");
     const frontmatter = await readFileFrontmatterFresh(ctx, file);
-    expect(frontmatter.tags).toEqual(["llm-wiki/new-name"]);
+    expect(frontmatter.tags).toEqual(["llm-wiki/ai/new-name"]);
 
     const consumer = app.readPath("PARA/Resources/Consumer.md") ?? "";
     expect(consumer).toContain("[[LLM-Wiki/AI/New Name.md]]");
@@ -181,12 +181,14 @@ describe("llm-wiki workflows", () => {
 
     await expect(renameLlmWiki(ctx, { title: "AI/New Name", newTitle: "Other/Folder" }))
       .rejects.toThrow(/bare basename/);
+    // The rejected cross-domain rename must not leave a partial write in a new domain folder.
+    expect(app.listPaths().some((path) => path.startsWith("LLM-Wiki/Other/"))).toBe(false);
   });
 
   it("deletes through core trash and cleans PARA-ZK-owned references", async () => {
     const { ctx, app } = createTestContext();
     await createResource(ctx, { title: "Source", open: false });
-    const wiki = await createLlmWiki(ctx, { title: "Derived", open: false });
+    const wiki = await createLlmWiki(ctx, { title: "AI/Derived", open: false });
     await updateResource(ctx, {
       title: "Source",
       key: "references",
@@ -198,14 +200,14 @@ describe("llm-wiki workflows", () => {
     const deleted = await deleteLlmWiki(ctx, { title: "Derived" });
 
     expect(deleted).toMatchObject({
-      path: "LLM-Wiki/Derived.md",
+      path: "LLM-Wiki/AI/Derived.md",
       type: "llm-wiki",
       deleted: true,
       trashed: true,
       cleaned: { references: 1 }
     });
-    expect(app.readPath("LLM-Wiki/Derived.md")).toBeUndefined();
-    expect(app.trashed.some((item) => item.path === "LLM-Wiki/Derived.md")).toBe(true);
+    expect(app.readPath("LLM-Wiki/AI/Derived.md")).toBeUndefined();
+    expect(app.trashed.some((item) => item.path === "LLM-Wiki/AI/Derived.md")).toBe(true);
     expect(app.readPath("PARA/Resources/Source.md")).not.toContain("LLM-Wiki/Derived.md");
   });
 
@@ -231,5 +233,30 @@ describe("llm-wiki workflows", () => {
     await expect(createLlmWiki(ctx, { title, open: false })).rejects.toThrow("llm-wiki title");
     await expect(readLlmWiki(ctx, { title, key: "body" })).rejects.toThrow("llm-wiki title");
     expect(app.listPaths()).toEqual([]);
+  });
+
+  it("requires exactly one domain folder and reuses a concept across domains", async () => {
+    const { ctx, app } = createTestContext();
+
+    // 1-depth enforced: a bare concept (no domain) and a deeper path are both rejected.
+    await expect(createLlmWiki(ctx, { title: "PPO", open: false }))
+      .rejects.toThrow(/<domain>\/<concept>/);
+    await expect(createLlmWiki(ctx, { title: "AI/RL/PPO", open: false }))
+      .rejects.toThrow(/<domain>\/<concept>/);
+
+    // A concept is a single page across the whole wiki: re-creating it under a different
+    // domain returns the existing page and writes no duplicate.
+    const first = await createLlmWiki(ctx, { title: "RL/PPO", body: "First.", open: false });
+    expect(first).toMatchObject({ path: "LLM-Wiki/RL/PPO.md", created: true });
+
+    const again = await createLlmWiki(ctx, { title: "Humanoid/PPO", body: "Must not apply.", open: false });
+    expect(again).toMatchObject({ path: "LLM-Wiki/RL/PPO.md", created: false });
+    expect(app.readPath("LLM-Wiki/Humanoid/PPO.md")).toBeUndefined();
+    expect(app.readPath("LLM-Wiki/RL/PPO.md")).toContain("First.");
+
+    // The concept identity is case-folded, so a case variant under another domain also reuses it.
+    const cased = await createLlmWiki(ctx, { title: "Humanoid/ppo", body: "Case variant.", open: false });
+    expect(cased).toMatchObject({ path: "LLM-Wiki/RL/PPO.md", created: false });
+    expect(app.readPath("LLM-Wiki/Humanoid/ppo.md")).toBeUndefined();
   });
 });

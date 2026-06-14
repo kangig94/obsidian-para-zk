@@ -481,6 +481,18 @@ function findLlmWikiByTitle(ctx: WorkflowContext, title: ResourceTitlePath): TFi
   });
 }
 
+// A concept lives once across the whole wiki — look it up by basename under the wiki folder
+// (any domain subfolder), so create-llm-wiki stays get-or-create and never duplicates a
+// concept into a second domain.
+export function findLlmWikiConcept(ctx: WorkflowContext, concept: string): TFile | undefined {
+  return findUniqueNoteByTitle(ctx, {
+    title: concept,
+    folders: [ctx.settings.paths.wikiFolder],
+    type: "llm-wiki",
+    label: "llm-wiki note"
+  });
+}
+
 async function findZkByTitle(
   ctx: WorkflowContext,
   title: string,

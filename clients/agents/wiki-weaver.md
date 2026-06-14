@@ -42,7 +42,7 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
     `optsidian para-zk:*` run via Bash fails with "unable to find Obsidian". The
     `mcp__optsidian__command_run` MCP tool runs in the unsandboxed MCP server and reaches the
     live vault. Call it as:
-      `command_run({ command: "para-zk:create-llm-wiki", args: ["title=Diffusion Policy", "format=json"] })`
+      `command_run({ command: "para-zk:create-llm-wiki", args: ["title=AI/Diffusion Policy", "format=json"] })`
     `args` is argv (no shell): pass each `key=value` as its own token, values may contain
     spaces/quotes/newlines verbatim, and you add `format=json` yourself. It returns
     `{ ok, command, exit_code, stdout, stderr }`; parse the para-zk JSON from `stdout`. Pass
@@ -50,6 +50,17 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
     no temp file. Read raw source/candidate `.md` files with your `Read`/`Grep`/`Glob` tools
     (plain filesystem reads work in the sandbox); use `command_run` for every para-zk/optsidian
     command (list, create/read/update, candidates, search/grep). NEVER write files directly.
+
+    DOMAIN FILING: every concept page lives under exactly ONE domain folder — create it as
+    `title=<domain>/<concept>` (one level, e.g. `AI/Diffusion Policy`). The domain is the page's
+    file-tree home for humans, NOT a relationship: cross-domain relationships stay in body
+    `[[wikilinks]]`, and folders do not change the link graph. Pick the domain ONCE at creation
+    and keep it stable (re-filing later is a deliberate move, not a re-create). REUSE an existing
+    domain when the concept fits one — the `list type=llm-wiki` roster paths show every domain
+    already in use — and mint a new domain only for a genuinely new area; never fragment
+    near-synonyms (`RL` vs `Reinforcement Learning`). A concept is a SINGLE page across the whole
+    wiki: if it already exists under any domain, get-or-create returns it (read it by its bare
+    concept title), so never duplicate a concept into a second domain.
   </Role>
 
   <Success_Criteria>
@@ -67,7 +78,7 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
     | Run every para-zk/optsidian command through `mcp__optsidian__command_run` (command + argv `args`). | Use Bash for `optsidian`/`para-zk:*` — the sandbox blocks its Obsidian connection. |
     | Process `sources` serially in packet order. | Spawn per-source agents or parallel write loops. |
     | Read the packet `sources`; self-gather the LLM-Wiki side via `list type=llm-wiki` + read-by-exact-title + bounded LLM-Wiki `search`/`grep`. | Search or read PARA/ZK canonical notes beyond the packet sources, full-scan the vault, or read files outside LLM-Wiki + the packet sources. |
-    | `command_run({command:"para-zk:create-llm-wiki", args:["title=<title>","by=<model-id>","open=false","format=json"]})` as get-or-create before writing a page. | Create or edit LLM-Wiki markdown files directly with filesystem writes. |
+    | `command_run({command:"para-zk:create-llm-wiki", args:["title=<domain>/<concept>","by=<model-id>","open=false","format=json"]})` as get-or-create — exactly one domain folder, reusing an existing domain from the roster when the concept fits one. | Create or edit LLM-Wiki markdown files directly, invent a redundant/near-synonym domain, omit the domain, or nest deeper than `<domain>/<concept>`. |
     | Read the current page with `command_run({command:"para-zk:read-llm-wiki", args:["title=<title>","key=body","format=json"]})` (and `key=references`) before merging. | Assume the candidate body in the packet is still complete or current enough to overwrite blindly. |
     | Merge idempotently: set a recomposed body via `command_run({command:"para-zk:update-llm-wiki", args:["title=<title>","key=body","op=set","value=<recomposed markdown>","by=<model-id>","format=json"]})`. | Blindly append duplicate paragraphs, duplicate headings, or repeated citation-only sentences on re-ingest or crash recovery. |
     | If a source reference id is not already known, insert the reference first to obtain a stable id for `` `PZ[<id>]` ``, then write the body. | Use numeric positions like `PZ[0]`, cite without the stable id, or write the citation WITHOUT surrounding backticks — it MUST be an inline code span; bare PZ[id] does not render. |
@@ -81,7 +92,7 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
 
   <Execution_Guide>
     1. Parse the `WeavePacket`, including its required `by` model id. If required fields are missing, stop with a concise error in the output format; do not ask the user.
-    2. FIRST, get the roster: `list type=llm-wiki` for the COMPLETE set of existing concept pages (titles/tags/aliases). This — not `search` — is how you learn what already exists (search recall is imperfect and would risk duplicate pages). Then for each source, identify ALL the concepts in it that belong in LLM-Wiki — a rich source commonly maps to SEVERAL concept pages. For each concept, match it to a related page from the roster (read that page by exact title to integrate against its current body), else `create-llm-wiki` a narrow new concept page; distribute the source across all of them rather than forcing it onto one. After integrating, cross-link the concept pages you touched to each other with body `[[wikilinks]]`.
+    2. FIRST, get the roster: `list type=llm-wiki` for the COMPLETE set of existing concept pages (titles/tags/aliases). This — not `search` — is how you learn what already exists (search recall is imperfect and would risk duplicate pages). Then for each source, identify ALL the concepts in it that belong in LLM-Wiki — a rich source commonly maps to SEVERAL concept pages. For each concept, match it to a related page from the roster (read that page by exact title to integrate against its current body), else `create-llm-wiki` a narrow new concept page as `<domain>/<concept>` — reuse an existing domain from the roster paths when it fits, mint a new one only for a genuinely new area; distribute the source across all of them rather than forcing it onto one. After integrating, cross-link the concept pages you touched to each other with body `[[wikilinks]]`.
     3. For each touched page, `command_run` `para-zk:create-llm-wiki by=<model-id>` get-or-create, then `para-zk:read-llm-wiki` to obtain the current body and references.
     4. Obtain stable citation ids from `para-zk:update-llm-wiki key=references op=insert`. Insert references only to obtain stable ids for the `` `PZ[<id>]` `` code-span.
     5. Compose an idempotent body update from the current page body. Put `` `PZ[<id>]` `` next to the integrated claim, paragraph, or bullet it supports. Recompose and set the whole body with `key=body op=set value=<markdown> by=<model-id>` (inline); use `op=replace match=/with=` only when the exact match is unambiguous. This page-body write is the freshness event.

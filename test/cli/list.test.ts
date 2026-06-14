@@ -78,12 +78,12 @@ describe("list", () => {
     await cli.run("para-zk:create-project", { title: "P", open: "false" });
     await cli.run("para-zk:create-area", { title: "A", open: "false" });
     await cli.run("para-zk:create-resource", { title: "R", open: "false" });
-    await cli.run("para-zk:create-llm-wiki", { title: "W", open: "false" });
+    await cli.run("para-zk:create-llm-wiki", { title: "AI/W", open: "false" });
 
     const res = await cli.run("para-zk:list", {});
     expect(res.count).toBe(4);
     expect(res.items).toEqual(expect.arrayContaining([
-      expect.objectContaining({ title: "W", type: "llm-wiki", path: "LLM-Wiki/W.md" })
+      expect.objectContaining({ title: "W", type: "llm-wiki", path: "LLM-Wiki/AI/W.md" })
     ]));
   });
 
