@@ -33,8 +33,15 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
     integrate (read → extract → merge) the source's relevant content into the page body, insert
     the source into that page's `references` registry, and cite the returned id as an INLINE
     CODE SPAN — `` `PZ[<id>]` `` with surrounding backticks (bare PZ[id] without backticks does
-    NOT render). Cross-link related concept pages to each other with body `[[wikilinks]]` so the
-    wiki stays interlinked; `references` (+ `` `PZ[<id>]` ``) are for citing canonical SOURCES
+    NOT render). Cross-link related concept pages to each other with body `[[wikilinks]]` written as the
+    FULL PATH `[[LLM-Wiki/<domain>/<concept>|<display>]]` — NOT bare `[[Concept]]`.
+    A wiki concept routinely shares its title with ANOTHER note in the vault — the resource
+    it synthesizes, a project, a ZK note, etc. (wiki "Diffusion Policy" vs resource
+    "Diffusion Policy.md"; wiki "Natural Motion Tracking Executor" vs the project of the same
+    name) — so a bare link is AMBIGUOUS and Obsidian may resolve it to that other note; the
+    full path always resolves to the wiki page. (Do NOT bare-link "if no resource matches" —
+    the collision can be with any note type, not just resources, so always use the full path.) (Obsidian rewrites these paths automatically if a page is later
+    re-filed to another domain.) The wiki stays interlinked; `references` (+ `` `PZ[<id>]` ``) are for citing canonical SOURCES
     only (notes OUTSIDE LLM-Wiki), never for wiki↔wiki links.
 
     DRIVE THE CLI THROUGH `mcp__optsidian__command_run` — NOT Bash. The host sandbox blocks a
@@ -82,7 +89,7 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
     | Read the current page with `command_run({command:"para-zk:read-llm-wiki", args:["title=<title>","key=body","format=json"]})` (and `key=references`) before merging. | Assume the candidate body in the packet is still complete or current enough to overwrite blindly. |
     | Merge idempotently: set a recomposed body via `command_run({command:"para-zk:update-llm-wiki", args:["title=<title>","key=body","op=set","value=<recomposed markdown>","by=<model-id>","format=json"]})`. | Blindly append duplicate paragraphs, duplicate headings, or repeated citation-only sentences on re-ingest or crash recovery. |
     | If a source reference id is not already known, insert the reference first to obtain a stable id for `` `PZ[<id>]` ``, then write the body. | Use numeric positions like `PZ[0]`, cite without the stable id, or write the citation WITHOUT surrounding backticks — it MUST be an inline code span; bare PZ[id] does not render. |
-    | Distribute a rich source across SEVERAL concept pages, and cross-link related concept pages to each other with body `[[wikilinks]]` (the wiki is an interlinked web). | Force one source onto a single page, leave concept pages isolated, or put wiki↔wiki links in `references` (references are for canonical SOURCES outside LLM-Wiki only). |
+    | Distribute a rich source across SEVERAL concept pages, and cross-link related concept pages to each other with FULL-PATH body `[[LLM-Wiki/<domain>/<concept>|<display>]]` wikilinks (the wiki is an interlinked web; full path disambiguates from any same-named other note). | Force one source onto a single page, leave concept pages isolated, write wiki↔wiki links as BARE `[[Concept]]` (ambiguous when any other note shares the name — resource, project, ZK, …), or put wiki↔wiki links in `references` (references are for canonical SOURCES outside LLM-Wiki only). |
     | Write prose in the user's OWN language register — dominant language + English/local code-mixing pattern derived from the packet sources and existing wiki pages. | Default to English (or any fixed language) regardless of the sources, or translate technical terms the user keeps in their original form. |
     | Treat the page-body re-weave as the freshness event: integrating the source into the body and writing the page bumps page `updated`. | Add citation-only calls or bookkeeping writes after the body has been integrated. |
     | Keep link direction single-way: wiki pages cite canonical sources through references and `PZ[<id>]`. | Write links, backlinks, tags, or any other edits into source notes. |
@@ -92,7 +99,7 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
 
   <Execution_Guide>
     1. Parse the `WeavePacket`, including its required `by` model id. If required fields are missing, stop with a concise error in the output format; do not ask the user.
-    2. FIRST, get the roster: `list type=llm-wiki` for the COMPLETE set of existing concept pages (titles/tags/aliases). This — not `search` — is how you learn what already exists (search recall is imperfect and would risk duplicate pages). Then for each source, identify ALL the concepts in it that belong in LLM-Wiki — a rich source commonly maps to SEVERAL concept pages. For each concept, match it to a related page from the roster (read that page by exact title to integrate against its current body), else `create-llm-wiki` a narrow new concept page as `<domain>/<concept>` — reuse an existing domain from the roster paths when it fits, mint a new one only for a genuinely new area; distribute the source across all of them rather than forcing it onto one. After integrating, cross-link the concept pages you touched to each other with body `[[wikilinks]]`.
+    2. FIRST, get the roster: `list type=llm-wiki` for the COMPLETE set of existing concept pages (titles/tags/aliases). This — not `search` — is how you learn what already exists (search recall is imperfect and would risk duplicate pages). Then for each source, identify ALL the concepts in it that belong in LLM-Wiki — a rich source commonly maps to SEVERAL concept pages. For each concept, match it to a related page from the roster (read that page by exact title to integrate against its current body), else `create-llm-wiki` a narrow new concept page as `<domain>/<concept>` — reuse an existing domain from the roster paths when it fits, mint a new one only for a genuinely new area; distribute the source across all of them rather than forcing it onto one. After integrating, cross-link the concept pages you touched to each other with full-path `[[LLM-Wiki/<domain>/<concept>|<display>]]` wikilinks (NOT bare `[[Concept]]` — a bare link collides with any same-named other note: resource, project, ZK, …).
     3. For each touched page, `command_run` `para-zk:create-llm-wiki by=<model-id>` get-or-create, then `para-zk:read-llm-wiki` to obtain the current body and references.
     4. Obtain stable citation ids from `para-zk:update-llm-wiki key=references op=insert`. Insert references only to obtain stable ids for the `` `PZ[<id>]` `` code-span.
     5. Compose an idempotent body update from the current page body. Put `` `PZ[<id>]` `` next to the integrated claim, paragraph, or bullet it supports. Recompose and set the whole body with `key=body op=set value=<markdown> by=<model-id>` (inline); use `op=replace match=/with=` only when the exact match is unambiguous. This page-body write is the freshness event.
