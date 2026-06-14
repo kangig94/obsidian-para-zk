@@ -55,11 +55,13 @@ describe("props schema lead fields", () => {
     });
   });
 
-  it("keeps vault-managed timestamps display-only wherever they are shown", () => {
+  it("keeps vault-managed timestamps read-only wherever they are shown", () => {
     for (const type of ["area", "resource", "llm-wiki", "subnote", "spark", "digest", "permanent"] as const) {
       const schema = propsSchemaForType(type, "en");
-      expect(findPropsField(schema, "created")?.control).toBe("display");
-      expect(findPropsField(schema, "updated")?.control).toBe("display");
+      // created = absolute read-only display; updated = relative read-only display.
+      // Neither is the editable "datetime" input.
+      expect(findPropsField(schema, "created")?.control).toBe("datetime-display");
+      expect(findPropsField(schema, "updated")?.control).toBe("relative-time");
     }
 
     expect(findPropsField(propsSchemaForType("project", "en"), "created")).toBeUndefined();

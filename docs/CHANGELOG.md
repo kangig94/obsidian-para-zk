@@ -307,6 +307,15 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Changed
 
+- The `para-zk-props` block now renders `created`/`updated` as PARA-ZK-formatted
+  read-only timestamps instead of raw frontmatter text. `created` shows an absolute
+  `YYYY-MM-DD HH:MM` (the ISO `T` and any seconds dropped); `updated` shows a relative
+  phrase (`방금` / `N분 전` / `N시간 M분 전` / `N일 전`) with the absolute time on hover,
+  falling back to the same absolute format once it is older than 30 days. PARA-ZK formats
+  the value itself, so the display is consistent regardless of how Obsidian types the
+  property (previously `created` and `updated` could render differently — raw vs.
+  normalized — depending on Obsidian's per-property type inference). Computed at render
+  time; muted styling; locale-aware (ko/en).
 - PARA-ZK no longer writes the `created` timestamp. New notes keep both
   `created:` and `updated:` as empty frontmatter keys, and update-time-on-edit
   owns filling them on create/update in its ISO timestamp format. Setup still

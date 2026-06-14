@@ -1,3 +1,4 @@
+import type { RelativePhrase } from "./time";
 import type { Locale } from "./types";
 
 export type LocalePack = {
@@ -597,6 +598,23 @@ const en: LocalePack = {
 
 export function localePack(locale: Locale | undefined): LocalePack {
   return locale === "ko" ? ko : en;
+}
+
+// Render a relative-time bucket as a localized phrase. Only the phrase buckets reach here;
+// past the relative horizon the caller shows a plain date (the "absolute" bucket) instead.
+export function formatRelativeTime(parts: RelativePhrase, locale: Locale | undefined): string {
+  const ko = locale === "ko";
+  switch (parts.unit) {
+    case "just-now":
+      return ko ? "방금" : "just now";
+    case "minutes":
+      return ko ? `${parts.minutes}분 전` : `${parts.minutes}m ago`;
+    case "hours":
+      if (parts.minutes === 0) return ko ? `${parts.hours}시간 전` : `${parts.hours}h ago`;
+      return ko ? `${parts.hours}시간 ${parts.minutes}분 전` : `${parts.hours}h ${parts.minutes}m ago`;
+    case "days":
+      return ko ? `${parts.days}일 전` : `${parts.days}d ago`;
+  }
 }
 
 export function normalizeLocale(value: unknown, fallback: Locale): Locale {

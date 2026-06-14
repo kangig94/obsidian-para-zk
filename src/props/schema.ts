@@ -40,6 +40,8 @@ type PropsFieldControl =
   | "area-list"
   | "date"
   | "datetime"
+  | "datetime-display"
+  | "relative-time"
   | "display"
   | "select"
   | "text"
@@ -88,8 +90,8 @@ export function inferPropsViewType(frontmatter: Record<string, unknown> | undefi
 export function propsSchemaForType(type: PropsViewType, locale: Locale): PropsSchema {
   const t = localePack(locale);
   const aliases = field("aliases", "aliases", t.labels.aliases, "text-list");
-  const created = displayField("created", "created", t.labels.created);
-  const updated = displayField("updated", "updated", t.labels.updated);
+  const created = field("created", "created", t.labels.created, "datetime-display");
+  const updated = field("updated", "updated", t.labels.updated, "relative-time");
   const createdBy = displayField("created_by", "created_by", t.labels.createdBy);
   const updatedBy = displayField("updated_by", "updated_by", t.labels.updatedBy);
 

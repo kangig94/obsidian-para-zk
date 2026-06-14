@@ -672,6 +672,10 @@ body.para-zk-width-active .markdown-preview-view .markdown-preview-sizer > div:h
   padding: 4px 0;
 }
 
+.para-zk-block__timestamp {
+  color: var(--text-muted);
+}
+
 .para-zk-inline-input :is(input, select) {
   min-height: 24px;
   width: auto;

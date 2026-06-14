@@ -12,9 +12,10 @@ import {
   type MarkdownPostProcessorContext,
   type WorkspaceLeaf
 } from "obsidian";
-import { localePack } from "../i18n";
+import { formatRelativeTime, localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { singleItemList } from "../text";
+import { formatDateTimeMinutes, frontmatterTimeMs, minutesFromMs, relativeTimeParts } from "../time";
 import {
   findPropsField,
   inferPropsViewType,
@@ -307,11 +308,14 @@ function renderPropsModeButton(
   buttonComponent.setDisabled(!options.sourcePath);
 }
 
-// Read-only display fields with no value (e.g. an area note's empty `parent`)
-// are skipped so they do not leave a half-empty row; editable controls always
-// render so the user can fill them.
+// Read-only display fields with no value (e.g. an area note's empty `parent`, or an
+// unfilled `created`/`updated`) are skipped so they do not leave a half-empty row;
+// editable controls always render so the user can fill them.
 function isHiddenDisplayField(field: PropsField, frontmatter: Frontmatter): boolean {
-  return field.control === "display" && valueText(readFieldValue(field, frontmatter)).trim() === "";
+  const readOnly = field.control === "display"
+    || field.control === "datetime-display"
+    || field.control === "relative-time";
+  return readOnly && valueText(readFieldValue(field, frontmatter)).trim() === "";
 }
 
 function renderField(
@@ -390,10 +394,46 @@ function renderFieldControl(
     case "area-list":
       renderAreaListInput(plugin, field, frontmatter, container, sourcePath, blockEl, rerender);
       return;
+    case "datetime-display":
+      renderDateTimeDisplay(field, frontmatter, container);
+      return;
+    case "relative-time":
+      renderRelativeTime(plugin, field, frontmatter, container);
+      return;
     case "display":
       renderDisplayValue(plugin, field, frontmatter, container, sourcePath);
       return;
   }
+}
+
+const TIMESTAMP_CLS = "para-zk-block__display para-zk-block__timestamp";
+
+// Read-only absolute timestamp (`YYYY-MM-DD HH:MM`). PARA-ZK formats the value itself so
+// the display is stable regardless of how Obsidian types the `created` property.
+function renderDateTimeDisplay(field: PropsField, frontmatter: Frontmatter, container: HTMLElement): void {
+  const raw = valueText(readFieldValue(field, frontmatter));
+  if (!raw) return;
+  container.createSpan({ cls: TIMESTAMP_CLS, text: formatDateTimeMinutes(raw) ?? raw });
+}
+
+// Read-only relative timestamp ("3시간 12분 전") with the absolute value on hover; past the
+// 30-day horizon it falls back to the same absolute format as `created`.
+function renderRelativeTime(
+  plugin: ParaZkPluginContext,
+  field: PropsField,
+  frontmatter: Frontmatter,
+  container: HTMLElement
+): void {
+  const raw = valueText(readFieldValue(field, frontmatter));
+  if (!raw) return;
+  const ms = frontmatterTimeMs(raw);
+  // Parse once: absolute date and the relative bucket both derive from `ms`. When the value
+  // is unparseable the span shows the raw text; past the 30-day horizon it shows the date.
+  const absolute = ms === undefined ? raw : minutesFromMs(ms);
+  const parts = ms === undefined ? undefined : relativeTimeParts(ms, Date.now());
+  const relative = parts && parts.unit !== "absolute" ? formatRelativeTime(parts, plugin.settings.locale) : undefined;
+  const span = container.createSpan({ cls: TIMESTAMP_CLS, text: relative ?? absolute });
+  if (relative) span.setAttribute("title", absolute);
 }
 
 function renderTextInput(

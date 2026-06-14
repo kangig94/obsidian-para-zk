@@ -40,6 +40,47 @@ export function frontmatterTimeMs(value: unknown): number | undefined {
   return Number.isNaN(parsed.getTime()) ? undefined : parsed.getTime();
 }
 
+export function minutesFromMs(ms: number): string {
+  const date = new Date(ms);
+  return `${localDate(date)} ${localTime(date)}`;
+}
+
+// Normalize a frontmatter timestamp to a human `YYYY-MM-DD HH:MM` (drops the ISO `T`
+// and any seconds). Returns undefined when the value is not a parseable timestamp, so
+// the caller can fall back to the raw text.
+export function formatDateTimeMinutes(value: unknown): string | undefined {
+  const ms = frontmatterTimeMs(value);
+  return ms === undefined ? undefined : minutesFromMs(ms);
+}
+
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+const RELATIVE_HORIZON_MS = 30 * DAY_MS;
+
+export type RelativeTime =
+  | { unit: "just-now" }
+  | { unit: "minutes"; minutes: number }
+  | { unit: "hours"; hours: number; minutes: number }
+  | { unit: "days"; days: number }
+  | { unit: "absolute" };
+
+// The buckets that map to a phrase; "absolute" is rendered as a plain date instead.
+export type RelativePhrase = Exclude<RelativeTime, { unit: "absolute" }>;
+
+// Bucket the age of a timestamp for relative display. Beyond the 30-day horizon (and for
+// future timestamps clamped to "just-now") the caller renders an absolute date instead.
+export function relativeTimeParts(thenMs: number, nowMs: number): RelativeTime {
+  const diff = nowMs - thenMs;
+  if (diff < MINUTE_MS) return { unit: "just-now" };
+  if (diff < HOUR_MS) return { unit: "minutes", minutes: Math.floor(diff / MINUTE_MS) };
+  if (diff < DAY_MS) {
+    return { unit: "hours", hours: Math.floor(diff / HOUR_MS), minutes: Math.floor((diff % HOUR_MS) / MINUTE_MS) };
+  }
+  if (diff < RELATIVE_HORIZON_MS) return { unit: "days", days: Math.floor(diff / DAY_MS) };
+  return { unit: "absolute" };
+}
+
 export function dateFromCli(value: string | undefined): Date {
   if (!value) return new Date();
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);

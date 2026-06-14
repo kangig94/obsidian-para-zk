@@ -150,12 +150,12 @@ describe("props url control", () => {
 });
 
 describe("props timestamp display controls", () => {
-  it("renders created and updated as display values, not editable datetime inputs", async () => {
+  it("renders created as a read-only absolute timestamp (T stripped), not an editable input", async () => {
     const { root } = await renderPropsBlock("resource", "PARA/Resources/Doc.md", [
       "---",
       "type: resource",
-      "created: 2026-06-10 08:30",
-      "updated: 2026-06-11 09:45",
+      "created: 2026-06-10T08:30",
+      "updated: 2020-01-01 09:45",
       "url: https://example.com/source",
       "---",
       ""
@@ -165,9 +165,34 @@ describe("props timestamp display controls", () => {
     expect(created.textContent).toBe("2026-06-10 08:30");
     expect(created.querySelector("input.para-zk-block__input")).toBeNull();
 
+    // updated older than the 30-day horizon falls back to the same absolute format
     const updated = propsFieldControl(root, "Updated");
-    expect(updated.textContent).toBe("2026-06-11 09:45");
+    expect(updated.textContent).toBe("2020-01-01 09:45");
     expect(updated.querySelector("input.para-zk-block__input")).toBeNull();
+  });
+
+  it("renders a recent updated as relative text with the absolute value on hover", async () => {
+    // Pin the clock so the relative phrase is exact, not minute-boundary dependent.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 14, 12, 30));
+    try {
+      const { root } = await renderPropsBlock("resource", "PARA/Resources/Recent.md", [
+        "---",
+        "type: resource",
+        "created: 2026-06-10T08:30",
+        "updated: 2026-06-14 10:00", // 2h30m before the pinned now
+        "---",
+        ""
+      ].join("\n"));
+
+      const updated = propsFieldControl(root, "Updated");
+      const span = updated.querySelector(".para-zk-block__timestamp") as FakeElement;
+      expect(span.textContent).toBe("2h 30m ago"); // en locale relative phrase
+      expect(span.getAttribute("title")).toBe("2026-06-14 10:00"); // hover reveals the absolute time
+      expect(updated.querySelector("input.para-zk-block__input")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("renders llm-wiki authorship as readonly display values", async () => {
