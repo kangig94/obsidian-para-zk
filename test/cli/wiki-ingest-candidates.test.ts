@@ -115,7 +115,7 @@ describe("wiki ingest candidates", () => {
     const stale = delta.candidates.find((candidate) => candidate.path === "PARA/Resources/Cited Stale.md");
     expect(stale).not.toHaveProperty("last_source_updated_ms");
     expect(stale).not.toHaveProperty("last_completed_at");
-    expect(stale?.stale_pages).toEqual([
+    expect(stale?.stale_llm_wikis).toEqual([
       {
         path: "LLM-Wiki/Old Concept.md",
         title: "Old Concept",
@@ -165,7 +165,7 @@ describe("wiki ingest candidates", () => {
     expect((result.candidates as Array<Record<string, unknown>>)[0]).toMatchObject({
       path: "PARA/Resources/Source.md",
       reason: "missing_wiki_citation",
-      stale_pages: []
+      stale_llm_wikis: []
     });
 
     const rejected = await cli.run("para-zk:wiki-ingest-candidates", {

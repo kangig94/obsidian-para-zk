@@ -239,7 +239,7 @@ export type WikiIngestCandidate = {
   title: string;
   updated: unknown;
   updated_ms: number | null;
-  stale_pages: WikiIngestStalePage[];
+  stale_llm_wikis: WikiIngestStalePage[];
   reason: WikiIngestCandidateReason;
 };
 

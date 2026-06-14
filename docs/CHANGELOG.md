@@ -61,7 +61,7 @@ Notable changes for PARA-ZK are tracked here.
   `wiki-ledger.ts`). LLM-Wiki candidate staleness now derives from page `updated`
   timestamps: uncited sources use `missing_wiki_citation`, sources newer than
   citing wiki pages use `source_newer_than_wiki`, and candidates include
-  `stale_pages` with the older citing wiki pages.
+  `stale_llm_wikis` with the older citing wiki pages.
 - Removed the redundant `para-zk:add-reference` CLI command. Add references via
   `para-zk:update-* key=references op=insert value_json='{"link":"..."}'`;
   child-note receivers use `para-zk:update-child ... key=references op=insert`.

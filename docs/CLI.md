@@ -335,7 +335,7 @@ JSON output fields:
 - `count`, `offset`, `limit`, `returned`, `has_more`: pagination envelope over
   the candidate list.
 - `candidates`: array of
-  `{ path, type, title, updated, updated_ms, stale_pages, reason }`.
+  `{ path, type, title, updated, updated_ms, stale_llm_wikis, reason }`.
 
 Reason codes:
 
@@ -349,7 +349,7 @@ Reason codes:
 - `reingest_requested`: targeted `re-ingest` source requested by `source_path`
   or `source_paths`.
 
-`stale_pages` is always present. For `source_newer_than_wiki` it lists the older
+`stale_llm_wikis` is always present. For `source_newer_than_wiki` it lists the older
 citing wiki pages as `{ path, title, updated_ms }`; for every other reason it is
 an empty array.
 

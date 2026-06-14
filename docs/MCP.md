@@ -85,10 +85,10 @@ ingest: `mode=<per-import|delta|init|re-ingest>`, `source_path=<vault-path>` or
 `source_paths=<json|comma-list>` for targeted modes only, plus `offset`,
 `limit`, and `format`. Its envelope includes `{ ok, command, count, offset,
 limit, returned, has_more, candidates }`, where each candidate has
-`{ path, type, title, updated, updated_ms, stale_pages, reason }`. Reasons are
+`{ path, type, title, updated, updated_ms, stale_llm_wikis, reason }`. Reasons are
 `missing_wiki_citation`, `source_newer_than_wiki`, `per_import`, and
 `reingest_requested`; `source_newer_than_wiki` means the source `updated`
-timestamp is newer than at least one citing wiki page, listed in `stale_pages`
+timestamp is newer than at least one citing wiki page, listed in `stale_llm_wikis`
 as `{ path, title, updated_ms }`.
 
 Related surface notes:

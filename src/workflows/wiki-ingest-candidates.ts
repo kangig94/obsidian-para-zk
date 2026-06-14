@@ -241,7 +241,7 @@ function candidateFromSource(
     title: source.file.basename,
     updated: source.updated,
     updated_ms: source.updatedMs,
-    stale_pages: stalePages,
+    stale_llm_wikis: stalePages,
     reason
   };
 }
