@@ -13,6 +13,15 @@ import { MockApp } from "../harness/vault";
 import { expectGeneratedReferenceId } from "./reference-id-test-helpers";
 
 describe("CitationSuggest", () => {
+  it("does not shadow EditorSuggest's trigger method with an instance field", () => {
+    const app = new MockApp();
+    const suggest = new CitationSuggest(fakePlugin(app));
+
+    // A field named `trigger` clobbers EditorSuggest.prototype.trigger, which Obsidian
+    // calls internally — that breaks the whole suggester at runtime (it never appears).
+    expect(Object.prototype.hasOwnProperty.call(suggest, "trigger")).toBe(false);
+  });
+
   it("triggers inside an open backtick code span", async () => {
     const app = new MockApp();
     const file = await app.vault.create("Source.md", "---\nreferences: []\n---\n");

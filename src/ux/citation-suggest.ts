@@ -35,7 +35,9 @@ type CitationSuggestion =
 // before the `]`; typing `#` there switches to suggesting the reference's headings/blocks.
 export class CitationSuggest extends EditorSuggest<CitationSuggestion> {
   private readonly suggestionIndexes = new Map<ReferenceRead, number>();
-  private trigger: CitationTrigger | null = null;
+  // NOTE: not `trigger` — EditorSuggest's base class owns a `trigger()` method; shadowing
+  // it with a field breaks the whole suggester (Obsidian calls `.trigger()` internally).
+  private activeTrigger: CitationTrigger | null = null;
 
   constructor(private readonly plugin: ParaZkPluginContext) {
     super(plugin.app);
@@ -48,7 +50,7 @@ export class CitationSuggest extends EditorSuggest<CitationSuggestion> {
     const trigger = parseCitationTrigger(beforeCursor);
     if (!trigger) return null;
 
-    this.trigger = trigger;
+    this.activeTrigger = trigger;
     return {
       start: { line: cursor.line, ch: cursor.ch - trigger.query.length },
       end: cursor,
@@ -58,8 +60,8 @@ export class CitationSuggest extends EditorSuggest<CitationSuggestion> {
 
   getSuggestions(context: EditorSuggestContext): CitationSuggestion[] | Promise<CitationSuggestion[]> {
     const references = resolveReferences(this.plugin, context.file);
-    if (this.trigger?.mode === "heading") {
-      return this.headingSuggestions(context, references, this.trigger.referenceId);
+    if (this.activeTrigger?.mode === "heading") {
+      return this.headingSuggestions(context, references, this.activeTrigger.referenceId);
     }
 
     this.suggestionIndexes.clear();
