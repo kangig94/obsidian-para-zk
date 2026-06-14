@@ -415,6 +415,56 @@ describe("audit", () => {
     expect(result.findings[0].detail).toMatchObject({ inbound_wiki_links: 0 });
   });
 
+  it("detects and fixes an llm-wiki identity tag that drifted from its folder domain", async () => {
+    // Legacy domain/concept tag (folder domain is the source of truth).
+    await createNote(
+      "LLM-Wiki/Reinforcement Learning/PPO.md",
+      ["type: llm-wiki", "tags:", "  - llm-wiki/reinforcement-learning/ppo"],
+      "Body."
+    );
+    // Wrong domain: tag says humanoid-control but the folder is Perception.
+    await createNote(
+      "LLM-Wiki/Perception/State Estimation.md",
+      ["type: llm-wiki", "tags:", "  - llm-wiki/humanoid-control"],
+      "Body."
+    );
+    // Correctly tagged: must NOT be flagged or touched.
+    await createNote(
+      "LLM-Wiki/Perception/Filtering.md",
+      ["type: llm-wiki", "tags:", "  - llm-wiki/perception"],
+      "Body."
+    );
+
+    const preview = asAudit(await cli.run("para-zk:audit", { check: "wiki_tag_domain_mismatch", limit: "all" }));
+    expect(preview.counts.wiki_tag_domain_mismatch).toBe(2);
+    expect(preview.fixed).toBeUndefined();
+    expect(preview.findings.map((finding) => finding.path).sort()).toEqual([
+      "LLM-Wiki/Perception/State Estimation.md",
+      "LLM-Wiki/Reinforcement Learning/PPO.md"
+    ]);
+    const ppoFinding = preview.findings.find((finding) => finding.path === "LLM-Wiki/Reinforcement Learning/PPO.md");
+    expect(ppoFinding?.detail).toMatchObject({
+      expected: "llm-wiki/reinforcement-learning",
+      actual: "llm-wiki/reinforcement-learning/ppo"
+    });
+
+    const fixed = asAudit(await cli.run("para-zk:audit", { check: "wiki_tag_domain_mismatch", fix: "true", limit: "all" }));
+    expect(fixed.counts.wiki_tag_domain_mismatch).toBe(0);
+    expect(fixed.fixed).toEqual([
+      { code: "wiki_tag_domain_mismatch", path: "LLM-Wiki/Perception/State Estimation.md", action: "setWikiDomainTag" },
+      { code: "wiki_tag_domain_mismatch", path: "LLM-Wiki/Reinforcement Learning/PPO.md", action: "setWikiDomainTag" }
+    ]);
+
+    const ppo = cli.app.readPath("LLM-Wiki/Reinforcement Learning/PPO.md") ?? "";
+    expect(ppo).toContain("- llm-wiki/reinforcement-learning");
+    expect(ppo).not.toContain("llm-wiki/reinforcement-learning/ppo");
+    const stateEstimation = cli.app.readPath("LLM-Wiki/Perception/State Estimation.md") ?? "";
+    expect(stateEstimation).toContain("- llm-wiki/perception");
+    expect(stateEstimation).not.toContain("humanoid-control");
+    // The already-correct page is left untouched.
+    expect(cli.app.readPath("LLM-Wiki/Perception/Filtering.md") ?? "").toContain("- llm-wiki/perception");
+  });
+
   it("rejects aliases and dryRun at the CLI boundary", async () => {
     const alias = await cli.run("para-zk:audit", { checkCode: "broken_link" });
     expect(alias.ok).toBe(false);

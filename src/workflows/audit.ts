@@ -1,6 +1,8 @@
 import type { TFile } from "obsidian";
+import { localePack } from "../i18n";
+import { slugify, uniqueStrings } from "../text";
 import { frontmatterTimeMs } from "../time";
-import { fileFrontmatter, readType, type Frontmatter } from "../vault/frontmatter";
+import { fileFrontmatter, frontmatterLinks, readFileFrontmatterFresh, readType, type Frontmatter } from "../vault/frontmatter";
 import type {
   AuditCheckCode,
   AuditFinding,
@@ -36,6 +38,7 @@ const AUDIT_CHECKS: AuditCheckCode[] = [
   "orphan_note",
   "upward_wiki_link",
   "orphan_wiki_page",
+  "wiki_tag_domain_mismatch",
   "unprocessed_spark",
   "stale_draft_permanent"
 ];
@@ -47,6 +50,7 @@ const CHECK_SEVERITY: Record<AuditCheckCode, AuditSeverity> = {
   orphan_note: "medium",
   upward_wiki_link: "medium",
   orphan_wiki_page: "low",
+  wiki_tag_domain_mismatch: "low",
   unprocessed_spark: "low",
   stale_draft_permanent: "low"
 };
@@ -67,9 +71,15 @@ export async function auditVault(ctx: WorkflowContext, options: AuditOptions = {
     const idlessFindings = enabledChecks.has("idless_reference")
       ? findings.filter((finding) => finding.code === "idless_reference")
       : await referenceFindings(ctx, notes, new Set<AuditCheckCode>(["idless_reference"]));
-    fixed = await backfillIdlessReferences(ctx, notes, idlessFindings);
+    const wikiTagFindings = enabledChecks.has("wiki_tag_domain_mismatch")
+      ? findings.filter((finding) => finding.code === "wiki_tag_domain_mismatch")
+      : await wikiTagDomainMismatchFindings(ctx, notes);
+    fixed = [
+      ...await backfillIdlessReferences(ctx, notes, idlessFindings),
+      ...await fixWikiTagDomains(ctx, notes, wikiTagFindings)
+    ];
     if (fixed.length > 0) {
-      // Backfill mutates references frontmatter, so pre-fix findings are stale.
+      // Fixes mutate frontmatter, so pre-fix findings are stale.
       findings = await collectAuditFindings(ctx, notes, enabledChecks);
     }
   }
@@ -155,6 +165,7 @@ async function collectAuditFindings(
   if (enabledChecks.has("orphan_note")) findings.push(...orphanNoteFindings(ctx, notes));
   if (enabledChecks.has("upward_wiki_link")) findings.push(...upwardWikiLinkFindings(ctx, notes));
   if (enabledChecks.has("orphan_wiki_page")) findings.push(...orphanWikiPageFindings(ctx, notes));
+  if (enabledChecks.has("wiki_tag_domain_mismatch")) findings.push(...await wikiTagDomainMismatchFindings(ctx, notes));
   if (enabledChecks.has("unprocessed_spark")) findings.push(...unprocessedSparkFindings(notes));
   if (enabledChecks.has("stale_draft_permanent")) findings.push(...staleDraftPermanentFindings(notes));
   return findings;
@@ -322,6 +333,74 @@ function orphanWikiPageFindings(ctx: WorkflowContext, notes: AuditableNote[]): A
     });
   }
   return findings;
+}
+
+// An llm-wiki page's domain folder is the source of truth for its identity tag. When a page is
+// re-filed to another domain (or carries a stale/legacy tag), the `llm-wiki/<domain>` tag drifts
+// from the folder; flag it (fixable — see fixWikiTagDomains).
+async function wikiTagDomainMismatchFindings(ctx: WorkflowContext, notes: AuditableNote[]): Promise<AuditFinding[]> {
+  const prefix = localePack(ctx.settings.locale).tags.llmWiki;
+  const findings: AuditFinding[] = [];
+  for (const note of notes) {
+    if (note.type !== "llm-wiki") continue;
+    const expected = expectedWikiDomainTag(ctx, note.file, prefix);
+    if (!expected) continue; // a flat (domain-less) page has no folder domain to derive from
+    // Always read tags fresh (not the note.frontmatter snapshot) so the post-fix re-collect
+    // reflects the corrected tag; the per-page read is fine for the non-hot-path audit.
+    const actual = currentWikiTag(await readFileFrontmatterFresh(ctx, note.file), prefix);
+    if (actual === expected) continue;
+    findings.push({
+      code: "wiki_tag_domain_mismatch",
+      severity: CHECK_SEVERITY.wiki_tag_domain_mismatch,
+      path: note.file.path,
+      type: note.type,
+      detail: { expected, actual: actual ?? null },
+      fix: "Run para-zk:audit fix=true to set the identity tag to the page's folder domain."
+    });
+  }
+  return findings;
+}
+
+async function fixWikiTagDomains(
+  ctx: WorkflowContext,
+  notes: AuditableNote[],
+  findings: AuditFinding[]
+): Promise<AuditFixedItem[]> {
+  const filesByPath = new Map(notes.map((note) => [note.file.path, note.file]));
+  const prefix = localePack(ctx.settings.locale).tags.llmWiki;
+  const paths = Array.from(new Set(findings.map((finding) => finding.path))).sort((left, right) => left.localeCompare(right));
+  const fixed: AuditFixedItem[] = [];
+  for (const path of paths) {
+    const file = filesByPath.get(path);
+    if (!file) continue;
+    const expected = expectedWikiDomainTag(ctx, file, prefix);
+    if (!expected) continue;
+    let changed = false;
+    await ctx.host.processFrontMatter(file, (fm) => {
+      const current = frontmatterLinks(fm.tags);
+      // Replace the existing llm-wiki identity tag with the folder-derived one; keep any other tags.
+      const others = current.filter((tag) => tag !== prefix && !tag.startsWith(`${prefix}/`));
+      const next = uniqueStrings([...others, expected]);
+      if (next.length !== current.length || next.some((tag, index) => tag !== current[index])) {
+        fm.tags = next;
+        changed = true;
+      }
+    });
+    if (changed) fixed.push({ code: "wiki_tag_domain_mismatch", path, action: "setWikiDomainTag" });
+  }
+  return fixed;
+}
+
+// The page's domain = the first folder segment under the wiki folder (`<domain>/<concept>.md`).
+function expectedWikiDomainTag(ctx: WorkflowContext, file: TFile, prefix: string): string | undefined {
+  const root = `${ctx.settings.paths.wikiFolder}/`;
+  if (!file.path.startsWith(root)) return undefined;
+  const segments = file.path.slice(root.length).split("/");
+  return segments.length >= 2 ? `${prefix}/${slugify(segments[0])}` : undefined;
+}
+
+function currentWikiTag(frontmatter: Frontmatter, prefix: string): string | undefined {
+  return frontmatterLinks(frontmatter.tags).find((tag) => tag === prefix || tag.startsWith(`${prefix}/`));
 }
 
 function isFolderMainNote(file: TFile): boolean {

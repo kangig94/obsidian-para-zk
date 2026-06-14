@@ -107,6 +107,12 @@ Notable changes for PARA-ZK are tracked here.
   page with no incoming links from other wiki pages (canonical→wiki links do not
   count). It is a hint for an under-woven concept — report-only, never forced, and a
   genuinely standalone topic is fine.
+- Added the `wiki_tag_domain_mismatch` audit check (`low`, auto-fixable): flags an
+  `llm-wiki` page whose identity tag (`llm-wiki/<domain>`) drifted from its folder
+  domain — a re-filed page or a legacy `llm-wiki/<domain>/<concept>` tag. `audit fix=true`
+  now applies two repairs vault-wide (id-less reference backfill AND wiki tag-domain
+  correction), setting each flagged tag to the page's folder domain; the `fixed[]` item
+  is `{ code: "wiki_tag_domain_mismatch", action: "setWikiDomainTag" }`.
 - Added a dedicated `para-zk:attach-file` CLI contract section covering local
   source options, single-file and multi-source result fields, unique-name
   collision behavior, directory recursion rules, desktop-local source paths,

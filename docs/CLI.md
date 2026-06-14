@@ -248,23 +248,23 @@ archived selector; active wiki notes live under `LLM-Wiki/`.
 ### `para-zk:audit`
 
 Runs a deterministic, read-only content-health audit over active PARA-ZK notes.
-By default it reports findings only. `fix=true` performs the only safe automatic
-repair: vault-wide id backfill for id-less references. No other finding is
-mutated, and there is no `dryRun`; the report-only run is the preview.
-`fix=true` always backfills every id-less reference across the whole vault and
-is NOT constrained by `check`/`severity`/`type` (those filter only the reported
-`findings`).
+By default it reports findings only. `fix=true` applies the safe automatic
+repairs: vault-wide id backfill for id-less references, and correcting each
+`llm-wiki` identity tag to its folder domain. No other finding is mutated, and
+there is no `dryRun`; the report-only run is the preview. `fix=true` always
+applies both repairs across the whole vault and is NOT constrained by
+`check`/`severity`/`type` (those filter only the reported `findings`).
 
 Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `check` | `broken_link`, `dangling_reference`, `idless_reference`, `orphan_note`, `upward_wiki_link`, `orphan_wiki_page`, `unprocessed_spark`, `stale_draft_permanent` | Optional check-code filter. |
+| `check` | `broken_link`, `dangling_reference`, `idless_reference`, `orphan_note`, `upward_wiki_link`, `orphan_wiki_page`, `wiki_tag_domain_mismatch`, `unprocessed_spark`, `stale_draft_permanent` | Optional check-code filter. |
 | `severity` | `high`, `medium`, `low` | Optional severity filter. |
 | `type` | stored note type | Optional frontmatter type filter, e.g. `resource` or `permanent`. |
 | `offset` | number | Zero-based finding offset (default `0`). |
 | `limit` | number or `all` | Maximum findings to return (default `50`). |
-| `fix` | boolean | `true` backfills id-less reference ids vault-wide; all other findings remain report-only. |
+| `fix` | boolean | `true` backfills id-less reference ids and corrects `llm-wiki` tag domains vault-wide; all other findings remain report-only. |
 
 Checks:
 
@@ -276,6 +276,7 @@ Checks:
 | `orphan_note` | `medium` | A resource, digest, or permanent note has no incoming backlinks and no outgoing resolved links, excluding templates, dashboards, archives, and folder main-notes. | Hint only: link it from an area, project, or hub. |
 | `upward_wiki_link` | `medium` | A non-`llm-wiki` note links into an `llm-wiki` note. Wiki pages cite canonical notes; canonical notes should not link back into the wiki. | Hint only: remove the reverse wiki link. |
 | `orphan_wiki_page` | `low` | An `llm-wiki` page has no incoming links from other `llm-wiki` pages (canonical→wiki links do not count). Usually an under-woven concept, but a genuinely standalone topic is legitimate. | Hint only: cross-link it from a related wiki page, or leave it if standalone. |
+| `wiki_tag_domain_mismatch` | `low` | An `llm-wiki` page's identity tag (`llm-wiki/<domain>`) does not match its folder domain — e.g. a re-filed page or a legacy `llm-wiki/<domain>/<concept>` tag. | Auto-fixable with `fix=true`: the tag is set to the page's folder domain. |
 | `unprocessed_spark` | `low` | A `spark` with `processed: false` is older than 7 days by `created`. | Hint only: distill or discard it. |
 | `stale_draft_permanent` | `low` | A `permanent` with `maturity: draft` has not been updated for 14 days by `updated`. | Hint only: refine or promote maturity. |
 
@@ -296,8 +297,9 @@ JSON output fields:
 - `count`, `offset`, `limit`, `returned`, `has_more`: pagination envelope over
   the flat filtered finding list.
 - `findings`: array of `{ code, severity, path, type, detail, fix }`.
-- `fixed`: present only when `fix=true`; each item is
-  `{ code: "idless_reference", path, action: "backfillReferenceIds" }`.
+- `fixed`: present only when `fix=true`; each item is `{ code, path, action }` —
+  `idless_reference`/`backfillReferenceIds` for a backfilled reference, or
+  `wiki_tag_domain_mismatch`/`setWikiDomainTag` for a corrected wiki tag.
 
 ### `para-zk:wiki-ingest-candidates`
 
