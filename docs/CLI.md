@@ -259,7 +259,7 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `check` | `broken_link`, `dangling_reference`, `idless_reference`, `orphan_note`, `upward_wiki_link`, `orphan_wiki_page`, `wiki_tag_domain_mismatch`, `unprocessed_spark`, `stale_draft_permanent` | Optional check-code filter. |
+| `check` | `broken_link`, `dangling_reference`, `idless_reference`, `bare_reference`, `orphan_note`, `upward_wiki_link`, `orphan_wiki_page`, `wiki_tag_domain_mismatch`, `unprocessed_spark`, `stale_draft_permanent` | Optional check-code filter. |
 | `severity` | `high`, `medium`, `low` | Optional severity filter. |
 | `type` | stored note type | Optional frontmatter type filter, e.g. `resource` or `permanent`. |
 | `offset` | number | Zero-based finding offset (default `0`). |
@@ -273,6 +273,7 @@ Checks:
 | `broken_link` | `high` | An outgoing body wikilink or embed does not resolve. | Hint only: fix the link or create the target. |
 | `dangling_reference` | `high` | A `references` registry entry points at a missing vault file. | Hint only: correct or remove the reference. |
 | `idless_reference` | `medium` | A reference has `id: null` and cannot be cited with `PZ[<id>]`. | Auto-fixable with `fix=true` or `key=references op=backfill`. |
+| `bare_reference` | `low` | A `references` entry's link is a bare basename (`[[X]]`) that currently resolves but is fragile — a same-named note (e.g. an `llm-wiki` concept page) makes it ambiguous and can silently rebind it. | Auto-fixable with `fix=true` when the name is UNIQUE (the frontmatter link is expanded to its full path; the body is never touched). An AMBIGUOUS bare name is reported, not fixed — disambiguate with an explicit path. |
 | `orphan_note` | `medium` | A resource, digest, or permanent note has no incoming backlinks and no outgoing resolved links, excluding templates, dashboards, archives, and folder main-notes. | Hint only: link it from an area, project, or hub. |
 | `upward_wiki_link` | `medium` | A non-`llm-wiki` note links into an `llm-wiki` note. Wiki pages cite canonical notes; canonical notes should not link back into the wiki. | Hint only: remove the reverse wiki link. |
 | `orphan_wiki_page` | `low` | An `llm-wiki` page has no incoming links from other `llm-wiki` pages (canonical→wiki links do not count). Usually an under-woven concept, but a genuinely standalone topic is legitimate. | Hint only: cross-link it from a related wiki page, or leave it if standalone. |
@@ -298,8 +299,9 @@ JSON output fields:
   the flat filtered finding list.
 - `findings`: array of `{ code, severity, path, type, detail, fix }`.
 - `fixed`: present only when `fix=true`; each item is `{ code, path, action }` —
-  `idless_reference`/`backfillReferenceIds` for a backfilled reference, or
-  `wiki_tag_domain_mismatch`/`setWikiDomainTag` for a corrected wiki tag.
+  `idless_reference`/`backfillReferenceIds` for a backfilled reference,
+  `wiki_tag_domain_mismatch`/`setWikiDomainTag` for a corrected wiki tag, or
+  `bare_reference`/`expandBareReferenceLinks` for expanded reference links.
 
 ### `para-zk:wiki-ingest-candidates`
 

@@ -14,7 +14,7 @@ import type {
   WorkflowContext
 } from "./context";
 import { isArchivedFile, isUnderAnyFolder, templateFolderPaths } from "./locations";
-import { backfillReferenceIds, readReferenceItemsFresh } from "./references";
+import { backfillReferenceIds, canonicalWikiLink, parseWikiLink, readReferenceItemsFresh, splitObsidianSubpath, updateReferenceItem } from "./references";
 
 type AuditableNote = {
   file: TFile;
@@ -35,6 +35,7 @@ const AUDIT_CHECKS: AuditCheckCode[] = [
   "broken_link",
   "dangling_reference",
   "idless_reference",
+  "bare_reference",
   "orphan_note",
   "upward_wiki_link",
   "orphan_wiki_page",
@@ -47,6 +48,7 @@ const CHECK_SEVERITY: Record<AuditCheckCode, AuditSeverity> = {
   broken_link: "high",
   dangling_reference: "high",
   idless_reference: "medium",
+  bare_reference: "low",
   orphan_note: "medium",
   upward_wiki_link: "medium",
   orphan_wiki_page: "low",
@@ -74,9 +76,13 @@ export async function auditVault(ctx: WorkflowContext, options: AuditOptions = {
     const wikiTagFindings = enabledChecks.has("wiki_tag_domain_mismatch")
       ? findings.filter((finding) => finding.code === "wiki_tag_domain_mismatch")
       : await wikiTagDomainMismatchFindings(ctx, notes);
+    const bareFindings = enabledChecks.has("bare_reference")
+      ? findings.filter((finding) => finding.code === "bare_reference")
+      : await referenceFindings(ctx, notes, new Set<AuditCheckCode>(["bare_reference"]));
     fixed = [
       ...await backfillIdlessReferences(ctx, notes, idlessFindings),
-      ...await fixWikiTagDomains(ctx, notes, wikiTagFindings)
+      ...await fixWikiTagDomains(ctx, notes, wikiTagFindings),
+      ...await fixBareReferences(ctx, notes, bareFindings)
     ];
     if (fixed.length > 0) {
       // Fixes mutate frontmatter, so pre-fix findings are stale.
@@ -159,7 +165,7 @@ async function collectAuditFindings(
 ): Promise<AuditFinding[]> {
   const findings: AuditFinding[] = [];
   if (enabledChecks.has("broken_link")) findings.push(...brokenLinkFindings(ctx, notes));
-  if (enabledChecks.has("dangling_reference") || enabledChecks.has("idless_reference")) {
+  if (enabledChecks.has("dangling_reference") || enabledChecks.has("idless_reference") || enabledChecks.has("bare_reference")) {
     findings.push(...await referenceFindings(ctx, notes, enabledChecks));
   }
   if (enabledChecks.has("orphan_note")) findings.push(...orphanNoteFindings(ctx, notes));
@@ -200,8 +206,11 @@ async function referenceFindings(
 ): Promise<AuditFinding[]> {
   const danglingFindings: AuditFinding[] = [];
   const idlessFindings: AuditFinding[] = [];
+  const bareFindings: AuditFinding[] = [];
   const checkDangling = enabledChecks.has("dangling_reference");
   const checkIdless = enabledChecks.has("idless_reference");
+  const checkBare = enabledChecks.has("bare_reference");
+  const basenames = checkBare ? markdownBasenameIndex(ctx) : undefined;
   for (const note of notes) {
     const references = await readReferenceItemsFresh(ctx, note.file);
     references.forEach((reference, index) => {
@@ -225,9 +234,89 @@ async function referenceFindings(
           fix: "Run para-zk:audit fix=true or update the note with key=references op=backfill."
         });
       }
+      if (checkBare && basenames) {
+        const bare = bareReferenceState(reference, basenames);
+        if (bare) {
+          bareFindings.push({
+            code: "bare_reference",
+            severity: CHECK_SEVERITY.bare_reference,
+            path: note.file.path,
+            type: note.type,
+            detail: {
+              index,
+              link: reference.link,
+              base: bare.base,
+              ...(bare.ambiguous ? { ambiguous: true, candidates: bare.matches } : { resolved: bare.resolvedPath })
+            },
+            fix: bare.ambiguous
+              ? `Ambiguous: "${bare.base}" matches ${bare.matches.length} notes; set an explicit path with key=references (not auto-fixable).`
+              : "Run para-zk:audit fix=true to expand the bare reference link to its full path."
+          });
+        }
+      }
     });
   }
-  return [...danglingFindings, ...idlessFindings];
+  return [...danglingFindings, ...idlessFindings, ...bareFindings];
+}
+
+type BareReferenceState = { base: string; resolvedPath: string; ambiguous: boolean; matches: string[] };
+
+// A reference whose stored link is a bare basename (no folder) and that currently resolves: it
+// works now but is fragile — a same-named note (e.g. an LLM-Wiki concept page) makes the bare
+// link ambiguous and can silently rebind it. Returns undefined for non-bare or unresolved refs.
+function bareReferenceState(reference: ReferenceRead, basenames: Map<string, string[]>): BareReferenceState | undefined {
+  if (!reference.path) return undefined;
+  const wiki = parseWikiLink(reference.link);
+  if (!wiki) return undefined;
+  const base = splitObsidianSubpath(wiki.target).base;
+  if (!base || base.includes("/")) return undefined;
+  const matches = [...(basenames.get(base.toLowerCase()) ?? [])].sort((left, right) => left.localeCompare(right));
+  return { base, resolvedPath: reference.path, ambiguous: matches.length > 1, matches };
+}
+
+function markdownBasenameIndex(ctx: WorkflowContext): Map<string, string[]> {
+  const index = new Map<string, string[]>();
+  for (const file of ctx.host.getMarkdownFiles()) {
+    const key = file.basename.toLowerCase();
+    const paths = index.get(key) ?? [];
+    paths.push(file.path);
+    index.set(key, paths);
+  }
+  return index;
+}
+
+// Frontmatter-only fix: rewrite each UNIQUE bare reference's `link` to its full path through the
+// references registry (updateReferenceItem -> processFrontMatter). Body `PZ[id]` citations key on
+// the stable id, so they stay valid and the body is never touched. Ambiguous bare links are left
+// for the human (reported as findings, not fixed).
+async function fixBareReferences(
+  ctx: WorkflowContext,
+  notes: AuditableNote[],
+  findings: AuditFinding[]
+): Promise<AuditFixedItem[]> {
+  const basenames = markdownBasenameIndex(ctx);
+  const filesByPath = new Map(notes.map((note) => [note.file.path, note.file]));
+  const paths = Array.from(new Set(findings.map((finding) => finding.path))).sort((left, right) => left.localeCompare(right));
+  const fixed: AuditFixedItem[] = [];
+  for (const path of paths) {
+    const file = filesByPath.get(path);
+    if (!file) continue;
+    const references = await readReferenceItemsFresh(ctx, file);
+    const edits: { index: number; link: string }[] = [];
+    references.forEach((reference, index) => {
+      const bare = bareReferenceState(reference, basenames);
+      if (!bare || bare.ambiguous) return;
+      const display = parseWikiLink(reference.link)?.alias ?? bare.base;
+      edits.push({ index, link: canonicalWikiLink(bare.resolvedPath, display) });
+    });
+    for (const edit of edits) {
+      await updateReferenceItem(ctx, file, edit.index, { link: edit.link });
+    }
+    if (edits.length > 0) {
+      fixed.push({ code: "bare_reference", path, action: "expandBareReferenceLinks" });
+    }
+  }
+  return fixed;
 }
 
 function isDanglingReference(reference: ReferenceRead): boolean {

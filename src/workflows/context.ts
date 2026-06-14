@@ -258,6 +258,7 @@ export type AuditCheckCode =
   | "broken_link"
   | "dangling_reference"
   | "idless_reference"
+  | "bare_reference"
   | "orphan_note"
   | "upward_wiki_link"
   | "orphan_wiki_page"
@@ -284,7 +285,7 @@ export type AuditFinding = {
 };
 
 export type AuditFixedItem = {
-  code: "idless_reference" | "wiki_tag_domain_mismatch";
+  code: "idless_reference" | "wiki_tag_domain_mismatch" | "bare_reference";
   path: string;
   action: string;
 };
