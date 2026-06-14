@@ -142,3 +142,35 @@ describe("reference ids", () => {
     ]);
   });
 });
+
+describe("ambiguous reference targets", () => {
+  it("rejects a bare target shared by several notes (e.g. a resource and a same-named wiki page)", async () => {
+    const { ctx, app } = createTestContext();
+    await app.vault.create("PARA/Resources/Paper/Diffusion Policy.md", "---\ntype: resource\n---\n");
+    await app.vault.create("LLM-Wiki/Reinforcement Learning/Diffusion Policy.md", "---\ntype: llm-wiki\n---\n");
+    const source = await app.vault.create("Note.md", "---\ntype: resource\n---\n");
+
+    await expect(insertReferenceItem(ctx, source, { link: "[[Diffusion Policy]]" })).rejects.toThrow(/ambiguous/i);
+  });
+
+  it("accepts an explicit path to one of several same-named notes (a human may cite either)", async () => {
+    const { ctx, app } = createTestContext();
+    await app.vault.create("PARA/Resources/Paper/Diffusion Policy.md", "---\ntype: resource\n---\n");
+    await app.vault.create("LLM-Wiki/Reinforcement Learning/Diffusion Policy.md", "---\ntype: llm-wiki\n---\n");
+    const source = await app.vault.create("Note.md", "---\ntype: resource\n---\n");
+
+    const ref = await insertReferenceItem(ctx, source, {
+      link: "[[PARA/Resources/Paper/Diffusion Policy.md|Diffusion Policy]]"
+    });
+    expect(ref.link).toBe("[[PARA/Resources/Paper/Diffusion Policy.md|Diffusion Policy]]");
+  });
+
+  it("still expands a unique bare target to its full path", async () => {
+    const { ctx, app } = createTestContext();
+    await app.vault.create("PARA/Resources/Paper/ASAP.md", "---\ntype: resource\n---\n");
+    const source = await app.vault.create("Note.md", "---\ntype: resource\n---\n");
+
+    const ref = await insertReferenceItem(ctx, source, { link: "[[ASAP]]" });
+    expect(ref.link).toBe("[[PARA/Resources/Paper/ASAP.md]]");
+  });
+});

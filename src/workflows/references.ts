@@ -752,12 +752,32 @@ function parseReferenceTargetInput(value: string): ParsedReferenceTarget {
   };
 }
 
+// A bare reference target (basename only, no folder) silently resolves to Obsidian's FIRST
+// match — wrong once several notes share that basename (e.g. an LLM-Wiki concept page named
+// after the source it synthesizes). Refuse the ambiguity and require an explicit path. An
+// explicit path still resolves to ANY note, so a human can deliberately cite a wiki page.
+function assertUnambiguousReferenceTarget(ctx: WorkflowContext, base: string): void {
+  if (base.includes("/")) return;
+  const wanted = base.toLowerCase();
+  const matches = ctx.host
+    .getMarkdownFiles()
+    .filter((file) => file.basename.toLowerCase() === wanted)
+    .map((file) => file.path)
+    .sort();
+  if (matches.length > 1) {
+    throw new Error(
+      `reference target "${base}" is ambiguous - ${matches.length} notes share that name (${matches.join(", ")}); pass an explicit path, e.g. [[${matches[0]}|${base}]]`
+    );
+  }
+}
+
 function resolveWikiReferenceFile(
   ctx: WorkflowContext,
   source: TFile,
   target: string
 ): { file: TFile; subpath: string } | undefined {
   const split = splitObsidianSubpath(target);
+  if (split.base) assertUnambiguousReferenceTarget(ctx, split.base);
   const normalized = referenceTargetWithSubpath(split.base, split.subpath);
   const resolved = ctx.host.getFirstLinkpathDest(normalized, source.path)
     ?? (split.base ? ctx.host.getFirstLinkpathDest(split.base, source.path) : null);
