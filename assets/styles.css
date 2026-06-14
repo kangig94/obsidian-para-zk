@@ -785,14 +785,8 @@ body.para-zk-width-active .markdown-preview-view .markdown-preview-sizer > div:h
   min-width: 220px;
 }
 
-.para-zk-reference-edit-target,
-.para-zk-reference-edit-anchor {
+.para-zk-reference-edit-target {
   width: min(420px, 100%);
-}
-
-.para-zk-reference-edit-anchor:disabled {
-  color: var(--text-faint);
-  cursor: not-allowed;
 }
 
 .para-zk-reference-edit-description {

@@ -86,13 +86,12 @@ function referenceHref(reference: ReferenceRead): string {
   return isExternalReference(reference.link) ? reference.link : "#";
 }
 
-// The link text Obsidian resolves on open/hover. An optional citation `subpath` (a heading
-// or `^block`) points at one section of the reference's target, overriding any anchor the
-// reference's own stored link carries — it is the more specific intent at the citation site.
+// The link text Obsidian resolves on open/hover. A reference always resolves to its base
+// target — any anchor in the stored link is ignored. A section comes only from the citation
+// `subpath` (a heading or `^block`), specified at the citation site.
 function referenceOpenText(reference: ReferenceRead, subpath?: string): string {
-  const target = parseWikiLink(reference.link)?.target ?? reference.link;
-  if (!subpath) return target;
-  return `${splitObsidianSubpath(target).base}#${subpath.replace(/^#+/, "")}`;
+  const base = splitObsidianSubpath(parseWikiLink(reference.link)?.target ?? reference.link).base;
+  return subpath ? `${base}#${subpath.replace(/^#+/, "")}` : base;
 }
 
 export function referenceTargetHint(reference: ReferenceRead): string {

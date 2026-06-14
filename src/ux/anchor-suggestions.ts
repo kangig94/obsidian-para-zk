@@ -2,8 +2,8 @@ import { TFile, stripHeading, stripHeadingForLink } from "obsidian";
 import type { ParaZkPluginContext } from "../plugin-interface";
 
 // A selectable subpath of a target file: a heading (rendered as `#Heading` in a link)
-// or a block (`#^id`). Shared by the reference editor's anchor field and the inline
-// `` `PZ[<id>#<section>]` `` citation suggester.
+// or a block (`#^id`). Used by the inline `` `PZ[<id>#<section>]` `` citation suggester
+// to complete the section after a `#`.
 export type AnchorSuggestion = {
   kind: "heading" | "block";
   value: string;

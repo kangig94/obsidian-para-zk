@@ -709,6 +709,12 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Removed
 
+- Removed reference-level heading/block anchors. A reference always resolves to its base
+  note; which section you mean is expressed only at the citation site with
+  `` `PZ[<id>#<section>]` ``. The reference editor's "Section or block" field is gone, and
+  navigation no longer honors an anchor stored in a reference link (no legacy/back-compat
+  path, no migration — clean up any existing `[[Note#Heading]]` references by hand). This
+  removes the dual mechanism where a reference anchor and a citation section could disagree.
 - Removed the need for Meta Bind in generated PARA-ZK templates and dashboards.
 - Removed DataviewJS-only card rendering for dashboard summary sections.
 - Removed the separate `sync-managed-files` GUI command.

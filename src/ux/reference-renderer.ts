@@ -11,7 +11,6 @@ import {
 import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { workflowContext } from "../vault/host";
-import { anchorSuggestionsForFile, type AnchorSuggestion } from "./anchor-suggestions";
 import {
   canonicalWikiLink,
   createResource,
@@ -65,18 +64,14 @@ type RenderableReference = {
 
 type ReferenceEditValue = {
   target: string;
-  anchor: string;
   description: string;
   originalLink?: string;
   prefilledTarget?: string;
-  prefilledAnchor?: string;
 };
 
 type ReferenceEditModalOptions = {
   suppressInitialTargetFocus?: boolean;
 };
-
-type ReferenceAnchorSuggestion = AnchorSuggestion;
 
 type ReferenceTargetSuggestion = {
   file: TFile;
@@ -245,7 +240,7 @@ function renderReferenceShell(
             plugin,
             addLabel,
             options.rootFile.path,
-            { target: "", anchor: "", description: "" },
+            { target: "", description: "" },
             async (value) => {
               await queueRegistryFileWrite(
                 options.rootFile,
@@ -393,7 +388,7 @@ async function insertReferenceFromEditor(
   value: ReferenceEditValue
 ): Promise<void> {
   await insertReferenceItem(workflowContext(plugin), rootFile, {
-    link: buildReferenceLinkInput(value.target, value.anchor),
+    link: buildReferenceLinkInput(value.target),
     ...(value.description.trim() ? { description: value.description } : {})
   });
 }
@@ -411,20 +406,19 @@ async function updateReferenceFromEditor(
       item.reference.link,
       referenceGoneMessage(plugin)
     );
-    // When the user left target and anchor untouched, update only the description so the
-    // stored link keeps its exact form (passing link would re-canonicalize, e.g. rewriting
-    // a short `[[Foo]]` to a full path or a text reference into a wikilink). Rebuild the link
-    // only when target/anchor actually changed.
+    // When the user left the target untouched, update only the description so the stored
+    // link keeps its exact form (passing link would re-canonicalize, e.g. rewriting a short
+    // `[[Foo]]` to a full path or a text reference into a wikilink). Rebuild the link only
+    // when the target actually changed.
     const linkUnchanged = value.originalLink !== undefined
-      && value.target === value.prefilledTarget
-      && value.anchor === value.prefilledAnchor;
+      && value.target === value.prefilledTarget;
     await updateReferenceItem(
       workflow,
       item.rootFile,
       index,
       linkUnchanged
         ? { description: value.description }
-        : { link: buildReferenceLinkInput(value.target, value.anchor), description: value.description }
+        : { link: buildReferenceLinkInput(value.target), description: value.description }
     );
   });
 }
@@ -483,46 +477,34 @@ function renderReferenceError(el: HTMLElement, error: unknown): void {
   renderRegistryBlockError(el, error, "references");
 }
 
-function buildReferenceLinkInput(target: string, anchor: string): string {
+function buildReferenceLinkInput(target: string): string {
   const trimmedTarget = target.trim();
   if (isExternalReference(trimmedTarget)) return trimmedTarget;
 
-  const normalizedAnchor = normalizeReferenceAnchor(anchor);
   const wiki = parseWikiLink(trimmedTarget);
-  if (wiki) {
-    // Target may arrive pre-wrapped from file suggestions; unwrap before applying anchor changes.
-    const split = splitObsidianSubpath(wiki.target);
-    const nextTarget = normalizedAnchor ? `${split.base}#${normalizedAnchor}` : wiki.target;
-    return canonicalWikiLink(nextTarget, wiki.alias);
-  }
-
-  return canonicalWikiLink(normalizedAnchor ? `${trimmedTarget}#${normalizedAnchor}` : trimmedTarget);
+  return wiki ? canonicalWikiLink(wiki.target, wiki.alias) : canonicalWikiLink(trimmedTarget);
 }
 
 function referenceEditValue(reference: ReferenceRead): ReferenceEditValue {
   const description = reference.description ?? "";
+  // url/text: the link IS the editable target. wiki/note/file: edit the path-only target
+  // (no alias, no #section) — a section is never stored on a reference, only at the cite site.
   if (reference.kind === "url" || reference.kind === "text") {
     return {
       target: reference.link,
-      anchor: "",
       description,
       originalLink: reference.link,
-      prefilledTarget: reference.link,
-      prefilledAnchor: ""
+      prefilledTarget: reference.link
     };
   }
 
   const innerTarget = parseWikiLink(reference.link)?.target ?? reference.target ?? reference.link;
-  const split = splitObsidianSubpath(innerTarget);
-  const target = reference.path ?? split.base;
-  const anchor = normalizeReferenceAnchor(split.subpath);
+  const target = reference.path ?? splitObsidianSubpath(innerTarget).base;
   return {
     target,
-    anchor,
     description,
     originalLink: reference.link,
-    prefilledTarget: target,
-    prefilledAnchor: anchor
+    prefilledTarget: target
   };
 }
 
@@ -531,11 +513,6 @@ class ReferenceEditModal extends Modal {
   private saving = false;
   private targetSuggest?: ReferenceTargetSuggest;
   private targetInputEl?: HTMLInputElement;
-  private anchorSuggest?: ReferenceAnchorSuggest;
-  private anchorInputEl?: HTMLInputElement;
-  private anchorSuggestions: ReferenceAnchorSuggestion[] = [];
-  private anchorLineCache = new Map<string, string[]>();
-  private anchorRefreshGeneration = 0;
   private readonly suppressInitialTargetFocus: boolean;
 
   constructor(
@@ -549,8 +526,7 @@ class ReferenceEditModal extends Modal {
     super(plugin.app);
     this.value = {
       ...value,
-      prefilledTarget: value.prefilledTarget ?? value.target,
-      prefilledAnchor: normalizeReferenceAnchor(value.prefilledAnchor ?? value.anchor)
+      prefilledTarget: value.prefilledTarget ?? value.target
     };
     this.suppressInitialTargetFocus = options.suppressInitialTargetFocus === true;
   }
@@ -558,7 +534,6 @@ class ReferenceEditModal extends Modal {
   onOpen(): void {
     const labels = localePack(this.plugin.settings.locale).labels;
     const targetLabel = labelValue(labels.referenceTargetPlaceholder, "Path or URL");
-    const anchorLabel = labelValue(labels.referenceAnchorPlaceholder, "Section or block (optional)");
     const descriptionLabel = labelValue(labels.referenceDescriptionPlaceholder, "Description");
     this.contentEl.empty();
     this.contentEl.addClass("para-zk-reference-edit-modal");
@@ -572,35 +547,12 @@ class ReferenceEditModal extends Modal {
           .setValue(this.value.target)
           .onChange((value) => {
             this.value.target = value;
-            void this.refreshAnchorSuggestions();
           });
         text.inputEl.addClass("para-zk-reference-edit-target");
         this.targetInputEl = text.inputEl;
         this.targetSuggest = new ReferenceTargetSuggest(this.plugin, text.inputEl, (file) => {
           this.value.target = text.inputEl.value || file.path;
-          void this.refreshAnchorSuggestions();
         });
-      });
-
-    new Setting(this.contentEl)
-      .setName(anchorLabel)
-      .addText((text) => {
-        text
-          .setPlaceholder(anchorLabel)
-          .setValue(this.value.anchor)
-          .onChange((value) => {
-            if (!text.inputEl.disabled) this.value.anchor = value;
-          });
-        this.anchorInputEl = text.inputEl;
-        text.inputEl.addClass("para-zk-reference-edit-anchor");
-        this.anchorSuggest = new ReferenceAnchorSuggest(
-          this.plugin,
-          text.inputEl,
-          () => this.anchorSuggestions,
-          (suggestion) => {
-            this.value.anchor = suggestion.value;
-          }
-        );
       });
 
     new Setting(this.contentEl)
@@ -614,8 +566,6 @@ class ReferenceEditModal extends Modal {
           });
         text.inputEl.addClass("para-zk-reference-edit-description");
       });
-
-    void this.refreshAnchorSuggestions();
 
     new Setting(this.contentEl)
       .addButton((button) => {
@@ -636,13 +586,9 @@ class ReferenceEditModal extends Modal {
   }
 
   onClose(): void {
-    this.anchorRefreshGeneration += 1;
     this.targetSuggest?.close();
-    this.anchorSuggest?.close();
     this.targetSuggest = undefined;
     this.targetInputEl = undefined;
-    this.anchorSuggest = undefined;
-    this.anchorInputEl = undefined;
     this.contentEl.empty();
   }
 
@@ -671,19 +617,12 @@ class ReferenceEditModal extends Modal {
 
     this.saving = true;
     try {
-      const anchor = normalizeReferenceAnchor(this.value.anchor);
       const saveValue: ReferenceEditValue = {
         target,
-        anchor,
         description: this.value.description,
-        prefilledTarget: this.value.prefilledTarget,
-        prefilledAnchor: this.value.prefilledAnchor
+        prefilledTarget: this.value.prefilledTarget
       };
-      if (
-        this.value.originalLink !== undefined
-        && target === this.value.prefilledTarget
-        && anchor === this.value.prefilledAnchor
-      ) {
+      if (this.value.originalLink !== undefined && target === this.value.prefilledTarget) {
         saveValue.originalLink = this.value.originalLink;
       }
       await this.save(saveValue);
@@ -693,76 +632,6 @@ class ReferenceEditModal extends Modal {
     } finally {
       this.saving = false;
     }
-  }
-
-  private async refreshAnchorSuggestions(): Promise<void> {
-    const generation = ++this.anchorRefreshGeneration;
-    const file = this.resolveAnchorTargetFile(this.value.target);
-    if (!isMarkdownFile(file)) {
-      this.anchorSuggestions = [];
-      this.clearAnchorValue();
-      this.setAnchorInputEnabled(false);
-      return;
-    }
-
-    try {
-      const suggestions = await this.loadAnchorSuggestions(file);
-      if (generation !== this.anchorRefreshGeneration) return;
-      this.anchorSuggestions = suggestions;
-      this.dropUnresolvedAnchor(suggestions);
-      this.setAnchorInputEnabled(true);
-    } catch (error) {
-      if (generation !== this.anchorRefreshGeneration) return;
-      this.anchorSuggestions = [];
-      this.setAnchorInputEnabled(false);
-      new Notice(registryErrorMessage(error));
-    }
-  }
-
-  private clearAnchorValue(): void {
-    this.value.anchor = "";
-    if (this.anchorInputEl) this.anchorInputEl.value = "";
-  }
-
-  private dropUnresolvedAnchor(suggestions: ReferenceAnchorSuggestion[]): void {
-    const anchor = normalizeReferenceAnchor(this.value.anchor);
-    if (!anchor) return;
-    if (suggestions.some((suggestion) => normalizeReferenceAnchor(suggestion.value) === anchor)) return;
-    this.clearAnchorValue();
-  }
-
-  private setAnchorInputEnabled(enabled: boolean): void {
-    if (!this.anchorInputEl) return;
-    this.anchorInputEl.disabled = !enabled;
-    this.anchorInputEl.classList.toggle("is-disabled", !enabled);
-    if (enabled) {
-      this.anchorInputEl.value = this.value.anchor;
-    }
-  }
-
-  private resolveAnchorTargetFile(targetValue: string): TFile | undefined {
-    const target = parseWikiLink(targetValue.trim())?.target ?? targetValue.trim();
-    if (!target || isExternalReference(target)) return undefined;
-
-    const linked = this.plugin.app.metadataCache.getFirstLinkpathDest(target, this.sourcePath);
-    if (linked instanceof TFile) return linked;
-
-    if (!looksLikeVaultPath(target)) return undefined;
-    const file = this.plugin.app.vault.getAbstractFileByPath(splitObsidianSubpath(target).base.replace(/\\/g, "/"));
-    return file instanceof TFile ? file : undefined;
-  }
-
-  private loadAnchorSuggestions(file: TFile): Promise<ReferenceAnchorSuggestion[]> {
-    return anchorSuggestionsForFile(this.plugin, file, (target) => this.cachedTargetLines(target));
-  }
-
-  private async cachedTargetLines(file: TFile): Promise<string[]> {
-    const cached = this.anchorLineCache.get(file.path);
-    if (cached) return cached;
-
-    const lines = (await this.plugin.app.vault.cachedRead(file)).split(/\r?\n/);
-    this.anchorLineCache.set(file.path, lines);
-    return lines;
   }
 }
 
@@ -832,59 +701,6 @@ function frontmatterAliases(value: unknown): string[] {
     .filter((item): item is string => typeof item === "string")
     .map((item) => item.trim())
     .filter((item) => item.length > 0);
-}
-
-class ReferenceAnchorSuggest extends AbstractInputSuggest<ReferenceAnchorSuggestion> {
-  constructor(
-    plugin: ParaZkPluginContext,
-    inputEl: HTMLInputElement,
-    // NOTE: do not name this `suggestions` — that shadows an internal member of the
-    // AbstractInputSuggest/PopoverSuggest base used to render the popup, which silently
-    // breaks rendering (getSuggestions runs but renderSuggestion is never called).
-    private readonly getItems: () => ReferenceAnchorSuggestion[],
-    private readonly onSelectAnchor: (suggestion: ReferenceAnchorSuggestion) => void
-  ) {
-    super(plugin.app, inputEl);
-    this.limit = 20;
-  }
-
-  protected getSuggestions(query: string): ReferenceAnchorSuggestion[] {
-    const normalized = normalizeReferenceAnchor(query).toLocaleLowerCase();
-    const matches = normalized
-      ? this.getItems().filter((suggestion) => suggestion.searchText.toLocaleLowerCase().includes(normalized))
-      : this.getItems();
-    return matches.slice(0, 20);
-  }
-
-  renderSuggestion(suggestion: ReferenceAnchorSuggestion, el: HTMLElement): void {
-    el.addClass("para-zk-reference-suggestion");
-    const title = el.createDiv({ cls: "para-zk-reference-suggestion-title", text: suggestion.label });
-    if (suggestion.kind === "heading") {
-      title.addClass("para-zk-reference-suggestion-heading");
-      title.style.paddingLeft = `${Math.max(0, (suggestion.level ?? 1) - 1) * 10}px`;
-    }
-    if (suggestion.detail) {
-      el.createDiv({ cls: "para-zk-reference-suggestion-detail", text: suggestion.detail });
-    }
-  }
-
-  selectSuggestion(suggestion: ReferenceAnchorSuggestion, _evt: MouseEvent | KeyboardEvent): void {
-    this.setValue(suggestion.value);
-    this.onSelectAnchor(suggestion);
-    this.close();
-  }
-}
-
-function normalizeReferenceAnchor(anchor: string): string {
-  return anchor.trim().replace(/^#/, "").trim();
-}
-
-function isMarkdownFile(file: TFile | undefined): file is TFile {
-  return file instanceof TFile && file.extension.toLocaleLowerCase() === "md";
-}
-
-function looksLikeVaultPath(value: string): boolean {
-  return value.includes("/") || value.toLocaleLowerCase().endsWith(".md");
 }
 
 function referenceSummaryText(items: RenderableReference[], labels: Record<string, string>): string {

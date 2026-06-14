@@ -968,11 +968,11 @@ LLM-Wiki.
 
 A citation may point at one section of its reference's target with
 `` `PZ[<id>#<section>]` `` — a heading (`#Training Loop`) or a block (`#^block-id`).
-The section renders as `[n §<section>]` and click/hover navigates to that section,
-overriding any anchor the reference's own stored link carries. A section cannot
-contain a comma (the multi-cite separator) — cite a comma-bearing heading through
-the reference's own stored anchor instead. Sections apply to internal references
-(note/file/wiki); they are ignored for url/text references.
+The section renders as `[n §<section>]` and click/hover navigates to that section.
+A reference always resolves to its base note; a section is specified only at the
+citation site, never stored on the reference. A section cannot contain a comma
+(the multi-cite separator). Sections apply to internal references (note/file/wiki);
+they are ignored for url/text references.
 
 At render time, the citation displays the reference's current 0-based registry
 position as `[n]`, matching `key=references/<i>`. Use `` `PZ[<id>, <id>]` `` for
