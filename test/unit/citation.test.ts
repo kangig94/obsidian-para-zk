@@ -6,18 +6,28 @@ import type { ReferenceRead } from "../../src/workflows";
 
 describe("parseCitationKeys", () => {
   it("returns a single stable id for PZ[<id>]", () => {
-    expect(parseCitationKeys("PZ[a1b2c3]")).toEqual(["a1b2c3"]);
-    expect(parseCitationKeys("PZ[Ref_12-x]")).toEqual(["Ref_12-x"]);
+    expect(parseCitationKeys("PZ[a1b2c3]")).toEqual([{ id: "a1b2c3" }]);
+    expect(parseCitationKeys("PZ[Ref_12-x]")).toEqual([{ id: "Ref_12-x" }]);
   });
 
   it("parses a comma-separated list, with or without spaces", () => {
-    expect(parseCitationKeys("PZ[a1b2c3,d4e5f6]")).toEqual(["a1b2c3", "d4e5f6"]);
-    expect(parseCitationKeys("PZ[a1b2c3, d4e5f6]")).toEqual(["a1b2c3", "d4e5f6"]);
-    expect(parseCitationKeys("PZ[ a1b2c3 , d4e5f6 ]")).toEqual(["a1b2c3", "d4e5f6"]);
+    expect(parseCitationKeys("PZ[a1b2c3,d4e5f6]")).toEqual([{ id: "a1b2c3" }, { id: "d4e5f6" }]);
+    expect(parseCitationKeys("PZ[a1b2c3, d4e5f6]")).toEqual([{ id: "a1b2c3" }, { id: "d4e5f6" }]);
+    expect(parseCitationKeys("PZ[ a1b2c3 , d4e5f6 ]")).toEqual([{ id: "a1b2c3" }, { id: "d4e5f6" }]);
   });
 
   it("treats numeric-looking content as a key, not a positional index", () => {
-    expect(parseCitationKeys("PZ[0]")).toEqual(["0"]);
+    expect(parseCitationKeys("PZ[0]")).toEqual([{ id: "0" }]);
+  });
+
+  it("parses an optional section subpath after the id", () => {
+    expect(parseCitationKeys("PZ[abc123#Training Loop]")).toEqual([{ id: "abc123", subpath: "Training Loop" }]);
+    expect(parseCitationKeys("PZ[abc123#^blk-1]")).toEqual([{ id: "abc123", subpath: "^blk-1" }]);
+    expect(parseCitationKeys("PZ[abc123#H1#H2]")).toEqual([{ id: "abc123", subpath: "H1#H2" }]);
+  });
+
+  it("mixes sectioned and plain ids in a multi-cite list", () => {
+    expect(parseCitationKeys("PZ[a1#Intro, b2]")).toEqual([{ id: "a1", subpath: "Intro" }, { id: "b2" }]);
   });
 
   it("only matches when the whole string is the token", () => {
@@ -48,11 +58,26 @@ describe("buildCitationElement", () => {
     buildCitationElement(fakePlugin(), [
       { id: "first1", link: "https://example.com/first", kind: "url", target: "https://example.com/first" },
       reference
-    ], ["pmg123"], "PARA/Projects/Alpha/Alpha.md", rendered.host);
+    ], [{ id: "pmg123" }], "PARA/Projects/Alpha/Alpha.md", rendered.host);
 
     expect(rendered.links).toHaveLength(1);
     expect(rendered.links[0].text).toBe("[1]");
     expect(rendered.links[0].attrs.title).toBe("PMG");
+  });
+
+  it("renders the section hint and tooltip for a sectioned citation", () => {
+    const reference: ReferenceRead = {
+      id: "abc123",
+      link: "[[PARA/Resources/Paper.md|Paper]]",
+      kind: "note",
+      path: "PARA/Resources/Paper.md"
+    };
+    const rendered = createCitationHost();
+
+    buildCitationElement(fakePlugin(), [reference], [{ id: "abc123", subpath: "Training Loop" }], "Source.md", rendered.host);
+
+    expect(rendered.links[0].text).toBe("[0 §Training Loop]");
+    expect(rendered.links[0].attrs.title).toBe("Paper · §Training Loop");
   });
 
   it("renders the same id at a new position after references reorder", () => {
@@ -65,7 +90,7 @@ describe("buildCitationElement", () => {
     buildCitationElement(fakePlugin(), [alpha, beta], keys, "Source.md", before.host);
     buildCitationElement(fakePlugin(), [beta, alpha], keys, "Source.md", after.host);
 
-    expect(keys).toEqual(["beta22"]);
+    expect(keys).toEqual([{ id: "beta22" }]);
     expect(before.links[0].text).toBe("[1]");
     expect(after.links[0].text).toBe("[0]");
   });
@@ -79,7 +104,7 @@ describe("buildCitationElement", () => {
     };
     const rendered = createCitationHost();
 
-    buildCitationElement(fakePlugin(), [reference], ["0"], "Source.md", rendered.host);
+    buildCitationElement(fakePlugin(), [reference], [{ id: "0" }], "Source.md", rendered.host);
 
     expect(rendered.links).toHaveLength(1);
     expect(rendered.links[0].text).toBe("[?]");
@@ -96,7 +121,7 @@ describe("buildCitationElement", () => {
     };
     const rendered = createCitationHost();
 
-    buildCitationElement(fakePlugin(), [reference], ["legacy1"], "Source.md", rendered.host);
+    buildCitationElement(fakePlugin(), [reference], [{ id: "legacy1" }], "Source.md", rendered.host);
 
     expect(rendered.links[0].text).toBe("[?]");
     expect(rendered.links[0].attrs.title).toBe("No reference for legacy1");
@@ -108,9 +133,20 @@ describe("buildCitationElement", () => {
     const beta: ReferenceRead = { id: "beta22", link: "https://example.com/b", kind: "url", target: "https://example.com/b" };
     const rendered = createCitationHost();
 
-    buildCitationElement(fakePlugin(), [alpha, beta], ["beta22", "alpha1"], "Source.md", rendered.host);
+    buildCitationElement(fakePlugin(), [alpha, beta], [{ id: "beta22" }, { id: "alpha1" }], "Source.md", rendered.host);
 
     expect(rendered.text()).toBe("[1, 0]");
+  });
+
+  it("renders a section hint on a non-first multi-cite entry", () => {
+    const alpha: ReferenceRead = { id: "alpha1", link: "https://example.com/a", kind: "url", target: "https://example.com/a" };
+    const beta: ReferenceRead = { id: "beta22", link: "https://example.com/b", kind: "url", target: "https://example.com/b" };
+    const rendered = createCitationHost();
+
+    buildCitationElement(fakePlugin(), [alpha, beta], [{ id: "alpha1" }, { id: "beta22", subpath: "Results" }], "Source.md", rendered.host);
+
+    expect(rendered.text()).toBe("[0, 1 §Results]");
+    expect(rendered.links[1].attrs.title).toBe("https://example.com/b · §Results");
   });
 
   it("keeps unresolved markers in place for mixed multi-cite ids", () => {
@@ -118,7 +154,7 @@ describe("buildCitationElement", () => {
     const beta: ReferenceRead = { id: "beta22", link: "https://example.com/b", kind: "url", target: "https://example.com/b" };
     const rendered = createCitationHost();
 
-    buildCitationElement(fakePlugin(), [alpha, beta], ["beta22", "MISSING", "alpha1"], "Source.md", rendered.host);
+    buildCitationElement(fakePlugin(), [alpha, beta], [{ id: "beta22" }, { id: "MISSING" }, { id: "alpha1" }], "Source.md", rendered.host);
 
     expect(rendered.text()).toBe("[1, ?, 0]");
     expect(rendered.links[1].classes).toContain("is-unresolved");

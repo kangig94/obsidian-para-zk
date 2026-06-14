@@ -10,7 +10,7 @@ import {
 import { TFile, editorInfoField, editorLivePreviewField } from "obsidian";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import type { ReferenceRead } from "../workflows";
-import { CITATION_TOKEN_RE, buildCitationElement, parseCitationKeys, resolveReferences } from "./citation-renderer";
+import { CITATION_TOKEN_RE, buildCitationElement, parseCitationKeys, resolveReferences, type CitationKey } from "./citation-renderer";
 
 // Live Preview counterpart to the reading-view citation post-processor: render a
 // `` `PZ[<id>]` `` / `` `PZ[<id>, <id>]` `` inline-code token as bracketed `[n, m]` links, reusing the
@@ -23,7 +23,7 @@ export function createCitationEditorExtension(plugin: ParaZkPluginContext): Exte
     private readonly referenceSignature: string;
 
     constructor(
-      private readonly keys: string[],
+      private readonly keys: CitationKey[],
       private readonly references: ReferenceRead[],
       private readonly sourcePath: string
     ) {
@@ -34,7 +34,8 @@ export function createCitationEditorExtension(plugin: ParaZkPluginContext): Exte
     eq(widget: WidgetType): boolean {
       if (!(widget instanceof CitationWidget) || widget.keys.length !== this.keys.length) return false;
       return this.referenceSignature === widget.referenceSignature
-        && this.keys.every((key, position) => key === widget.keys[position]);
+        && this.keys.every((key, position) =>
+          key.id === widget.keys[position].id && key.subpath === widget.keys[position].subpath);
     }
 
     toDOM(): HTMLElement {

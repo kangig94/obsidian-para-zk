@@ -954,15 +954,25 @@ optsidian para-zk:update-project title="Model Evaluation" key=frontmatter/status
 Body prose cites the note's own registry references inline with a code span whose
 whole content is `` `PZ[<id>]` ``. The `<id>` is the stable `id` returned by
 `read ... key=references`; it is not the visible registry position and is not
-typed by hand in normal editing. In Obsidian, type `PZ[` in the editor to open
-the reference suggester, search by title/alias, description, or link, and select
-the reference; the suggester inserts the full inline-code citation token.
+typed by hand in normal editing. In Obsidian, type a backtick then `PZ[` (the backtick opt-in keeps bare `PZ[`
+prose untouched) to open the reference suggester, search by title/alias,
+description, or link, and select the reference; the suggester inserts the id and
+leaves the cursor just before the `]`. Typing `#` there switches the suggester to
+the reference target's headings and blocks, completing a section citation.
 If a hand-authored reference reads as `id: null`, run
 `update ... key=references op=backfill` first; pure reads never assign ids.
 The backticks are required: bare `PZ[<id>]` text does not render as a citation.
 For LLM-Wiki pages, cross-link concept pages with body `[[link]]`; `references`
 and `` `PZ[<id>]` `` citations are only for canonical source notes outside
 LLM-Wiki.
+
+A citation may point at one section of its reference's target with
+`` `PZ[<id>#<section>]` `` — a heading (`#Training Loop`) or a block (`#^block-id`).
+The section renders as `[n §<section>]` and click/hover navigates to that section,
+overriding any anchor the reference's own stored link carries. A section cannot
+contain a comma (the multi-cite separator) — cite a comma-bearing heading through
+the reference's own stored anchor instead. Sections apply to internal references
+(note/file/wiki); they are ignored for url/text references.
 
 At render time, the citation displays the reference's current 0-based registry
 position as `[n]`, matching `key=references/<i>`. Use `` `PZ[<id>, <id>]` `` for

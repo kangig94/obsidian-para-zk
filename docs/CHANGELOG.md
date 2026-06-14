@@ -80,6 +80,14 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- Inline citations can now target a section of their reference: `` `PZ[<id>#<heading>]` ``
+  (or `#^block-id`) renders as `[n §<heading>]` and click/hover navigates to that section,
+  overriding any anchor the reference's own link carries. The section cannot contain a comma
+  (the multi-cite separator) and is honored only for internal (note/file/wiki) references.
+  The editor citation suggester now triggers only inside a backtick code span (bare `PZ[`
+  is left alone), places the cursor before the `]` after picking a reference, and — when the
+  user then types `#` — completes the reference target's headings and blocks. This also fixes
+  the nested-backtick insertion when a code span was already open.
 - The HomePage dashboard summary now includes an LLM-Wiki count card (📖), counting pages
   with `type: llm-wiki` under the `LLM-Wiki/` folder — the same identification the rest of
   the plugin uses. Rendered after the PARA/ZK cards; localized label `llmWiki` ("LLM-Wiki").

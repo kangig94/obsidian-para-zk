@@ -7,53 +7,76 @@ import type {
 } from "obsidian";
 import { CitationSuggest } from "../../src/ux/citation-suggest";
 import type { ParaZkPluginContext } from "../../src/plugin-interface";
+import type { AnchorSuggestion } from "../../src/ux/anchor-suggestions";
 import { DEFAULT_SETTINGS } from "../../src/types";
 import { MockApp } from "../harness/vault";
 import { expectGeneratedReferenceId } from "./reference-id-test-helpers";
 
 describe("CitationSuggest", () => {
-  it("triggers on PZ[ before the cursor", async () => {
+  it("triggers inside an open backtick code span", async () => {
     const app = new MockApp();
     const file = await app.vault.create("Source.md", "---\nreferences: []\n---\n");
     const suggest = new CitationSuggest(fakePlugin(app));
-    const line = "Before PZ[ali";
-    const cursor = { line: 0, ch: "Before PZ[ali".length };
-    const editor = fakeEditor(line);
+    const line = "Before `PZ[ali";
 
-    const trigger = suggest.onTrigger(cursor, editor, file);
-
-    expect(trigger).toEqual({
-      start: { line: 0, ch: "Before ".length },
-      end: cursor,
+    expect(suggest.onTrigger({ line: 0, ch: line.length }, fakeEditor(line), file)).toEqual({
+      start: { line: 0, ch: line.indexOf("ali") },
+      end: { line: 0, ch: line.length },
       query: "ali"
     });
   });
 
-  it("does not trigger without an open PZ[ token at the cursor", async () => {
+  it("ignores a bare PZ[ without a leading backtick", async () => {
     const app = new MockApp();
     const file = await app.vault.create("Source.md", "---\nreferences: []\n---\n");
     const suggest = new CitationSuggest(fakePlugin(app));
+    const line = "Before PZ[ali";
 
-    expect(suggest.onTrigger({ line: 0, ch: "Before ".length }, fakeEditor("Before PZ[ali"), file))
-      .toBeNull();
+    expect(suggest.onTrigger({ line: 0, ch: line.length }, fakeEditor(line), file)).toBeNull();
   });
 
-  it("does not trigger inside an already closed PZ token", async () => {
+  it("still triggers when the cursor sits before the closing bracket", async () => {
     const app = new MockApp();
     const file = await app.vault.create("Source.md", "---\nreferences: []\n---\n");
     const suggest = new CitationSuggest(fakePlugin(app));
-    const line = "Before PZ[ali] after";
+    const line = "`PZ[ali]`";
 
-    expect(suggest.onTrigger({ line: 0, ch: "Before PZ[ali".length }, fakeEditor(line), file))
-      .toBeNull();
+    // cursor between "ali" and "]" — the spot left after picking a reference.
+    expect(suggest.onTrigger({ line: 0, ch: "`PZ[ali".length }, fakeEditor(line), file)).toEqual({
+      start: { line: 0, ch: "`PZ[".length },
+      end: { line: 0, ch: "`PZ[ali".length },
+      query: "ali"
+    });
+  });
+
+  it("does not trigger once the cursor is past the closing bracket", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("Source.md", "---\nreferences: []\n---\n");
+    const suggest = new CitationSuggest(fakePlugin(app));
+    const line = "`PZ[ali]`";
+
+    expect(suggest.onTrigger({ line: 0, ch: "`PZ[ali]".length }, fakeEditor(line), file)).toBeNull();
+  });
+
+  it("switches to a section query after a # following the id", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("Source.md", "---\nreferences: []\n---\n");
+    const suggest = new CitationSuggest(fakePlugin(app));
+    const line = "`PZ[ref1#Tra";
+
+    // The query is the section text after `#`, not the whole "ref1#Tra" entry.
+    expect(suggest.onTrigger({ line: 0, ch: line.length }, fakeEditor(line), file)).toEqual({
+      start: { line: 0, ch: line.indexOf("Tra") },
+      end: { line: 0, ch: line.length },
+      query: "Tra"
+    });
   });
 
   it("does not trigger without a file", () => {
     const app = new MockApp();
     const suggest = new CitationSuggest(fakePlugin(app));
 
-    expect(suggest.onTrigger({ line: 0, ch: "PZ[".length }, fakeEditor("PZ["), null))
-      .toBeNull();
+    expect(suggest.onTrigger({ line: 0, ch: "`PZ[".length }, fakeEditor("`PZ["), null)).toBeNull();
   });
 
   it("filters suggestions by title, description, and link in registry order", async () => {
@@ -72,17 +95,17 @@ describe("CitationSuggest", () => {
     ].join("\n"));
     const suggest = new CitationSuggest(fakePlugin(app));
 
-    expect(suggest.getSuggestions(context(file, "", fakeEditor("PZ["))).map((reference) => reference.id))
+    expect((await suggest.getSuggestions(context(file, "", fakeEditor("`PZ[")))).map(referenceId))
       .toEqual(["alias1", "other2"]);
-    expect(suggest.getSuggestions(context(file, "alias", fakeEditor("PZ[alias"))).map((reference) => reference.id))
+    expect((await suggest.getSuggestions(context(file, "alias", fakeEditor("`PZ[alias")))).map(referenceId))
       .toEqual(["alias1"]);
-    expect(suggest.getSuggestions(context(file, "primary", fakeEditor("PZ[primary"))).map((reference) => reference.id))
+    expect((await suggest.getSuggestions(context(file, "primary", fakeEditor("`PZ[primary")))).map(referenceId))
       .toEqual(["alias1"]);
-    expect(suggest.getSuggestions(context(file, "example.com/other", fakeEditor("PZ[example"))).map((reference) => reference.id))
+    expect((await suggest.getSuggestions(context(file, "example.com/other", fakeEditor("`PZ[example")))).map(referenceId))
       .toEqual(["other2"]);
   });
 
-  it("renders the current index, title, description, and link", async () => {
+  it("renders the current index, title, description, and link of a reference suggestion", async () => {
     const app = new MockApp();
     const file = await app.vault.create("Source.md", [
       "---",
@@ -96,7 +119,7 @@ describe("CitationSuggest", () => {
       ""
     ].join("\n"));
     const suggest = new CitationSuggest(fakePlugin(app));
-    const suggestions = suggest.getSuggestions(context(file, "beta", fakeEditor("PZ[beta")));
+    const suggestions = await suggest.getSuggestions(context(file, "beta", fakeEditor("`PZ[beta")));
     const el = fakeSuggestionElement();
 
     suggest.renderSuggestion(suggestions[0], el.host);
@@ -109,25 +132,18 @@ describe("CitationSuggest", () => {
     ]);
   });
 
-  it("renders an unindexed suggestion without a registry position prefix", () => {
+  it("renders a heading suggestion as label and detail", () => {
     const app = new MockApp();
     const suggest = new CitationSuggest(fakePlugin(app));
     const el = fakeSuggestionElement();
 
-    suggest.renderSuggestion({
-      id: null,
-      link: "https://example.com/unindexed",
-      kind: "url",
-      target: "https://example.com/unindexed"
-    }, el.host);
+    suggest.renderSuggestion({ kind: "heading", anchor: headingAnchor("Training Loop") }, el.host);
 
-    expect(el.children.map((child) => child.text)).toEqual([
-      "https://example.com/unindexed",
-      "https://example.com/unindexed"
-    ]);
+    expect(el.classes).toContain("para-zk-reference-suggestion");
+    expect(el.children.map((child) => child.text)).toEqual(["Training Loop", "H2"]);
   });
 
-  it("persists a missing reference id before inserting the citation token", async () => {
+  it("inserts <id>] and a closing backtick, absorbing the auto-paired backtick without nesting", async () => {
     const app = new MockApp();
     const file = await app.vault.create("Legacy.md", [
       "---",
@@ -137,23 +153,122 @@ describe("CitationSuggest", () => {
       "---",
       "Body"
     ].join("\n"));
-    const plugin = fakePlugin(app);
-    const suggest = new CitationSuggest(plugin);
-    const editor = fakeEditor("Body PZ[legacy");
-    const suggestContext = context(file, "legacy", editor, { line: 0, ch: 5 }, { line: 0, ch: 14 });
-    const suggestions = suggest.getSuggestions(suggestContext);
-    expect(suggestions[0].id).toBeNull();
+    const suggest = new CitationSuggest(fakePlugin(app));
+    // Obsidian auto-pairs the opening backtick, so the closing one already follows the cursor.
+    const editor = fakeEditor("Body `PZ[legacy`");
+    const start = { line: 0, ch: "Body `PZ[".length };
+    const end = { line: 0, ch: "Body `PZ[legacy".length };
+    const suggestContext = context(file, "legacy", editor, start, end);
+    const suggestions = await suggest.getSuggestions(suggestContext);
+    expect(referenceId(suggestions[0])).toBeNull();
     suggest.context = suggestContext;
 
     suggest.selectSuggestion(suggestions[0], {} as KeyboardEvent);
     await waitFor(() => editor.replacement !== undefined);
 
-    const token = editor.replacement ?? "";
-    const id = token.match(/^`PZ\[([A-Za-z0-9_-]+)\]`$/)?.[1];
+    const id = editor.line.match(/`PZ\[([A-Za-z0-9_-]+)\]`$/)?.[1];
     expectGeneratedReferenceId(id);
-    expect(token).toBe(`\`PZ[${id}]\``);
-    expect(editor.cursor).toEqual({ line: 0, ch: 5 + token.length });
+    expect(editor.line).toBe(`Body \`PZ[${id}]\``);
+    expect(editor.cursor).toEqual({ line: 0, ch: start.ch + (id ?? "").length });
     expect(app.readPath("Legacy.md")).toContain(`id: ${id}`);
+  });
+
+  it("inserts a chosen heading after the #, closing and stepping past the token", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("Source.md", "---\nreferences: []\n---\n");
+    const suggest = new CitationSuggest(fakePlugin(app));
+    const editor = fakeEditor("`PZ[ref1#Tra]`");
+    const start = { line: 0, ch: "`PZ[ref1#".length };
+    const end = { line: 0, ch: "`PZ[ref1#Tra".length };
+    suggest.context = context(file, "Tra", editor, start, end);
+
+    suggest.selectSuggestion({ kind: "heading", anchor: headingAnchor("Training Loop") }, {} as KeyboardEvent);
+
+    expect(editor.line).toBe("`PZ[ref1#Training Loop]`");
+    // Past the closing "]`" so the suggester dismisses — the section is the terminal step.
+    expect(editor.cursor).toEqual({ line: 0, ch: editor.line.length });
+  });
+
+  it("closes a hand-typed section into a valid token when no bracket follows", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("Source.md", "---\nreferences: []\n---\n");
+    const suggest = new CitationSuggest(fakePlugin(app));
+    // User typed `PZ[ref1# directly: the auto-paired backtick follows, but no "]" exists yet.
+    const editor = fakeEditor("`PZ[ref1#`");
+    const start = { line: 0, ch: "`PZ[ref1#".length };
+    const end = start;
+    suggest.context = context(file, "", editor, start, end);
+
+    suggest.selectSuggestion({ kind: "heading", anchor: headingAnchor("Training Loop") }, {} as KeyboardEvent);
+
+    expect(editor.line).toBe("`PZ[ref1#Training Loop]`");
+  });
+
+  it("appends a closing bracket and backtick when none follow the picked reference", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("Legacy.md", [
+      "---",
+      "references:",
+      "  - link: https://example.com/legacy",
+      "---",
+      "Body"
+    ].join("\n"));
+    const suggest = new CitationSuggest(fakePlugin(app));
+    // No auto-paired backtick and no "]" after the cursor.
+    const editor = fakeEditor("Body `PZ[legacy");
+    const start = { line: 0, ch: "Body `PZ[".length };
+    const end = { line: 0, ch: "Body `PZ[legacy".length };
+    const suggestContext = context(file, "legacy", editor, start, end);
+    const suggestions = await suggest.getSuggestions(suggestContext);
+    suggest.context = suggestContext;
+
+    suggest.selectSuggestion(suggestions[0], {} as KeyboardEvent);
+    await waitFor(() => editor.replacement !== undefined);
+
+    const id = editor.line.match(/`PZ\[([A-Za-z0-9_-]+)\]`$/)?.[1];
+    expectGeneratedReferenceId(id);
+    expect(editor.line).toBe(`Body \`PZ[${id}]\``);
+    expect(editor.cursor).toEqual({ line: 0, ch: start.ch + (id ?? "").length });
+  });
+
+  it("does not trigger when a backtick sits between PZ[ and the cursor", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("Source.md", "---\nreferences: []\n---\n");
+    const suggest = new CitationSuggest(fakePlugin(app));
+    const line = "`PZ[ali`";
+
+    expect(suggest.onTrigger({ line: 0, ch: line.length }, fakeEditor(line), file)).toBeNull();
+  });
+
+  it("reads the id from a non-first multi-cite entry in heading mode", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("Source.md", "---\nreferences: []\n---\n");
+    const suggest = new CitationSuggest(fakePlugin(app));
+    const line = "`PZ[a1, b2#Sec";
+
+    expect(suggest.onTrigger({ line: 0, ch: line.length }, fakeEditor(line), file)).toEqual({
+      start: { line: 0, ch: line.indexOf("Sec") },
+      end: { line: 0, ch: line.length },
+      query: "Sec"
+    });
+  });
+
+  it("returns no heading suggestions for a url reference", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("Source.md", [
+      "---",
+      "references:",
+      "  - link: https://example.com/a",
+      "    id: url1",
+      "---",
+      ""
+    ].join("\n"));
+    const suggest = new CitationSuggest(fakePlugin(app));
+    const editor = fakeEditor("`PZ[url1#Sec");
+    // onTrigger sets heading mode + referenceId="url1" from the open token.
+    suggest.onTrigger({ line: 0, ch: editor.line.length }, editor, file);
+
+    expect(await suggest.getSuggestions(context(file, "Sec", editor))).toEqual([]);
   });
 
   it("does not edit the stale editor when context changes before id persistence resolves", async () => {
@@ -175,9 +290,9 @@ describe("CitationSuggest", () => {
       await originalProcessFrontMatter(target, fn);
     };
     const suggest = new CitationSuggest(fakePlugin(app));
-    const editor = fakeEditor("Body PZ[legacy");
-    const suggestContext = context(file, "legacy", editor, { line: 0, ch: 5 }, { line: 0, ch: 14 });
-    const suggestions = suggest.getSuggestions(suggestContext);
+    const editor = fakeEditor("Body `PZ[legacy`");
+    const suggestContext = context(file, "legacy", editor, { line: 0, ch: 9 }, { line: 0, ch: 15 });
+    const suggestions = await suggest.getSuggestions(suggestContext);
     suggest.context = suggestContext;
 
     suggest.selectSuggestion(suggestions[0], {} as KeyboardEvent);
@@ -190,6 +305,14 @@ describe("CitationSuggest", () => {
     expect(editor.cursor).toBeUndefined();
   });
 });
+
+function referenceId(suggestion: Awaited<ReturnType<CitationSuggest["getSuggestions"]>>[number]): string | null {
+  return suggestion.kind === "reference" ? suggestion.reference.id : null;
+}
+
+function headingAnchor(value: string): AnchorSuggestion {
+  return { kind: "heading", value, label: value, detail: "H2", line: 0, level: 2, searchText: value };
+}
 
 function fakePlugin(app: MockApp): ParaZkPluginContext {
   return {
@@ -227,8 +350,12 @@ type FakeEditor = Editor & {
 function fakeEditor(line: string): FakeEditor {
   return {
     line,
-    getLine: () => line,
-    replaceRange(replacement: string) {
+    getLine() {
+      return this.line;
+    },
+    replaceRange(replacement: string, from: EditorPosition, to?: EditorPosition) {
+      const end = to ?? from;
+      this.line = this.line.slice(0, from.ch) + replacement + this.line.slice(end.ch);
       this.replacement = replacement;
     },
     setCursor(pos: EditorPosition) {

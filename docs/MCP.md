@@ -194,10 +194,14 @@ source of truth for each type's read/write keys and collections.
 Within body/section prose, cite the note's own registry references inline with a
 code span whose whole content is `` `PZ[<id>]` ``. The `<id>` is the reference's
 stable id returned by `read key=references`; `` `PZ[<id>, <id>]` `` cites several
-references. Obsidian authors can type `PZ[` and search the registry by
-title/alias, description, or link with the editor suggester. Citations render as
-the reference's current 0-based registry position `[n]`; positional input such as
-`` `PZ[0]` `` is not supported, and bare `PZ[<id>]` text does not render. For
+references. A citation may target one section of the reference with
+`` `PZ[<id>#<section>]` `` — a heading (`#Training Loop`) or block (`#^block-id`),
+rendered as `[n §<section>]`; the section cannot contain a comma and is honored
+only for internal (note/file/wiki) references. Obsidian authors type a backtick
+then `PZ[` and search the registry by title/alias, description, or link with the
+editor suggester, then optionally type `#` to complete a section. Citations render
+as the reference's current 0-based registry position `[n]`; positional input such
+as `` `PZ[0]` `` is not supported, and bare `PZ[<id>]` text does not render. For
 LLM-Wiki, cross-link concept pages with body `[[link]]`; `references` and
 `` `PZ[<id>]` `` cite only canonical notes outside LLM-Wiki. The `describe`
 scope note states this too.

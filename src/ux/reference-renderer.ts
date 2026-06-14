@@ -6,13 +6,12 @@ import {
   Notice,
   Setting,
   TFile,
-  stripHeading,
-  stripHeadingForLink,
   type MarkdownPostProcessorContext
 } from "obsidian";
 import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { workflowContext } from "../vault/host";
+import { anchorSuggestionsForFile, type AnchorSuggestion } from "./anchor-suggestions";
 import {
   canonicalWikiLink,
   createResource,
@@ -77,15 +76,7 @@ type ReferenceEditModalOptions = {
   suppressInitialTargetFocus?: boolean;
 };
 
-type ReferenceAnchorSuggestion = {
-  kind: "heading" | "block";
-  value: string;
-  label: string;
-  detail: string;
-  line: number;
-  level?: number;
-  searchText: string;
-};
+type ReferenceAnchorSuggestion = AnchorSuggestion;
 
 type ReferenceTargetSuggestion = {
   file: TFile;
@@ -715,7 +706,7 @@ class ReferenceEditModal extends Modal {
     }
 
     try {
-      const suggestions = await this.anchorSuggestionsForFile(file);
+      const suggestions = await this.loadAnchorSuggestions(file);
       if (generation !== this.anchorRefreshGeneration) return;
       this.anchorSuggestions = suggestions;
       this.dropUnresolvedAnchor(suggestions);
@@ -761,47 +752,8 @@ class ReferenceEditModal extends Modal {
     return file instanceof TFile ? file : undefined;
   }
 
-  private async anchorSuggestionsForFile(file: TFile): Promise<ReferenceAnchorSuggestion[]> {
-    const cache = this.plugin.app.metadataCache.getFileCache(file);
-    if (!cache) return [];
-
-    const blocks = Object.entries(cache.blocks ?? {});
-    const lines = blocks.length > 0 ? await this.cachedTargetLines(file) : [];
-    const suggestions: ReferenceAnchorSuggestion[] = [];
-
-    for (const heading of cache.headings ?? []) {
-      // stripHeadingForLink drops link-illegal chars like `|`, but keeps `[`/`]`/backtick.
-      // A heading that still contains those cannot be stored as a valid
-      // `[[file#anchor]]` wikilink, so skip it.
-      const value = stripHeadingForLink(heading.heading);
-      if (/[[\]`]/.test(value)) continue;
-      suggestions.push({
-        kind: "heading",
-        value,
-        label: stripHeading(heading.heading),
-        detail: `H${heading.level}`,
-        line: heading.position.start.line,
-        level: heading.level,
-        searchText: stripHeading(heading.heading)
-      });
-    }
-
-    for (const [id, block] of blocks) {
-      const snippet = blockLineSnippet(lines, block.position.start.line);
-      suggestions.push({
-        kind: "block",
-        value: `^${id}`,
-        label: `^${id}`,
-        detail: snippet,
-        line: block.position.start.line,
-        searchText: `^${id} ${snippet}`
-      });
-    }
-
-    return suggestions.sort((left, right) => {
-      if (left.line !== right.line) return left.line - right.line;
-      return left.kind.localeCompare(right.kind);
-    });
+  private loadAnchorSuggestions(file: TFile): Promise<ReferenceAnchorSuggestion[]> {
+    return anchorSuggestionsForFile(this.plugin, file, (target) => this.cachedTargetLines(target));
   }
 
   private async cachedTargetLines(file: TFile): Promise<string[]> {
@@ -933,11 +885,6 @@ function isMarkdownFile(file: TFile | undefined): file is TFile {
 
 function looksLikeVaultPath(value: string): boolean {
   return value.includes("/") || value.toLocaleLowerCase().endsWith(".md");
-}
-
-function blockLineSnippet(lines: string[], line: number): string {
-  const text = (lines[line] ?? "").trim().replace(/\s+/g, " ");
-  return text.length > 60 ? `${text.slice(0, 57)}...` : text;
 }
 
 function referenceSummaryText(items: RenderableReference[], labels: Record<string, string>): string {

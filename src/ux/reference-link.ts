@@ -17,19 +17,20 @@ export function renderReferenceAnchor(
   plugin: ParaZkPluginContext,
   parent: HTMLElement,
   reference: ReferenceRead,
-  opts: { text: string; title: string; cls: string; hoverParent: HTMLElement; sourcePath: string }
+  opts: { text: string; title: string; cls: string; hoverParent: HTMLElement; sourcePath: string; subpath?: string }
 ): HTMLAnchorElement {
   const link = parent.createEl("a", { cls: opts.cls, text: opts.text });
   link.setAttr("href", referenceHref(reference));
   link.setAttr("title", opts.title);
-  attachReferenceLinkBehavior(plugin, link, reference, opts.hoverParent, opts.sourcePath);
+  attachReferenceLinkBehavior(plugin, link, reference, opts.hoverParent, opts.sourcePath, opts.subpath);
   link.addEventListener("click", (event) => {
     event.preventDefault();
     void openReferenceLink(
       plugin,
       reference,
       opts.sourcePath,
-      event.ctrlKey || event.metaKey || event.button === 1
+      event.ctrlKey || event.metaKey || event.button === 1,
+      opts.subpath
     ).catch((error: unknown) => {
       new Notice(registryErrorMessage(error));
     });
@@ -41,13 +42,14 @@ async function openReferenceLink(
   plugin: ParaZkPluginContext,
   reference: ReferenceRead,
   sourcePath: string,
-  newLeaf = false
+  newLeaf = false,
+  subpath?: string
 ): Promise<void> {
   if (isExternalReference(reference.link)) {
     window.open(reference.link, "_blank", "noopener");
     return;
   }
-  await plugin.app.workspace.openLinkText(referenceOpenText(reference), sourcePath, newLeaf);
+  await plugin.app.workspace.openLinkText(referenceOpenText(reference, subpath), sourcePath, newLeaf);
 }
 
 function attachReferenceLinkBehavior(
@@ -55,11 +57,12 @@ function attachReferenceLinkBehavior(
   link: HTMLAnchorElement,
   reference: ReferenceRead,
   hoverParent: HTMLElement,
-  sourcePath: string
+  sourcePath: string,
+  subpath?: string
 ): void {
   if (!isInternalReference(reference)) return;
 
-  const linktext = referenceOpenText(reference);
+  const linktext = referenceOpenText(reference, subpath);
   link.addClass("internal-link");
   link.setAttr("href", linktext);
   link.setAttr("data-href", linktext);
@@ -83,8 +86,13 @@ function referenceHref(reference: ReferenceRead): string {
   return isExternalReference(reference.link) ? reference.link : "#";
 }
 
-function referenceOpenText(reference: ReferenceRead): string {
-  return parseWikiLink(reference.link)?.target ?? reference.link;
+// The link text Obsidian resolves on open/hover. An optional citation `subpath` (a heading
+// or `^block`) points at one section of the reference's target, overriding any anchor the
+// reference's own stored link carries — it is the more specific intent at the citation site.
+function referenceOpenText(reference: ReferenceRead, subpath?: string): string {
+  const target = parseWikiLink(reference.link)?.target ?? reference.link;
+  if (!subpath) return target;
+  return `${splitObsidianSubpath(target).base}#${subpath.replace(/^#+/, "")}`;
 }
 
 export function referenceTargetHint(reference: ReferenceRead): string {

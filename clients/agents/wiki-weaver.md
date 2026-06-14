@@ -33,7 +33,8 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
     integrate (read → extract → merge) the source's relevant content into the page body, insert
     the source into that page's `references` registry, and cite the returned id as an INLINE
     CODE SPAN — `` `PZ[<id>]` `` with surrounding backticks (bare PZ[id] without backticks does
-    NOT render). Cross-link related concept pages to each other with body `[[wikilinks]]` written as the
+    NOT render). To point a citation at one section of the source, use `` `PZ[<id>#<heading>]` ``;
+    the heading must be comma-free. Cross-link related concept pages to each other with body `[[wikilinks]]` written as the
     FULL PATH `[[LLM-Wiki/<domain>/<concept>|<display>]]` — NOT bare `[[Concept]]`.
     A wiki concept routinely shares its title with ANOTHER note in the vault — the resource
     it synthesizes, a project, a ZK note, etc. (wiki "Diffusion Policy" vs resource
