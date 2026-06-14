@@ -345,6 +345,15 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Changed
 
+- CLI text output (the default format) now renders each command's data — audit findings
+  grouped by path, note lists, the read surface, the resulting path, pagination hints —
+  instead of echoing a static one-line summary (`vault audited`, `notes listed`). `format=json`
+  is unchanged and remains the canonical machine envelope parsed by automation and the MCP
+  server; reach for it only when the output is machine-parsed. The audit `check=` option now
+  advertises `bare_reference` and its `fix=` description covers bare-reference expansion.
+  The bundled skills and the MCP describe-surface guidance (`invoke`/`schema`/`install`
+  strings) no longer prescribe `format=json`; the wiki-weaver agent (where MCP/structured
+  output is the primary surface) and the MCP server's own internal JSON parsing keep it.
 - The `para-zk-props` block now renders `created`/`updated` as PARA-ZK-formatted
   read-only timestamps instead of raw frontmatter text. `created` shows an absolute
   `YYYY-MM-DD HH:MM` (the ISO `T` and any seconds dropped); `updated` shows a relative

@@ -13,6 +13,7 @@ import {
 } from "../vocabulary";
 import { RESOURCE_CREATE_KIND_CODE_HELP, ZK_KIND_CODE_HELP } from "../zk/kinds";
 import { parseList } from "./parse";
+import { renderCliText } from "./text-output";
 import { workflowContext } from "../vault/host";
 import { joinVaultPath, normalizeVaultPath, sanitizeFileName, wikiLink } from "../vault/paths";
 import {
@@ -850,12 +851,12 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     command: "para-zk:audit",
     description: "Audit the vault for deterministic PARA-ZK content-health findings",
     options: {
-      check: { value: "<broken_link|dangling_reference|idless_reference|orphan_note|upward_wiki_link|orphan_wiki_page|wiki_tag_domain_mismatch|unprocessed_spark|stale_draft_permanent>", description: "Optional check code filter." },
+      check: { value: "<broken_link|dangling_reference|idless_reference|bare_reference|orphan_note|upward_wiki_link|orphan_wiki_page|wiki_tag_domain_mismatch|unprocessed_spark|stale_draft_permanent>", description: "Optional check code filter." },
       severity: { value: "<high|medium|low>", description: "Optional severity filter." },
       type: { value: "<note-type>", description: "Optional stored frontmatter type filter, e.g. resource or permanent." },
       offset: { value: "<number>", description: "Zero-based finding offset (default: 0)." },
       limit: { value: "<number|all>", description: "Maximum findings to return (default: 50)." },
-      fix: { value: "<true|false>", description: "When true, apply auto-repairs vault-wide: backfill id-less reference ids and correct llm-wiki tag domains; all other findings remain report-only." },
+      fix: { value: "<true|false>", description: "When true, apply auto-repairs vault-wide: backfill id-less reference ids, expand unique bare reference links to full paths, and correct llm-wiki tag domains; all other findings (including ambiguous bare references) remain report-only." },
       format: FORMAT_OPTION
     },
     text: "vault audited",
@@ -1471,7 +1472,7 @@ export function registerNativeCliHandlers(plugin: ParaZkPluginContext): void {
       command.options,
       async (args = {}) => {
         if (isHelpRequest(args)) return renderCommandHelp(command, args);
-        return withCliErrors(args, async () => {
+        return withCliErrors(command.command, args, async () => {
           command.preResolve?.(args);
           rejectUnsupportedByArg(command, args);
           const resolved = await resolveFileBackedArgs(args, command.options);
@@ -1523,19 +1524,20 @@ function renderCommandHelp(command: NativeCliCommand, args: CliArgs): string {
 }
 
 async function withCliErrors(
+  command: string,
   args: CliArgs,
   fn: () => Promise<Record<string, unknown>>,
   text: string
 ): Promise<string> {
   try {
     const payload = await fn();
-    return renderCli(args, {
+    return renderCli(command, args, {
       ...payload,
       ok: true
     }, text);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return renderCli(args, {
+    return renderCli(command, args, {
       ok: false,
       error: message
     }, `error: ${message}`);
@@ -1803,13 +1805,9 @@ function describeCollectionFilters(surfaces: SurfaceDescription[]): Record<strin
   );
 }
 
-function renderCli(args: CliArgs, payload: Record<string, unknown>, text: string): string {
+function renderCli(command: string, args: CliArgs, payload: Record<string, unknown>, text: string): string {
   if (readCliString(args, "format") === "json") return JSON.stringify(payload);
-  const warnings = Array.isArray(payload.warnings)
-    ? payload.warnings.filter((warning): warning is string => typeof warning === "string")
-    : [];
-  if (warnings.length === 0) return text;
-  return [text, ...warnings.map((warning) => `warning: ${warning}`)].join("\n");
+  return renderCliText(command, payload, text);
 }
 
 function readCliString(args: CliArgs, key: string): string | undefined {

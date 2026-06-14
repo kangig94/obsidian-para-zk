@@ -27,14 +27,14 @@ On invalid args (source args with `init`/`delta`, or none with `per-import`/`re-
 
 ## Execution
 
-1. **Orient**: Call `optsidian para-zk:describe format=json` first. Use the returned invocation style for subsequent `para-zk:*` calls; examples below use `optsidian`. Confirm the surface exposes `para-zk:wiki-ingest-candidates`, `para-zk:create-llm-wiki`, `para-zk:read-llm-wiki`, and `para-zk:update-llm-wiki`. If the vault is unavailable, stop with the CLI error; do not fall back to direct file writes.
+1. **Orient**: Call `optsidian para-zk:describe` first. Use the returned invocation style for subsequent `para-zk:*` calls; examples below use `optsidian`. Confirm the surface exposes `para-zk:wiki-ingest-candidates`, `para-zk:create-llm-wiki`, `para-zk:read-llm-wiki`, and `para-zk:update-llm-wiki`. If the vault is unavailable, stop with the CLI error; do not fall back to direct file writes.
 
 2. **Resolve mode**: Normalize exactly one mode from `{per-import, delta, init, re-ingest}`. Preserve `limit` and `offset` when supplied. For targeted modes, preserve exactly one of `source_path` or `source_paths`; for untargeted modes, reject either source selector before doing any reads.
 
 3. **Discover sources**: Call the candidate primitive with the same mode and target arguments:
 
    ```bash
-   optsidian para-zk:wiki-ingest-candidates mode=<mode> [source_path=<path>|source_paths='<json-or-comma-list>'] [limit=<n|all>] [offset=<n>] format=json
+   optsidian para-zk:wiki-ingest-candidates mode=<mode> [source_path=<path>|source_paths='<json-or-comma-list>'] [limit=<n|all>] [offset=<n>]
    ```
 
    Gate on the response envelope. Candidate reasons are `missing_wiki_citation` or `source_newer_than_wiki`; candidates may include `stale_llm_wikis: [{path,title,updated_ms}]`, the citing LLM-Wiki pages older than the source. For `delta`, carry those citing-page titles into the packet's `stale_llm_wikis` (step 5) so the weaver re-weaves exactly them. If `ok` is false or the command errors, stop. If `returned` is `0`, report that no source candidates were returned and do not spawn the weaver. If `has_more` is true, weave only the returned page of candidates and report that another bounded page remains; do not auto-page into a full scan.
@@ -59,7 +59,7 @@ On invalid args (source args with `init`/`delta`, or none with `per-import`/`re-
    - **`per-import` / `re-ingest`** (targeted, usually small): build ONE packet for the whole returned set → a single serial weaver.
    - **`init` / `delta`** (discovery — batch can be large, e.g. after a bulk import): split for parallelism, ONE packet per group.
      - **Subnote candidates**: group by parent project/area subtree (a reliable disjoint partition — different projects rarely share concept pages); put the parent project/area note in that group's `context` (the weaver reads it to FRAME the subnotes; it is not an ingest target).
-     - **Resource/digest/permanent candidates**: PEEK each — `optsidian read path="<candidate.path>" lines=1:200 format=json` (title + frontmatter + abstract/first section; the weaver still reads full bodies) — and cluster into concept-DISJOINT groups.
+     - **Resource/digest/permanent candidates**: PEEK each — `optsidian read path="<candidate.path>" lines=1:200` (title + frontmatter + abstract/first section; the weaver still reads full bodies) — and cluster into concept-DISJOINT groups.
      - Group CONSERVATIVELY: if two sources likely touch the same concept page (shared topic/method/entity — and for `delta`, sources citing the same `stale_llm_wikis` MUST share a group), put them in the SAME group; split only genuinely disjoint sources. (Residual contention is safe: page writes are compare-and-swap, so a conflicting write is rejected and retried, never lost.)
 
 6. **Spawn weaver(s)**, in background when the host supports it — each weaver gets ONE packet:

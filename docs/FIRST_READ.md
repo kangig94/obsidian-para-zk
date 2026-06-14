@@ -190,7 +190,7 @@ export PARA_ZK_TEST_VAULT=/path/to/para-zk-test-vault
 OBSIDIAN_PLUGIN_DIR="$PARA_ZK_TEST_VAULT/.obsidian/plugins/para-zk" npm run build
 optsidian open-gui vault-path="$PARA_ZK_TEST_VAULT"
 optsidian raw plugin:reload id=para-zk
-optsidian para-zk:setup installDeps=true format=json
+optsidian para-zk:setup installDeps=true
 ```
 
 For a clean run, preserve `.obsidian`, clear the rest of the vault, and remove

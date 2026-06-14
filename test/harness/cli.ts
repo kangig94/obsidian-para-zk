@@ -14,6 +14,9 @@ export type CliHarness = {
   app: MockApp;
   settings: ParaZkSettings;
   run: (command: string, args?: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  // Invokes a command in its default (text) format and returns the raw rendered
+  // string, so tests can assert the human-facing output the JSON `run` hides.
+  runText: (command: string, args?: Record<string, unknown>) => Promise<string>;
 };
 
 export function createCliHarness(overrides: Partial<ParaZkSettings> = {}): CliHarness {
@@ -43,6 +46,11 @@ export function createCliHarness(overrides: Partial<ParaZkSettings> = {}): CliHa
       if (!handler) throw new Error(`unknown CLI command: ${command}`);
       const output = await handler({ ...args, format: "json" });
       return JSON.parse(output) as Record<string, unknown>;
+    },
+    runText: async (command, args = {}) => {
+      const handler = handlers.get(command);
+      if (!handler) throw new Error(`unknown CLI command: ${command}`);
+      return handler(args);
     }
   };
 }

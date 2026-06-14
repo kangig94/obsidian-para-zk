@@ -33,7 +33,7 @@ default and state it; ask only if the choice materially changes the result.
 
 ## 2. Orient
 
-Call `describe` first (`optsidian para-zk:describe format=json`); use its `invoke` string
+Call `describe` first (`optsidian para-zk:describe`); use its `invoke` string
 for every call, its `vault` context, and `para-zk:describe type=resource` for the create
 command + inputs. Identify the note(s) to link from (area / project / resource).
 
@@ -82,7 +82,7 @@ that metadata or it is needed to avoid ambiguity. For images:
 - A **web** image → embed it by its source URL with `![alt](https://…)`; Obsidian renders
   remote images inline, so do **not** download or attach it.
 - A **local** image — from a local-file source, or a figure `marker` extracted from a PDF →
-  `optsidian para-zk:attach-file source=<abs-path> folder=assets/<slug> format=json`, then
+  `optsidian para-zk:attach-file source=<abs-path> folder=assets/<slug>`, then
   embed the returned `![[…]]`.
 
 ## 4. Produce clean Markdown — never a raw dump
@@ -154,7 +154,7 @@ the structured frontmatter:
 ```
 optsidian para-zk:create-resource title="<title>" body=@/tmp/<file>.md \
   url="<source url>" first_author="<first author>" license="<SPDX id>" kind=<paper|article|book|video|web|code|guide|other> \
-  domain="<subject domain>" format=json
+  domain="<subject domain>"
 ```
 
 `license` is an SPDX identifier (`MIT`, `Apache-2.0`, `CC-BY-4.0`, `CC-BY-SA-4.0`, `CC0-1.0`, …); when
@@ -167,17 +167,17 @@ Then link as requested. To make an existing note reference a resource — e.g. "
 AI area":
 
 ```
-optsidian para-zk:update-area title="AI" key=references op=insert value_json='{"link":"[[<resource title>]]"}' format=json
+optsidian para-zk:update-area title="AI" key=references op=insert value_json='{"link":"[[<resource title>]]"}'
 ```
 
-For a child receiver, use `para-zk:update-child root_type=<project|area> root_title="<root>" relpath='<ancestors>' title="<child>" key=references op=insert value_json='{"link":"[[<resource title>]]"}' format=json`.
+For a child receiver, use `para-zk:update-child root_type=<project|area> root_title="<root>" relpath='<ancestors>' title="<child>" key=references op=insert value_json='{"link":"[[<resource title>]]"}'`.
 
 For multiple resources (per chapter, per item), create each and link them into the requested
 hub — an area, a project, or an index resource — so the set is navigable.
 
 ## 7. Verify
 
-Run `para-zk:read-resource title="<title>" key=body format=json` and re-scan for artifacts;
+Run `para-zk:read-resource title="<title>" key=body` and re-scan for artifacts;
 confirm links via the origin note's `key=references` and the resource's `key=backlinks`. Fix and
 repeat if anything is still broken. For notes with math, confirm Obsidian delimiters are used:
 `$…$` for inline math and `$$…$$` for blocks; no `\(...\)` or `\[...\]` should remain.

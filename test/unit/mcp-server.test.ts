@@ -15,9 +15,9 @@ describe("MCP server pure helpers", () => {
       cli: "optsidian",
       vault: expect.stringContaining("second brain"),
       scope: expect.stringContaining("raw file edits"),
-      invoke: "optsidian para-zk:<command> [args...] format=json",
+      invoke: "optsidian para-zk:<command> [args...]",
       surfaceTypes: ["project", "area"],
-      schema: "optsidian para-zk:describe type=<surfaceType> format=json",
+      schema: "optsidian para-zk:describe type=<surfaceType>",
       commands: "optsidian --help",
       howto: expect.stringContaining("Locale-neutral"),
       install: expect.stringContaining("plugin:install")
@@ -41,7 +41,7 @@ describe("MCP server pure helpers", () => {
       running: false,
       cli: "obsidian",
       vault: expect.stringContaining("second brain"),
-      invoke: "obsidian para-zk:<command> [args...] format=json",
+      invoke: "obsidian para-zk:<command> [args...]",
       commands: "obsidian --help",
       howto: expect.stringContaining("Open the vault in Obsidian"),
       install: expect.stringContaining("manifest.json"),
@@ -92,10 +92,10 @@ describe("MCP server pure helpers", () => {
   });
 
   it("documents CLI invocation, schema drill-down, and help commands", () => {
-    expect(invokePattern("optsidian")).toBe("optsidian para-zk:<command> [args...] format=json");
-    expect(invokePattern("obsidian")).toBe("obsidian para-zk:<command> [args...] format=json");
-    expect(schemaCommand("optsidian")).toBe("optsidian para-zk:describe type=<surfaceType> format=json");
-    expect(schemaCommand("obsidian")).toBe("obsidian para-zk:describe type=<surfaceType> format=json");
+    expect(invokePattern("optsidian")).toBe("optsidian para-zk:<command> [args...]");
+    expect(invokePattern("obsidian")).toBe("obsidian para-zk:<command> [args...]");
+    expect(schemaCommand("optsidian")).toBe("optsidian para-zk:describe type=<surfaceType>");
+    expect(schemaCommand("obsidian")).toBe("obsidian para-zk:describe type=<surfaceType>");
     expect(helpCommand("optsidian")).toBe("optsidian --help");
     expect(helpCommand("obsidian")).toBe("obsidian --help");
   });

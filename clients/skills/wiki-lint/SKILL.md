@@ -29,18 +29,18 @@ Two layers:
 
 ## Execution
 
-1. **Orient**: Call `optsidian para-zk:describe format=json` first; use the returned invocation style for subsequent `para-zk:*` calls. Confirm the surface exposes `para-zk:audit`, `para-zk:list`, `para-zk:read-llm-wiki`, and `para-zk:update-llm-wiki`. If the vault is unavailable, stop with the CLI error.
+1. **Orient**: Call `optsidian para-zk:describe` first; use the returned invocation style for subsequent `para-zk:*` calls. Confirm the surface exposes `para-zk:audit`, `para-zk:list`, `para-zk:read-llm-wiki`, and `para-zk:update-llm-wiki`. If the vault is unavailable, stop with the CLI error.
 
-2. **Resolve scope**: For `full`, enumerate pages with `optsidian para-zk:list type=llm-wiki limit=all format=json`. For `scoped`, use the provided `paths` (reject if empty).
+2. **Resolve scope**: For `full`, enumerate pages with `optsidian para-zk:list type=llm-wiki limit=all`. For `scoped`, use the provided `paths` (reject if empty).
 
-3. **Structural pass (deterministic, free)**: Run `optsidian para-zk:audit limit=all format=json` and keep findings on llm-wiki pages — `orphan_wiki_page`, `upward_wiki_link`, `broken_link`, `dangling_reference`, `idless_reference`. These are report-only here (id-less references are separately auto-fixable by the user via `para-zk:audit fix=true`). Do NOT re-derive them in the semantic pass.
+3. **Structural pass (deterministic, free)**: Run `optsidian para-zk:audit limit=all` and keep findings on llm-wiki pages — `orphan_wiki_page`, `upward_wiki_link`, `broken_link`, `dangling_reference`, `idless_reference`. These are report-only here (id-less references are separately auto-fixable by the user via `para-zk:audit fix=true`). Do NOT re-derive them in the semantic pass.
 
 4. **Semantic pass (fresh-context read)**: Read the target pages' bodies and detect, per page and across pages: orthographic/generation slips (malformed CJK/non-Latin syllables); cross-page contradictions; concepts that warrant their own page but lack one; missing cross-references between related pages; and data gaps. Choose the reader by context-freshness:
-   - If you (the orchestrator) did NOT generate these pages this session, read them directly: `optsidian para-zk:read-llm-wiki title=<title> key=body format=json`.
+   - If you (the orchestrator) did NOT generate these pages this session, read them directly: `optsidian para-zk:read-llm-wiki title=<title> key=body`.
    - If the page set is large (a full sweep on a big wiki) or you orchestrated their generation this session, spawn ONE fresh general-purpose reviewer agent (clean context, no generation history) and have it drive the vault through `mcp__optsidian__command_run` (a sandboxed sub-agent cannot reach Obsidian over Bash). Pass it the page list and this report/fix policy.
    - Never let the wiki-weaver (or any agent that just wrote these pages) lint its own output.
 
-5. **Fix policy**: Fix ONLY high-confidence mechanical orthographic slips — a clear non-word with one obvious correction from context — in place: `optsidian para-zk:update-llm-wiki title=<title> key=body op=replace match=<garbled> with=<fixed> by=<model-id> format=json`. Report (do NOT fix) every ambiguous correction and every semantic finding (contradiction, missing concept page, missing cross-reference, data gap). Never `op=set` a recomposed body to "fix" semantics — that re-runs generation and can introduce new slips.
+5. **Fix policy**: Fix ONLY high-confidence mechanical orthographic slips — a clear non-word with one obvious correction from context — in place: `optsidian para-zk:update-llm-wiki title=<title> key=body op=replace match=<garbled> with=<fixed> by=<model-id>`. Report (do NOT fix) every ambiguous correction and every semantic finding (contradiction, missing concept page, missing cross-reference, data gap). Never `op=set` a recomposed body to "fix" semantics — that re-runs generation and can introduce new slips.
 
 6. **Inject `by`**: Use the orchestrator's current model id for `by=<model-id>` on any `op=replace` fix.
 
