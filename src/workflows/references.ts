@@ -685,6 +685,7 @@ function canonicalizeReferenceTarget(
   }
 
   if (parsed.syntax === "wiki") {
+    assertUnambiguousReferenceTarget(ctx, splitObsidianSubpath(parsed.target).base);
     const resolved = resolveWikiReferenceFile(ctx, source, parsed.target);
     if (resolved) {
       return {
@@ -777,7 +778,6 @@ function resolveWikiReferenceFile(
   target: string
 ): { file: TFile; subpath: string } | undefined {
   const split = splitObsidianSubpath(target);
-  if (split.base) assertUnambiguousReferenceTarget(ctx, split.base);
   const normalized = referenceTargetWithSubpath(split.base, split.subpath);
   const resolved = ctx.host.getFirstLinkpathDest(normalized, source.path)
     ?? (split.base ? ctx.host.getFirstLinkpathDest(split.base, source.path) : null);
