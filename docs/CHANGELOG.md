@@ -80,6 +80,9 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- The HomePage dashboard summary now includes an LLM-Wiki count card (📖), counting pages
+  with `type: llm-wiki` under the `LLM-Wiki/` folder — the same identification the rest of
+  the plugin uses. Rendered after the PARA/ZK cards; localized label `llmWiki` ("LLM-Wiki").
 - `key=references op=insert` now returns the reference's stable `id` in its result, so a
   caller can cite it inline as `` `PZ[<id>]` `` in the same flow without a follow-up
   `read key=references`. A no-op duplicate insert returns the existing reference's id, and

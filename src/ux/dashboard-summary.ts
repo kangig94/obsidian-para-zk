@@ -63,7 +63,8 @@ function summaryCards(plugin: ParaZkPluginContext, type: DashboardSummaryType): 
         card("📚", t.labels.references, groups.resources.length),
         card("🌟", "Spark", groups.spark.length),
         card("📚", "Digest", groups.digest.length),
-        card("🧠", "Permanent", groups.permanent.length)
+        card("🧠", "Permanent", groups.permanent.length),
+        card("📖", t.labels.llmWiki, groups.wiki.length)
       ];
     case "projects": {
       const today = startOfToday();
@@ -142,6 +143,7 @@ function dashboardRecordGroups(records: FileRecord[], settings: ParaZkSettings):
   spark: FileRecord[];
   digest: FileRecord[];
   permanent: FileRecord[];
+  wiki: FileRecord[];
 } {
   return {
     projects: records.filter((record) => record.frontmatter.type === "project" && isInFolder(record.file, settings.paths.projectsFolder)),
@@ -149,7 +151,8 @@ function dashboardRecordGroups(records: FileRecord[], settings: ParaZkSettings):
     resources: records.filter((record) => record.frontmatter.type === "resource" && isInFolder(record.file, settings.paths.resourcesFolder)),
     spark: records.filter((record) => isInFolder(record.file, settings.paths.sparkFolder) && record.frontmatter.processed !== true),
     digest: records.filter((record) => isInFolder(record.file, settings.paths.digestFolder)),
-    permanent: records.filter((record) => isInFolder(record.file, settings.paths.permanentFolder))
+    permanent: records.filter((record) => isInFolder(record.file, settings.paths.permanentFolder)),
+    wiki: records.filter((record) => record.frontmatter.type === "llm-wiki" && isInFolder(record.file, settings.paths.wikiFolder))
   };
 }
 
