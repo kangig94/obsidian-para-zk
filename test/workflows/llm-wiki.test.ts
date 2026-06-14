@@ -39,7 +39,7 @@ describe("llm-wiki workflows", () => {
     expect(Object.keys(frontmatter).sort()).toEqual(["aliases", "created", "created_by", "id", "tags", "type", "updated", "updated_by"]);
     expect(frontmatter).toMatchObject({
       type: "llm-wiki",
-      tags: ["llm-wiki/ai/attention-wiki"],
+      tags: ["llm-wiki/ai"],
       aliases: ["Attention"]
     });
     expect(frontmatter.updated === "" || frontmatter.updated === null).toBe(true);
@@ -132,7 +132,7 @@ describe("llm-wiki workflows", () => {
       "---",
       "type: llm-wiki",
       "tags:",
-      "  - llm-wiki/ai/backfill",
+      "  - llm-wiki/ai",
       "references:",
       "  - https://example.com/bare",
       "  - link: https://example.com/object",
@@ -151,7 +151,7 @@ describe("llm-wiki workflows", () => {
     items.forEach((reference) => expectGeneratedReferenceId(reference.id));
   });
 
-  it("renames in place, rewrites the title-derived tag, and rewrites inbound wikilinks", async () => {
+  it("renames in place, keeps the domain-only tag, and rewrites inbound wikilinks", async () => {
     const { ctx, app } = createTestContext();
     await createLlmWiki(ctx, { title: "AI/Old Name", open: false });
     await createResource(ctx, { title: "Consumer", body: "See [[LLM-Wiki/AI/Old Name.md]].", open: false });
@@ -173,7 +173,7 @@ describe("llm-wiki workflows", () => {
     const file = app.vault.getFileByPath("LLM-Wiki/AI/New Name.md");
     if (!file) throw new Error("missing renamed wiki note");
     const frontmatter = await readFileFrontmatterFresh(ctx, file);
-    expect(frontmatter.tags).toEqual(["llm-wiki/ai/new-name"]);
+    expect(frontmatter.tags).toEqual(["llm-wiki/ai"]);
 
     const consumer = app.readPath("PARA/Resources/Consumer.md") ?? "";
     expect(consumer).toContain("[[LLM-Wiki/AI/New Name.md]]");

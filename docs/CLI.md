@@ -742,8 +742,8 @@ For `*-llm-wiki` commands, `title` is an LLM-Wiki-relative slash path. Every wik
 page is filed under exactly one domain folder, so **`create-llm-wiki` requires
 `title="<domain>/<concept>"`** (exactly one level, e.g. `AI/Diffusion Policy`) and
 rejects a bare concept or a deeper path. It creates `LLM-Wiki/<domain>/<concept>.md`;
-the visible title and tag slug derive from `<concept>`, and the identity tag carries
-the domain as `llm-wiki/<domain>/<concept>`. The domain is the page's file-tree home,
+the visible title and path derive from `<concept>`, and the identity tag classifies by
+domain as `llm-wiki/<domain>` (no per-concept leaf). The domain is the page's file-tree home,
 not a relationship — cross-domain links live in the body, and folders do not change the
 link graph. A concept is a single page across the whole wiki: `create-llm-wiki` is
 get-or-create by concept, so re-creating it under a different domain returns the existing
@@ -1025,7 +1025,7 @@ retros are left in place.
 | `para-zk:rename-project` | `title`; optional `archived` | Renames the folder-style project folder and main note. Child notes move with the folder; default project-scoped retros are renamed with it. |
 | `para-zk:rename-area` | `title`; optional `archived` | Renames the folder-style area folder and main note. Child areas move with the folder; default area-scoped retros and area tag namespaces are updated without dropping inherited parent tags. |
 | `para-zk:rename-resource` | `title`; optional `archived`; `/` addresses a Resources-relative path | Renames the resource note file in its current folder. `new_title` must be a bare basename; use native `move`/`rename` to move folders. |
-| `para-zk:rename-llm-wiki` | `title`; `/` addresses an LLM-Wiki-relative path | Renames the wiki note's concept in its current domain folder and rewrites the `llm-wiki/<domain>/<concept>` tag (the domain is preserved). `new_title` must be a bare basename; re-file to another domain with native `move`/`rename`. No `archived`. |
+| `para-zk:rename-llm-wiki` | `title`; `/` addresses an LLM-Wiki-relative path | Renames the wiki note's concept in its current domain folder; the `llm-wiki/<domain>` tag is unchanged (it classifies by domain, not concept). `new_title` must be a bare basename; re-file to another domain with native `move`/`rename`. No `archived`. |
 | `para-zk:rename-zk` | `title` plus optional `kind` | Renames the selected ZK note file in place. |
 | `para-zk:rename-child` | `root_type` + `root_title` + optional `relpath` + `title` | Renames a subnote, fallback note, or nested area. `new_title` renames the addressed child. |
 
@@ -1184,10 +1184,12 @@ Options:
 | `first_author` | string | Optional provenance: the source's first author. |
 | `license` | SPDX id | Optional provenance: SPDX identifier (e.g. `MIT`, `CC-BY-4.0`); when no SPDX id fits, a short recognizable token (e.g. `arXiv`). |
 | `kind` | `paper` \| `article` \| `book` \| `video` \| `web` \| `code` \| `guide` \| `other` | Optional provenance: locale-neutral source kind code. |
+| `domain` | string | Optional subject domain for the identity tag. With a domain the tag is `리소스/<domain>`; omit for a flat `리소스` tag. Reuse an existing domain vocabulary. |
 | `body` | markdown | Optional initial free-form body content. |
 | `open` | boolean | Default `false`. |
 
-The four provenance keys and `aliases` are also editable after creation via
+The identity tag classifies (groups) the note rather than naming it: `리소스/<domain>`
+when `domain` is given, otherwise the flat `리소스`. The four provenance keys and `aliases` are also editable after creation via
 `para-zk:update-resource key=frontmatter/<aliases|url|first_author|license|kind>`
 (and surfaced by `para-zk:describe type=resource`); `kind` is validated against
 the code list above. `aliases` is stored as a single-item list for one canonical
@@ -1232,7 +1234,8 @@ Options:
 | `open` | boolean | Default `false`. |
 
 The created note stores `type: llm-wiki` and exactly one identity tag
-`llm-wiki/<domain>/<concept>` plus vault-managed timestamps/id. `created_by` and
+`llm-wiki/<domain>` (domain only — the tag classifies by domain, not concept) plus
+vault-managed timestamps/id. `created_by` and
 `updated_by` are readable when set through `by`, but not writable directly. It
 intentionally has no resource provenance frontmatter (`url`, `first_author`,
 `license`, `kind`). The template includes `para-zk-props` plus a managed tail
@@ -1293,6 +1296,9 @@ Options:
 | `maturity` | maturity code | Used for permanent notes. Defaults to `draft`. |
 | `body` | markdown | Optional initial free-form body content. |
 | `open` | boolean | Default `false`. |
+
+ZK notes (spark/digest/permanent) get no auto identity tag; the created note ships an empty
+`tags:` for the human to fill manually.
 
 Example:
 

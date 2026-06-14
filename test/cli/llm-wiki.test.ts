@@ -63,7 +63,7 @@ describe("llm-wiki CLI adapters", () => {
     expect(Object.keys(frontmatter).sort()).toEqual(["aliases", "created", "created_by", "id", "tags", "type", "updated", "updated_by"]);
     expect(frontmatter).toMatchObject({
       type: "llm-wiki",
-      tags: ["llm-wiki/ai/attention-wiki"],
+      tags: ["llm-wiki/ai"],
       aliases: ["Attention"]
     });
     expect(frontmatter.created === "" || frontmatter.created === null).toBe(true);
@@ -73,7 +73,7 @@ describe("llm-wiki CLI adapters", () => {
     expect(frontmatter).not.toHaveProperty("license");
     expect(frontmatter).not.toHaveProperty("kind");
     expect(content).toContain("type: llm-wiki");
-    expect(content).toContain("tags:\n  - llm-wiki/ai/attention-wiki");
+    expect(content).toContain("tags:\n  - llm-wiki/ai");
     expect(content).toContain("aliases:\n  - Attention");
     expect(content).toContain("Machine-owned synthesis.");
     expect(content).toContain("```para-zk-props\ntype: llm-wiki\n```");
@@ -150,9 +150,9 @@ describe("llm-wiki CLI adapters", () => {
     expect(cli.app.readPath("LLM-Wiki/AI/Policy.md")).toBeUndefined();
     const renamedContent = cli.app.readPath("LLM-Wiki/AI/Policy Wiki.md") ?? "";
     const renamedFrontmatter = frontmatterAt("LLM-Wiki/AI/Policy Wiki.md");
-    expect(renamedFrontmatter.tags).toEqual(["llm-wiki/ai/policy-wiki"]);
+    expect(renamedFrontmatter.tags).toEqual(["llm-wiki/ai"]);
     expect(renamedContent).not.toMatch(/llm-wiki\/policy(?:\s|$)/);
-    expect(renamedContent).toContain("llm-wiki/ai/policy-wiki");
+    expect(renamedContent).toContain("llm-wiki/ai");
     const consumerContent = cli.app.readPath("PARA/Resources/Wiki Consumer.md") ?? "";
     expect(consumerContent).toContain("[[LLM-Wiki/AI/Policy Wiki.md]]");
     expect(consumerContent).not.toContain("[[LLM-Wiki/AI/Policy.md]]");

@@ -304,6 +304,10 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Optional initial free-form body content.",
         "value": "<markdown>",
       },
+      "domain": {
+        "description": "Optional subject domain for the identity tag (<type>/<domain>, e.g. resource/ai); omit for a flat type tag. Reuse an existing domain vocabulary.",
+        "value": "<domain>",
+      },
       "first_author": {
         "description": "Optional provenance: the source's first author.",
         "value": "<name>",

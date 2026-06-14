@@ -139,7 +139,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         frontmatter([
           "type: resource",
           "tags:",
-          `  - ${tags.resource}/${slugPlaceholder}`,
+          `  - ${tags.resource}`,
           "created:",
           "updated:",
           "aliases:",
@@ -159,7 +159,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         frontmatter([
           "type: llm-wiki",
           "tags:",
-          `  - ${tags.llmWiki}/${slugPlaceholder}`,
+          `  - ${tags.llmWiki}`,
           "created:",
           "updated:",
           "created_by:",
@@ -252,7 +252,6 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         frontmatter([
           "type: spark",
           "tags:",
-          `  - ${tags.knowledge}/${slugPlaceholder}`,
           "created:",
           "updated:",
           "processed: false"
@@ -268,7 +267,6 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         frontmatter([
           "type: digest",
           "tags:",
-          `  - ${tags.knowledge}/${slugPlaceholder}`,
           "created:",
           "updated:",
           "sourceTitle:",
@@ -287,7 +285,6 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
         frontmatter([
           "type: permanent",
           "tags:",
-          `  - ${tags.knowledge}/${slugPlaceholder}`,
           "created:",
           "updated:",
           "maturity: {{maturity}}",
@@ -574,7 +571,7 @@ function renderGuide(settings: ParaZkSettings): string {
     `- ${tags.project}/...`,
     `- ${tags.area}/...`,
     `- ${tags.resource}/...`,
-    `- ${tags.knowledge}/...`,
+    `- ${tags.llmWiki}/...`,
     `- ${tags.journal}`,
     `- ${tags.retro}`,
     "",

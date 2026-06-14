@@ -22,8 +22,10 @@ describe("resource provenance frontmatter", () => {
 
     const content = cli.app.readPath("PARA/Resources/AI/Foo.md") ?? "";
     expect(content).toContain("type: resource");
-    expect(content).toContain("tags:\n  - resource/foo");
-    expect(content).not.toContain("resource/ai/foo");
+    // No domain given: the identity tag is the flat group tag, not a per-note slug.
+    expect(content).toContain("tags:\n  - resource");
+    expect(content).not.toContain("resource/foo");
+    expect(content).not.toContain("resource/ai");
   });
 
   it("returns the existing resource on a duplicate title without suffixing or clobbering", async () => {
@@ -50,8 +52,30 @@ describe("resource provenance frontmatter", () => {
     expect(created.title).toBe("Foo");
 
     const content = cli.app.readPath("PARA/Resources/AI/ML/Foo.md") ?? "";
-    expect(content).toContain("tags:\n  - resource/foo");
+    expect(content).toContain("tags:\n  - resource");
+    expect(content).not.toContain("resource/foo");
     expect(content).not.toContain("resource/ml/foo");
+  });
+
+  it("tags a resource by domain when given, and flat when omitted", async () => {
+    const withDomain = await cli.run("para-zk:create-resource", {
+      title: "Transformers Paper",
+      domain: "AI",
+      open: "false"
+    });
+    expect(withDomain.created).toBe(true);
+    const domainContent = cli.app.readPath("PARA/Resources/Transformers Paper.md") ?? "";
+    expect(domainContent).toContain("tags:\n  - resource/ai");
+    expect(domainContent).not.toContain("resource/transformers-paper");
+
+    const flat = await cli.run("para-zk:create-resource", {
+      title: "Loose Note",
+      open: "false"
+    });
+    expect(flat.created).toBe(true);
+    const flatContent = cli.app.readPath("PARA/Resources/Loose Note.md") ?? "";
+    expect(flatContent).toContain("tags:\n  - resource");
+    expect(flatContent).not.toContain("resource/");
   });
 
   it("reads, updates, and deletes a nested resource by exact title path", async () => {

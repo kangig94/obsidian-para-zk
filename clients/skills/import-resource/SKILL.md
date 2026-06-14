@@ -154,12 +154,14 @@ the structured frontmatter:
 ```
 optsidian para-zk:create-resource title="<title>" body=@/tmp/<file>.md \
   url="<source url>" first_author="<first author>" license="<SPDX id>" kind=<paper|article|book|video|web|code|guide|other> \
-  format=json
+  domain="<subject domain>" format=json
 ```
 
 `license` is an SPDX identifier (`MIT`, `Apache-2.0`, `CC-BY-4.0`, `CC-BY-SA-4.0`, `CC0-1.0`, …); when
 no SPDX id fits use a short recognizable token (e.g. `arXiv` for an arXiv-default paper), never a long
-descriptive sentence. `kind` is one of the codes shown. Omit any field you cannot determine — don't guess.
+descriptive sentence. `kind` is one of the codes shown. `domain` is the subject group for the identity
+tag — reuse an existing domain vocabulary; omit it for a flat resource tag. Omit any field you cannot
+determine — don't guess.
 
 Then link as requested. To make an existing note reference a resource — e.g. "add a ref to the
 AI area":

@@ -31,7 +31,9 @@ describe("managed templates", () => {
     expect(resource).not.toContain("# Overview");
     expect(resource).not.toContain("# Body");
     expect(llmWiki).toContain("type: llm-wiki");
-    expect(llmWiki).toContain("  - llm-wiki/{{slug}}");
+    // Identity tag classifies by domain (set by create-llm-wiki); the template ships the flat group tag.
+    expect(llmWiki).toContain("tags:\n  - llm-wiki\n");
+    expect(llmWiki).not.toContain("llm-wiki/{{slug}}");
     expect(llmWiki).toContain("updated:\ncreated_by:\nupdated_by:\naliases:");
     expect(llmWiki).toContain("```para-zk-props\ntype: llm-wiki\n```\n{{cursor}}\n\n```para-zk-managed\n```");
     expect(llmWiki).not.toContain("url:");
@@ -42,6 +44,11 @@ describe("managed templates", () => {
     expect(spark).not.toContain("# One-line thought summary");
     expect(spark).not.toContain("# Memo");
     expect(source).toContain("```para-zk-props\ntype: digest\n```\n{{cursor}}\n\n```para-zk-managed");
+    // ZK templates carry no auto identity tag: `tags:` is empty so the human assigns tags.
+    for (const zk of [spark, source, permanent]) {
+      expect(zk).toContain("tags:\ncreated:");
+      expect(zk).not.toContain("knowledge/");
+    }
     expect(source).not.toContain("## Highlights (quotes/evidence)");
     expect(source).not.toContain("# Summary");
     expect(source).not.toContain("# Key insights");

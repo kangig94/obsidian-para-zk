@@ -49,6 +49,7 @@ export type CreateResourceOptions = {
   firstAuthor?: string;
   license?: string;
   kind?: string;
+  domain?: string;
   body?: string;
   open?: boolean;
 };

@@ -234,7 +234,8 @@ export async function createResource(ctx: WorkflowContext, options: CreateResour
   await ctx.host.processFrontMatter(file, (fm) => {
     fm.type = "resource";
     applyAlias(fm, options.alias);
-    fm.tags = [`${tags.resource}/${slugify(title.basename)}`];
+    const resourceDomain = options.domain?.trim();
+    fm.tags = [resourceDomain ? `${tags.resource}/${slugify(resourceDomain)}` : tags.resource];
     applyCreatedUpdatedDefaults(fm);
     // Provenance: write only what was provided. url/first_author/license are free text;
     // kind is already validated to a code (or undefined) by readOptionalCode above.
@@ -287,7 +288,7 @@ export async function createLlmWiki(ctx: WorkflowContext, options: CreateLlmWiki
   await ctx.host.processFrontMatter(file, (fm) => {
     fm.type = "llm-wiki";
     applyAlias(fm, options.alias);
-    fm.tags = [`${tags.llmWiki}/${slugify(domain)}/${slugify(concept)}`];
+    fm.tags = [`${tags.llmWiki}/${slugify(domain)}`];
     applyCreatedUpdatedDefaults(fm);
     if (by) {
       fm.created_by = by;
@@ -457,11 +458,9 @@ export async function createZkFile(
     cursor: ""
   });
 
-  const tags = localePack(ctx.settings.locale).tags;
   await ctx.host.processFrontMatter(file, (fm) => {
     fm.type = zkKindCode(kind);
     applyAlias(fm, options.alias);
-    fm.tags = [`${tags.knowledge}/${slugify(title)}`];
     applyCreatedUpdatedDefaults(fm);
     if (kind === "Spark" && fm.processed === undefined) fm.processed = false;
     if (kind === "Permanent") fm.maturity = fm.maturity ?? maturity;

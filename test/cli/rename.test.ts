@@ -68,6 +68,11 @@ describe("rename-resource", () => {
     expect(renamed.ok).toBe(true);
     expect(renamed.path).toBe("PARA/Resources/Renamed source.md");
     expect(cli.app.readPath("PARA/Resources/Source.md")).toBeUndefined();
+    // The resource identity tag classifies (flat/by-domain), so a rename must not mint a
+    // per-title tag from the new basename.
+    const content = cli.app.readPath("PARA/Resources/Renamed source.md") ?? "";
+    expect(content).toContain("tags:\n  - resource");
+    expect(content).not.toContain("resource/renamed-source");
   });
 
   it("renames a nested resource in its current folder", async () => {

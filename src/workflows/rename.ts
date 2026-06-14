@@ -346,7 +346,10 @@ async function updateTitleDerivedTag(
       }
       return tag;
     });
-    if (!replaced) next.push(nextTag);
+    // Only folder-style notes carry a title-derived identity tag, so only they synthesize one
+    // when none was rewritten. resource/llm-wiki tags classify by group (or are absent on ZK),
+    // so a rename must leave those untouched rather than mint a per-title tag.
+    if (!replaced && isTitleDerivedTagDomain(domain)) next.push(nextTag);
     fm.tags = uniqueStrings(next);
   });
 
@@ -358,6 +361,12 @@ async function updateTitleDerivedTag(
 function tagPrefixForDomain(locale: "en" | "ko", domain: TagDomain): string {
   const tags = localePack(locale).tags;
   return domain === "llm-wiki" ? tags.llmWiki : tags[domain];
+}
+
+// Folder-style notes (project/area) tag by their own title, so a rename re-derives the tag.
+// resource/llm-wiki tags classify by group and ZK notes carry none — a rename preserves them.
+function isTitleDerivedTagDomain(domain: TagDomain): boolean {
+  return domain === "project" || domain === "area";
 }
 
 function renamedTitleTag(

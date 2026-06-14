@@ -1197,6 +1197,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       first_author: { value: "<name>", description: "Optional provenance: the source's first author." },
       license: { value: "<spdx-id>", description: "Optional provenance: source license as an SPDX identifier (e.g. MIT, CC-BY-4.0); when no SPDX id fits, a short recognizable token (e.g. arXiv)." },
       kind: { value: `<${RESOURCE_KIND_CODE_HELP}>`, description: "Optional provenance: locale-neutral source kind code." },
+      domain: { value: "<domain>", description: "Optional subject domain for the identity tag (<type>/<domain>, e.g. resource/ai); omit for a flat type tag. Reuse an existing domain vocabulary." },
       body: { value: "<markdown>", description: "Optional initial free-form body content." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
       format: { value: "<text|json>", description: "Output format (default: text)." }
@@ -1214,6 +1215,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
         firstAuthor: readCliString(args, "first_author"),
         license: readCliString(args, "license"),
         kind: readCliString(args, "kind"),
+        domain: readCliString(args, "domain"),
         body: readCliString(args, "body"),
         open: readCliBoolean(args, "open") ?? false
       };

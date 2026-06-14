@@ -6,10 +6,19 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Breaking
 
+- Identity tags now classify (group) instead of being per-note slugs. LLM-Wiki pages tag
+  `llm-wiki/<domain>` (domain only; the `/<concept>` leaf is dropped — was
+  `llm-wiki/<domain>/<concept>`). Resources tag `리소스/<domain>` when `create-resource`
+  is given the new optional `domain` flag, else a flat `리소스` (was `리소스/<title-slug>`).
+  ZK notes (spark/digest/permanent) get NO auto identity tag — the template ships an empty
+  `tags:` for the human to fill. `rename-llm-wiki`/`rename-resource`/`rename-zk` no longer
+  mint a per-title identity tag (folder-style project/area renames still re-derive theirs);
+  an llm-wiki rename keeps the domain-only tag unchanged. project/area/retro/journal tagging
+  is unchanged.
 - LLM-Wiki pages are now filed under a one-level domain folder. `create-llm-wiki` requires
   `title="<domain>/<concept>"` (exactly one domain folder, e.g. `AI/Diffusion Policy`) and
   rejects a bare concept or a deeper path; it writes `LLM-Wiki/<domain>/<concept>.md` with the
-  identity tag `llm-wiki/<domain>/<concept>` (was the flat `llm-wiki/<concept>`). The domain is
+  identity tag `llm-wiki/<domain>` (domain only). The domain is
   the page's file-tree home, not a relationship — cross-domain links stay in the body and the
   link graph is unchanged. `create-llm-wiki` is get-or-create by concept across the whole wiki:
   re-creating a concept under a different domain returns the existing page (no duplicate);
@@ -78,7 +87,7 @@ Notable changes for PARA-ZK are tracked here.
 - Added the `llm-wiki` surface type for LLM-owned derived synthesis under
   `LLM-Wiki/`: native CLI CRUD (`create/read/update/rename/delete-llm-wiki`),
   slash-path title addressing, `body`/`frontmatter/aliases`/`references` editing,
-  `llm-wiki/<domain>/<concept>` identity tags that rewrite on rename, list/describe/audit
+  `llm-wiki/<domain>` identity tags (domain only; unchanged on rename), list/describe/audit
   participation, MCP `type=llm-wiki` mutation mapping, and setup/smoke coverage.
 - Added the LLM-Wiki ingest loop: `para-zk:wiki-ingest-candidates` lists active,
   non-template ingestable sources (`resource`, `digest`, `permanent`, `subnote`)

@@ -11,7 +11,12 @@ describe("zk notes", () => {
   it("creates spark and permanent notes and reads/updates maturity", async () => {
     const spark = await cli.run("para-zk:create-zk", { title: "Spark", kind: "spark", open: "false" });
     expect(spark.created).toBe(true);
-    expect(cli.app.readPath(String(spark.path)) ?? "").toContain("type: spark");
+    const sparkContent = cli.app.readPath(String(spark.path)) ?? "";
+    expect(sparkContent).toContain("type: spark");
+    // ZK notes carry no auto identity tag: the created note has an empty tags key,
+    // not a knowledge/<slug> identity tag, for the human to fill manually.
+    expect(sparkContent).toMatch(/^tags:( null|\s*)$/m);
+    expect(sparkContent).not.toContain("knowledge/");
 
     const permanent = await cli.run("para-zk:create-zk", {
       title: "Evergreen",
@@ -155,6 +160,8 @@ describe("zk notes", () => {
     const renamed = await cli.run("para-zk:rename-zk", { title: "Old idea", kind: "permanent", new_title: "New idea" });
     expect(renamed.path).toBe("ZK/Permanent/New idea.md");
     expect(cli.app.readPath("ZK/Permanent/Old idea.md")).toBeUndefined();
+    // ZK notes carry no identity tag, so a rename must not mint one from the new title.
+    expect(cli.app.readPath("ZK/Permanent/New idea.md") ?? "").not.toContain("permanent/");
 
     const deleted = await cli.run("para-zk:delete-zk", { title: "New idea", kind: "permanent" });
     expect(deleted.ok).toBe(true);
