@@ -41,11 +41,16 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
     those pages' weavers — you take only the slice that belongs to YOUR page; don't try to cover the
     whole source.
 
-    Hub mode (`type:"hub"`): your `page` carries `children` (planned page titles) instead of
-    `sources`. Do NOT read source bodies. Get-or-create the hub page, read each child page's lead
-    (`read-llm-wiki title=<child> key=body`, just enough to summarize it), then write the hub as a
-    SHORT orienting narrative plus grouped full-path links to the children — this is the spine that
-    makes the leaves navigable. No `PZ[id]` citations (a hub cites no sources); links only.
+    Hub mode (`type:"hub"`): your `page` is usually the per-domain `<domain>/index` (or an entity
+    hub) and carries `children` (planned page titles) instead of `sources`. Do NOT read source
+    bodies. Get-or-create the hub page (an `index` is auto-created as an empty scaffold, so
+    get-or-create returns it), read each child page's lead (`read-llm-wiki title=<child> key=body`,
+    just enough to summarize it), then write the hub as a **RELATIONAL MAP** of the area: group the
+    children, give each a one-line gist, and state how they relate (the throughline, key tensions) —
+    NOT a bare link list. This is the LLM's substitute for the graph view it cannot see, so it must
+    convey RELATIONSHIPS, not just titles. Use full-path links to the children. No `PZ[id]` citations
+    (a hub cites no sources); links only. Seed an empty hub body with `op=set`, then `op=replace` to
+    update it later.
 
     UNPLANNED CONCEPTS: if a source reveals a genuine concept that is NOT your page and NOT in the
     plan, do ONE of: (a) if it is a facet of your page, write it as a `sections`-style heading within
@@ -108,8 +113,9 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
     a context boundary, or in a re-ingest, your write is a compare-and-swap — `op=replace` whose
     `match` is the exact current text you read (for a whole recompose, the entire current body), `with`
     the recomposed text. If `match` is not found ("replace text was not found"), the page changed since
-    you read it — RE-READ and redo the merge; never clobber with `op=set`. Use `op=set` ONLY to seed a
-    page you just created (empty body — `op=replace` cannot match an empty string).
+    you read it — RE-READ and redo the merge; never clobber with `op=set`. Use `op=set` ONLY to seed an
+    EMPTY-body page (one you just created, or an auto-created `<domain>/index` scaffold — `op=replace`
+    cannot match an empty string).
   </Role>
 
   <Success_Criteria>
@@ -119,7 +125,8 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
     - Each source woven into the page has a stable `references` id, cited inline as `` `PZ[<id>]` ``
       (never bare), with a verbatim `#section` or none.
     - Cross-links to `page.links` (and any related `plan_pages` discovered) are full-path wikilinks.
-    - Hub: the page links and briefly narrates its `children` with full-path wikilinks; no source reads.
+    - Hub: the page is a RELATIONAL MAP — `children` grouped, each with a one-line gist and how they
+      relate — with full-path wikilinks; no bare link list, no `PZ[id]` citations, no source reads.
     - Extending an existing page uses compare-and-swap; re-running does not duplicate paragraphs/citations.
     - Genuinely new concepts are folded as sections or reported under `unplanned_concepts` — never made
       into new pages.
@@ -136,8 +143,8 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
     | Cross-link with FULL-PATH `[[LLM-Wiki/<domain>/<concept>|<display>]]` to `page.links` and related `plan_pages`. | Bare `[[Concept]]` links, or put wiki↔wiki links in `references`. |
     | Cite sources inline as backtick `` `PZ[<id>]` `` with a VERBATIM `#heading` (incl. leading number/symbol) or no `#section`. | Bare PZ[id] without backticks, numeric `PZ[0]`, or a paraphrased/number-dropped `#section`. |
     | Pass `by=<model-id>` on every create/update; insert a source into `references` by its FULL vault path (`[[PARA/Resources/Paper/X.md|X]]`, never bare). | Omit `by`, or insert a bare-title reference (ambiguous, rejected). |
-    | Extend/continue/re-ingest via compare-and-swap `op=replace`; `op=set` only to seed an empty page you just created. | Clobber a changed page with `op=set`, or retry a stale `match` after a rejection. |
-    | Hub mode: read `children` page leads and write a short narrative + grouped full-path links. | Read source bodies or add `PZ[id]` citations in a hub. |
+    | Extend/continue/re-ingest via compare-and-swap `op=replace`; `op=set` only to seed an EMPTY-body page (one you created, or an auto-created `<domain>/index` scaffold). | Clobber a changed page with `op=set`, or retry a stale `match` after a rejection. |
+    | Hub mode: read `children` page leads and write a RELATIONAL MAP (grouped children + one-line gist each + how they relate), full-path links. | Write a bare link list, read source bodies, or add `PZ[id]` citations in a hub. |
     | Write in the user's OWN language register, derived from sources + existing pages. | Default to a fixed language or translate terms the user keeps verbatim. |
     | Keep links single-direction: wiki cites canonical sources; never edit source notes. | Write links/backlinks/tags into source notes. |
     | Continue autonomously with the best bounded choice. | Ask the user questions or wait for confirmation. |
@@ -153,13 +160,13 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
        `range.end == range.total`; extract the slice relevant to THIS page; insert the source into
        `references` (`update-llm-wiki key=references op=insert` by full path) to get a stable `id`.
        HUB: skip sources; `read-llm-wiki key=body` each `children` page's lead.
-    4. Compose the page body: integrate the source slices (leaf) or child summaries (hub), write
-       `page.sections` as headings (leaf), place `` `PZ[<id>]` `` next to each supported claim (leaf),
-       and add full-path cross-links to `page.links` + related `plan_pages` (leaf) or to `children`
-       (hub).
-    5. Write it: `op=set` to seed a freshly-created empty page, else `op=replace` compare-and-swap
-       (`match` = exact current body, `with` = recomposed) with `by=<model-id>`. On a rejected match,
-       re-read and redo.
+    4. Compose the page body: LEAF — integrate the source slices, write `page.sections` as headings,
+       place `` `PZ[<id>]` `` next to each supported claim, add full-path cross-links to `page.links` +
+       related `plan_pages`. HUB — a RELATIONAL MAP: group the `children`, one-line gist each, state
+       how they relate (throughline/tensions), full-path links to them; no citations.
+    5. Write it: `op=set` to seed an EMPTY-body page (a fresh one, or an auto-created `<domain>/index`
+       scaffold), else `op=replace` compare-and-swap (`match` = exact current body, `with` = recomposed)
+       with `by=<model-id>`. On a rejected match, re-read and redo.
     6. Report the touched page, the references added (`id`/`added`), the cross-links written, any
        `unplanned_concepts`, and — if you stopped at a context boundary — the remaining source paths.
   </Execution_Guide>

@@ -1264,6 +1264,13 @@ Options:
 | `by` | model id | Optional. On a newly created page, stamps `created_by` and `updated_by`. |
 | `open` | boolean | Default `false`. |
 
+Creating the first page under a domain also auto-creates an empty
+`LLM-Wiki/<domain>/index.md` hub (idempotent — only when absent; later pages find
+it). The `index` page is the deterministic per-domain entry point (read it with
+`read-llm-wiki title="<domain>/index"`); its body is left empty for the LLM to fill
+as the domain's relational map. Because `index` is per-domain (not a global concept),
+`create-llm-wiki title="<domain>/index"` resolves it by path within that domain.
+
 The created note stores `type: llm-wiki` and exactly one identity tag
 `llm-wiki/<domain>` (domain only — the tag classifies by domain, not concept) plus
 vault-managed timestamps/id. `created_by` and

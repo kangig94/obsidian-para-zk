@@ -120,6 +120,11 @@ Notable changes for PARA-ZK are tracked here.
   page plan (page set, domains, granularity, source→page assignments, cross-links,
   spine), then spawns one `wiki-weaver` per planned page in parallel to fill it, then a
   hub pass builds the navigable spine.
+- `create-llm-wiki` auto-mints an empty `LLM-Wiki/<domain>/index.md` hub when a domain's first page
+  is created (idempotent — only when absent; `index` is resolved per-domain by path, not the global
+  concept lookup). The index is the deterministic per-domain entry point an LLM reads for the area
+  map (`read-llm-wiki title="<domain>/index"`), filled by the wiki-ingest Synthesize pass as a
+  relational map; `para-zk:audit` `orphan_wiki_page` exempts `<domain>/index` (intentional roots).
 - Added `by=<model-id>` to `create-llm-wiki` and `update-llm-wiki`, stamping
   `created_by`/`updated_by` on create and `updated_by` on changed updates.
 - LLM-Wiki pages now use the managed template shape: props plus a managed tail

@@ -504,6 +504,9 @@ function orphanWikiPageFindings(ctx: WorkflowContext, notes: AuditableNote[]): A
   const findings: AuditFinding[] = [];
   for (const note of notes) {
     if (note.type !== "llm-wiki") continue;
+    // A `<domain>/index` hub is the intentional per-domain entry point: it links OUT to the
+    // domain's concept pages and is not expected to have inbound wiki links, so never flag it.
+    if (isWikiDomainIndex(ctx, note.file)) continue;
     if ((inboundFromWiki.get(note.file.path) ?? 0) > 0) continue;
     findings.push({
       code: "orphan_wiki_page",
@@ -571,6 +574,14 @@ async function fixWikiTagDomains(
     if (changed) fixed.push({ code: "wiki_tag_domain_mismatch", path, action: "setWikiDomainTag" });
   }
   return fixed;
+}
+
+// A `<domain>/index` hub: exactly one folder under the wiki root, basename `index`.
+function isWikiDomainIndex(ctx: WorkflowContext, file: TFile): boolean {
+  const root = `${ctx.settings.paths.wikiFolder}/`;
+  if (!file.path.startsWith(root)) return false;
+  const segments = file.path.slice(root.length).split("/");
+  return segments.length === 2 && segments[1] === "index.md";
 }
 
 // The page's domain = the first folder segment under the wiki folder (`<domain>/<concept>.md`).

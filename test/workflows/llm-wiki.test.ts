@@ -217,11 +217,12 @@ describe("llm-wiki workflows", () => {
     await app.vault.create("PARA/Archives/LLM-Wiki/Archived.md", "---\ntype: llm-wiki\n---\nArchived only\n");
 
     const filtered = await listNotes(ctx, { type: "llm-wiki" });
-    expect(filtered).toMatchObject({ count: 1, returned: 1, type: "llm-wiki", root: "LLM-Wiki" });
-    expect(filtered.items).toEqual(["AI/Foo"]);
+    // AI/Foo also auto-mints the AI/index hub.
+    expect(filtered).toMatchObject({ count: 2, returned: 2, type: "llm-wiki", root: "LLM-Wiki" });
+    expect((filtered.items as string[]).slice().sort()).toEqual(["AI/Foo", "AI/index"]);
 
     const all = await listNotes(ctx);
-    expect(all.count).toBe(1);
+    expect(all.count).toBe(2);
     await expect(readLlmWiki(ctx, { title: "Archived", key: "body" })).rejects.toThrow("llm-wiki note not found");
   });
 

@@ -76,11 +76,15 @@ the concrete routing error — do not ask the user.
 4. **Plan** (you, the orchestrator — inline): read enough to decide the global page structure, then
    decide it.
    - **Read the head of each candidate** — `optsidian read path="<path>" lines=1:200` (frontmatter +
-     abstract + lead/early sections). Read a few more lines only if a head is too thin to classify.
-     Do NOT read full bodies — that is the weaver's job and would overflow you.
+     abstract + lead/early sections). If the head does not make the source clear enough to classify,
+     read FURTHER (more line windows, or `grep '^#{1,6} '` for its headings) until you understand it
+     well enough to place it — reading more of a source when you need it is fine. You just don't
+     routinely page whole bodies for every source (that's the weaver's job and would overflow you).
    - **Read the existing wiki**: `optsidian para-zk:list type=llm-wiki limit=all` for the complete
-     roster (every `<domain>/<concept>` path → the domains already in use); for `delta`/`per-import`/
-     `re-ingest`, `read-llm-wiki` the related pages to know what they already cover.
+     roster (every `<domain>/<concept>` path → the domains already in use). Then, for the domains the
+     candidates touch, **read that domain's `<domain>/index` hub FIRST** (`read-llm-wiki title="<domain>/index"`)
+     — it is the area map and the cheapest way to learn the domain's structure; only read individual
+     concept pages when the index is insufficient.
    - **Decide the plan**, applying these rules:
      - **Granularity:** a PAGE is a concept that recurs across ≥2 sources OR is a canonical,
        standalone concept/method/system. A one-off mechanism from a single source is a **section
@@ -94,8 +98,11 @@ the concrete routing error — do not ask the user.
        Learning`). One concept = one page across the whole wiki.
      - **Assignment & cross-links:** assign every candidate source to ≥1 page (a source spanning N
        concepts goes into N pages' `sources`); set each page's `links` to the related pages.
-     - **Spine:** plan at least one per-domain hub (`type:"hub"`, with `children` = that domain's leaf
-       titles); add an entity hub for a large cluster; optionally a root overview.
+     - **Spine:** every domain's hub is `<domain>/index` (create-llm-wiki auto-mints it as an empty
+       scaffold when the domain's first page is created, so it always exists — you don't create it).
+       Plan it as `type:"hub"` with `title="<domain>/index"` and `children` = that domain's leaf
+       titles, for the Synthesize pass to FILL. Add an entity hub (descriptive title) for a large
+       sub-cluster when it helps.
      - **Honor THIS conversation:** include/exclude and domain choices the user expressed here win.
    - Produce the page list — each page `{title, type, existing, sources, sections, links, children,
      guidance}` (`type` ∈ `concept`|`source-summary`|`hub`) — plus a `skipped` list with reasons.
@@ -129,10 +136,11 @@ the concrete routing error — do not ask the user.
    ```
 
 6. **Synthesize** (spine): AFTER the leaf weavers complete (hubs link pages that must already exist),
-   spawn one `wiki-weaver` in hub mode for EACH planned page with `type:"hub"` — same packet shape; a
-   hub `page` carries `page.children` (planned page titles) and no `sources`. The weaver writes the
-   hub as a short narrative + full-path links to its children. For targeted modes, this refreshes only
-   the hubs your plan lists.
+   spawn one `wiki-weaver` in hub mode for EACH planned `type:"hub"` page (the per-domain
+   `<domain>/index`, plus any entity hub) — same packet shape; a hub `page` carries `page.children`
+   (planned page titles) and no `sources`. The weaver fills the hub as a RELATIONAL MAP of the area
+   (grouped children, a one-line gist each, and how they relate) — the LLM's substitute for the graph
+   view it cannot see. For targeted modes, this refreshes only the hubs your plan lists.
 
 7. **Report launch**: Return the mode, the plan summary (counts of concept / source-summary / hub
    pages, sources assigned vs `skipped`), whether `has_more` was true, and the weaver launch

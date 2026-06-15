@@ -85,11 +85,13 @@ describe("list", () => {
     await cli.run("para-zk:create-llm-wiki", { title: "AI/W", open: "false" });
 
     const res = await cli.run("para-zk:list", {});
-    expect(res.count).toBe(4);
+    // create-llm-wiki AI/W also auto-mints the AI/index hub -> 5 notes, two of them llm-wiki.
+    expect(res.count).toBe(5);
     expect(res.root).toBeUndefined();
-    expect((res.items as Array<{ type: string }>).map((i) => i.type).sort()).toEqual(["area", "llm-wiki", "project", "resource"]);
+    expect((res.items as Array<{ type: string }>).map((i) => i.type).sort()).toEqual(["area", "llm-wiki", "llm-wiki", "project", "resource"]);
     expect(res.items).toEqual(expect.arrayContaining([
-      expect.objectContaining({ name: "LLM-Wiki/AI/W", type: "llm-wiki" })
+      expect.objectContaining({ name: "LLM-Wiki/AI/W", type: "llm-wiki" }),
+      expect.objectContaining({ name: "LLM-Wiki/AI/index", type: "llm-wiki" })
     ]));
   });
 
@@ -98,8 +100,9 @@ describe("list", () => {
     await cli.app.vault.create("PARA/Archives/LLM-Wiki/Archived.md", "---\ntype: llm-wiki\n---\nArchived only\n");
 
     const res = await cli.run("para-zk:list", { type: "llm-wiki" });
-    expect(res).toMatchObject({ ok: true, count: 1, returned: 1, type: "llm-wiki", root: "LLM-Wiki" });
-    expect(res.items).toEqual(["AI/Wiki"]);
+    // AI/Wiki also auto-mints the AI/index hub.
+    expect(res).toMatchObject({ ok: true, count: 2, returned: 2, type: "llm-wiki", root: "LLM-Wiki" });
+    expect((res.items as string[]).slice().sort()).toEqual(["AI/Wiki", "AI/index"]);
   });
 
   it("reports an empty single-type listing with root and empty items", async () => {
