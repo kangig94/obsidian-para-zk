@@ -171,7 +171,6 @@ async function renderTaskBlock(
   const blockState = beginTaskBlockRender(el, args);
   if (args.root === "all" && blockState.toolbar.order === "manual") blockState.toolbar.order = "smart";
   const generation = blockState.generation;
-  el.empty();
 
   try {
     const t = localePack(plugin.settings.locale);
@@ -180,6 +179,7 @@ async function renderTaskBlock(
       : undefined;
 
     if (args.root === "current" && !(rootFile instanceof TFile)) {
+      el.empty();
       renderBlockEmpty(renderBlockShell(el, { kind: "tasks", title: args.title }).body, t.labels.taskRootUnavailable);
       return;
     }
@@ -189,6 +189,10 @@ async function renderTaskBlock(
       : await allRootTasks(plugin);
     if (!isCurrentTaskBlockGeneration(el, generation)) return;
 
+    // Keep the old rows visible during the async fetch above, then replace them in one
+    // synchronous pass here — so a refresh (including a sibling task block reacting to a
+    // shared-data change) swaps content atomically instead of flashing blank.
+    el.empty();
     const visible = filteredTasks(items, args, blockState.toolbar);
     blockState.items = items;
     blockState.visible = visible;

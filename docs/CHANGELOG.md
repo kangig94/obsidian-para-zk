@@ -693,7 +693,10 @@ Notable changes for PARA-ZK are tracked here.
   changes under counted roots (PARA / ZK / LLM-Wiki), so unrelated edits — including a task
   toggle writing its shard — don't flicker the cards. The task block ignores edits outside its
   tasks-folder shards / own note and skips refreshing while a checkbox's optimistic-UI reconcile
-  is mid-flight, so it never clobbers an in-progress toggle.
+  is mid-flight, so it never clobbers an in-progress toggle. A task-list refresh keeps the old
+  rows visible during its async fetch and swaps them in one synchronous pass, so a block reacting
+  to a change made in a sibling block (e.g. toggling a task in the upcoming-7 list updating the
+  due-today list) updates without flashing blank.
 - Managed template frontmatter no longer makes Obsidian's metadata indexer log "Keys with
   collection values will be stringified" warnings. Whole-value placeholders like
   `status: {{status}}` parsed (unrendered) as a YAML flow-map used as a map key, so every
