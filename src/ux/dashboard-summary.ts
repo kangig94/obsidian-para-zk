@@ -29,12 +29,14 @@ export function registerDashboardSummaryRenderers(plugin: ParaZkPluginContext): 
 }
 
 // The cards aggregate the whole vault, so a dashboard open in another tab went stale until
-// reopened. Any note created/removed/moved, or whose frontmatter (type / processed / links)
-// changed, can move a count, so there is no path filter — refresh on those, debounced so a
-// burst of edits costs one scan. `metadataCache "changed"` fires after Obsidian parses
-// frontmatter (broader than vault `modify`, but the correct signal for counts read from the
-// cache); `renderDashboardSummary` is synchronous, so the debounce serializes renders and no
-// generation guard is needed. Mirrors the reference / retro-summary renderers' subscription.
+// reopened. A count moves only when a file under a counted root (the PARA folders, ZK, and
+// LLM-Wiki — counts plus reverse links from those into resources) is created / removed / moved,
+// or its frontmatter (type / processed / maturity / links) changes. Edits elsewhere cannot move
+// a card, so they are filtered out to avoid needless flicker — notably toggling a dashboard task
+// writes its tasks-folder shard, which used to re-render the cards. Refresh is debounced so a
+// burst costs one scan; `metadataCache "changed"` is the post-parse signal for cache-read
+// counts, and `renderDashboardSummary` is synchronous so no generation guard is needed.
+// Mirrors the reference / retro-summary renderers' subscription.
 class DashboardSummaryRenderChild extends MarkdownRenderChild {
   private renderTimer: number | undefined;
 
@@ -48,15 +50,42 @@ class DashboardSummaryRenderChild extends MarkdownRenderChild {
 
   onload(): void {
     renderDashboardSummary(this.plugin, this.source, this.containerEl);
-    this.registerEvent(this.plugin.app.vault.on("create", () => this.scheduleRender()));
-    this.registerEvent(this.plugin.app.vault.on("delete", () => this.scheduleRender()));
-    this.registerEvent(this.plugin.app.vault.on("rename", () => this.scheduleRender()));
-    this.registerEvent(this.plugin.app.metadataCache.on("changed", () => this.scheduleRender()));
+    this.registerEvent(this.plugin.app.vault.on("create", (file) => this.onChange(file)));
+    this.registerEvent(this.plugin.app.vault.on("delete", (file) => this.onChange(file)));
+    this.registerEvent(this.plugin.app.vault.on("rename", (file, oldPath) => this.onChange(file, oldPath)));
+    this.registerEvent(this.plugin.app.metadataCache.on("changed", (file) => this.onChange(file)));
   }
 
   onunload(): void {
     if (this.renderTimer !== undefined) window.clearTimeout(this.renderTimer);
     this.renderTimer = undefined;
+  }
+
+  private onChange(file: unknown, oldPath?: string): void {
+    if (!(file instanceof TFile)) return;
+    if (!this.affectsSummary(file.path) && !this.affectsSummary(oldPath)) return;
+    this.scheduleRender();
+  }
+
+  // A change feeds a count only under a counted root; anything else — task shards above all —
+  // never moves a card, so it must not trigger a re-render.
+  private affectsSummary(path: string | undefined): boolean {
+    if (!path) return false;
+    const normalized = normalizeVaultPath(path);
+    const paths = this.plugin.settings.paths;
+    return [
+      paths.projectsFolder,
+      paths.areasFolder,
+      paths.resourcesFolder,
+      paths.sparkFolder,
+      paths.digestFolder,
+      paths.permanentFolder,
+      paths.wikiFolder,
+      paths.zkFolder
+    ].some((folder) => {
+      const root = normalizeVaultPath(folder);
+      return normalized === root || normalized.startsWith(`${root}/`);
+    });
   }
 
   private scheduleRender(): void {
