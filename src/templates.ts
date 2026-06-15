@@ -97,9 +97,9 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "aliases:",
           "areas:",
           "due_date:",
-          "status: {{status}}",
+          "status: \"{{status}}\"",
           "start_date:",
-          "priority: {{priority}}",
+          "priority: \"{{priority}}\"",
           "done_date:"
         ]),
         paraZkPropsBlock("project"),
@@ -180,8 +180,8 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           `  - ${tags.journal}`,
           "created:",
           "updated:",
-          "date: {{date}}",
-          "energy: {{energy}}"
+          "date: \"{{date}}\"",
+          "energy: \"{{energy}}\""
         ]),
         paraZkPropsBlock("journal"),
         `# ${t.labels.focus}`,
@@ -208,12 +208,12 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           `  - ${tags.retro}`,
           "created:",
           "updated:",
-          "project: {{project_frontmatter}}",
-          "date: {{date}}",
-          "week_iso: {{week_iso}}",
-          "week_start: {{week_start}}",
-          "week_end: {{week_end}}",
-          "areas: {{areas_frontmatter}}"
+          "project: \"{{project_frontmatter}}\"",
+          "date: \"{{date}}\"",
+          "week_iso: \"{{week_iso}}\"",
+          "week_start: \"{{week_start}}\"",
+          "week_end: \"{{week_end}}\"",
+          "areas: \"{{areas_frontmatter}}\""
         ]),
         paraZkPropsBlock("retro"),
         "---",
@@ -238,7 +238,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "type: subnote",
           "created:",
           "updated:",
-          "subnote_type: {{subnote_type}}",
+          "subnote_type: \"{{subnote_type}}\"",
           "parent:"
         ]),
         paraZkPropsBlock("subnote"),
@@ -287,7 +287,7 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
           "tags:",
           "created:",
           "updated:",
-          "maturity: {{maturity}}",
+          "maturity: \"{{maturity}}\"",
           "aliases:"
         ]),
         paraZkPropsBlock("permanent"),

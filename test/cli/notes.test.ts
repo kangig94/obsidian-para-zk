@@ -239,6 +239,26 @@ describe("retro", () => {
     expect(retroSurface.readKeys).not.toContain("references");
   });
 
+  it("substitutes quoted frontmatter placeholders without leaking template quotes or tokens", async () => {
+    await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
+
+    // Project retro: project_frontmatter (a quoted yaml scalar) and the date/week scalars expand.
+    const projectRetro = await cli.run("para-zk:create-retro", {
+      source_type: "project", source_title: "Alpha", date: "2026-06-02", open: "false"
+    });
+    const projectRaw = cli.app.readPath(String(projectRetro.path)) ?? "";
+    expect(projectRaw).not.toContain("{{");
+    // week_iso is a quoted placeholder in the template; the rendered value is the bare code.
+    const weekIso = await cli.run("para-zk:read-retro", {
+      title: String(projectRetro.path).split("/").pop()!.replace(/\.md$/, ""), key: "frontmatter/week_iso"
+    });
+    expect(String(weekIso.value)).toMatch(/^\d{4}-W\d{2}$/);
+
+    // General retro (no source): project_frontmatter / areas_frontmatter are empty placeholders.
+    const generalRetro = await cli.run("para-zk:create-retro", { date: "2026-06-09", open: "false" });
+    expect(cli.app.readPath(String(generalRetro.path)) ?? "").not.toContain("{{");
+  });
+
   it("links a project retro even when metadata cache has not caught up", async () => {
     await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
 

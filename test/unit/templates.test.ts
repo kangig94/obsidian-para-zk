@@ -159,8 +159,17 @@ describe("managed templates", () => {
     expect(dataviewViewBlock("llm-wiki-cited-by", DEFAULT_SETTINGS, sourcePath)).toContain("file.link AS \"Filename\", file.mtime AS \"Updated\"");
   });
 
-  it("keeps the retro areas placeholder valid YAML", () => {
-    expect(renderTemplate("retro", DEFAULT_SETTINGS)).toContain("areas: {{areas_frontmatter}}");
+  it("quotes whole-value frontmatter placeholders so the unrendered template is valid YAML", () => {
+    // A bare `key: {{placeholder}}` value parses as a YAML flow-map used as a map key, which
+    // makes Obsidian's metadata indexer warn on every template file. Whole-value placeholders
+    // must be quoted; the substitution consumes the quotes so rendered values stay unquoted.
+    // Mid-scalar (tag) and body placeholders stay bare and are not flagged.
+    for (const name of TEMPLATE_NAMES) {
+      const frontmatter = renderTemplate(name, DEFAULT_SETTINGS).match(/^---\n([\s\S]*?)\n---/)?.[1] ?? "";
+      expect(frontmatter, name).not.toMatch(/:\s+\{\{/);
+    }
+    expect(renderTemplate("retro", DEFAULT_SETTINGS)).toContain('areas: "{{areas_frontmatter}}"');
+    expect(renderTemplate("project", DEFAULT_SETTINGS)).toContain('status: "{{status}}"');
   });
 
   it("keeps retro summary empty by default", () => {

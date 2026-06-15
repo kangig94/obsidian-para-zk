@@ -685,6 +685,14 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Fixed
 
+- Managed template frontmatter no longer makes Obsidian's metadata indexer log "Keys with
+  collection values will be stringified" warnings. Whole-value placeholders like
+  `status: {{status}}` parsed (unrendered) as a YAML flow-map used as a map key, so every
+  `Templates/para-zk/template_*.md` tripped the warning on each index. They are now quoted
+  (`status: "{{status}}"`) so the unrendered template is valid YAML; template substitution
+  consumes the wrapping quotes, so created notes are byte-identical (values stay unquoted,
+  `date`/`week_*` stay date-typed). Re-run `para-zk:setup` to update the template files (no
+  `force` needed for unmodified templates).
 - Setup now reconciles the custom-sort `sortspec` bookmarks group instead of only
   creating it when absent. The group is PARA-ZK's managed file-explorer order, and the
   baseline grows over time (e.g. `LLM-Wiki` was added after `ZK`); previously a vault

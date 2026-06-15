@@ -539,9 +539,19 @@ function applyTemplateVariables(content: string, variables: TemplateVariables): 
   let result = content;
   for (const [key, value] of Object.entries(variables)) {
     if (key === "created") continue;
-    result = result.replace(new RegExp(`{{\\s*${escapeRegExp(key)}\\s*}}`, "g"), () => value ?? "");
+    result = result.replace(placeholderPattern(escapeRegExp(key)), () => value ?? "");
   }
-  return normalizeTemplateOutput(collapseExcessBlankLines(result.replace(/{{\s*[A-Za-z0-9_]+\s*}}/g, "")));
+  // Drop any unresolved placeholder so it never lands in a saved note.
+  return normalizeTemplateOutput(collapseExcessBlankLines(result.replace(placeholderPattern("[A-Za-z0-9_]+"), "")));
+}
+
+// Matches a `{{ inner }}` placeholder, optionally wrapped in the double quotes the templates use
+// to keep frontmatter valid YAML. The quotes are part of the match, so substitution consumes them
+// and the rendered value stays unquoted (or carries the value's own quotes); bare body and
+// mid-scalar placeholders match the unquoted alternative.
+function placeholderPattern(inner: string): RegExp {
+  const token = `\\{\\{\\s*${inner}\\s*\\}\\}`;
+  return new RegExp(`"${token}"|${token}`, "g");
 }
 
 function collapseExcessBlankLines(content: string): string {
