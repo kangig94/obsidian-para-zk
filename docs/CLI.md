@@ -29,7 +29,10 @@ Notes are addressed **by name, never by file path** — the CLI never exposes a
 Child notes (subnotes, fallback notes, and nested areas) use the dedicated
 `*-child` commands with `root_type` (`project` or `area`), `root_title`,
 optional `relpath` (ancestor chain from the root to the immediate parent), and
-`title` (the child itself). The full drill path is `[...relpath, title]`.
+`title` (the child itself). The full drill path is `[...relpath, title]`. On
+`create-child type=subnote`, `title` may be a relative path (`subdir/title`) to
+file the subnote in a subfolder under its parent — it stays the parent's child
+by frontmatter regardless of subfolder, so address it afterward by its basename.
 ZK notes derived from an origin name it with `source_title` (and `source_type`
 where the origin type is ambiguous, e.g. scoped retro / resource link). Each
 concept uses exactly one option name: `title`, `kind`, `area_titles`,
@@ -536,7 +539,7 @@ Options:
 | `root_type` | `project` or `area` | Required directly-addressable root ancestor type. |
 | `root_title` | string | Required directly-addressable root ancestor title. |
 | `relpath` | JSON list | Optional ancestor chain from root to immediate parent. Empty or omitted means directly under the root. |
-| `title` | string | Required child title. Full drill path is `[...relpath, title]`. |
+| `title` | string | Required child title. Full drill path is `[...relpath, title]`. For `type=subnote`, may be a `subdir/title` path to file the note in a subfolder under the parent; it stays the parent's child by frontmatter, so address it afterward by its basename (give two subnotes the same basename only in distinct parents, not distinct subfolders of one parent). |
 | `subnote_type` | subnote type code | `type=subnote` only. Defaults to `free`. |
 | `body` | markdown | `type=subnote` only. Optional initial free-form body content. Accepts `@<absolute-path>`. |
 | `inherit_parent_tag` | boolean | `type=area` only. Include the parent area tag too. Default `true`. |
@@ -556,8 +559,9 @@ optsidian para-zk:create-child \
 
 Side effects:
 
-- `type=subnote` creates the note in the parent folder, converts a single-note
-  parent into folder-style layout if needed, and sets `parent` to the parent note link.
+- `type=subnote` creates the note in the parent folder (or a subfolder of it when
+  `title` is a `subdir/title` path), converts a single-note parent into folder-style
+  layout if needed, and sets `parent` to the parent note link.
 - `type=area` creates a nested folder-style area inside the addressed parent
   area. Nested areas store `type: area` too; the `parent` link is the distinction.
 

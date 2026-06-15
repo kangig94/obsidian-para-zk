@@ -1127,10 +1127,11 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
   },
   {
     command: "para-zk:create-child",
-    description: "Create a child note under a project or root area. relpath is the ancestor chain to the immediate parent; title is the new child.",
+    description: "Create a child note under a project or root area. relpath is the ancestor chain to the immediate parent; title is the new child (for type=subnote, may be a subdir/title path to file it in a subfolder under the parent).",
     options: {
       type: { value: "<subnote|area>", description: "Child type to create. type=area requires root_type=area; type=subnote allows root_type=project or area." },
       ...CHILD_ADDRESS_OPTIONS,
+      title: { value: "<title|subdir/title>", description: "New child. For type=subnote, a relative path (subdir/title) files it in a subfolder under the parent; it stays the parent's child by frontmatter regardless of subfolder. For type=area, the child area title." },
       subnote_type: { value: `<${SUBNOTE_TYPE_CODE_HELP}>`, description: "type=subnote only. Locale-neutral subnote type code." },
       body: { value: "<markdown>", description: "type=subnote only. Optional initial free-form body content." },
       inherit_parent_tag: { value: "<true|false>", description: "type=area only. Include the parent area tag as well as the child tag (default true)." },

@@ -116,7 +116,7 @@ exports[`native CLI command metadata is stable 1`] = `
   },
   {
     "command": "para-zk:create-child",
-    "description": "Create a child note under a project or root area. relpath is the ancestor chain to the immediate parent; title is the new child.",
+    "description": "Create a child note under a project or root area. relpath is the ancestor chain to the immediate parent; title is the new child (for type=subnote, may be a subdir/title path to file it in a subfolder under the parent).",
     "options": {
       "body": {
         "description": "type=subnote only. Optional initial free-form body content.",
@@ -151,8 +151,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<free|checklist|todo|plan|research|meeting|decision|guide|risk|idea|settlement>",
       },
       "title": {
-        "description": "Child title. The full child drill path is [...relpath, title].",
-        "value": "<title>",
+        "description": "New child. For type=subnote, a relative path (subdir/title) files it in a subfolder under the parent; it stays the parent's child by frontmatter regardless of subfolder. For type=area, the child area title.",
+        "value": "<title|subdir/title>",
       },
       "type": {
         "description": "Child type to create. type=area requires root_type=area; type=subnote allows root_type=project or area.",

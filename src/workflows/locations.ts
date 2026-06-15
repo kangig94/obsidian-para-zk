@@ -439,6 +439,10 @@ export function llmWikiTitlePath(value: string | undefined): ResourceTitlePath {
   return titlePath(value, "llm-wiki title");
 }
 
+export function subnoteTitlePath(value: string | undefined): ResourceTitlePath {
+  return titlePath(value, "subnote title");
+}
+
 function findResourceByTitle(ctx: WorkflowContext, title: ResourceTitlePath, archived: boolean | undefined): TFile | undefined {
   const folders = archiveAwareFolders(ctx, ctx.settings.paths.resourcesFolder, archived);
 

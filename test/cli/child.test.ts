@@ -30,6 +30,67 @@ describe("*-child commands", () => {
     })).rejects.toThrow(/unknown CLI command: para-zk:create-subnote/);
   });
 
+  it("files a subnote in a subfolder when the title is a relative path, still addressable by basename", async () => {
+    await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
+
+    const created = await cli.run("para-zk:create-child", {
+      type: "subnote",
+      root_type: "project",
+      root_title: "Alpha",
+      title: "Notes/Plan",
+      body: "Sub-foldered plan.",
+      open: "false"
+    });
+    expect(created.ok).toBe(true);
+    expect(created.path).toBe("PARA/Projects/Alpha/Notes/Plan.md");
+    expect(created.parentPath).toBe("PARA/Projects/Alpha/Alpha.md");
+    // The parent link lives in frontmatter, not folder position — that is what keeps a
+    // sub-foldered subnote the parent's child (the folder-direct match cannot reach a subfolder).
+    expect(cli.app.readPath("PARA/Projects/Alpha/Notes/Plan.md")).toContain("[[PARA/Projects/Alpha/Alpha.md");
+
+    // It therefore resolves by basename (relpath empty) regardless of the subfolder it sits in.
+    const read = await cli.run("para-zk:read-child", {
+      root_type: "project",
+      root_title: "Alpha",
+      title: "Plan",
+      key: "body"
+    });
+    expect(read.path).toBe("PARA/Projects/Alpha/Notes/Plan.md");
+    expect(String(read.value)).toContain("Sub-foldered plan.");
+  });
+
+  it("allows a qualified subnote whose basename equals the parent, and nested subfolders", async () => {
+    await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
+
+    // A flat title equal to the parent is a conflict; the same basename inside a subfolder is fine.
+    const sameName = await cli.run("para-zk:create-child", {
+      type: "subnote", root_type: "project", root_title: "Alpha", title: "Sub/Alpha", open: "false"
+    });
+    expect(sameName.ok).toBe(true);
+    expect(sameName.path).toBe("PARA/Projects/Alpha/Sub/Alpha.md");
+
+    const nested = await cli.run("para-zk:create-child", {
+      type: "subnote", root_type: "project", root_title: "Alpha", title: "Notes/Archive/Plan", open: "false"
+    });
+    expect(nested.path).toBe("PARA/Projects/Alpha/Notes/Archive/Plan.md");
+
+    const conflict = await cli.run("para-zk:create-child", {
+      type: "subnote", root_type: "project", root_title: "Alpha", title: "Alpha", open: "false"
+    });
+    expect(conflict.ok).toBe(false);
+    expect(String(conflict.error)).toContain("conflicts with parent note");
+  });
+
+  it("rejects a subnote title that escapes its parent folder", async () => {
+    await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
+    for (const title of ["../Escape", "/Absolute"]) {
+      const rejected = await cli.run("para-zk:create-child", {
+        type: "subnote", root_type: "project", root_title: "Alpha", title, open: "false"
+      });
+      expect(rejected.ok).toBe(false);
+    }
+  });
+
   it("reads, updates, renames, and deletes nested same-title children by relpath", async () => {
     await cli.run("para-zk:create-area", { title: "Ops", open: "false" });
     await cli.run("para-zk:create-child", { type: "area", root_type: "area", root_title: "Ops", title: "Hiring", open: "false" });

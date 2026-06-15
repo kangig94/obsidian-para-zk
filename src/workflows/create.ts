@@ -57,6 +57,7 @@ import {
   llmWikiTitlePath,
   requireTitle,
   resourceTitlePath,
+  subnoteTitlePath,
   resolveOptionalFile,
   resolveRequiredByType,
   resolveRequiredFile,
@@ -345,17 +346,20 @@ function llmWikiBy(value: string | undefined): string | undefined {
 }
 
 export async function createSubnote(ctx: WorkflowContext, options: CreateSubnoteOptions): Promise<CreateSubnoteResult> {
-  const title = requireTitle(options.title, "subnote title");
+  // A subnote title may be a relative path ("subdir/note") to file it in a subfolder under the
+  // parent — same as create-resource. The subnote stays a child of the parent by frontmatter
+  // regardless of subfolder, so the parent's subnote view is unaffected.
+  const title = subnoteTitlePath(options.title);
   const source = await resolveRequiredParent(ctx, options);
-  if (title === source.basename) {
-    throw new Error(`subnote title conflicts with parent note: ${title}`);
+  if (!title.qualified && title.basename === source.basename) {
+    throw new Error(`subnote title conflicts with parent note: ${title.basename}`);
   }
   const parent = await ensureFolderStyleParent(ctx, source);
   const subnoteTypeCode = readOptionalCode(options.subnoteType, parseSubnoteTypeCode, "subnote_type", SUBNOTE_TYPE_CODE_HELP);
   const subnoteType = subnoteTypeCode ?? "free";
-  const path = joinVaultPath(parent.childFolder, `${title}.md`);
+  const path = joinVaultPath(parent.childFolder, `${title.relpath}.md`);
   if (path === parent.file.path) {
-    throw new Error(`subnote title conflicts with parent note: ${title}`);
+    throw new Error(`subnote title conflicts with parent note: ${title.basename}`);
   }
   let created = true;
   let file = ctx.host.getFile(path);
