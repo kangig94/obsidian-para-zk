@@ -10,7 +10,8 @@ import {
 import { TFile, editorInfoField, editorLivePreviewField } from "obsidian";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import type { ReferenceRead } from "../workflows";
-import { CITATION_TOKEN_RE, buildCitationElement, parseCitationKeys, resolveReferences, type CitationKey } from "./citation-renderer";
+import { CITATION_TOKEN_RE, parseCitationKeys, type CitationKey } from "../citation-token";
+import { buildCitationElement, resolveReferences } from "./citation-renderer";
 
 // Live Preview counterpart to the reading-view citation post-processor: render a
 // `` `PZ[<id>]` `` / `` `PZ[<id>, <id>]` `` inline-code token as bracketed `[n, m]` links, reusing the

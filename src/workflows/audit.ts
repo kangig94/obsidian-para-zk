@@ -1,4 +1,5 @@
 import type { TFile } from "obsidian";
+import { CITATION_TOKEN_RE, parseCitationKeys } from "../citation-token";
 import { localePack } from "../i18n";
 import { slugify, uniqueStrings } from "../text";
 import { frontmatterTimeMs } from "../time";
@@ -36,6 +37,7 @@ const AUDIT_CHECKS: AuditCheckCode[] = [
   "dangling_reference",
   "idless_reference",
   "bare_reference",
+  "bad_citation_subpath",
   "orphan_note",
   "upward_wiki_link",
   "orphan_wiki_page",
@@ -49,6 +51,7 @@ const CHECK_SEVERITY: Record<AuditCheckCode, AuditSeverity> = {
   dangling_reference: "high",
   idless_reference: "medium",
   bare_reference: "low",
+  bad_citation_subpath: "low",
   orphan_note: "medium",
   upward_wiki_link: "medium",
   orphan_wiki_page: "low",
@@ -168,6 +171,7 @@ async function collectAuditFindings(
   if (enabledChecks.has("dangling_reference") || enabledChecks.has("idless_reference") || enabledChecks.has("bare_reference")) {
     findings.push(...await referenceFindings(ctx, notes, enabledChecks));
   }
+  if (enabledChecks.has("bad_citation_subpath")) findings.push(...await citationSubpathFindings(ctx, notes));
   if (enabledChecks.has("orphan_note")) findings.push(...orphanNoteFindings(ctx, notes));
   if (enabledChecks.has("upward_wiki_link")) findings.push(...upwardWikiLinkFindings(ctx, notes));
   if (enabledChecks.has("orphan_wiki_page")) findings.push(...orphanWikiPageFindings(ctx, notes));
@@ -197,6 +201,95 @@ function brokenLinkFindings(ctx: WorkflowContext, notes: AuditableNote[]): Audit
     }
   }
   return findings;
+}
+
+// `PZ[id#section]` citations whose `#section` does not resolve to a real heading or block in
+// the cited source — usually the section was paraphrased or had a leading number dropped, so
+// the citation lands at the top of the source instead of the intended section. Report-only:
+// the intended heading cannot be guessed safely.
+async function citationSubpathFindings(ctx: WorkflowContext, notes: AuditableNote[]): Promise<AuditFinding[]> {
+  const findings: AuditFinding[] = [];
+  const anchorCache = new Map<string, SourceAnchors>();
+  for (const note of notes) {
+    const cited = subpathCitations(await ctx.host.read(note.file));
+    if (cited.length === 0) continue;
+    const referenceById = new Map<string, ReferenceRead>();
+    for (const reference of await readReferenceItemsFresh(ctx, note.file)) {
+      if (reference.id) referenceById.set(reference.id, reference);
+    }
+    for (const { id, subpath } of cited) {
+      const reference = referenceById.get(id);
+      if (!reference) continue; // an unknown citation id is a separate concern, not a bad subpath
+      if (await citationSubpathResolves(ctx, reference, subpath, anchorCache)) continue;
+      findings.push({
+        code: "bad_citation_subpath",
+        severity: CHECK_SEVERITY.bad_citation_subpath,
+        path: note.file.path,
+        type: note.type,
+        detail: { id, subpath, target: reference.path ?? reference.link },
+        fix: "Cite the source heading verbatim (keep any leading number/symbol), or drop the #section and cite PZ[id] alone."
+      });
+    }
+  }
+  return findings;
+}
+
+// Distinct (id, subpath) citation entries in a note body — only those carrying a `#section`.
+function subpathCitations(content: string): { id: string; subpath: string }[] {
+  const seen = new Set<string>();
+  const result: { id: string; subpath: string }[] = [];
+  for (const match of content.matchAll(CITATION_TOKEN_RE)) {
+    for (const key of parseCitationKeys(match[1]) ?? []) {
+      if (!key.subpath) continue;
+      const dedupe = `${key.id}#${key.subpath}`;
+      if (seen.has(dedupe)) continue;
+      seen.add(dedupe);
+      result.push({ id: key.id, subpath: key.subpath });
+    }
+  }
+  return result;
+}
+
+type SourceAnchors = { headings: Set<string>; blocks: Set<string> };
+
+async function citationSubpathResolves(
+  ctx: WorkflowContext,
+  reference: ReferenceRead,
+  subpath: string,
+  cache: Map<string, SourceAnchors>
+): Promise<boolean> {
+  if (!reference.path) return false; // a URL/non-note reference has no heading or block to anchor into
+  let anchors = cache.get(reference.path);
+  if (!anchors) {
+    const file = ctx.host.getFile(reference.path);
+    if (!file) return false; // missing source; dangling_reference reports the source itself
+    anchors = sourceAnchors(await ctx.host.read(file));
+    cache.set(reference.path, anchors);
+  }
+  const block = subpath.match(/^\^(.+)$/);
+  return block ? anchors.blocks.has(block[1].trim().toLowerCase()) : anchors.headings.has(normalizeAnchor(subpath));
+}
+
+// Heading texts and `^block` ids a `#section` can resolve against, mirroring Obsidian: headings
+// matched case-insensitively on their full text (numbers/punctuation kept), block ids by their
+// trailing `^id` marker. Fenced code is skipped so `#` lines inside it are not read as headings.
+function sourceAnchors(content: string): SourceAnchors {
+  const headings = new Set<string>();
+  const blocks = new Set<string>();
+  let fenced = false;
+  for (const line of content.split(/\r?\n/)) {
+    if (/^\s*(```|~~~)/.test(line)) { fenced = !fenced; continue; }
+    if (fenced) continue;
+    const heading = line.match(/^#{1,6}\s+(.+?)\s*$/);
+    if (heading) headings.add(normalizeAnchor(heading[1]));
+    const block = line.match(/(?:^|\s)\^([A-Za-z0-9_-]+)\s*$/);
+    if (block) blocks.add(block[1].toLowerCase());
+  }
+  return { headings, blocks };
+}
+
+function normalizeAnchor(text: string): string {
+  return text.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 async function referenceFindings(

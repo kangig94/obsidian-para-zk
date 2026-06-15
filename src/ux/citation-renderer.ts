@@ -1,39 +1,9 @@
 import { MarkdownRenderChild, TFile, type MarkdownPostProcessorContext } from "obsidian";
+import { type CitationKey, parseCitationKeys } from "../citation-token";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { workflowContext } from "../vault/host";
 import { readReferenceItemsFromFrontmatter, type ReferenceRead } from "../workflows";
 import { referenceTitle, renderReferenceAnchor } from "./reference-link";
-
-const CITATION_ID_RE_SOURCE = "[A-Za-z0-9_-]+";
-// An optional section after the id: `#` then heading or block (`#^id`) text. Comma is the
-// multi-cite separator and `]` closes the token, so an inline-cited section excludes both —
-// a heading containing a comma must be cited via the reference's own stored anchor instead.
-const CITATION_SUBPATH_RE_SOURCE = "#[^,\\]\\n]+";
-const CITATION_ENTRY_RE_SOURCE = `${CITATION_ID_RE_SOURCE}(?:${CITATION_SUBPATH_RE_SOURCE})?`;
-const CITATION_ENTRY_LIST_RE_SOURCE = `${CITATION_ENTRY_RE_SOURCE}(?:\\s*,\\s*${CITATION_ENTRY_RE_SOURCE})*`;
-const CITATION_CODE_RE_SOURCE = `PZ\\[\\s*(${CITATION_ENTRY_LIST_RE_SOURCE})\\s*\\]`;
-const CITATION_TOKEN_CODE_RE_SOURCE = `PZ\\[\\s*${CITATION_ENTRY_LIST_RE_SOURCE}\\s*\\]`;
-const CITATION_RE = new RegExp(`^${CITATION_CODE_RE_SOURCE}$`);
-const CITATION_ENTRY_RE = new RegExp(`^(${CITATION_ID_RE_SOURCE})(?:#(.+))?$`);
-export const CITATION_TOKEN_RE = new RegExp("`(" + CITATION_TOKEN_CODE_RE_SOURCE + ")`", "g");
-
-// A single cited reference: its stable id and an optional section subpath (heading text or
-// `^block`) that points the citation at one part of the reference's target.
-export type CitationKey = { id: string; subpath?: string };
-
-// Pure: a citation token is a code span whose whole content is `PZ[<id>]`,
-// `PZ[<id>#<section>]`, or a comma-separated list of either (spaces optional).
-// Returns the parsed keys, or undefined for anything else.
-export function parseCitationKeys(text: string): CitationKey[] | undefined {
-  const match = text.trim().match(CITATION_RE);
-  if (!match) return undefined;
-  return match[1].split(",").map((part) => {
-    const entry = part.trim().match(CITATION_ENTRY_RE);
-    const id = entry?.[1] ?? part.trim();
-    const subpath = entry?.[2]?.trim();
-    return subpath ? { id, subpath } : { id };
-  });
-}
 
 // Synchronous reference lookup from the note's cached frontmatter — both the reading-view
 // post-processor and the CM6 editor extension run in a sync context. Malformed `references`

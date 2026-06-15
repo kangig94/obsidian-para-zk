@@ -259,6 +259,7 @@ export type AuditCheckCode =
   | "dangling_reference"
   | "idless_reference"
   | "bare_reference"
+  | "bad_citation_subpath"
   | "orphan_note"
   | "upward_wiki_link"
   | "orphan_wiki_page"

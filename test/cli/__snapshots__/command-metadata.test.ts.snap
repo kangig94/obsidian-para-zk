@@ -38,7 +38,7 @@ exports[`native CLI command metadata is stable 1`] = `
     "options": {
       "check": {
         "description": "Optional check code filter.",
-        "value": "<broken_link|dangling_reference|idless_reference|bare_reference|orphan_note|upward_wiki_link|orphan_wiki_page|wiki_tag_domain_mismatch|unprocessed_spark|stale_draft_permanent>",
+        "value": "<broken_link|dangling_reference|idless_reference|bare_reference|bad_citation_subpath|orphan_note|upward_wiki_link|orphan_wiki_page|wiki_tag_domain_mismatch|unprocessed_spark|stale_draft_permanent>",
       },
       "fix": {
         "description": "When true, apply auto-repairs vault-wide: backfill id-less reference ids, expand unique bare reference links to full paths, and correct llm-wiki tag domains; all other findings (including ambiguous bare references) remain report-only.",
