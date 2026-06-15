@@ -10,7 +10,7 @@ Health-check the LLM-Wiki and report findings. This is **invocation-gated** — 
 
 ## Context
 
-The LLM-Wiki is a compounding, interlinked web of LLM-owned concept pages under `LLM-Wiki/`. Over time it can drift: orphaned concepts, contradictions between pages, missing cross-references, and — because LLMs generate non-Latin (CJK) prose with sub-syllable tokenization — **well-formed-but-wrong syllables** (a wrong jamo/받침 yields a real but wrong word, e.g. 궤적→궁적, 댄스→댓스). Lint surfaces these.
+The LLM-Wiki is a compounding, interlinked web of LLM-owned concept pages under `LLM-Wiki/`. Over time it can drift: orphaned concepts, contradictions between pages, missing cross-references, **cohesion decay** (a concept split across many thin pages, duplicate/near-synonym pages, near-synonym domains, or a weak/empty domain `index` hub), and — because LLMs generate non-Latin (CJK) prose with sub-syllable tokenization — **well-formed-but-wrong syllables** (a wrong jamo/받침 yields a real but wrong word, e.g. 궤적→궁적, 댄스→댓스). Lint surfaces these.
 
 Two layers:
 - **Structural** (deterministic, 0 LLM tokens) — delegated entirely to `para-zk:audit`. Never re-implement these checks here.
@@ -33,9 +33,14 @@ Two layers:
 
 2. **Resolve scope**: For `full`, enumerate pages with `optsidian para-zk:list type=llm-wiki limit=all`. For `scoped`, use the provided `paths` (reject if empty).
 
-3. **Structural pass (deterministic, free)**: Run `optsidian para-zk:audit limit=all` and keep findings on llm-wiki pages — `orphan_wiki_page`, `upward_wiki_link`, `broken_link`, `dangling_reference`, `idless_reference`. These are report-only here (id-less references are separately auto-fixable by the user via `para-zk:audit fix=true`). Do NOT re-derive them in the semantic pass.
+3. **Structural pass (deterministic, free)**: Run `optsidian para-zk:audit limit=all` and keep findings on llm-wiki pages — `orphan_wiki_page`, `upward_wiki_link`, `broken_link`, `dangling_reference`, `idless_reference`. These are report-only here (id-less references are separately auto-fixable by the user via `para-zk:audit fix=true`). Do NOT re-derive them in the semantic pass. (`orphan_wiki_page` exempts `<domain>/index` hubs — they are intentional roots — so an empty or weak hub is judged in the semantic pass, not here.)
 
-4. **Semantic pass (fresh-context read)**: Read the target pages' bodies and detect, per page and across pages: orthographic/generation slips (malformed CJK/non-Latin syllables); cross-page contradictions; concepts that warrant their own page but lack one; missing cross-references between related pages; and data gaps. Choose the reader by context-freshness:
+4. **Semantic pass (fresh-context read)**: Read the target pages' bodies and detect, per page and across pages: orthographic/generation slips (malformed CJK/non-Latin syllables); cross-page contradictions; concepts that warrant their own page but lack one; missing cross-references between related pages; data gaps; and **cohesion** (the wiki must read as one interlinked web, not a flat pile):
+   - **Over-fragmentation** — thin single-source pages that should be SECTIONS of a broader concept page (e.g. several motion-prior mechanisms that belong in one "Motion Prior" page), and duplicate / near-synonym concept pages that should merge into one.
+   - **Domain coherence** — near-synonym domains (`RL` vs `Reinforcement Learning`) that should be one; a domain that is a large flat bucket with no organizing structure.
+   - **Hub health** — read each domain's `<domain>/index`: it should be a real RELATIONAL MAP of the area (grouped concepts + how they relate), not empty (never filled by Synthesize) or a bare link list; and every concept page in a domain should be reachable from that domain's index. (This complements the structural `orphan_wiki_page`, which flags any page with no incoming wiki link; here you instead judge whether the domain's `index` — itself exempt from that check — actually maps to every leaf.)
+
+   Choose the reader by context-freshness:
    - If you (the orchestrator) did NOT generate these pages this session, read them directly: `optsidian para-zk:read-llm-wiki title=<title> key=body`.
    - If the page set is large (a full sweep on a big wiki) or you orchestrated their generation this session, spawn ONE fresh general-purpose reviewer agent (clean context, no generation history) and have it drive the vault through `mcp__optsidian__command_run` (a sandboxed sub-agent cannot reach Obsidian over Bash). Pass it the page list and this report/fix policy.
    - Never let the wiki-weaver (or any agent that just wrote these pages) lint its own output.
@@ -51,6 +56,6 @@ Return a structured report:
 - **mode + coverage**: which pages were read (and, for a chunked large sweep, which remain) — never silently truncate.
 - **structural** (from `para-zk:audit`): the wiki findings by code, with paths.
 - **fixed** (auto-applied): page, and the `<garbled> → <fixed>` orthographic correction for each.
-- **needs decision** (report-only): ambiguous orthographic corrections, and semantic findings (contradictions, missing concept pages, missing cross-references, data gaps) with page references and a one-line suggestion (e.g. re-ingest the source, add a cross-link, write a new concept page).
+- **needs decision** (report-only): ambiguous orthographic corrections; semantic findings (contradictions, missing concept pages, missing cross-references, data gaps); and **cohesion findings** (over-fragmentation, duplicate / near-synonym pages, near-synonym domains, weak / empty / unreachable `index` hubs) — each with page references and a one-line suggestion. Cohesion remediation is generally a `para-zk:wiki-ingest` re-plan (which decides the page set / domains / hubs globally), not a manual edit; minor fixes (add a cross-link, fill an empty hub) can be done directly.
 
 Do not commit, do not edit source notes, and do not auto-rewrite prose.

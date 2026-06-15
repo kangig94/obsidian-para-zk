@@ -125,6 +125,11 @@ Notable changes for PARA-ZK are tracked here.
   concept lookup). The index is the deterministic per-domain entry point an LLM reads for the area
   map (`read-llm-wiki title="<domain>/index"`), filled by the wiki-ingest Synthesize pass as a
   relational map; `para-zk:audit` `orphan_wiki_page` exempts `<domain>/index` (intentional roots).
+- `wiki-lint`'s semantic read pass now also assesses **cohesion** — over-fragmentation, duplicate /
+  near-synonym pages, near-synonym domains, and `<domain>/index` hub health (empty / weak / a leaf
+  unreachable from its hub). Report-only; cohesion remediation routes to a `wiki-ingest` re-plan
+  (which decides the page set / domains / hubs globally) rather than piecemeal manual edits, though
+  minor fixes (a cross-link, filling an empty hub) can be done directly.
 - Added `by=<model-id>` to `create-llm-wiki` and `update-llm-wiki`, stamping
   `created_by`/`updated_by` on create and `updated_by` on changed updates.
 - LLM-Wiki pages now use the managed template shape: props plus a managed tail
