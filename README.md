@@ -1,4 +1,4 @@
-# PARA-ZK
+# PARA-ZK (with LLM-Wiki)
 
 An LLM-maintained PARA + Zettelkasten knowledge wiki for Obsidian.
 
