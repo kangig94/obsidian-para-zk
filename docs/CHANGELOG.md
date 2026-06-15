@@ -679,6 +679,15 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Fixed
 
+- Setup now reconciles the custom-sort `sortspec` bookmarks group instead of only
+  creating it when absent. The group is PARA-ZK's managed file-explorer order, and the
+  baseline grows over time (e.g. `LLM-Wiki` was added after `ZK`); previously a vault
+  whose group was built from an older baseline never gained the newer top-level folders,
+  so `LLM-Wiki` fell to default sort and `force=true` did not help. Setup now additively
+  inserts any missing baseline top-level folder at its baseline position (LLM-Wiki right
+  after ZK), preserving the order of entries already present and writing nothing when the
+  group is already complete. Matching is group-strict — a same-titled file bookmark no
+  longer satisfies a folder entry.
 - Realigned stale `smoke:vault` expectations with the current GUI: ribbon
   create-action order (resource before ZK), the subnote template's managed
   block, and the Korean `일일 노트`/`하위노트` labels.

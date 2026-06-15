@@ -23,12 +23,13 @@ export const customSortDependencyConfiguration: DependencyConfiguration = {
 async function isCustomSortConfigured(
   services: DependencyConfigurationServices,
   app: App,
-  manager: PluginManager
+  manager: PluginManager,
+  settings: ParaZkSettings
 ): Promise<boolean> {
   const currentSettings = await services.readSettingsFile(app, CUSTOM_SORT_SETTINGS_PATH);
   const nextSettings = mergeCustomSortSettings(currentSettings);
   if (JSON.stringify(currentSettings) !== JSON.stringify(nextSettings)) return false;
-  if (!await hasCustomSortBookmarksGroup(app)) return false;
+  if (!await hasCompleteCustomSortBookmarksGroup(app, settings)) return false;
 
   const runtimeSettings = services.readRuntimePluginSettings(manager, CUSTOM_SORT_PLUGIN_ID);
   if (!runtimeSettings) return true;
@@ -75,25 +76,61 @@ function mergeCustomSortSettings(current: Record<string, unknown>): Record<strin
   };
 }
 
-async function hasCustomSortBookmarksGroup(app: App): Promise<boolean> {
+// The sortspec group is PARA-ZK's managed folder order. The baseline grows over time (e.g.
+// LLM-Wiki was added after ZK), so a vault whose group was built from an older baseline is
+// missing the newer top-level folders. The group is complete only when it already contains
+// every baseline top-level folder.
+async function hasCompleteCustomSortBookmarksGroup(app: App, settings: ParaZkSettings): Promise<boolean> {
   const bookmarks = await readBookmarksConfig(app);
-  const group = findCustomSortBookmarksGroup(bookmarks.items);
-  return Boolean(group && Array.isArray(group.items) && group.items.length > 0);
+  const existing = findCustomSortBookmarksGroup(bookmarks.items);
+  if (!existing || !Array.isArray(existing.items) || existing.items.length === 0) return false;
+  const present = new Set(existing.items.map(bookmarkGroupTitle).filter(Boolean));
+  return topLevelTitles(createCustomSortBookmarksGroup(settings)).every((title) => present.has(title));
 }
 
 async function ensureCustomSortBookmarksGroup(app: App, settings: ParaZkSettings): Promise<boolean> {
   const bookmarks = await readBookmarksConfig(app);
   const existing = findCustomSortBookmarksGroup(bookmarks.items);
-  if (existing && Array.isArray(existing.items) && existing.items.length > 0) return false;
-
   const baseline = createCustomSortBookmarksGroup(settings);
-  if (existing) {
-    existing.items = baseline.items;
-  } else {
+  const baselineItems = Array.isArray(baseline.items) ? (baseline.items as BookmarkItem[]) : [];
+
+  if (!existing) {
     bookmarks.items.push(baseline);
+  } else if (!Array.isArray(existing.items) || existing.items.length === 0) {
+    existing.items = baselineItems;
+  } else if (!reconcileTopLevelBookmarks(existing.items as BookmarkItem[], baselineItems)) {
+    return false;
   }
+
   await app.vault.adapter.write(BOOKMARKS_CONFIG_PATH, `${JSON.stringify(bookmarks, null, 2)}\n`);
   return true;
+}
+
+// Add each baseline top-level folder missing from the existing group, positioned right after
+// its baseline predecessor that is present, so a newly-added folder lands where the baseline
+// puts it (LLM-Wiki after ZK). Entries already present keep their order untouched.
+function reconcileTopLevelBookmarks(existingItems: BookmarkItem[], baselineItems: BookmarkItem[]): boolean {
+  let changed = false;
+  let anchor = -1; // index of the last baseline folder found-or-inserted in existingItems
+  for (const baselineItem of baselineItems) {
+    const title = bookmarkGroupTitle(baselineItem);
+    if (!title) continue;
+    const found = existingItems.findIndex((item) => bookmarkGroupTitle(item) === title);
+    if (found !== -1) {
+      anchor = found;
+      continue;
+    }
+    const insertAt = anchor + 1;
+    existingItems.splice(insertAt, 0, baselineItem);
+    anchor = insertAt;
+    changed = true;
+  }
+  return changed;
+}
+
+function topLevelTitles(group: BookmarkItem): string[] {
+  const items = Array.isArray(group.items) ? group.items : [];
+  return items.map(bookmarkGroupTitle).filter((title): title is string => Boolean(title));
 }
 
 async function readBookmarksConfig(app: App): Promise<{ items: BookmarkItem[] }> {
@@ -170,6 +207,11 @@ function bookmarkCtimeGenerator(): () => number {
 
 function isBookmarkItem(value: unknown): value is BookmarkItem {
   return isRecord(value) && typeof value.type === "string";
+}
+
+// Only a GROUP node satisfies a baseline folder entry; a same-titled file bookmark does not.
+function bookmarkGroupTitle(item: unknown): string | undefined {
+  return isRecord(item) && item.type === "group" && typeof item.title === "string" ? item.title : undefined;
 }
 
 function isBookmarkGroup(value: unknown, title: string): boolean {
