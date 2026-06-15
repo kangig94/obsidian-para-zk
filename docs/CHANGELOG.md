@@ -80,6 +80,10 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- Added a Codex-only `codex-setup` skill that converts bundled `clients/agents/*.md`
+  agent prompts into Codex custom-agent TOML files under `~/.codex/agents/`. This lets
+  plugin users install named agents such as `wiki-weaver` without splitting the shared
+  `clients/` bundle or duplicating the MCP server.
 - Inline citations can now target a section of their reference: `` `PZ[<id>#<heading>]` ``
   (or `#^block-id`) renders as `[n §<heading>]` and click/hover navigates to that section,
   overriding any anchor the reference's own link carries. The section cannot contain a comma

@@ -6,7 +6,9 @@ argument-hint: "mode=<init|delta|per-import|re-ingest>"
 
 # Wiki Ingest
 
-Orchestrate a bounded LLM-Wiki ingest run and hand one scoped packet to `para-zk:wiki-weaver`.
+Orchestrate a bounded LLM-Wiki ingest run and hand one scoped packet to the PARA-ZK
+wiki-weaver agent (`para-zk:wiki-weaver` in Claude Code, `wiki-weaver` in Codex after
+running the bundled `codex-setup` skill).
 
 ## Context
 
@@ -62,7 +64,14 @@ On invalid args (source args with `init`/`delta`, or none with `per-import`/`re-
      - **Resource/digest/permanent candidates**: PEEK each — `optsidian read path="<candidate.path>" lines=1:200` (title + frontmatter + abstract/first section; the weaver still reads full bodies) — and cluster into concept-DISJOINT groups.
      - Group CONSERVATIVELY: if two sources likely touch the same concept page (shared topic/method/entity — and for `delta`, sources citing the same `stale_llm_wikis` MUST share a group), put them in the SAME group; split only genuinely disjoint sources. (Residual contention is safe: page writes are compare-and-swap, so a conflicting write is rejected and retried, never lost.)
 
-6. **Spawn weaver(s)**, in background when the host supports it — each weaver gets ONE packet:
+6. **Spawn weaver(s)**, in background when the host supports it — each weaver gets ONE packet.
+   In Claude Code, use the bundled `para-zk:wiki-weaver` agent. In Codex, first ensure the
+   bundled `codex-setup` skill has installed the plugin's custom agents into
+   `~/.codex/agents/`, then spawn the custom agent named `wiki-weaver`. If that agent is not
+   available, stop and tell the user to run `codex-setup`, then restart Codex or start a new
+   thread.
+
+   Claude Code shape:
 
    ```text
    Agent({
@@ -70,6 +79,15 @@ On invalid args (source args with `init`/`delta`, or none with `per-import`/`re-
      run_in_background: true,
      prompt: "Weave this WeavePacket. Process its `sources` serially in packet order and report per your Output Format.\n\n<WEAVE_PACKET_JSON>"
    })
+   ```
+
+   Codex shape:
+
+   ```text
+   Spawn a `wiki-weaver` subagent with:
+   "Weave this WeavePacket. Process its `sources` serially in packet order and report per your Output Format.
+
+   <WEAVE_PACKET_JSON>"
    ```
 
    - **`per-import` / `re-ingest`**: spawn EXACTLY ONE serial weaver for the whole packet. One weaver builds the compounding web across the set and cross-links related sources in a single pass; do not spawn once per source.

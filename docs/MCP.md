@@ -14,15 +14,16 @@ PARA-ZK ships a thin MCP server for discovery plus shell-safe edit tools. It exp
 /plugin install para-zk@obsidian-para-zk
 ```
 
-The plugin also bundles an `import-resource` skill (`clients/skills/import-resource/`),
-discovered by both Claude Code (auto, under the plugin root) and Codex (declared via the
-`skills` field in `.codex-plugin/plugin.json`). Where `describe` advertises the unit
-commands, the skill encodes the procedure for turning a request into clean resource note(s)
-from any source — a local file, a web page, open web research, or synthesis — and any
-transform (verbatim import, translation, research/compilation, multi-note breakdowns):
-gather, produce clean Markdown, **correct/verify**, store via the CLI, and link it — so a
-caller does not stop at a raw, unreviewed dump. (Clients without skill support still get the
-`vault` orientation through `describe`.)
+The plugin also bundles skills under `clients/skills/`, discovered by both Claude Code
+(auto, under the plugin root) and Codex (declared via the `skills` field in
+`.codex-plugin/plugin.json`). `import-resource` encodes the procedure for turning a request
+into clean resource note(s) from any source — gather, produce clean Markdown,
+**correct/verify**, store via the CLI, and link it — so a caller does not stop at a raw,
+unreviewed dump. `codex-setup` installs PARA-ZK custom Codex agents from the bundled
+`clients/agents/*.md` definitions into `~/.codex/agents/*.toml`; this is what lets Codex
+spawn named agents such as `wiki-weaver` after a restart/new thread. Those agents assume the
+Optsidian MCP command runner (`mcp__optsidian__command_run`) is available. Clients without
+skill support still get the `vault` orientation through `describe`.
 
 ## Codex CLI
 
