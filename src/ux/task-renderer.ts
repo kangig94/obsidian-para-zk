@@ -1,5 +1,6 @@
 import {
   ButtonComponent,
+  MarkdownRenderChild,
   Modal,
   Notice,
   Setting,
@@ -11,6 +12,7 @@ import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { localDate } from "../time";
 import { readFileFrontmatterFresh } from "../vault/frontmatter";
+import { normalizeVaultPath } from "../vault/paths";
 import { workflowContext } from "../vault/host";
 import { parseCodeBlockKeyValues } from "./code-block-args";
 import {
@@ -87,12 +89,76 @@ type TaskMetaChip = {
 type TaskEditValue = Pick<TaskRead, "name" | "priority" | "due" | "scheduled" | "start">;
 
 const CHECKBOX_RECONCILE_DELAY_MS = 1200;
+const TASK_RERENDER_DELAY_MS = 120;
 const taskBlockStates = new WeakMap<HTMLElement, TaskBlockState>();
 
 export function registerTaskRenderers(plugin: ParaZkPluginContext): void {
   plugin.registerMarkdownCodeBlockProcessor("para-zk-tasks", (source, el, ctx) => {
-    void renderTaskBlock(plugin, source, el, ctx).catch((error: unknown) => renderTaskError(el, error));
+    ctx.addChild(new TaskBlockRenderChild(plugin, source, el, ctx));
   });
+}
+
+// A task block open in another tab went stale until reopened. Task data lives in the
+// tasks-folder shards (and a "current" block also depends on its own note), so refresh on
+// vault changes there, debounced. Mirrors the reference/retro-summary renderers' subscription.
+class TaskBlockRenderChild extends MarkdownRenderChild {
+  private renderTimer: number | undefined;
+
+  constructor(
+    private readonly plugin: ParaZkPluginContext,
+    private readonly source: string,
+    containerEl: HTMLElement,
+    private readonly ctx: MarkdownPostProcessorContext
+  ) {
+    super(containerEl);
+  }
+
+  onload(): void {
+    void this.render();
+    this.registerEvent(this.plugin.app.vault.on("modify", (file) => this.onVaultFile(file)));
+    this.registerEvent(this.plugin.app.vault.on("create", (file) => this.onVaultFile(file)));
+    this.registerEvent(this.plugin.app.vault.on("delete", (file) => this.onVaultFile(file)));
+    this.registerEvent(this.plugin.app.vault.on("rename", (file, oldPath) => this.onVaultFile(file, oldPath)));
+  }
+
+  onunload(): void {
+    if (this.renderTimer !== undefined) window.clearTimeout(this.renderTimer);
+    this.renderTimer = undefined;
+    // The checkbox reconcile timer lives on the per-element state, not this child; cancel it so
+    // no timer dangles after the tab closes (the queued write still completes independently).
+    const state = taskBlockStates.get(this.containerEl);
+    if (state) cancelPendingCheckboxReconcile(state);
+  }
+
+  private onVaultFile(file: unknown, oldPath?: string): void {
+    if (!(file instanceof TFile)) return;
+    if (!this.affectsTasks(file.path) && !this.affectsTasks(oldPath)) return;
+    this.scheduleRender();
+  }
+
+  private affectsTasks(path: string | undefined): boolean {
+    if (!path) return false;
+    if (path === this.ctx.sourcePath) return true;
+    const tasksFolder = normalizeVaultPath(this.plugin.settings.paths.tasksFolder);
+    const normalized = normalizeVaultPath(path);
+    return normalized === tasksFolder || normalized.startsWith(`${tasksFolder}/`);
+  }
+
+  private scheduleRender(): void {
+    if (this.renderTimer !== undefined) window.clearTimeout(this.renderTimer);
+    this.renderTimer = window.setTimeout(() => {
+      this.renderTimer = undefined;
+      void this.render();
+    }, TASK_RERENDER_DELAY_MS);
+  }
+
+  private render(): Promise<void> {
+    // A checkbox toggle holds an optimistic UI until its own reconcile re-render fires; skip the
+    // vault-driven refresh while that is pending so it does not clobber the optimistic state.
+    if (taskBlockStates.get(this.containerEl)?.pendingCheckboxTimer !== undefined) return Promise.resolve();
+    return renderTaskBlock(this.plugin, this.source, this.containerEl, this.ctx)
+      .catch((error: unknown) => renderTaskError(this.containerEl, error));
+  }
 }
 
 async function renderTaskBlock(

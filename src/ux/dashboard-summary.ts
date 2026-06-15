@@ -1,4 +1,4 @@
-import { TFile, type App } from "obsidian";
+import { MarkdownRenderChild, TFile, type App } from "obsidian";
 import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import type { ParaZkSettings } from "../types";
@@ -20,10 +20,52 @@ type FileRecord = {
   frontmatter: Record<string, unknown>;
 };
 
+const DASHBOARD_SUMMARY_RERENDER_DELAY_MS = 120;
+
 export function registerDashboardSummaryRenderers(plugin: ParaZkPluginContext): void {
-  plugin.registerMarkdownCodeBlockProcessor("para-zk-dashboard-summary", (source, el) => {
-    renderDashboardSummary(plugin, source, el);
+  plugin.registerMarkdownCodeBlockProcessor("para-zk-dashboard-summary", (source, el, ctx) => {
+    ctx.addChild(new DashboardSummaryRenderChild(plugin, source, el));
   });
+}
+
+// The cards aggregate the whole vault, so a dashboard open in another tab went stale until
+// reopened. Any note created/removed/moved, or whose frontmatter (type / processed / links)
+// changed, can move a count, so there is no path filter — refresh on those, debounced so a
+// burst of edits costs one scan. `metadataCache "changed"` fires after Obsidian parses
+// frontmatter (broader than vault `modify`, but the correct signal for counts read from the
+// cache); `renderDashboardSummary` is synchronous, so the debounce serializes renders and no
+// generation guard is needed. Mirrors the reference / retro-summary renderers' subscription.
+class DashboardSummaryRenderChild extends MarkdownRenderChild {
+  private renderTimer: number | undefined;
+
+  constructor(
+    private readonly plugin: ParaZkPluginContext,
+    private readonly source: string,
+    containerEl: HTMLElement
+  ) {
+    super(containerEl);
+  }
+
+  onload(): void {
+    renderDashboardSummary(this.plugin, this.source, this.containerEl);
+    this.registerEvent(this.plugin.app.vault.on("create", () => this.scheduleRender()));
+    this.registerEvent(this.plugin.app.vault.on("delete", () => this.scheduleRender()));
+    this.registerEvent(this.plugin.app.vault.on("rename", () => this.scheduleRender()));
+    this.registerEvent(this.plugin.app.metadataCache.on("changed", () => this.scheduleRender()));
+  }
+
+  onunload(): void {
+    if (this.renderTimer !== undefined) window.clearTimeout(this.renderTimer);
+    this.renderTimer = undefined;
+  }
+
+  private scheduleRender(): void {
+    if (this.renderTimer !== undefined) window.clearTimeout(this.renderTimer);
+    this.renderTimer = window.setTimeout(() => {
+      this.renderTimer = undefined;
+      renderDashboardSummary(this.plugin, this.source, this.containerEl);
+    }, DASHBOARD_SUMMARY_RERENDER_DELAY_MS);
+  }
 }
 
 function renderDashboardSummary(plugin: ParaZkPluginContext, source: string, el: HTMLElement): void {

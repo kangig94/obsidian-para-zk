@@ -685,6 +685,13 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Fixed
 
+- The dashboard summary cards (`para-zk-dashboard-summary`) and task lists (`para-zk-tasks`)
+  now live-refresh when the vault changes, so a dashboard open in another tab no longer goes
+  stale until reopened. Each block subscribes to the relevant vault/metadata events with a
+  120ms debounce (so a burst of edits costs one refresh) — the same pattern the reference,
+  retro-summary, and Dataview-view blocks already used. The task block ignores edits outside
+  its tasks-folder shards / own note and skips refreshing while a checkbox's optimistic-UI
+  reconcile is mid-flight, so it never clobbers an in-progress toggle.
 - Managed template frontmatter no longer makes Obsidian's metadata indexer log "Keys with
   collection values will be stringified" warnings. Whole-value placeholders like
   `status: {{status}}` parsed (unrendered) as a YAML flow-map used as a map key, so every
