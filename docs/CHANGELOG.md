@@ -80,6 +80,12 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- Added a `bad_citation_subpath` audit check: a body citation `PZ[<id>#<section>]` whose
+  `#section` matches no heading or `^block` id in the cited source (e.g. a paraphrased heading or a
+  dropped leading number like `3. `) is reported, so a citation that silently lands at the
+  source's top instead of the intended section is caught. Report-only — the intended heading is
+  not guessed. The PZ citation-token grammar moved to `src/citation-token.ts`, shared by the GUI
+  citation renderers and the audit.
 - Added a Codex-only `codex-setup` skill that converts bundled `clients/agents/*.md`
   agent prompts into Codex custom-agent TOML files under `~/.codex/agents/`. This lets
   plugin users install named agents such as `wiki-weaver` without splitting the shared
@@ -109,9 +115,11 @@ Notable changes for PARA-ZK are tracked here.
   non-template ingestable sources (`resource`, `digest`, `permanent`, `subnote`)
   for `per-import`, `delta`, `init`, and `re-ingest`; `para-zk:audit` now includes
   the `upward_wiki_link` check for reverse links from canonical notes into the
-  wiki; and the bundled `wiki-ingest` skill plus `wiki-weaver` agent orchestrate
-  one bounded, serial direct-writer weave per ingest call over the full returned
-  source set.
+  wiki; and the bundled `wiki-ingest` skill runs **Plan → Fill → Synthesize** — the
+  orchestrator reads the candidates' structure + the existing wiki and forms one global
+  page plan (page set, domains, granularity, source→page assignments, cross-links,
+  spine), then spawns one `wiki-weaver` per planned page in parallel to fill it, then a
+  hub pass builds the navigable spine.
 - Added `by=<model-id>` to `create-llm-wiki` and `update-llm-wiki`, stamping
   `created_by`/`updated_by` on create and `updated_by` on changed updates.
 - LLM-Wiki pages now use the managed template shape: props plus a managed tail

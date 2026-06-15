@@ -6,17 +6,36 @@ argument-hint: "mode=<init|delta|per-import|re-ingest>"
 
 # Wiki Ingest
 
-Orchestrate a bounded LLM-Wiki ingest run and hand one scoped packet to the PARA-ZK
-wiki-weaver agent (`para-zk:wiki-weaver` in Claude Code, `wiki-weaver` in Codex after
-running the bundled `codex-setup` skill).
+Orchestrate a bounded LLM-Wiki ingest run as **Plan → Fill → Synthesize**: YOU (the orchestrator)
+read the candidates' structure and the existing wiki and decide the whole page structure first, then
+spawn one `wiki-weaver` per planned page to fill it in parallel, then a hub pass builds the navigable
+spine. The weaver is `para-zk:wiki-weaver` in Claude Code, `wiki-weaver` in Codex (after running the
+bundled `codex-setup` skill).
 
 ## Context
 
-LLM-Wiki pages are LLM-owned derived synthesis under `LLM-Wiki/`; canonical knowledge remains in Resources, PARA, and ZK notes. The wiki is a **compounding, interlinked web of concept pages** drawn from the WHOLE canonical base (resources, digests, permanents, subnotes): the weaver integrates each source into the concept pages it touches (one source commonly spans several) and cross-links related pages, rather than mirroring sources 1:1. This skill is the sole ingest orchestrator: it discovers the source set, hands the weaver the source PATHS and metadata — never the bodies, which the weaver reads itself from each path so no large body is funneled through (and silently truncated by) the packet — and spawns one direct-writer weaver, which self-gathers the LLM-Wiki side (`list type=llm-wiki` + read-by-title) — the skill pre-gathers no wiki pages, so the loop never depends on search recall. It never writes wiki prose itself, never validates or commits a returned plan, and never edits source notes. The weaver writes pages directly via `create-llm-wiki`/`update-llm-wiki` with `by=<model-id>`, and the page-body re-weave is the freshness event. Wiki prose mirrors the user's OWN language register — the dominant language and the English/local code-mixing pattern evidenced by the sources — which the weaver derives from the material; the skill imposes no language.
+LLM-Wiki pages are LLM-owned derived synthesis under `LLM-Wiki/`; canonical knowledge stays in
+Resources, PARA, and ZK notes. The wiki is a **compounding, interlinked web of concept pages** drawn
+from the WHOLE canonical base (resources, digests, permanents, subnotes) — pages cross-link, a rich
+source spans several pages, and each ingest extends existing pages rather than mirroring sources 1:1.
+
+Cohesion (the right page set, the right granularity, consistent domains, a navigable spine) is a
+GLOBAL property, so **you decide it yourself, up front, before any page is written** — and you do it
+HERE in the orchestrator (not in a sub-agent) precisely because you hold THIS conversation: the plan
+must reflect what the user actually wants (what to include/skip, domain preferences). You discover
+the source set, read each candidate's HEAD (a bounded structural peek — not the full body) plus the
+existing wiki, and produce one global plan: the page set, domains, granularity, source→page
+assignments, cross-links, and the spine. Then you spawn one `wiki-weaver` per planned page. Weavers
+do the heavy work — full-body reads and the actual writing (`create-llm-wiki`/`update-llm-wiki` with
+`by=<model-id>`) — but never decide which pages exist, so they cannot diverge on domains, over-split
+a source into micro-pages, or duplicate concepts. You never write wiki prose or read full bodies; you
+never edit source notes. Wiki prose mirrors the user's OWN language register, which the weavers
+derive from the material.
 
 ## Argument Routing
 
-`mode` (required) selects what to discover. `init`/`delta` take no source args; `per-import`/`re-ingest` require one of `source_path` or `source_paths`, passed through to `para-zk:wiki-ingest-candidates`.
+`mode` (required) selects what to discover. `init`/`delta` take no source args; `per-import`/`re-ingest`
+require one of `source_path` or `source_paths`, passed through to `para-zk:wiki-ingest-candidates`.
 
 | `mode` | Targets |
 |--------|---------|
@@ -25,78 +44,116 @@ LLM-Wiki pages are LLM-owned derived synthesis under `LLM-Wiki/`; canonical know
 | `per-import` | exactly the given `source_path`/`source_paths` |
 | `re-ingest` | exactly the given `source_path`/`source_paths`, even if already cited/fresh |
 
-On invalid args (source args with `init`/`delta`, or none with `per-import`/`re-ingest`), stop with the concrete routing error — do not ask the user.
+On invalid args (source args with `init`/`delta`, or none with `per-import`/`re-ingest`), stop with
+the concrete routing error — do not ask the user.
 
 ## Execution
 
-1. **Orient**: Call `optsidian para-zk:describe` first. Use the returned invocation style for subsequent `para-zk:*` calls; examples below use `optsidian`. Confirm the surface exposes `para-zk:wiki-ingest-candidates`, `para-zk:create-llm-wiki`, `para-zk:read-llm-wiki`, and `para-zk:update-llm-wiki`. If the vault is unavailable, stop with the CLI error; do not fall back to direct file writes.
+1. **Orient**: Call `optsidian para-zk:describe` first. Use the returned invocation style for
+   subsequent `para-zk:*` calls; examples below use `optsidian`. Confirm the surface exposes
+   `para-zk:wiki-ingest-candidates`, `para-zk:list`, `para-zk:read-llm-wiki`,
+   `para-zk:create-llm-wiki`, and `para-zk:update-llm-wiki`. If the vault is unavailable, stop with
+   the CLI error; do not fall back to direct file writes.
 
-2. **Resolve mode**: Normalize exactly one mode from `{per-import, delta, init, re-ingest}`. Preserve `limit` and `offset` when supplied. For targeted modes, preserve exactly one of `source_path` or `source_paths`; for untargeted modes, reject either source selector before doing any reads.
+2. **Resolve mode**: Normalize exactly one mode from `{per-import, delta, init, re-ingest}`. Preserve
+   `limit`/`offset` when supplied. For targeted modes, preserve exactly one of `source_path` or
+   `source_paths`; for untargeted modes, reject either source selector before doing any reads.
 
-3. **Discover sources**: Call the candidate primitive with the same mode and target arguments:
+3. **Discover candidates**:
 
    ```bash
    optsidian para-zk:wiki-ingest-candidates mode=<mode> [source_path=<path>|source_paths='<json-or-comma-list>'] [limit=<n|all>] [offset=<n>]
    ```
 
-   Gate on the response envelope. Candidate reasons are `missing_wiki_citation` or `source_newer_than_wiki`; candidates may include `stale_llm_wikis: [{path,title,updated_ms}]`, the citing LLM-Wiki pages older than the source. For `delta`, carry those citing-page titles into the packet's `stale_llm_wikis` (step 5) so the weaver re-weaves exactly them. If `ok` is false or the command errors, stop. If `returned` is `0`, report that no source candidates were returned and do not spawn the weaver. If `has_more` is true, weave only the returned page of candidates and report that another bounded page remains; do not auto-page into a full scan.
+   Gate on the envelope. Candidate reasons are `missing_wiki_citation` or `source_newer_than_wiki`;
+   candidates may include `stale_llm_wikis: [{path,title,updated_ms}]` (the citing LLM-Wiki pages
+   older than the source). If `ok` is false or the command errors, stop. If `returned` is `0`, report
+   that none were returned and stop. If `has_more` is true, plan/ingest only the returned page and
+   report that another bounded page remains; do not auto-page into a full scan. Collect candidate
+   `path`s and any `stale_llm_wikis`; for subnote candidates, collect their parent project/area note
+   paths as framing `context`.
 
-4. **Carry source metadata (do NOT read bodies)**: The skill passes candidate METADATA only — the weaver reads each source's FULL body itself from its `path` (so a large body is never funneled through, or silently truncated by, the packet). Build each source object as just `{path}` (plus `stale_llm_wikis` for `delta` — the one field the weaver can't derive itself, since it is wiki↔source citation info); `type`/`title`/`updated` live in the source's own frontmatter, which the weaver sees when it reads the body, so the packet never duplicates them and never carries a `body`. A run is bounded by the NUMBER of sources (step 3's `limit`/`offset`), never by truncating any one body.
+4. **Plan** (you, the orchestrator — inline): read enough to decide the global page structure, then
+   decide it.
+   - **Read the head of each candidate** — `optsidian read path="<path>" lines=1:200` (frontmatter +
+     abstract + lead/early sections). Read a few more lines only if a head is too thin to classify.
+     Do NOT read full bodies — that is the weaver's job and would overflow you.
+   - **Read the existing wiki**: `optsidian para-zk:list type=llm-wiki limit=all` for the complete
+     roster (every `<domain>/<concept>` path → the domains already in use); for `delta`/`per-import`/
+     `re-ingest`, `read-llm-wiki` the related pages to know what they already cover.
+   - **Decide the plan**, applying these rules:
+     - **Granularity:** a PAGE is a concept that recurs across ≥2 sources OR is a canonical,
+       standalone concept/method/system. A one-off mechanism from a single source is a **section
+       within** a broader page, listed in that page's `sections` — NOT its own page. A per-source
+       SUMMARY page (`type:"source-summary"`) only when a work is distinct enough that concept pages
+       do not cover it. Project-operational / ephemeral material (status memos, test logs, trip
+       checklists) is NOT a concept — skip it (record why) or fold under a project hub. Prefer FEWER,
+       denser pages.
+     - **Domains:** one level, `<domain>/<concept>`. REUSE a roster domain when a concept fits; mint a
+       new domain only for a genuinely new area; never near-synonyms (`RL` vs `Reinforcement
+       Learning`). One concept = one page across the whole wiki.
+     - **Assignment & cross-links:** assign every candidate source to ≥1 page (a source spanning N
+       concepts goes into N pages' `sources`); set each page's `links` to the related pages.
+     - **Spine:** plan at least one per-domain hub (`type:"hub"`, with `children` = that domain's leaf
+       titles); add an entity hub for a large cluster; optionally a root overview.
+     - **Honor THIS conversation:** include/exclude and domain choices the user expressed here win.
+   - Produce the page list — each page `{title, type, existing, sources, sections, links, children,
+     guidance}` (`type` ∈ `concept`|`source-summary`|`hub`) — plus a `skipped` list with reasons.
 
-5. **Assemble packet**: The skill gathers only source METADATA (paths — not bodies, which the weaver reads itself); the weaver self-gathers the LLM-Wiki side (the skill pre-gathers no wiki pages and no index seed). Each `WeavePacket`:
+5. **Fill** (leaf pages): for EACH planned page with `type` `concept` or `source-summary`, spawn one
+   `wiki-weaver`, IN PARALLEL, with a `WeavePacket`:
 
    ```json
-   {
-     "mode": "<init|delta|per-import|re-ingest>",
-     "by": "<model-id>",
-     "sources": [
-       {"path": "...", "stale_llm_wikis": ["<wiki page title>", "..."]}
-     ],
-     "context": ["<parent project/area note path>", "..."]
-   }
+   { "mode": "<mode>", "by": "<model-id>", "page": <the planned page object>,
+     "plan_pages": ["<every planned page title>", "..."], "context": ["<parent note path>", "..."] }
    ```
 
-   Inject `by` from the orchestrator's current model id; the weaver passes it to `create-llm-wiki` and `update-llm-wiki`. Do NOT pre-gather wiki pages or an index seed — the weaver discovers them via `list` so it never depends on search recall. Do not add a commit plan or any direct-write instructions for the skill itself. The packet carries DATA only (no `rules` block) — the weaver's read/write/filing/linking/citation behavior is defined by the `para-zk:wiki-weaver` agent and is not restated here.
+   Inject `by` from your current model id; `plan_pages` is every planned title so a weaver's
+   cross-links resolve to real (current or about-to-exist) pages. One weaver owns one page → leaf
+   pages do not contend. If a weaver reports `remaining_sources` (a context boundary), spawn a FRESH
+   weaver for the SAME page with the remaining paths (its compare-and-swap writes make continuation
+   safe). Do not post-process a weaver's writes.
 
-   - **`per-import` / `re-ingest`** (targeted, usually small): build ONE packet for the whole returned set → a single serial weaver.
-   - **`init` / `delta`** (discovery — batch can be large, e.g. after a bulk import): split for parallelism, ONE packet per group.
-     - **Subnote candidates**: group by parent project/area subtree (a reliable disjoint partition — different projects rarely share concept pages); put the parent project/area note in that group's `context` (the weaver reads it to FRAME the subnotes; it is not an ingest target).
-     - **Resource/digest/permanent candidates**: PEEK each — `optsidian read path="<candidate.path>" lines=1:200` (title + frontmatter + abstract/first section; the weaver still reads full bodies) — and cluster into concept-DISJOINT groups.
-     - Group CONSERVATIVELY: if two sources likely touch the same concept page (shared topic/method/entity — and for `delta`, sources citing the same `stale_llm_wikis` MUST share a group), put them in the SAME group; split only genuinely disjoint sources. (Residual contention is safe: page writes are compare-and-swap, so a conflicting write is rejected and retried, never lost.)
-
-6. **Spawn weaver(s)**, in background when the host supports it — each weaver gets ONE packet.
-   In Claude Code, use the bundled `para-zk:wiki-weaver` agent. In Codex, first ensure the
-   bundled `codex-setup` skill has installed the plugin's custom agents into
-   `~/.codex/agents/`, then spawn the custom agent named `wiki-weaver`. If that agent is not
-   available, stop and tell the user to run `codex-setup`, then restart Codex or start a new
-   thread.
-
-   Claude Code shape:
+   Claude Code spawn shape:
 
    ```text
-   Agent({
-     subagent_type: "para-zk:wiki-weaver",
-     run_in_background: true,
-     prompt: "Weave this WeavePacket. Process its `sources` serially in packet order and report per your Output Format.\n\n<WEAVE_PACKET_JSON>"
-   })
+   Agent({ subagent_type: "para-zk:wiki-weaver", run_in_background: true,
+           prompt: "Fill this WeavePacket's one page and report per your Output Format.\n\n<WEAVE_PACKET_JSON>" })
    ```
 
-   Codex shape:
+   Codex (after `codex-setup` has installed the custom agents into `~/.codex/agents/`; if `wiki-weaver`
+   is unavailable, stop and tell the user to run `codex-setup`, then restart Codex):
 
    ```text
-   Spawn a `wiki-weaver` subagent with:
-   "Weave this WeavePacket. Process its `sources` serially in packet order and report per your Output Format.
-
-   <WEAVE_PACKET_JSON>"
+   Spawn a `wiki-weaver` subagent: "Fill this WeavePacket's one page and report per your Output Format.\n\n<WEAVE_PACKET_JSON>"
    ```
 
-   - **`per-import` / `re-ingest`**: spawn EXACTLY ONE serial weaver for the whole packet. One weaver builds the compounding web across the set and cross-links related sources in a single pass; do not spawn once per source.
-   - **`init` / `delta`**: spawn ONE weaver PER group, IN PARALLEL. Concept-disjoint groups mostly write different pages, so they rarely contend; any residual overlap is contained by the agent's compare-and-swap writes (a conflicting `op=replace` is rejected, not clobbered) and by the step-8 duplicate-page check.
+6. **Synthesize** (spine): AFTER the leaf weavers complete (hubs link pages that must already exist),
+   spawn one `wiki-weaver` in hub mode for EACH planned page with `type:"hub"` — same packet shape; a
+   hub `page` carries `page.children` (planned page titles) and no `sources`. The weaver writes the
+   hub as a short narrative + full-path links to its children. For targeted modes, this refreshes only
+   the hubs your plan lists.
 
-   A weaver nearing its context limit stops after the last fully-integrated source and reports which remain; spawn a FRESH weaver for that group's remainder (rebuild metadata per step 4). Bound work by source/group count and by chaining weavers — never by truncating a body. Do not post-process the weaver's writes.
+7. **Report launch**: Return the mode, the plan summary (counts of concept / source-summary / hub
+   pages, sources assigned vs `skipped`), whether `has_more` was true, and the weaver launch
+   handle(s). The observable write contract is the weavers' direct page writes succeeding.
 
-7. **Report launch**: Return the mode, source count (and group count for `init`/`delta`), whether `has_more` was true (another candidate page remains), and the weaver launch handle(s) if the host provides them. If any weaver later reports a context boundary with sources still remaining, spawn a fresh weaver for that remainder. The observable write contract is the weaver's direct page writes (`create-llm-wiki`/`update-llm-wiki` succeeding).
+8. **Verify on completion (clean-context pass)**: When the weavers finish, read the touched pages
+   (`read-llm-wiki key=body` each). You never generated this prose, so this catches generation slips.
+   Fix high-confidence orthographic/generation slips in place — malformed Korean syllables where a
+   wrong 받침/jamo yields a well-formed but wrong word (궤적→궁적, 댄스→댓스, 앉기→앙기) — via
+   `update-llm-wiki key=body op=replace by=<model-id>`. Surface (do NOT auto-apply): ambiguous
+   corrections, any `unplanned_concepts` weavers reported (so the user can decide whether to plan a
+   page for them next run), and any semantic findings (contradictions, a leaf missing from its hub,
+   missing cross-references). If the touched-page volume would bloat your context, isolate this pass
+   in a freshly spawned verifier sub-agent — but still report rather than auto-apply. (A whole-wiki
+   health sweep is the separate, human-requested `wiki-lint`, not part of ingest.)
 
-8. **Verify on weaver completion (clean-context pass)**: When the weaver reports completion, the MAIN agent (the orchestrator that ran this skill — NOT the weaver) reads the weaver's `touched_pages` (`read-llm-wiki key=body` each). This is a clean detection pass: the main agent never generated this prose, so it catches generation slips the weaver — still carrying its full generation context — misses (its own inline self-review is unreliable). Fix high-confidence orthographic/generation slips in place — malformed Korean syllables where a wrong 받침/jamo yields a well-formed but wrong word (궤적→궁적, 댄스→댓스, 앉기→앙기) — via `update-llm-wiki key=body op=replace by=<model-id>`. Surface ambiguous corrections and any semantic findings (contradictions, duplicate concept pages from a parallel `init`/`delta` run, missing concept pages, missing cross-references) to the user for a decision; do not auto-rewrite prose. If the touched-page volume would bloat the main context, isolate this pass in a freshly spawned verifier sub-agent instead — but still report ambiguous fixes rather than auto-applying them. (A full whole-wiki health sweep is a separate, occasional, human-requested review — not part of ingest.)
-
-9. **Fold in conversation-derived insight (orchestrator, optional, human-judged)**: The background weaver only saw the WeavePacket — it has no access to this conversation. So if THIS conversation surfaced a genuine, wiki-worthy insight about the just-ingested sources that the source bodies alone do not capture (a synthesis, a key tension, a correction the user raised), the MAIN agent — which holds the conversation — folds it into the relevant touched page(s) via `update-llm-wiki key=body op=... by=<model-id>` after verification, citing any canonical source it draws on as a backtick `` `PZ[id]` `` and keeping links single-direction. This restores the gist's "discuss key takeaways → update pages" at the orchestrator level (the weaver cannot, having no conversation). Guardrails: ONLY genuine user-surfaced insight — never invent, embellish, or inject tangential conversation; if unsure whether it belongs, surface it to the user instead of writing it; if nothing genuine emerged, skip this step. Report what was folded in.
+9. **Fold in conversation-derived insight (optional, human-judged)**: The background weavers only saw
+   their packets. If THIS conversation surfaced a genuine, wiki-worthy insight the source bodies alone
+   do not capture (a synthesis, a key tension, a correction the user raised), fold it into the relevant
+   touched page(s) via `update-llm-wiki key=body op=... by=<model-id>` after verification, citing any
+   canonical source as a backtick `` `PZ[id]` `` and keeping links single-direction. Guardrails: ONLY
+   genuine user-surfaced insight — never invent, embellish, or inject tangential conversation; if
+   unsure whether it belongs, surface it to the user instead of writing it; if nothing genuine
+   emerged, skip. Report what was folded in.

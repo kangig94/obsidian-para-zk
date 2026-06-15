@@ -192,8 +192,8 @@ wiki-ingest mode=per-import source_paths='["<created resource path>","<created r
 ```
 
 Use the returned `path` from every `create-resource` result in this import. Do not spawn
-`wiki-weaver` directly, and do not call `wiki-ingest` once per file; one front door call starts
-one weaver that serially weaves the full imported set.
+`wiki-weaver` directly, and do not call `wiki-ingest` once per file; one front-door call plans the
+whole imported set and weaves it.
 
 ## Examples
 

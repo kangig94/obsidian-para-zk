@@ -30,7 +30,14 @@ back to the wiki or depend on it.
 Phase 2 adds an LLM-owned ingest loop for that derived layer. The `wiki-ingest`
 skill is the sole orchestrator: it resolves `mode`, calls
 `para-zk:wiki-ingest-candidates`, gathers a bounded neighborhood of candidates,
-then spawns one background `para-zk:wiki-weaver` for the whole source set. The `wiki-weaver` agent is the direct writer: it uses `create-llm-wiki` and
+then runs **Plan → Fill → Synthesize** — the orchestrator itself reads the
+candidates' structure (heads) and the existing wiki and forms one global page
+plan (page set, domains, source→page assignments, cross-links, and the spine);
+one `para-zk:wiki-weaver` per planned page fills it in parallel; a final hub pass
+builds the navigable spine. Planning the page set globally first — in the
+conversation-aware orchestrator, rather than letting per-source weavers each
+invent pages — is what keeps the wiki cohesive.
+The `wiki-weaver` is the direct writer: it uses `create-llm-wiki` and
 `update-llm-wiki key=references op=insert` to write wiki pages and cite sources
 with `` `PZ[<id>]` ``; it never edits source notes and never asks the user.
 `import-resource` calls `wiki-ingest mode=per-import` at completion. The
