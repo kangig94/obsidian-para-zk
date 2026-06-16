@@ -179,6 +179,25 @@ describe("renderCliText", () => {
       expect(text).toContain("  reference: link");
     });
 
+    it("renders conventions as a schema dump", () => {
+      const text = renderCliText("para-zk:conventions", {
+        ok: true,
+        command: "para-zk:conventions",
+        vault: "vault convention",
+        scope: "scope convention",
+        citation: "citation convention",
+        compounding: "compounding convention"
+      }, "conventions described");
+
+      expect(text).toBe([
+        "conventions described",
+        "vault: vault convention",
+        "scope: scope convention",
+        "citation: citation convention",
+        "compounding: compounding convention"
+      ].join("\n"));
+    });
+
     it("renders a mutation summary, path, and array fields", () => {
       const text = renderCliText("para-zk:create-project", {
         ok: true, path: "P/A.md", title: "A", created: true,

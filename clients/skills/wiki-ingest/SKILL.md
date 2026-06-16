@@ -49,11 +49,12 @@ the concrete routing error — do not ask the user.
 
 ## Execution
 
-1. **Orient**: Call `optsidian para-zk:describe` first. Use the returned invocation style for
-   subsequent `para-zk:*` calls; examples below use `optsidian`. Confirm the surface exposes
-   `para-zk:wiki-ingest-candidates`, `para-zk:list`, `para-zk:read-llm-wiki`,
-   `para-zk:create-llm-wiki`, and `para-zk:update-llm-wiki`. If the vault is unavailable, stop with
-   the CLI error; do not fall back to direct file writes.
+1. **Orient**: Run `optsidian para-zk:conventions` ONCE first for this task, then call
+   `optsidian para-zk:describe` / `optsidian para-zk:describe type=<t>` as reference. Use the
+   returned invocation style for subsequent `para-zk:*` calls; examples below use `optsidian`.
+   Confirm the surface exposes `para-zk:wiki-ingest-candidates`, `para-zk:list`,
+   `para-zk:read-llm-wiki`, `para-zk:create-llm-wiki`, and `para-zk:update-llm-wiki`. If the vault
+   is unavailable, stop with the CLI error; do not fall back to direct file writes.
 
 2. **Resolve mode**: Normalize exactly one mode from `{per-import, delta, init, re-ingest}`. Preserve
    `limit`/`offset` when supplied. For targeted modes, preserve exactly one of `source_path` or

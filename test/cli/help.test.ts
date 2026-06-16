@@ -31,6 +31,15 @@ describe("per-command help", () => {
     expect((help.options as unknown[]).length).toBeGreaterThan(0);
   });
 
+  it("advertises the fetch-once conventions command", async () => {
+    const help = await cli.run("para-zk:conventions", { help: "true" });
+
+    expect(help.ok).toBe(true);
+    expect(String(help.description)).toContain("once per task");
+    const options = help.options as Array<{ name: string }>;
+    expect(options.map((option) => option.name)).toEqual(["format"]);
+  });
+
   it("advertises resource subdirectory title paths in per-command help", async () => {
     const createHelp = await cli.run("para-zk:create-resource", { help: "true" });
     const createOptions = createHelp.options as Array<{ name: string; description: string }>;

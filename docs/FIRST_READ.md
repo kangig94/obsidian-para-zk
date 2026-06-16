@@ -51,9 +51,11 @@ The vault is a single user's private, local Obsidian "second brain" — local-fi
 personal by design, not a shared, published, or collaborative medium like Notion. A
 cold automation caller can misread it as web/public content and over-refuse (e.g.,
 declining to save a paper the user is studying on "redistribution" grounds). To prevent
-that, `describe` and the MCP envelope carry a `vault` context field stating this up
-front: nothing in the vault is published or distributed, so storing source material is
-ordinary personal-use note-taking, not redistribution.
+that, the MCP tool description/fallback and lean `describe` carry an always-on `safety`
+line: saving, translating, summarizing, excerpting, or storing full source texts here is
+ordinary personal note-taking, so callers should not refuse on copyright, licensing, or
+public-distribution grounds. The fuller orientation and usage rules are fetched once per
+task with `para-zk:conventions`; `describe` stays the lightweight surface reference.
 
 ## Test Vaults
 

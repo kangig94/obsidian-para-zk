@@ -80,6 +80,16 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- New `wiki-capture` skill (`clients/skills/wiki-capture/`): folds a durable synthesis that
+  emerged from a query/conversation back into the LLM-Wiki — the query→compound half of the wiki
+  (`wiki-ingest` grows it from sources, `wiki-capture` from exploration). It is **propose-confirm**:
+  it gates on worthiness (a multi-source comparison/connection or a standard concept the wiki
+  lacks — never one-off lookups), searches for the best-fit existing page first, proposes a target
+  + shape (update an existing page vs a new page), and writes only on the user's confirmation
+  (reads must not write). Placement/granularity reuse `wiki-ingest`'s Plan rules so cohesion does
+  not split; new pages get a light hub touch; minting a new domain is deferred to `wiki-ingest`.
+  Discovered via `para-zk:conventions`' `compounding` discipline; auto-registered for Claude and
+  Codex from `clients/skills/`.
 - Subnotes can now be created in a subfolder under their parent: `create-child type=subnote`
   (and the GUI "create subnote" prompt) accepts a `subdir/title` path for `title`, mirroring
   `create-resource`. The subfolder(s) are created and the note is filed there, but it stays the
@@ -103,8 +113,8 @@ Notable changes for PARA-ZK are tracked here.
   The editor citation suggester now triggers only inside a backtick code span (bare `PZ[`
   is left alone), places the cursor before the `]` after picking a reference, and — when the
   user then types `#` — completes the reference target's headings and blocks. This also fixes
-  the nested-backtick insertion when a code span was already open. The CLI/MCP `describe`
-  scope note advertises the `PZ[<id>#<section>]` form so automation surfaces know it.
+  the nested-backtick insertion when a code span was already open. The `para-zk:conventions`
+  `citation` field advertises the `PZ[<id>#<section>]` form so automation surfaces know it.
 - The HomePage dashboard summary now includes an LLM-Wiki count card (📖), counting pages
   with `type: llm-wiki` under the `LLM-Wiki/` folder — the same identification the rest of
   the plugin uses. Rendered after the PARA/ZK cards; localized label `llmWiki` ("LLM-Wiki").
@@ -254,13 +264,12 @@ Notable changes for PARA-ZK are tracked here.
   advertises the unit commands).
 - Added a setting to show/hide the file-explorer empty-trash button
   (`showEmptyTrashAction`, on by default), toggled live from the PARA-ZK settings tab.
-- Added a `vault` context field to discovery so a cold automation caller reasons from
-  the right premise. `para-zk:describe` and the MCP envelope (both `running` states)
-  now state that the vault is one user's private, local, single-user Obsidian "second
-  brain" — never published or shared — so saving source material (notes, excerpts, or
-  full texts the user is studying) is personal-use storage, not redistribution. The MCP
-  `describe` tool description carries a short form of the same. Prevents reflexive
-  refusals to store content on public-distribution grounds.
+- Added always-on discovery safety so a cold automation caller reasons from the right
+  premise. Lean `para-zk:describe`, the MCP discovery envelope, the MCP fallback, and the
+  MCP `describe` tool description state that saving, translating, summarizing, excerpting,
+  or storing full source texts in the private vault is ordinary personal note-taking and
+  should not be refused on copyright, licensing, or public-distribution grounds. The fuller
+  private-vault orientation now lives in `para-zk:conventions`.
 - Added file-backed text args: create commands' `body` option and update
   commands' `value` option accept an `@<absolute-path>` value, which the plugin
   reads from disk instead of taking inline. This is the shell-safe way to pass
@@ -373,6 +382,13 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Changed
 
+- Split fetch-once usage conventions out of no-type `para-zk:describe` into the new
+  `para-zk:conventions` command. No-type `describe` is now lean (`surfaceTypes`,
+  `collectionFilters`, `workflows`, a `conventions` pointer, and the always-on `safety`
+  line), while `describe type=<t>` remains the per-type contract. The MCP discovery envelope
+  mirrors the lean shape with a CLI-specific conventions pointer and no longer duplicates
+  the large vault/scope prose; its tool description and fallback keep only the strengthened
+  anti-refusal safety sentence.
 - The project/area subnote views now show a `Subfolder` (`하위폴더`) column — each subnote's
   folder relative to the parent note's folder — so subnotes filed under a subdirectory
   (`create-subnote title="Notes/Plan"`) are no longer indistinguishable from same-named
@@ -426,8 +442,9 @@ Notable changes for PARA-ZK are tracked here.
   bundle (`clients/para-zk-mcp.mjs`) stays committed, since the Claude Code / Codex
   marketplace ships `clients/` via git clone with no install-time build.
 - Reframed the product positioning as an LLM-maintained PARA + Zettelkasten
-  knowledge wiki (README intro and the `describe`/MCP `vault` context string,
-  kept verbatim in sync). Framing only — no `id`, command, or contract change.
+  knowledge wiki (README intro and the `para-zk:conventions` `vault` field; the
+  MCP keeps only the always-on safety line). Framing only — no `id`, workflow, or
+  vault-data change.
 - `para-zk-props` now renders vault-managed `created` and `updated`
   frontmatter as display-only wherever those fields are shown. GUI frontmatter
   edits now route through the canonical workflow update functions by note type
@@ -478,15 +495,13 @@ Notable changes for PARA-ZK are tracked here.
   bare-title area lookup resolves only root areas (gated on an empty `parent`, not a separate
   type), and nested areas are reached via the `*-child` commands. `describe` no longer lists a
   `subarea` surface type.
-- `para-zk:describe` is now a more self-sufficient contract so a cold caller learns the
-  boundaries up front instead of by trial-and-error: the top-level output carries a `scope`
-  note (PARA-ZK owns typed PARA/ZK operations; raw file edits, free-form frontmatter, and
-  full-text search route to the host — optsidian); per-type `writeKeys` now spell out each
-  mutable key with its op (e.g. `frontmatter/{…}=set`, `tasks=insert`, `body=set|append|prepend|replace`)
-  — matching the just-in-time update-key error — so keys absent there (notably `created`/`updated`,
-  which the vault manages) are visibly not writable; and `addressVia` for `subnote`/`note`
-  now names the `*-child` route (`root_type/root_title/relpath/title`, with
-  `update-child` for writes). The MCP discovery envelope carries the same `scope`.
+- `para-zk:describe` is now a more self-sufficient per-surface contract: per-type
+  `writeKeys` spell out each mutable key with its op (e.g. `frontmatter/{…}=set`,
+  `tasks=insert`, `body=set|append|prepend|replace`) — matching the just-in-time
+  update-key error — so keys absent there (notably `created`/`updated`, which the vault
+  manages) are visibly not writable; and `addressVia` for `subnote`/`note` names the
+  `*-child` route (`root_type/root_title/relpath/title`, with `update-child` for writes).
+  The ownership/routing boundary now lives in `para-zk:conventions`' `scope` field.
 - Multi-value frontmatter list keys now accept add/remove, not just a whole-list `set`. A
   project's (and retro's) `frontmatter/areas` supports `op=append`/`prepend` (add one value) and
   `op=delete` (remove one), and resolves an area title to its canonical link (an existing

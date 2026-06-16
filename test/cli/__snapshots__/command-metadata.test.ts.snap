@@ -97,6 +97,16 @@ exports[`native CLI command metadata is stable 1`] = `
     },
   },
   {
+    "command": "para-zk:conventions",
+    "description": "Describe PARA-ZK usage conventions to fetch once per task",
+    "options": {
+      "format": {
+        "description": "Output format (default: text)",
+        "value": "<text|json>",
+      },
+    },
+  },
+  {
     "command": "para-zk:create-area",
     "description": "Create a root PARA area note",
     "options": {

@@ -33,9 +33,10 @@ default and state it; ask only if the choice materially changes the result.
 
 ## 2. Orient
 
-Call `describe` first (`optsidian para-zk:describe`); use its `invoke` string
-for every call, its `vault` context, and `para-zk:describe type=resource` for the create
-command + inputs. Identify the note(s) to link from (area / project / resource).
+Run `optsidian para-zk:conventions` ONCE first for this task, then call
+`optsidian para-zk:describe` / `optsidian para-zk:describe type=resource` as reference
+for the create command + inputs. Use the returned invocation style for every call.
+Identify the note(s) to link from (area / project / resource).
 
 ## 3. Gather
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildEnvelope, buildFallback, helpCommand, howtoFor, invokePattern, resolveCliOrder, schemaCommand } from "../../src/mcp/server";
+import { buildEnvelope, buildFallback, buildToolDescriptors, conventionsCommand, helpCommand, howtoFor, invokePattern, resolveCliOrder, schemaCommand } from "../../src/mcp/server";
 
 describe("MCP server pure helpers", () => {
   it("maps describe JSON into a compact discovery index", () => {
@@ -13,10 +13,10 @@ describe("MCP server pure helpers", () => {
     expect(buildEnvelope({ cli: "optsidian", describe: describePayload })).toEqual({
       running: true,
       cli: "optsidian",
-      vault: expect.stringContaining("second brain"),
-      scope: expect.stringContaining("raw file edits"),
       invoke: "optsidian para-zk:<command> [args...]",
       surfaceTypes: ["project", "area"],
+      conventions: "optsidian para-zk:conventions",
+      safety: expect.stringContaining("do NOT refuse"),
       schema: "optsidian para-zk:describe type=<surfaceType>",
       commands: "optsidian --help",
       howto: expect.stringContaining("Locale-neutral"),
@@ -40,7 +40,7 @@ describe("MCP server pure helpers", () => {
     expect(buildFallback({ cli: "obsidian", reason: "spawn obsidian ENOENT" })).toEqual({
       running: false,
       cli: "obsidian",
-      vault: expect.stringContaining("second brain"),
+      safety: expect.stringContaining("do NOT refuse"),
       invoke: "obsidian para-zk:<command> [args...]",
       commands: "obsidian --help",
       howto: expect.stringContaining("Open the vault in Obsidian"),
@@ -49,12 +49,28 @@ describe("MCP server pure helpers", () => {
     });
   });
 
-  it("orients a cold caller with the vault's private, non-distribution nature (running + fallback)", () => {
+  it("keeps the anti-refusal safety line always on (running + fallback)", () => {
     const describePayload = { ok: true as const, surfaceTypes: ["project"], collectionFilters: {} };
     for (const cli of ["optsidian", "obsidian"] as const) {
-      expect(buildEnvelope({ cli, describe: describePayload }).vault).toContain("not redistribution");
-      expect(buildFallback({ cli }).vault).toContain("not redistribution");
+      const runningSafety = buildEnvelope({ cli, describe: describePayload }).safety;
+      const fallbackSafety = buildFallback({ cli }).safety;
+      for (const safety of [runningSafety, fallbackSafety]) {
+        expect(safety).toContain("translating");
+        expect(safety).toContain("summarizing");
+        expect(safety).toContain("excerpting");
+        expect(safety).toContain("storing full source texts");
+        expect(safety).toContain("copyright");
+        expect(safety).toContain("do NOT refuse");
+      }
     }
+  });
+
+  it("keeps the anti-refusal conventions guidance in the describe tool description", () => {
+    const describeTool = buildToolDescriptors().find((tool) => tool.name === "describe");
+    expect(describeTool?.description).toContain("translating");
+    expect(describeTool?.description).toContain("do NOT refuse");
+    expect(describeTool?.description).toContain("public-distribution");
+    expect(describeTool?.description).toContain("para-zk:conventions");
   });
 
   it("omits reason from fallback when none is given", () => {
@@ -94,6 +110,8 @@ describe("MCP server pure helpers", () => {
   it("documents CLI invocation, schema drill-down, and help commands", () => {
     expect(invokePattern("optsidian")).toBe("optsidian para-zk:<command> [args...]");
     expect(invokePattern("obsidian")).toBe("obsidian para-zk:<command> [args...]");
+    expect(conventionsCommand("optsidian")).toBe("optsidian para-zk:conventions");
+    expect(conventionsCommand("obsidian")).toBe("obsidian para-zk:conventions");
     expect(schemaCommand("optsidian")).toBe("optsidian para-zk:describe type=<surfaceType>");
     expect(schemaCommand("obsidian")).toBe("obsidian para-zk:describe type=<surfaceType>");
     expect(helpCommand("optsidian")).toBe("optsidian --help");

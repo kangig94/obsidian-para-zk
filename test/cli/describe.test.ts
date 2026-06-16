@@ -8,6 +8,30 @@ beforeEach(() => {
 });
 
 describe("describe", () => {
+  it("returns conventions as a fetch-once command split from lean describe", async () => {
+    const result = await cli.run("para-zk:conventions");
+
+    expect(result.ok).toBe(true);
+    expect(result.command).toBe("para-zk:conventions");
+    expect(Object.keys(result).sort()).toEqual([
+      "citation",
+      "command",
+      "compounding",
+      "ok",
+      "scope",
+      "vault"
+    ]);
+    expect(String(result.vault)).toContain("LLM-maintained PARA + Zettelkasten wiki");
+    expect(String(result.scope)).toContain("host's file/search tools");
+    expect(String(result.scope)).toContain("created/updated");
+    expect(String(result.citation)).toContain("PZ[<id>]");
+    expect(String(result.citation)).toContain("PZ[<id>#<section>]");
+    expect(String(result.citation)).toContain("Bare PZ[...] text");
+    expect(String(result.citation)).toContain("positional `PZ[0]` are not supported");
+    expect(String(result.compounding)).toContain("propose filing it back");
+    expect(String(result.compounding)).toContain("write only on the user's confirmation");
+  });
+
   it("describes a single surface type with compact read keys and op-detailed write keys", async () => {
     const result = await cli.run("para-zk:describe", { type: "project" });
 
@@ -59,19 +83,22 @@ describe("describe", () => {
   it("lists surface types and global collection filters; rejects unknown types", async () => {
     const all = await cli.run("para-zk:describe");
     expect(all.ok).toBe(true);
+    expect(Object.keys(all).sort()).toEqual([
+      "collectionFilters",
+      "conventions",
+      "ok",
+      "safety",
+      "surfaceTypes",
+      "workflows"
+    ]);
     expect(all).not.toHaveProperty("surfaces");
-    // Orients a cold caller: the vault is a private, local, single-user store, so saved
-    // content is personal use, not redistribution.
-    expect(String(all.vault)).toContain("not redistribution");
-    // scope sets the boundary: PARA-ZK's typed ops vs raw vault ops left to the host,
-    // and names created/updated as not writable here.
-    expect(String(all.scope)).toContain("optsidian");
-    expect(String(all.scope)).toContain("created");
-    // A cold caller learns the inline-citation convention from scope alone — including the
-    // section form, so an agent knows it can cite one heading of a reference.
-    expect(String(all.scope)).toContain("PZ[<id>]");
-    expect(String(all.scope)).toContain("PZ[<id>#<section>]");
-    expect(String(all.scope)).not.toContain("PZ[n]");
+    expect(all).not.toHaveProperty("vault");
+    expect(all).not.toHaveProperty("scope");
+    expect(all.conventions).toBe("para-zk:conventions");
+    expect(String(all.safety)).toContain("translating");
+    expect(String(all.safety)).toContain("storing full source texts");
+    expect(String(all.safety)).toContain("do NOT refuse");
+    expect(String(all.safety)).toContain("copyright");
     expect(all.surfaceTypes).toEqual(
       expect.arrayContaining(["project", "area", "resource", "llm-wiki", "retro", "note"])
     );
@@ -83,6 +110,7 @@ describe("describe", () => {
 
     // Named (non-surface) workflows are discoverable from the index, with inputs.
     const workflows = all.workflows as Array<{ command: string; inputs: string[] }>;
+    expect(workflows.find((w) => w.command === "para-zk:conventions")?.inputs).toEqual([]);
     expect(workflows.map((w) => w.command)).not.toContain("para-zk:add-reference");
     const audit = workflows.find((w) => w.command === "para-zk:audit");
     expect(audit?.inputs).toEqual(expect.arrayContaining(["check", "severity", "type", "offset", "limit", "fix"]));

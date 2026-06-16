@@ -21,6 +21,7 @@ function renderBody(command: string, payload: Envelope, summary: string): string
     case "para-zk:audit": return renderAudit(payload);
     case "para-zk:list": return renderNoteList(payload);
     case "para-zk:wiki-ingest-candidates": return renderCandidates(payload);
+    case "para-zk:conventions": return renderSchema(payload, summary);
     case "para-zk:describe": return renderSchema(payload, summary);
     default:
       return command.startsWith("para-zk:read")
