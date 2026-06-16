@@ -77,6 +77,9 @@ Notable changes for PARA-ZK are tracked here.
   root areas only; nested areas use `para-zk:create-child type=area
   root_type=area ...`. The MCP mutation tools keep their `child` parameter for
   LLM ergonomics and route child updates internally to `update-child`.
+- `codex-setup` now overwrites existing Codex custom-agent TOML files for the
+  generated PARA-ZK agent names by default. `--force` is retained only as a
+  compatibility no-op; use `--dry-run` to preview the destructive refresh.
 
 ### Added
 

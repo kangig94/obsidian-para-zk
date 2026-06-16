@@ -46,11 +46,6 @@ for (const file of files) {
     results.push({ status: "unchanged", target });
     continue;
   }
-  if (current !== undefined && !options.force) {
-    results.push({ status: "skipped-existing", target });
-    warnings.push(`${target} already exists and differs; rerun with --force to overwrite`);
-    continue;
-  }
   if (!options.dryRun) {
     await writeFile(target, agent.toml, "utf8");
   }
@@ -166,7 +161,6 @@ function tomlMultilineString(value) {
 function parseArgs(args) {
   const parsed = {
     dryRun: false,
-    force: false,
     outDir: undefined,
     sourceDir: undefined
   };
@@ -175,7 +169,7 @@ function parseArgs(args) {
     if (arg === "--dry-run") {
       parsed.dryRun = true;
     } else if (arg === "--force") {
-      parsed.force = true;
+      // Kept for compatibility with older instructions; installs overwrite by default.
     } else if (arg === "--out-dir") {
       parsed.outDir = readArgValue(args, ++i, arg);
     } else if (arg === "--source-dir") {
@@ -200,6 +194,8 @@ function printHelp() {
   console.log(`Usage: install-codex-agents.mjs [--dry-run] [--force] [--out-dir PATH] [--source-dir PATH]
 
 Convert PARA-ZK clients/agents/*.md files into Codex custom-agent TOML files.
+Existing generated target files are overwritten by default. --force is accepted
+for compatibility with older instructions and has no effect.
 
 Defaults:
   source: ${defaultSourceDir}

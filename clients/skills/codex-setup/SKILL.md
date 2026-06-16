@@ -28,18 +28,20 @@ the plugin's shared `clients/agents/*.md` agent definitions into Codex's
    node <this-skill-dir>/scripts/install-codex-agents.mjs
    ```
 
-3. Report the installed, skipped, and warning lines from the script.
+3. Report the installed, updated, unchanged, and warning lines from the script.
 4. Tell the user to restart Codex or start a new thread before expecting the new
    agent names to appear.
 
 ## Installer Options
 
 - `--dry-run`: print what would be written without modifying files.
-- `--force`: overwrite existing agent TOML files when the generated content differs.
+- `--force`: accepted for compatibility with older instructions; installs now
+  overwrite existing agent TOML files by default.
 - `--out-dir <path>`: write to a custom Codex agent directory instead of
   `${CODEX_HOME:-~/.codex}/agents`.
 - `--source-dir <path>`: read agent markdown files from a custom directory instead
   of the plugin's `clients/agents`.
 
-Default installs are non-destructive: an existing different TOML file is skipped
-unless `--force` is passed.
+Default installs are destructive for managed agent names: an existing different
+TOML file at the generated target path is overwritten with the bundled agent
+definition. Use `--dry-run` to preview writes.
