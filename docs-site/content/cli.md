@@ -30,6 +30,16 @@ Successful responses use stable fields such as:
 
 Errors return `ok: false` with an `error` message.
 
+## Load Conventions Once
+
+Automation should start each task with:
+
+```bash
+optsidian para-zk:conventions format=json
+```
+
+It returns the vault orientation, ownership/routing rules, citation rules, and wiki-compounding rules. Then use `para-zk:describe` as the live surface reference.
+
 ## Discover The Live Surface
 
 Start with:
@@ -46,7 +56,7 @@ optsidian para-zk:describe type=resource format=json
 optsidian para-zk:describe type=permanent format=json
 ```
 
-`describe type=<surface>` returns selectors, create inputs, read keys, write keys, collections, and supported operations for that note type.
+`describe type=<surface>` returns selectors, create inputs, read keys, write keys, collections, and supported operations for that note type. Keys absent from `writeKeys` are not writable through PARA-ZK; route raw file edits, raw frontmatter, and full-text search to the host CLI.
 
 For one command's arguments, use `help=true`:
 
@@ -76,11 +86,11 @@ optsidian para-zk:wiki-ingest-candidates mode=per-import source_paths='["PARA/Re
 optsidian para-zk:wiki-ingest-candidates mode=re-ingest source_path="PARA/Resources/Source Paper.md" format=json
 ```
 
-`mode` is one of `per-import`, `delta`, `init`, or `re-ingest`. `source_path` or `source_paths=<json|comma-list>` is required for `per-import` and `re-ingest`, and rejected for `delta` and `init`. The command also accepts `offset=<n>`, `limit=<n|all>` (default `50`), and `format`. Results include `{ ok, command, count, offset, limit, returned, has_more, candidates }`; each candidate has `{ path, type, title, updated, updated_ms, stale_pages, reason }`.
+`mode` is one of `per-import`, `delta`, `init`, or `re-ingest`. `source_path` or `source_paths=<json|comma-list>` is required for `per-import` and `re-ingest`, and rejected for `delta` and `init`. The command also accepts `offset=<n>`, `limit=<n|all>` (default `50`), and `format`. Results include `{ ok, command, count, offset, limit, returned, has_more, candidates }`; each candidate has `{ path, type, title, updated, updated_ms, stale_llm_wikis, reason }`.
 
-Reason codes are `missing_wiki_citation`, `source_newer_than_wiki`, `per_import`, and `reingest_requested`. `source_newer_than_wiki` derives staleness from page `updated`: the source is newer than at least one citing wiki page, listed in `stale_pages` as `{ path, title, updated_ms }`.
+Reason codes are `missing_wiki_citation`, `source_newer_than_wiki`, `per_import`, and `reingest_requested`. `source_newer_than_wiki` derives staleness from page `updated`: the source is newer than at least one citing wiki page, listed in `stale_llm_wikis` as `{ path, title, updated_ms }`.
 
-The audit check `upward_wiki_link` (`medium`) flags a non-`llm-wiki` note that links into an `llm-wiki` note. Wiki pages cite canonical notes; canonical notes should not link back into the wiki. The `orphan_wiki_page` (`low`) check is an advisory hint for an `llm-wiki` page that no other wiki page links to (canonical→wiki links do not count) — usually an under-woven concept, though a genuinely standalone topic is fine and never forced.
+The audit checks include `upward_wiki_link` (`medium`), which flags a non-`llm-wiki` note that links into an `llm-wiki` note; `orphan_wiki_page` (`low`), an advisory hint for a wiki page that no other wiki page links to; and `wiki_tag_domain_mismatch` (`low`), which can be fixed with `audit fix=true`.
 
 `create-llm-wiki` and `update-llm-wiki` accept `by=<model-id>` for authorship: create stamps `created_by` and `updated_by`, while changed updates stamp `updated_by`. LLM-Wiki pages include managed props plus Cited-by scoped to `LLM-Wiki/`, then References. Cross-link wiki concept pages with body `[[link]]`; use `references` plus backtick code-span `` `PZ[<id>]` `` citations only for canonical sources outside LLM-Wiki. Bare `PZ[<id>]` text does not render.
 
@@ -95,9 +105,11 @@ Examples:
 - `kind` for ZK kind
 - `area_titles` when creating or linking project areas
 - `source_title` for source notes used by create/distill workflows
-- `child` to drill into an existing child note
+- `root_type`, `root_title`, `relpath`, and `title` for `create-child`, `read-child`, `update-child`, `rename-child`, and `delete-child`
 
 Notes are addressed by name, not by vault file path.
+
+Top-level parent CRUD commands do not accept `child=`. Address child notes, fallback notes, and nested areas through the dedicated `*-child` command family.
 
 ## Locale-Neutral Codes
 
@@ -115,16 +127,27 @@ energy=normal
 
 ## Large Bodies From Files
 
-Create commands support file-backed `body` input:
+Create commands support file-backed `body` input, and update commands support file-backed `value` input:
 
 ```bash
 optsidian para-zk:create-resource title="Attention Is All You Need" body=@/absolute/path/to/note.md
+optsidian para-zk:update-child root_type=project root_title="Model Evaluation" title="Planning Meeting" key=body op=set value=@/absolute/path/to/body.md
 ```
 
 Use an absolute path. The plugin reads the file from the Obsidian process, which keeps multiline Markdown, quotes, `$`, and backticks intact.
 
 > [!note]
-> Only `body` is file-backed. Short fields such as journal `content` are literal, so `@mentions` remain text.
+> Only create `body` and update `value` are file-backed. Short fields such as journal `content`, `match`, and `with` are literal, so `@mentions` remain text.
+
+## References And Citations
+
+Reference registries expose stable ids. Read them with:
+
+```bash
+optsidian para-zk:read-resource title="Source Paper" key=references limit=all format=json
+```
+
+Body prose cites references with backtick code spans such as `` `PZ[<id>]` ``, `` `PZ[<id>, <id>]` ``, or `` `PZ[<id>#<section>]` ``. The id is not the visible registry index. Citations render as the reference's current position, so reordering references changes the displayed number but not the stored citation target.
 
 ## More Detail
 

@@ -2,27 +2,35 @@
 title: Installation
 ---
 
-PARA-ZK ships with prebuilt plugin files. You do not need to build the repo before installing it into an Obsidian vault.
+PARA-ZK is installed from published release assets. You do not need to build the repo unless you are doing local development.
+
+## Install With BRAT
+
+Install the beta with [BRAT](https://github.com/TfTHacker/obsidian42-brat):
+
+1. Install and enable BRAT from Obsidian community plugins.
+2. Run **BRAT: Add a beta plugin for testing**.
+3. Enter:
+
+```text
+https://github.com/kangig94/obsidian-para-zk
+```
+
+BRAT downloads the latest published release and keeps it updated. Enable **PARA-ZK** under **Settings -> Community plugins**.
 
 ## Install With Optsidian
 
-If you have `optsidian` installed, install and enable PARA-ZK in one command:
+If you use `optsidian`, install and enable PARA-ZK with:
 
 ```bash
 optsidian plugin:install url=https://github.com/kangig94/obsidian-para-zk enable
 ```
 
-This installs the committed plugin artifacts into:
-
-```text
-<vault>/.obsidian/plugins/para-zk/
-```
-
-Use `vault-path=<path>` to target a non-active vault, or `ref=<git-ref>` to pin a version.
+Use `vault-path=<path>` to target a non-active vault.
 
 ## Manual Install
 
-Copy these files from the repo root:
+Download these files from the latest GitHub release:
 
 ```text
 manifest.json
@@ -38,6 +46,18 @@ Place them in:
 
 Then open Obsidian and enable **PARA-ZK** under **Settings -> Community plugins**.
 
+## Local Development
+
+Build first, then install the generated deployment folder:
+
+```bash
+pnpm install
+pnpm run build
+optsidian plugin:install path=build enable
+```
+
+The repo root does not commit `main.js` or `styles.css`; release assets and `build/` are the deployable plugin shape.
+
 ## Set Up The Vault
 
 After installing the plugin, run **PARA-ZK: Set up PARA-ZK vault** from the command palette.
@@ -48,7 +68,7 @@ Automation can run the same setup as:
 optsidian para-zk:setup installDeps=true
 ```
 
-Setup is idempotent. It creates or syncs the PARA/ZK layout, managed templates, dashboards, the vault guide, and required Obsidian settings.
+Setup is idempotent. It creates or syncs the PARA/ZK layout, `LLM-Wiki/`, managed templates, dashboards, the vault guide, required Obsidian settings, and dependency configuration.
 
 With `installDeps=true`, setup offers to install and enable the required community plugins:
 

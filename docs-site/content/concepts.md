@@ -34,6 +34,12 @@ Instead, the origin surfaces the relationship through backlinks and its *Cited b
 > [!note]
 > This keeps source notes stable. The new note carries the citation, and Obsidian resolves the reverse relationship.
 
+## LLM-Wiki
+
+`LLM-Wiki/` is a derived layer, not a second canonical knowledge base. Canonical knowledge lives in Resources, PARA notes, and ZK notes that a person may curate.
+
+Wiki pages cite canonical notes through their `references` registry and backtick citation tokens such as `` `PZ[<id>]` ``. Wiki pages can link to each other with normal body `[[wikilinks]]`. Canonical notes should not link back into `LLM-Wiki/`; the wiki depends on the sources, not the other way around.
+
 ## Distilling Sparks
 
 Distilling turns a spark into a new permanent note:
@@ -42,7 +48,7 @@ Distilling turns a spark into a new permanent note:
 optsidian para-zk:distill-spark source_title="Raw Thought" title="Durable Thought" maturity=evergreen
 ```
 
-By default, the spark is kept and marked `processed: true`. It also records the created permanent in `distilled_to`. You can discard the spark during distill with `discard=true`.
+By default, the spark is kept, marked `processed: true`, and records the created permanent in `distilled_to`. You can move the spark to trash during distill with `discard=true`. The permanent never references the ephemeral spark.
 
 ## Where To Go Next
 

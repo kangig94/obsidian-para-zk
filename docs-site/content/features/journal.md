@@ -17,7 +17,7 @@ The left ribbon includes the same daily-note shortcut.
 The journal note is addressed by date in the CLI:
 
 ```bash
-optsidian para-zk:read-journal date=2026-05-30
+optsidian para-zk:read-journal date=YYYY-MM-DD
 ```
 
 ## Quick Memo Capture

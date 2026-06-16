@@ -4,7 +4,7 @@ title: MCP
 
 PARA-ZK ships a thin MCP server that proxies the native CLI while Obsidian is running.
 
-The server exposes discovery plus shell-safe section edits. It does not replace the CLI contract; it gives MCP clients a small, reliable way to discover and mutate PARA-ZK notes through the same workflow surface.
+The server exposes fetch-once conventions, live discovery, and shell-safe string mutation tools. It does not replace the CLI contract; it gives MCP clients a small, reliable way to discover and mutate PARA-ZK notes through the same workflow surface.
 
 ## Prerequisites
 
@@ -47,22 +47,31 @@ Clients that accept an `mcpServers` JSON config can register the bundled server 
 }
 ```
 
-Build the bundle before direct registration if you are using a local checkout:
+If you edited the MCP server source in a local checkout, rebuild the bundle before direct registration:
 
 ```bash
 pnpm run build
 ```
 
+Released plugin installs already include the bundled `clients/para-zk-mcp.mjs`; rebuild only when working from edited source.
+
 ## Tools
 
 The MCP server exposes:
 
+- `conventions`: recommended first call for tasks touching the vault. It returns ownership/routing, citation, and wiki-compounding rules.
 - `describe`: returns the live PARA-ZK surface index, install guidance, vault context, workflows, and per-type schema drill-down.
-- `replace`: literal replacement inside a body or section.
-- `set`: replace an entire body or section.
-- `add`: append or prepend content to a body or section.
+- `replace`: literal replacement inside a writable key that supports `replace`, usually body or section prose.
+- `set`: replace an entire writable key, including documented `frontmatter/<key>` scalar or list keys that support `set`.
+- `add`: append or prepend content to body/section keys and documented list frontmatter keys that support append/prepend.
 
-Frontmatter updates, task mutations, and other structured operations stay available through the CLI commands returned by `describe`.
+Structured operations outside those string shapes stay CLI-only, including task insertion with `value_json`, task deletion, reference insertion/backfill, and audit/list/wiki-ingest workflows. The MCP mutation tools pass the requested `key` through to the matching `update-*` command, so always check `describe type=<surface>` `writeKeys`.
+
+## Child Notes
+
+For MCP mutation tools, `child: ["Generation", "Vision"]` is accepted only with `type=project` or `type=area`. The server routes that internally to `para-zk:update-child` with `root_type`, `root_title`, `relpath`, and `title`. The `key` belongs to the addressed child note, not the root.
+
+For non-mutation child operations, use the CLI commands returned by `describe`: `create-child`, `read-child`, `rename-child`, and `delete-child`.
 
 ## Values
 
@@ -76,6 +85,10 @@ kind=permanent
 ```
 
 The Obsidian GUI renders localized labels in the vault.
+
+## Citations
+
+Within body or section prose, cite the note's own reference registry with backtick code-span citations such as `` `PZ[<id>]` `` or `` `PZ[<id>#<section>]` ``. The id is the stable reference id from `read key=references`; positional input such as `` `PZ[0]` `` is not supported. Bare `PZ[<id>]` text does not render.
 
 ## More Detail
 

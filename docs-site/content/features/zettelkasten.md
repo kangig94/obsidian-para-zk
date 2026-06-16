@@ -41,25 +41,24 @@ Distill when a spark contains an idea worth keeping:
 optsidian para-zk:distill-spark source_title="Raw Thought" title="Durable Thought" maturity=evergreen
 ```
 
-By default, the spark stays in place, is marked `processed: true`, and records the permanent in `distilled_to`. Pass `discard=true` to move the spark to Obsidian trash instead.
+By default, the spark stays in place, is marked `processed: true`, and records the permanent in `distilled_to`. Pass `discard=true` to move the spark to Obsidian trash instead. The permanent never references the ephemeral spark.
 
 ## Inline Citations
 
 Use inline citation tokens to cite the note's reference registry from the body.
 
 ````markdown
-`PZ[0]`
-`PZ[0, 2]`
+`PZ[abc123]`
+`PZ[abc123, def456]`
+`PZ[abc123#Training Loop]`
 ````
 
-`PZ[0]` renders as a `[0]` link to the note's 0-th registry reference.
-
-`PZ[0, 2]` renders independent `[0]` and `[2]` links. Each index points to the matching reference position.
+The value inside `PZ[...]` is the reference's stable `id`, returned by `read ... key=references`. It is not the visible registry position. A section suffix such as `#Training Loop` or `#^block-id` points the citation at a heading or block inside the referenced note.
 
 Inline citations work in both reading view and Live Preview. In Live Preview, the raw token is visible while the cursor is inside it, and the rendered citation appears otherwise.
 
 > [!warning]
-> Citation indexes are positional. If you reorder the references registry, the rendered citation targets change with the new order.
+> Positional input such as `` `PZ[0]` `` is not supported. The stored id stays stable across reference reorders; only the rendered `[n]` display follows the current registry position.
 
 ## Backlinks And Cited By
 

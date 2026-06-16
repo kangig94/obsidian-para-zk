@@ -111,7 +111,7 @@ prose or import the workflow core; it points agents to the host CLI.
 
 When no running vault is reachable (`running: false`), it returns a `reason` and a `howto` for recovery — with `optsidian`, the `howto` points at `optsidian open-gui` to launch the last-opened vault, then retry.
 
-The `install` field is present in both states (the active vault running PARA-ZK does not mean a target vault has it) and gives the full two-step setup: (1) install the prebuilt plugin — with `optsidian`, `optsidian plugin:install url=<repo> enable` (add `vault-path=` for a non-active vault); without it, copy the committed `manifest.json`/`main.js`/`styles.css` into `<vault>/.obsidian/plugins/para-zk/` and enable it. (2) initialize the vault — `para-zk:setup installDeps=true` (creates the PARA/ZK layout and installs required community plugins).
+The `install` field is present in both states (the active vault running PARA-ZK does not mean a target vault has it) and gives the full two-step setup: (1) install the published plugin release — with `optsidian`, `optsidian plugin:install url=<repo> enable` (add `vault-path=` for a non-active vault); without it, use BRAT or download `manifest.json`, `main.js`, and `styles.css` from the latest GitHub release into `<vault>/.obsidian/plugins/para-zk/` and enable it. Local development checkouts should build first and install the generated `build/` folder. (2) initialize the vault — `para-zk:setup installDeps=true` (creates the PARA/ZK layout and installs required community plugins).
 
 `para-zk:wiki-ingest-candidates` is surfaced through the `describe.workflows`
 array, not as a separate MCP tool, consistent with `list` and `audit`. Invoke it

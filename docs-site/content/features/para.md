@@ -13,6 +13,7 @@ PARA-ZK: Create project
 PARA-ZK: Create area
 PARA-ZK: Create resource
 PARA-ZK: Create subnote
+PARA-ZK: Create subarea
 PARA-ZK: Create retro
 ```
 
@@ -31,16 +32,16 @@ optsidian para-zk:create-resource title="Source Paper"
 An area can live under another area. Nested areas are still `type: area`; the `parent` field is what makes them nested.
 
 ```bash
-optsidian para-zk:create-area title="Robot" parent_title="AI"
+optsidian para-zk:create-child type=area root_type=area root_title="AI" title="Robot"
 ```
 
-For deeper nesting, use `parent_title` plus a `child=` drill into that parent:
+For deeper nesting, use `relpath` as the ancestor chain from the root area to the immediate parent:
 
 ```bash
-optsidian para-zk:create-area title="Vision" parent_title="AI" child='["Generation"]'
+optsidian para-zk:create-child type=area root_type=area root_title="AI" relpath='["Generation"]' title="Vision"
 ```
 
-This nests **Vision** inside `AI/Generation/` — `child` drills into AI's existing child *Generation*, then creates Vision there.
+This nests **Vision** inside `AI/Generation/`. Existing child notes are read, updated, renamed, and deleted with the matching `read-child`, `update-child`, `rename-child`, and `delete-child` commands. Top-level parent CRUD commands do not accept `child=`.
 
 ## Props Block
 
@@ -81,6 +82,8 @@ CLI example:
 ```bash
 optsidian para-zk:update-project title="Model Evaluation" key=references op=insert value_json='{"link":"https://example.com/paper","description":"Source paper"}'
 ```
+
+Reference items have stable ids used by inline body citations such as `` `PZ[<id>]` ``. If imported references are id-less, run `key=references op=backfill` before citing them.
 
 ## Tasks Block
 
