@@ -1,6 +1,6 @@
 # PARA-ZK MCP
 
-PARA-ZK ships a thin MCP server for discovery plus shell-safe edit tools. It exposes `describe` for the live PARA-ZK surface index, and `replace`, `set`, and `add` for string-based update operations. Those mutation tools are not limited to body/section keys: for the target type, use the documented `writeKeys` from `describe`, including `frontmatter/<key>` scalar keys with `set` and list keys with `set`/`add`. Structured task mutations that require `value_json` inserts or `tasks/<id>` deletion remain CLI-only. The same server is packaged as both a Claude Code plugin and a Codex plugin that share `clients/` (`.claude-plugin/` + `.codex-plugin/` manifests and one bundled `para-zk-mcp.mjs`), or it can be registered as a plain MCP server in any client. The two platforms resolve plugin MCP paths differently, so each manifest declares its own config: Claude inlines `mcpServers` directly in `.claude-plugin/plugin.json` (`${CLAUDE_PLUGIN_ROOT}/para-zk-mcp.mjs`), while Codex points at `clients/.mcp.codex.json` (relative `para-zk-mcp.mjs` plus `cwd: "."`, which Codex rebases to the plugin root, since Codex neither expands `${CLAUDE_PLUGIN_ROOT}` in `args` nor accepts an inline `mcpServers` object).
+PARA-ZK ships a thin MCP server for discovery plus shell-safe edit tools. It exposes `conventions` (fetch-once usage rules, the recommended first call), `describe` for the live PARA-ZK surface index, and `replace`, `set`, and `add` for string-based update operations. Those mutation tools are not limited to body/section keys: for the target type, use the documented `writeKeys` from `describe`, including `frontmatter/<key>` scalar keys with `set` and list keys with `set`/`add`. Structured task mutations that require `value_json` inserts or `tasks/<id>` deletion remain CLI-only. The same server is packaged as both a Claude Code plugin and a Codex plugin that share `clients/` (`.claude-plugin/` + `.codex-plugin/` manifests and one bundled `para-zk-mcp.mjs`), or it can be registered as a plain MCP server in any client. The two platforms resolve plugin MCP paths differently, so each manifest declares its own config: Claude inlines `mcpServers` directly in `.claude-plugin/plugin.json` (`${CLAUDE_PLUGIN_ROOT}/para-zk-mcp.mjs`), while Codex points at `clients/.mcp.codex.json` (relative `para-zk-mcp.mjs` plus `cwd: "."`, which Codex rebases to the plugin root, since Codex neither expands `${CLAUDE_PLUGIN_ROOT}` in `args` nor accepts an inline `mcpServers` object).
 
 ## Prerequisites
 
@@ -24,8 +24,8 @@ unreviewed dump. `codex-setup` installs PARA-ZK custom Codex agents from the bun
 spawn named agents such as `wiki-weaver` after a restart/new thread. Those agents assume the
 Optsidian MCP command runner (`mcp__optsidian__command_run`) is available. Clients without
 skill support still get the always-on `safety` note through `describe`; usage conventions
-are fetched once with the returned `conventions` field, e.g.
-`optsidian para-zk:conventions` or `obsidian para-zk:conventions`.
+are fetched once with the `conventions` tool (MCP callers) or the equivalent CLI command
+`optsidian para-zk:conventions` / `obsidian para-zk:conventions` (CLI-direct callers).
 
 ## Codex CLI
 
@@ -73,6 +73,19 @@ Build the bundle with `npm run build` before registering it.
 
 ## Tools
 
+### `conventions`
+
+The recommended **first** call for any task touching the vault: a cold caller runs it
+**once** to load the usage rules, then uses `describe` as the surface reference. It
+proxies the host CLI `para-zk:conventions` (no shell, `execFile`) and returns the four
+locale-neutral fields — `vault` (LLM-maintained PARA+ZK orientation), `scope`
+(ownership/routing: what PARA-ZK owns vs. what routes to host file/search tools),
+`citation` (the body `` `PZ[<id>]` `` rule), and `compounding` (the query→wiki
+propose-confirm discipline) — plus the always-on `safety` note. The conventions prose
+lives once in the CLI adapter; the MCP does not duplicate it or import the workflow
+core. When no vault is reachable it returns the same `running: false` fallback as
+`describe` (still carrying `safety` and a recovery `howto`).
+
 ### `describe`
 
 Returns a compact index with the preferred CLI invocation, help command, usage notes,
@@ -87,7 +100,8 @@ supported surface types, the named `workflows` (non-surface commands such as
 `update-child`, `rename-child`, `delete-child`, `capture-journal`, `distill-spark`,
 `create-from-*`, `attach-file`, each with their inputs), a `conventions` command
 pointer such as `optsidian para-zk:conventions` or `obsidian para-zk:conventions`
-for fetch-once vault/scope/citation/compounding rules, and the `schema` drill-down
+(the CLI form of the `conventions` tool, for CLI-direct callers) for fetch-once
+vault/scope/citation/compounding rules, and the `schema` drill-down
 command. Use `schema` (`para-zk:describe type=<t>`) to
 fetch a type's address selectors, `create` command + `createInputs`, and read/write
 keys (`writeKeys` carry each mutable key with its op; keys absent there, e.g.

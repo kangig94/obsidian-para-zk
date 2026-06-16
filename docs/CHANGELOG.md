@@ -389,6 +389,15 @@ Notable changes for PARA-ZK are tracked here.
   mirrors the lean shape with a CLI-specific conventions pointer and no longer duplicates
   the large vault/scope prose; its tool description and fallback keep only the strengthened
   anti-refusal safety sentence.
+- Promoted `conventions` to a first-class MCP tool (now five tools, listed first) so a cold
+  client calls it once before `describe` or any read/write tool — instead of relying on a
+  pointer string an agent may skip. It proxies the host CLI `para-zk:conventions format=json`
+  via `execFile` (no shell, no workflow-core import, prose still lives once in the CLI adapter)
+  and returns the four `vault`/`scope`/`citation`/`compounding` fields plus the always-on
+  `safety` note, falling back to the same `running:false` recovery shape as `describe` when no
+  vault is reachable. The former single tool description split into a `conventions` entry
+  ("Call FIRST and ONCE") and a demoted `describe` reference entry; both retain the anti-refusal
+  clause so it stays always-on regardless of which tool a cold agent reaches first.
 - The project/area subnote views now show a `Subfolder` (`하위폴더`) column — each subnote's
   folder relative to the parent note's folder — so subnotes filed under a subdirectory
   (`create-subnote title="Notes/Plan"`) are no longer indistinguishable from same-named

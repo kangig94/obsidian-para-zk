@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildEnvelope, buildFallback, buildToolDescriptors, conventionsCommand, helpCommand, howtoFor, invokePattern, resolveCliOrder, schemaCommand } from "../../src/mcp/server";
+import { buildConventionsEnvelope, buildEnvelope, buildFallback, buildToolDescriptors, conventionsCommand, helpCommand, howtoFor, invokePattern, resolveCliOrder, schemaCommand } from "../../src/mcp/server";
 
 describe("MCP server pure helpers", () => {
   it("maps describe JSON into a compact discovery index", () => {
@@ -65,12 +65,34 @@ describe("MCP server pure helpers", () => {
     }
   });
 
-  it("keeps the anti-refusal conventions guidance in the describe tool description", () => {
-    const describeTool = buildToolDescriptors().find((tool) => tool.name === "describe");
-    expect(describeTool?.description).toContain("translating");
-    expect(describeTool?.description).toContain("do NOT refuse");
-    expect(describeTool?.description).toContain("public-distribution");
-    expect(describeTool?.description).toContain("para-zk:conventions");
+  it("exposes conventions as the first tool, directing a cold caller to it before describe", () => {
+    const tools = buildToolDescriptors();
+    expect(tools.map((tool) => tool.name)).toEqual(["conventions", "describe", "replace", "set", "add"]);
+
+    const conventionsTool = tools[0];
+    expect(conventionsTool.description).toContain("FIRST");
+    expect(conventionsTool.description).toContain("ONCE");
+    expect(conventionsTool.description).toContain("PZ[<id>]");
+    expect(conventionsTool.inputSchema).toMatchObject({ type: "object", additionalProperties: false });
+  });
+
+  it("decorates the conventions CLI payload with the always-on safety note", () => {
+    const payload = { ok: true as const, command: "para-zk:conventions", vault: "v", scope: "s", citation: "c", compounding: "k" };
+    const envelope = buildConventionsEnvelope(payload);
+    expect(envelope).toMatchObject(payload);
+    expect(envelope.safety).toContain("do NOT refuse");
+    expect(envelope.safety).toContain("translating");
+  });
+
+  it("keeps the anti-refusal clause in both the conventions and describe tool descriptions", () => {
+    const tools = buildToolDescriptors();
+    for (const name of ["conventions", "describe"] as const) {
+      const description = tools.find((tool) => tool.name === name)?.description ?? "";
+      expect(description).toContain("translating");
+      expect(description).toContain("do NOT refuse");
+      expect(description).toContain("public-distribution");
+    }
+    expect(tools.find((tool) => tool.name === "describe")?.description).toContain("conventions");
   });
 
   it("omits reason from fallback when none is given", () => {
