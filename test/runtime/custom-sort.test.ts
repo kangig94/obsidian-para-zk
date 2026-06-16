@@ -29,7 +29,7 @@ function groups(titles: string[]): Item[] {
 }
 
 // Built from an older baseline: every top-level folder EXCEPT LLM-Wiki, in baseline order
-// (exactly the shape found live in the Overmind vault).
+// (the on-disk shape a vault first set up before LLM-Wiki was a top-level folder still carries).
 function staleBookmarks(): { items: Item[] } {
   return sortspecBookmarks(groups(BASELINE_ORDER.filter((title) => title !== "LLM-Wiki")));
 }
