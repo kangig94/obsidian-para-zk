@@ -373,6 +373,13 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Changed
 
+- The project/area subnote views now show a `Subfolder` (`하위폴더`) column — each subnote's
+  folder relative to the parent note's folder — so subnotes filed under a subdirectory
+  (`create-subnote title="Notes/Plan"`) are no longer indistinguishable from same-named
+  flat subnotes. Flat subnotes leave the column blank. The list now sorts by `file.path`
+  so subnotes group by subfolder instead of interleaving by filename. View-only change:
+  the stored managed block is still the compact `para-zk-view` token, so existing vaults
+  pick this up on next render with no migration.
 - CLI text output (the default format) now renders each command's data — audit findings
   grouped by path, note lists, the read surface, the resulting path, pagination hints —
   instead of echoing a static one-line summary (`vault audited`, `notes listed`). `format=json`

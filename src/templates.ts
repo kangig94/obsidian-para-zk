@@ -1,6 +1,8 @@
 import type { ParaZkSettings } from "./types";
 import { localePack } from "./i18n";
 import type { PropsViewType } from "./props/schema";
+import { escapeRegExp } from "./text";
+import { parentFolder } from "./vault/files";
 import { ZK_KIND_CODES } from "./zk/kinds";
 
 export type ManagedArtifact = {
@@ -454,11 +456,23 @@ function dataviewChildAreas(t: ReturnType<typeof localePack>, settings: ParaZkSe
 
 function dataviewChildDocs(t: ReturnType<typeof localePack>, sourcePath?: string): string[] {
   return fenced("dataview", [
-    `TABLE WITHOUT ID file.link AS "${t.labels.filename}", file.mtime AS "${t.labels.updated}"`,
+    `TABLE WITHOUT ID file.link AS "${t.labels.filename}", ${dataviewChildSubfolder(sourcePath)} AS "${t.labels.subfolder}", file.mtime AS "${t.labels.updated}"`,
     "FROM \"\"",
     `WHERE parent = ${dataviewCurrentFileLink(sourcePath)} AND type = "subnote"`,
-    "SORT file.name ASC"
+    "SORT file.path ASC"
   ]);
+}
+
+// Each subnote's folder relative to the parent note's folder, so a subnote filed under
+// a subdirectory shows where it lives while a flat subnote leaves the column blank. The
+// view is regenerated with the live source path on every render (renamed parents included),
+// so the baked parent folder never goes stale; path-less callers fall back to this.file.folder.
+function dataviewChildSubfolder(sourcePath: string | undefined): string {
+  if (sourcePath === undefined) {
+    return `regexreplace(file.folder, "^" + this.file.folder + "(/|$)", "")`;
+  }
+  const pattern = `^${escapeRegExp(parentFolder(sourcePath))}(/|$)`;
+  return `regexreplace(file.folder, ${JSON.stringify(pattern)}, "")`;
 }
 
 function dataviewAreaRetros(t: ReturnType<typeof localePack>, settings: ParaZkSettings, sourcePath?: string): string[] {

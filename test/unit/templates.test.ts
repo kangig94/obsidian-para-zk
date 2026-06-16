@@ -151,8 +151,12 @@ describe("managed templates", () => {
     expect(dataviewViewBlock("project-retros", DEFAULT_SETTINGS, sourcePath)).toContain("file.mtime AS \"Updated\"");
     expect(dataviewViewBlock("area-retros", DEFAULT_SETTINGS, sourcePath)).toContain("file.mtime AS \"Updated\"");
     expect(dataviewViewBlock("project-subnotes", DEFAULT_SETTINGS, sourcePath)).toContain(`parent = ${sourceLink}`);
-    expect(dataviewViewBlock("project-subnotes", DEFAULT_SETTINGS, sourcePath)).toContain("file.link AS \"Filename\", file.mtime AS \"Updated\"");
-    expect(dataviewViewBlock("area-subnotes", DEFAULT_SETTINGS, sourcePath)).toContain("file.link AS \"Filename\", file.mtime AS \"Updated\"");
+    expect(dataviewViewBlock("project-subnotes", DEFAULT_SETTINGS, sourcePath)).toContain(
+      "file.link AS \"Filename\", regexreplace(file.folder, \"^PARA/Projects/Alpha(/|$)\", \"\") AS \"Subfolder\", file.mtime AS \"Updated\""
+    );
+    expect(dataviewViewBlock("project-subnotes", DEFAULT_SETTINGS, sourcePath)).toContain("SORT file.path ASC");
+    expect(dataviewViewBlock("area-subnotes", DEFAULT_SETTINGS, sourcePath)).toContain("regexreplace(file.folder, \"^PARA/Projects/Alpha(/|$)\", \"\") AS \"Subfolder\"");
+    expect(dataviewViewBlock("project-subnotes", DEFAULT_SETTINGS)).toContain("regexreplace(file.folder, \"^\" + this.file.folder + \"(/|$)\", \"\") AS \"Subfolder\"");
     expect(dataviewViewBlock("resource-cited-by", DEFAULT_SETTINGS, sourcePath)).toContain(`contains(file.outlinks, ${sourceLink})`);
     expect(dataviewViewBlock("resource-cited-by", DEFAULT_SETTINGS, sourcePath)).toContain("file.link AS \"Filename\", file.mtime AS \"Updated\"");
     expect(dataviewViewBlock("llm-wiki-cited-by", DEFAULT_SETTINGS, sourcePath)).toContain(`contains(file.outlinks, ${sourceLink})`);
