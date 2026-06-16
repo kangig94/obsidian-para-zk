@@ -1,0 +1,82 @@
+---
+title: LLM-Wiki
+---
+
+`LLM-Wiki/` is PARA-ZK's LLM-owned synthesis layer. It is derived from canonical notes, not a second place to keep source truth.
+
+Canonical knowledge lives in Resources, PARA notes, and ZK notes. Wiki pages summarize and connect those sources so future LLM work can read a compact map before acting.
+
+## Link Direction
+
+Wiki pages cite canonical notes through their `references` registry and backtick citation tokens:
+
+````markdown
+`PZ[abc123]`
+`PZ[abc123#Training Loop]`
+````
+
+Use normal body `[[links]]` between wiki concept pages. Do not link canonical notes back into `LLM-Wiki/`; the wiki depends on the sources, not the other way around.
+
+## Create Wiki Pages
+
+Create pages under exactly one domain folder:
+
+```bash
+optsidian para-zk:create-llm-wiki title="AI/Diffusion Policy" by="gpt-5"
+```
+
+The path is `LLM-Wiki/<domain>/<concept>.md`. A concept is unique across the wiki: creating the same concept under another domain returns the existing page instead of duplicating it. When the first page in a domain is created, PARA-ZK also creates `LLM-Wiki/<domain>/index.md` as that domain's hub.
+
+`create-llm-wiki` and `update-llm-wiki` accept `by=<model-id>` for authorship. Creation stamps `created_by` and `updated_by`; changed updates stamp `updated_by`.
+
+## Write Synthesis
+
+LLM-Wiki pages expose the same managed surface contract as other PARA-ZK notes:
+
+```bash
+optsidian para-zk:update-llm-wiki title="AI/Diffusion Policy" key=body op=set value=@/absolute/path/body.md by="gpt-5"
+optsidian para-zk:update-llm-wiki title="AI/Diffusion Policy" key=references op=insert value_json='{"link":"[[PARA/Resources/Source Paper.md]]","description":"Canonical source"}'
+```
+
+Read the inserted reference id before citing it:
+
+```bash
+optsidian para-zk:read-llm-wiki title="AI/Diffusion Policy" key=references limit=all format=json
+```
+
+Then cite that stable id from the body with `` `PZ[<id>]` ``. Bare `PZ[<id>]` text and positional `` `PZ[0]` `` input do not render.
+
+## Ingest Candidates
+
+`para-zk:wiki-ingest-candidates` lists source notes that should be folded into the wiki without reading source or wiki bodies:
+
+```bash
+optsidian para-zk:wiki-ingest-candidates mode=delta limit=50 format=json
+optsidian para-zk:wiki-ingest-candidates mode=per-import source_path="PARA/Resources/Source Paper.md" format=json
+```
+
+Candidate modes:
+
+- `init`: find uncited ingestable sources for an initial wiki build.
+- `delta`: find uncited sources and sources newer than citing wiki pages.
+- `per-import`: process source paths immediately after import.
+- `re-ingest`: deliberately refresh selected source paths.
+
+Ingestable source types are `resource`, `digest`, `permanent`, and `subnote`.
+
+## Audit Checks
+
+PARA-ZK audit includes wiki-specific checks:
+
+- `upward_wiki_link`: a canonical note links into an `llm-wiki` note.
+- `orphan_wiki_page`: a wiki page has no incoming links from other wiki pages.
+- `wiki_tag_domain_mismatch`: a wiki page's `llm-wiki/<domain>` tag does not match its folder domain.
+
+Run:
+
+```bash
+optsidian para-zk:audit type=llm-wiki format=json
+optsidian para-zk:audit fix=true format=json
+```
+
+`fix=true` can correct wiki tag domain drift. Link-shape findings remain review hints.

@@ -36,6 +36,7 @@ For manual installs, download `manifest.json`, `main.js`, and `styles.css` from 
 - [[concepts|Learn the mental model]]
 - [[features/para|Use PARA workflows]]
 - [[features/zettelkasten|Use Zettelkasten workflows]]
+- [[features/llm-wiki|Maintain the LLM-Wiki]]
 - [[features/journal|Capture daily notes and memos]]
 - [[cli|Drive PARA-ZK from the CLI]]
 - [[mcp|Connect MCP clients]]

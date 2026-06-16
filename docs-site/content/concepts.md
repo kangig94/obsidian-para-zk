@@ -54,4 +54,5 @@ By default, the spark is kept, marked `processed: true`, and records the created
 
 - [[features/para|PARA workflows]]
 - [[features/zettelkasten|Zettelkasten workflows]]
+- [[features/llm-wiki|LLM-Wiki]]
 - [[features/journal|Daily journal]]
