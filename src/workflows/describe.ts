@@ -322,52 +322,67 @@ function specForSurfaceType(type: SurfaceType): ReadSurfaceSpec {
   return specForType(type);
 }
 
+const CHILD_AREA_ADDRESSING =
+  "Root areas are directly addressable by title. Nested areas are child notes: create/read/update/delete/rename them with the *-child commands using root_type=area + root_title + relpath (ancestor chain to the immediate parent) + title.";
+const RESOURCE_PATH_ADDRESSING =
+  "A resource title may be a Resources-relative path using /: title=\"AI/Foo\" addresses or creates <Resources>/AI/Foo.md. A bare title resolves anywhere under Resources and is ambiguous if duplicated.";
+const LLM_WIKI_PATH_ADDRESSING =
+  "An llm-wiki title may be an LLM-Wiki-relative path using /: title=\"AI/Foo\" addresses or creates <LLM-Wiki>/AI/Foo.md. A bare title resolves anywhere under LLM-Wiki and is ambiguous if duplicated.";
+const CHILD_NOTE_ADDRESSING =
+  "not directly addressable — create/read/update/delete/rename it with the *-child commands: root_type (project|area) + root_title + relpath (ancestor chain to the immediate parent) + title";
+const GENERIC_NOTE_ADDRESSING =
+  "not directly addressable — read/update/delete/rename it with the *-child commands: root_type (project|area) + root_title + relpath (ancestor chain to the immediate parent) + title";
+const ZK_ADDRESSING: SurfaceAddressing = {
+  addressable: true,
+  selectors: ["title", "kind"],
+  create: "para-zk:create-zk",
+  rename: true
+};
+
+const SURFACE_ADDRESSING: Record<SurfaceType, SurfaceAddressing> = {
+  project: { addressable: true, selectors: ["title", "archived"], create: "para-zk:create-project", rename: true },
+  area: {
+    addressable: true,
+    selectors: ["title", "archived"],
+    addressVia: CHILD_AREA_ADDRESSING,
+    create: "para-zk:create-area",
+    rename: true
+  },
+  resource: {
+    addressable: true,
+    selectors: ["title", "archived"],
+    addressVia: RESOURCE_PATH_ADDRESSING,
+    create: "para-zk:create-resource",
+    rename: true
+  },
+  "llm-wiki": {
+    addressable: true,
+    selectors: ["title"],
+    addressVia: LLM_WIKI_PATH_ADDRESSING,
+    create: "para-zk:create-llm-wiki",
+    read: "para-zk:read-llm-wiki",
+    update: "para-zk:update-llm-wiki",
+    rename: true
+  },
+  journal: { addressable: true, selectors: ["date"], create: "para-zk:capture-journal", rename: false },
+  retro: { addressable: true, selectors: ["title", "date", "archived"], create: "para-zk:create-retro", rename: false },
+  subnote: { addressable: false, addressVia: CHILD_NOTE_ADDRESSING, create: "para-zk:create-child", rename: true },
+  spark: ZK_ADDRESSING,
+  digest: ZK_ADDRESSING,
+  permanent: ZK_ADDRESSING,
+  note: { addressable: false, addressVia: GENERIC_NOTE_ADDRESSING, rename: true }
+};
+
 // Addressing facet: how an LLM reaches/creates a note of this type. Separated from
 // the surface (keys) facet because some types are create-able but not directly
 // addressable for R/U/R/D — they are reached through the dedicated *-child CLI family.
 function addressingForType(type: SurfaceType): SurfaceAddressing {
-  switch (type) {
-    case "project":
-      return { addressable: true, selectors: ["title", "archived"], create: "para-zk:create-project", rename: true };
-    case "area":
-      return {
-        addressable: true,
-        selectors: ["title", "archived"],
-        addressVia: "Root areas are directly addressable by title. Nested areas are child notes: create/read/update/delete/rename them with the *-child commands using root_type=area + root_title + relpath (ancestor chain to the immediate parent) + title.",
-        create: "para-zk:create-area",
-        rename: true
-      };
-    case "resource":
-      return {
-        addressable: true,
-        selectors: ["title", "archived"],
-        addressVia: "A resource title may be a Resources-relative path using /: title=\"AI/Foo\" addresses or creates <Resources>/AI/Foo.md. A bare title resolves anywhere under Resources and is ambiguous if duplicated.",
-        create: "para-zk:create-resource",
-        rename: true
-      };
-    case "llm-wiki":
-      return {
-        addressable: true,
-        selectors: ["title"],
-        addressVia: "An llm-wiki title may be an LLM-Wiki-relative path using /: title=\"AI/Foo\" addresses or creates <LLM-Wiki>/AI/Foo.md. A bare title resolves anywhere under LLM-Wiki and is ambiguous if duplicated.",
-        create: "para-zk:create-llm-wiki",
-        read: "para-zk:read-llm-wiki",
-        update: "para-zk:update-llm-wiki",
-        rename: true
-      };
-    case "retro":
-      return { addressable: true, selectors: ["title", "date", "archived"], create: "para-zk:create-retro", rename: false };
-    case "journal":
-      return { addressable: true, selectors: ["date"], create: "para-zk:capture-journal", rename: false };
-    case "subnote":
-      return { addressable: false, addressVia: "not directly addressable — create/read/update/delete/rename it with the *-child commands: root_type (project|area) + root_title + relpath (ancestor chain to the immediate parent) + title", create: "para-zk:create-child", rename: true };
-    case "spark":
-    case "digest":
-    case "permanent":
-      return { addressable: true, selectors: ["title", "kind"], create: "para-zk:create-zk", rename: true };
-    case "note":
-      return { addressable: false, addressVia: "not directly addressable — read/update/delete/rename it with the *-child commands: root_type (project|area) + root_title + relpath (ancestor chain to the immediate parent) + title", rename: true };
-  }
+  const addressing = SURFACE_ADDRESSING[type];
+  return {
+    ...addressing,
+    ...(addressing.selectors ? { selectors: [...addressing.selectors] } : {}),
+    ...(addressing.createInputs ? { createInputs: [...addressing.createInputs] } : {})
+  };
 }
 
 function describeSurfaceSpec(type: SurfaceType, spec: ReadSurfaceSpec): SurfaceDescription {
