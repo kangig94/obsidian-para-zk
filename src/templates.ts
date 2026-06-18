@@ -395,61 +395,83 @@ function fenced(language: string, lines: string[]): string[] {
   ];
 }
 
+type TemplateLabelKey = keyof TemplateLocalePack["labels"];
+type ManagedUiType = Exclude<TemplateName, "retro">;
+type ManagedUiBlockRecipeItem =
+  | { kind: "tasks"; label: TemplateLabelKey }
+  | { kind: "view"; key: DataviewViewKey; label: TemplateLabelKey }
+  | { kind: "references"; label: TemplateLabelKey };
+
+const MANAGED_UI_BLOCK_RECIPES: Record<ManagedUiType, readonly ManagedUiBlockRecipeItem[]> = {
+  project: [
+    { kind: "tasks", label: "tasks" },
+    { kind: "view", key: "project-subnotes", label: "subnotes" },
+    { kind: "view", key: "project-retros", label: "retros" },
+    { kind: "references", label: "references" }
+  ],
+  area: [
+    { kind: "view", key: "area-projects", label: "dashboardProjects" },
+    { kind: "tasks", label: "tasks" },
+    { kind: "view", key: "area-subareas", label: "subareas" },
+    { kind: "view", key: "area-subnotes", label: "subnotes" },
+    { kind: "view", key: "area-retros", label: "retros" },
+    { kind: "references", label: "references" }
+  ],
+  subnote: [
+    { kind: "references", label: "references" }
+  ],
+  resource: [
+    { kind: "view", key: "resource-cited-by", label: "createdFromThis" },
+    { kind: "references", label: "references" }
+  ],
+  "llm-wiki": [
+    { kind: "view", key: "llm-wiki-cited-by", label: "citedBy" },
+    { kind: "references", label: "references" }
+  ],
+  journal: [
+    { kind: "tasks", label: "tasks" },
+    { kind: "references", label: "references" }
+  ],
+  spark: [
+    { kind: "view", key: "spark-distill", label: "createdFromThis" },
+    { kind: "references", label: "references" }
+  ],
+  digest: [
+    { kind: "view", key: "digest-cited-by", label: "createdFromThis" },
+    { kind: "references", label: "references" }
+  ],
+  permanent: [
+    { kind: "view", key: "permanent-cited-by", label: "citedBy" },
+    { kind: "references", label: "references" }
+  ]
+};
+
 export function managedUiBlockForType(type: string, settings: ParaZkSettings): string | undefined {
+  const recipe = managedUiBlockRecipe(type);
+  if (!recipe) return undefined;
   const t = localePack(settings.locale);
-  switch (type.trim().toLocaleLowerCase()) {
-    case "project":
-      return joinManagedUiBlocks([
-        paraZkTasksBlock("current", [], t.labels.tasks),
-        paraZkViewBlock("project-subnotes", t.labels.subnotes),
-        paraZkViewBlock("project-retros", t.labels.retros),
-        paraZkReferencesBlock("current", t.labels.references)
-      ]);
-    case "area":
-      return joinManagedUiBlocks([
-        paraZkViewBlock("area-projects", t.labels.dashboardProjects),
-        paraZkTasksBlock("current", [], t.labels.tasks),
-        paraZkViewBlock("area-subareas", t.labels.subareas),
-        paraZkViewBlock("area-subnotes", t.labels.subnotes),
-        paraZkViewBlock("area-retros", t.labels.retros),
-        paraZkReferencesBlock("current", t.labels.references)
-      ]);
-    case "subnote":
-      return joinManagedUiBlocks([
-        paraZkReferencesBlock("current", t.labels.references)
-      ]);
-    case "resource":
-      return joinManagedUiBlocks([
-        paraZkViewBlock("resource-cited-by", t.labels.createdFromThis),
-        paraZkReferencesBlock("current", t.labels.references)
-      ]);
-    case "llm-wiki":
-      return joinManagedUiBlocks([
-        paraZkViewBlock("llm-wiki-cited-by", t.labels.citedBy),
-        paraZkReferencesBlock("current", t.labels.references)
-      ]);
-    case "journal":
-      return joinManagedUiBlocks([
-        paraZkTasksBlock("current", [], t.labels.tasks),
-        paraZkReferencesBlock("current", t.labels.references)
-      ]);
-    case "spark":
-      return joinManagedUiBlocks([
-        paraZkViewBlock("spark-distill", t.labels.createdFromThis),
-        paraZkReferencesBlock("current", t.labels.references)
-      ]);
-    case "digest":
-      return joinManagedUiBlocks([
-        paraZkViewBlock("digest-cited-by", t.labels.createdFromThis),
-        paraZkReferencesBlock("current", t.labels.references)
-      ]);
-    case "permanent":
-      return joinManagedUiBlocks([
-        paraZkViewBlock("permanent-cited-by", t.labels.citedBy),
-        paraZkReferencesBlock("current", t.labels.references)
-      ]);
-    default:
-      return undefined;
+  return joinManagedUiBlocks(recipe.map((item) => renderManagedUiBlockRecipeItem(item, t)));
+}
+
+function managedUiBlockRecipe(type: string): readonly ManagedUiBlockRecipeItem[] | undefined {
+  const normalized = type.trim().toLocaleLowerCase();
+  return Object.prototype.hasOwnProperty.call(MANAGED_UI_BLOCK_RECIPES, normalized)
+    ? MANAGED_UI_BLOCK_RECIPES[normalized as ManagedUiType]
+    : undefined;
+}
+
+function renderManagedUiBlockRecipeItem(
+  item: ManagedUiBlockRecipeItem,
+  t: TemplateLocalePack
+): string | string[] {
+  const label = t.labels[item.label];
+  switch (item.kind) {
+    case "tasks":
+      return paraZkTasksBlock("current", [], label);
+    case "view":
+      return paraZkViewBlock(item.key, label);
+    case "references":
+      return paraZkReferencesBlock("current", label);
   }
 }
 
@@ -568,6 +590,26 @@ export const DATAVIEW_VIEW_KEYS = [
 ] as const;
 
 export type DataviewViewKey = typeof DATAVIEW_VIEW_KEYS[number];
+type DataviewViewRenderContext = {
+  t: TemplateLocalePack;
+  settings: ParaZkSettings;
+  sourcePath?: string;
+};
+type DataviewViewRenderer = (context: DataviewViewRenderContext) => string[];
+
+const DATAVIEW_VIEW_RENDERERS: Record<DataviewViewKey, DataviewViewRenderer> = {
+  "project-subnotes": ({ t, sourcePath }) => dataviewChildDocs(t, sourcePath),
+  "project-retros": ({ t, settings, sourcePath }) => dataviewProjectRetros(t, settings, sourcePath),
+  "area-projects": ({ t, settings, sourcePath }) => dataviewAreaProjects(t, settings, sourcePath),
+  "area-subareas": ({ t, settings, sourcePath }) => dataviewChildAreas(t, settings, sourcePath),
+  "area-subnotes": ({ t, sourcePath }) => dataviewChildDocs(t, sourcePath),
+  "area-retros": ({ t, settings, sourcePath }) => dataviewAreaRetros(t, settings, sourcePath),
+  "resource-cited-by": ({ t, settings, sourcePath }) => dataviewCitedBy(t, settings, sourcePath),
+  "llm-wiki-cited-by": ({ t, settings, sourcePath }) => dataviewWikiCitedBy(t, settings, sourcePath),
+  "permanent-cited-by": ({ t, settings, sourcePath }) => dataviewCitedBy(t, settings, sourcePath),
+  "spark-distill": ({ t }) => dataviewDistilledInto(t),
+  "digest-cited-by": ({ t, settings, sourcePath }) => dataviewCitedBy(t, settings, sourcePath)
+};
 
 /**
  * Returns the fenced Dataview block for a named view, so notes can embed a
@@ -575,22 +617,16 @@ export type DataviewViewKey = typeof DATAVIEW_VIEW_KEYS[number];
  * localized column labels) stays in code; the renderer expands it at view time.
  */
 export function dataviewViewBlock(key: string, settings: ParaZkSettings, sourcePath?: string): string | undefined {
+  const renderer = dataviewViewRenderer(key);
+  if (!renderer) return undefined;
   const t = localePack(settings.locale);
-  switch (key) {
-    case "project-subnotes": return dataviewChildDocs(t, sourcePath).join("\n");
-    case "project-retros": return dataviewProjectRetros(t, settings, sourcePath).join("\n");
-    case "area-projects": return dataviewAreaProjects(t, settings, sourcePath).join("\n");
-    case "area-subareas": return dataviewChildAreas(t, settings, sourcePath).join("\n");
-    case "area-subnotes": return dataviewChildDocs(t, sourcePath).join("\n");
-    case "area-retros": return dataviewAreaRetros(t, settings, sourcePath).join("\n");
-    case "resource-cited-by":
-    case "permanent-cited-by":
-    case "digest-cited-by":
-      return dataviewCitedBy(t, settings, sourcePath).join("\n");
-    case "llm-wiki-cited-by": return dataviewWikiCitedBy(t, settings, sourcePath).join("\n");
-    case "spark-distill": return dataviewDistilledInto(t).join("\n");
-    default: return undefined;
-  }
+  return renderer({ t, settings, sourcePath }).join("\n");
+}
+
+function dataviewViewRenderer(key: string): DataviewViewRenderer | undefined {
+  return Object.prototype.hasOwnProperty.call(DATAVIEW_VIEW_RENDERERS, key)
+    ? DATAVIEW_VIEW_RENDERERS[key as DataviewViewKey]
+    : undefined;
 }
 
 function dataviewCurrentFileLink(sourcePath: string | undefined): string {
