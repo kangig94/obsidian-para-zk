@@ -79,14 +79,16 @@ const UPDATE_OPTIONS: Record<string, CliOptionSpec> = {
   format: { value: "<text|json>", description: "Output format (default: text)." }
 };
 
+const CURRENT_TITLE_OPTION: CliOptionSpec = { value: "<title>", description: "Current note title." };
+
 const RENAME_OPTIONS: Record<string, CliOptionSpec> = {
-  title: { value: "<title>", description: "Current note title." },
+  title: CURRENT_TITLE_OPTION,
   new_title: { value: "<title>", description: "New note title." },
   format: { value: "<text|json>", description: "Output format (default: text)." }
 };
 
 const DELETE_OPTIONS: Record<string, CliOptionSpec> = {
-  title: { value: "<title>", description: "Current note title." },
+  title: CURRENT_TITLE_OPTION,
   force: { value: "<true|false>", description: "Required when deleting a folder-style note that contains child files." },
   format: { value: "<text|json>", description: "Output format (default: text)." }
 };
@@ -496,138 +498,41 @@ function makeParaDeleteCommand(config: ParaNoteCommandConfig): NativeCliCommand 
 }
 
 function readCommandOptions(selector: SelectorVariant, key: CliOptionSpec): Record<string, CliOptionSpec> {
-  switch (selector.variant) {
-    case "by-title":
-      return {
-        title: titleOption(selector),
-        archived: ARCHIVED_OPTION,
-        key,
-        ...READ_COLLECTION_OPTIONS,
-        format: FORMAT_OPTION
-      };
-    case "by-title-no-archive":
-      return {
-        title: titleOption(selector),
-        key,
-        ...READ_COLLECTION_OPTIONS,
-        format: FORMAT_OPTION
-      };
-    case "zk":
-      return {
-        title: { value: "<title>", description: "ZK note title." },
-        kind: ZK_KIND_FILTER_OPTION,
-        key,
-        ...READ_COLLECTION_OPTIONS,
-        format: FORMAT_OPTION
-      };
-    case "journal":
-      return {
-        date: JOURNAL_DATE_OPTION,
-        key,
-        ...READ_COLLECTION_OPTIONS,
-        format: FORMAT_OPTION
-      };
-    case "retro":
-      return {
-        title: { value: "<title>", description: "Retro note title." },
-        date: RETRO_DATE_OPTION,
-        archived: ARCHIVED_OPTION,
-        key,
-        ...READ_COLLECTION_OPTIONS,
-        format: FORMAT_OPTION
-      };
-  }
+  return {
+    ...selectorDefaultAddressOptions(selector),
+    key,
+    ...READ_COLLECTION_OPTIONS,
+    format: FORMAT_OPTION
+  };
 }
 
 function updateCommandOptions(selector: SelectorVariant, key: CliOptionSpec): Record<string, CliOptionSpec> {
-  switch (selector.variant) {
-    case "by-title":
-      return {
-        title: titleOption(selector),
-        archived: ARCHIVED_OPTION,
-        key,
-        ...UPDATE_OPTIONS
-      };
-    case "by-title-no-archive":
-      return {
-        title: titleOption(selector),
-        key,
-        ...UPDATE_OPTIONS
-      };
-    case "zk":
-      return {
-        title: { value: "<title>", description: "ZK note title." },
-        kind: ZK_KIND_FILTER_OPTION,
-        key,
-        ...UPDATE_OPTIONS
-      };
-    case "journal":
-      return {
-        date: JOURNAL_DATE_OPTION,
-        key,
-        ...UPDATE_OPTIONS
-      };
-    case "retro":
-      return {
-        title: { value: "<title>", description: "Retro note title." },
-        date: RETRO_DATE_OPTION,
-        archived: ARCHIVED_OPTION,
-        key,
-        ...UPDATE_OPTIONS
-      };
-  }
+  return {
+    ...selectorDefaultAddressOptions(selector),
+    key,
+    ...UPDATE_OPTIONS
+  };
 }
 
 function renameCommandOptions(selector: Extract<SelectorVariant, { variant: "by-title" | "by-title-no-archive" | "zk" }>): Record<string, CliOptionSpec> {
-  switch (selector.variant) {
-    case "by-title":
-      return {
-        title: titleOption(selector, true),
-        new_title: RENAME_OPTIONS.new_title,
-        format: RENAME_OPTIONS.format,
-        archived: ARCHIVED_OPTION
-      };
-    case "by-title-no-archive":
-      return {
-        title: titleOption(selector, true),
-        new_title: RENAME_OPTIONS.new_title,
-        format: RENAME_OPTIONS.format
-      };
-    case "zk":
-      return {
-        ...RENAME_OPTIONS,
-        kind: ZK_KIND_FILTER_OPTION
-      };
-  }
+  return {
+    ...selectorCurrentTitleOption(selector),
+    new_title: RENAME_OPTIONS.new_title,
+    format: RENAME_OPTIONS.format,
+    ...selectorKindOption(selector),
+    ...selectorArchiveOption(selector)
+  };
 }
 
 function deleteCommandOptions(selector: Exclude<SelectorVariant, { variant: "journal" }>): Record<string, CliOptionSpec> {
-  switch (selector.variant) {
-    case "by-title":
-      return {
-        title: titleOption(selector, true),
-        force: DELETE_OPTIONS.force,
-        format: DELETE_OPTIONS.format,
-        archived: ARCHIVED_OPTION
-      };
-    case "by-title-no-archive":
-      return {
-        title: titleOption(selector, true),
-        force: DELETE_OPTIONS.force,
-        format: DELETE_OPTIONS.format
-      };
-    case "zk":
-      return {
-        ...DELETE_OPTIONS,
-        kind: ZK_KIND_FILTER_OPTION
-      };
-    case "retro":
-      return {
-        ...DELETE_OPTIONS,
-        date: RETRO_DATE_OPTION,
-        archived: ARCHIVED_OPTION
-      };
-  }
+  return {
+    ...selectorCurrentTitleOption(selector),
+    force: DELETE_OPTIONS.force,
+    format: DELETE_OPTIONS.format,
+    ...selectorKindOption(selector),
+    ...selectorDateOption(selector),
+    ...selectorArchiveOption(selector)
+  };
 }
 
 function titleOption(selector: Extract<SelectorVariant, { variant: "by-title" | "by-title-no-archive" }>, current = false): CliOptionSpec {
@@ -638,40 +543,94 @@ function titleOption(selector: Extract<SelectorVariant, { variant: "by-title" | 
     : { value: "<title>", description: `${selector.label} title.` };
 }
 
+function selectorDefaultAddressOptions(selector: SelectorVariant): Record<string, CliOptionSpec> {
+  return {
+    ...selectorDefaultTitleOption(selector),
+    ...selectorKindOption(selector),
+    ...selectorDateOption(selector),
+    ...selectorArchiveOption(selector)
+  };
+}
+
+function selectorDefaultTitleOption(selector: SelectorVariant): Record<string, CliOptionSpec> {
+  if (selector.variant === "by-title" || selector.variant === "by-title-no-archive") {
+    return { title: titleOption(selector) };
+  }
+  if (selector.variant === "zk") {
+    return { title: { value: "<title>", description: "ZK note title." } };
+  }
+  if (selector.variant === "retro") {
+    return { title: { value: "<title>", description: "Retro note title." } };
+  }
+  return {};
+}
+
+function selectorCurrentTitleOption(
+  selector: Exclude<SelectorVariant, { variant: "journal" }>
+): Record<string, CliOptionSpec> {
+  if (selector.variant === "by-title" || selector.variant === "by-title-no-archive") {
+    return { title: titleOption(selector, true) };
+  }
+  return { title: CURRENT_TITLE_OPTION };
+}
+
+function selectorKindOption(selector: SelectorVariant): Record<string, CliOptionSpec> {
+  return selector.variant === "zk" ? { kind: ZK_KIND_FILTER_OPTION } : {};
+}
+
+function selectorDateOption(selector: SelectorVariant): Record<string, CliOptionSpec> {
+  if (selector.variant === "journal") return { date: JOURNAL_DATE_OPTION };
+  if (selector.variant === "retro") return { date: RETRO_DATE_OPTION };
+  return {};
+}
+
+function selectorArchiveOption(selector: SelectorVariant): Record<string, CliOptionSpec> {
+  return selector.variant === "by-title" || selector.variant === "retro"
+    ? { archived: ARCHIVED_OPTION }
+    : {};
+}
+
 function selectorOptions(
   args: CliArgs,
   selector: SelectorVariant,
   mode: WorkflowOptionMode
 ): Record<string, unknown> {
-  switch (selector.variant) {
-    case "by-title":
-      rejectChildOnCrudCommands(args);
-      return {
-        title: readCliTitle(args),
-        archived: readCliBoolean(args, "archived")
-      };
-    case "by-title-no-archive":
-      rejectChildOnCrudCommands(args);
-      rejectArchivedSelector(args, selector.type);
-      return {
-        title: readCliTitle(args)
-      };
-    case "zk":
-      return {
-        title: readCliTitle(args),
-        kind: readCliZkKind(args, mode)
-      };
-    case "journal":
-      return {
-        date: readCliString(args, "date")
-      };
-    case "retro":
-      return {
-        title: readCliTitle(args),
-        date: readCliString(args, "date"),
-        archived: readCliBoolean(args, "archived")
-      };
+  rejectSelectorArgs(args, selector);
+  return {
+    ...selectorTitleValue(args, selector),
+    ...selectorKindValue(args, selector, mode),
+    ...selectorDateValue(args, selector),
+    ...selectorArchivedValue(args, selector)
+  };
+}
+
+function rejectSelectorArgs(args: CliArgs, selector: SelectorVariant): void {
+  if (selector.variant === "by-title" || selector.variant === "by-title-no-archive") {
+    rejectChildOnCrudCommands(args);
   }
+  if (selector.variant === "by-title-no-archive") {
+    rejectArchivedSelector(args, selector.type);
+  }
+}
+
+function selectorTitleValue(args: CliArgs, selector: SelectorVariant): Record<string, unknown> {
+  return selector.variant === "journal" ? {} : { title: readCliTitle(args) };
+}
+
+function selectorKindValue(args: CliArgs, selector: SelectorVariant, mode: WorkflowOptionMode): Record<string, unknown> {
+  return selector.variant === "zk" ? { kind: readCliZkKind(args, mode) } : {};
+}
+
+function selectorDateValue(args: CliArgs, selector: SelectorVariant): Record<string, unknown> {
+  return selector.variant === "journal" || selector.variant === "retro"
+    ? { date: readCliString(args, "date") }
+    : {};
+}
+
+function selectorArchivedValue(args: CliArgs, selector: SelectorVariant): Record<string, unknown> {
+  return selector.variant === "by-title" || selector.variant === "retro"
+    ? { archived: readCliBoolean(args, "archived") }
+    : {};
 }
 
 function readCliZkKind(args: CliArgs, mode: WorkflowOptionMode): string | undefined {
