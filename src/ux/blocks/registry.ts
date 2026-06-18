@@ -1,5 +1,5 @@
 import { ButtonComponent, Notice } from "obsidian";
-import { renderBlockNotice } from "./block-shell";
+import { renderBlockNotice } from "./shell";
 
 export type RegistryBlockState<TToolbar, TItem> = {
   toolbar: TToolbar;

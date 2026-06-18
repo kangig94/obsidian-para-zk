@@ -1,15 +1,15 @@
 import { Notice, type TFile } from "obsidian";
-import { localePack, normalizeLocale } from "../i18n";
-import type { ParaZkPluginContext } from "../plugin-interface";
-import { isRecord } from "../records";
-import { workflowContext } from "../vault/host";
+import { localePack, normalizeLocale } from "../../i18n";
+import type { ParaZkPluginContext } from "../../plugin-interface";
+import { isRecord } from "../../records";
+import { workflowContext } from "../../vault/host";
 import {
   statusCommandEntries,
   workflowCommandEntries
-} from "./locale-labels";
-import { chooseValue, confirmAction, promptDistill, promptSetupOptions, promptText } from "./prompts";
+} from "../locale-labels";
+import { chooseValue, confirmAction, promptDistill, promptSetupOptions, promptText } from "../prompts";
 
-type WorkflowsModule = typeof import("../workflows");
+type WorkflowsModule = typeof import("../../workflows");
 type InteractiveWorkflowLabels = ReturnType<typeof localePack>["labels"];
 type InteractiveWorkflowContext = {
   plugin: ParaZkPluginContext;
@@ -112,7 +112,7 @@ export async function runGuiWorkflow(plugin: ParaZkPluginContext, command: strin
 }
 
 async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: string, sourcePath?: string): Promise<unknown | undefined> {
-  const workflows = await import("../workflows");
+  const workflows = await import("../../workflows");
   const ctx = workflowContext(plugin);
   const labels = localePack(plugin.settings.locale).labels;
   const activePath = sourcePath ?? plugin.app.workspace.getActiveFile()?.path;

@@ -1,10 +1,10 @@
 import { MarkdownRenderChild, TFile, type App } from "obsidian";
-import { localePack } from "../i18n";
-import type { ParaZkPluginContext } from "../plugin-interface";
-import type { ParaZkSettings } from "../types";
-import { frontmatterLinks } from "../vault/frontmatter";
-import { normalizeVaultPath } from "../vault/paths";
-import { parseCodeBlockKeyValues } from "./code-block-args";
+import { localePack } from "../../i18n";
+import type { ParaZkPluginContext } from "../../plugin-interface";
+import type { ParaZkSettings } from "../../types";
+import { frontmatterLinks } from "../../vault/frontmatter";
+import { normalizeVaultPath } from "../../vault/paths";
+import { parseCodeBlockKeyValues } from "../code-block-args";
 
 type DashboardSummaryType = "home" | "projects" | "areas" | "resources" | "zk" | "review";
 

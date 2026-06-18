@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { TFile } from "obsidian";
 import { parseCitationKeys } from "../../src/citation-token";
-import { buildCitationElement, registerCitationRenderers } from "../../src/ux/citation-renderer";
+import { buildCitationElement, registerCitationRenderers } from "../../src/ux/citations/renderer";
 import type { ParaZkPluginContext } from "../../src/plugin-interface";
 import type { ReferenceRead } from "../../src/workflows";
 

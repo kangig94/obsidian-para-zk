@@ -4,9 +4,9 @@ import type { ParaZkPluginContext } from "../plugin-interface";
 import type { SetupOptions, SetupResult } from "../types";
 import { normalizeVaultPath } from "../vault/paths";
 import { refreshEditorWidthControl } from "./editor-width";
-import { refreshExplorerActions } from "./explorer-actions";
+import { refreshExplorerActions } from "./actions/explorer";
 import { refreshRegisteredLocaleLabels } from "./locale-labels";
-import { refreshRibbonActions } from "./ribbon-actions";
+import { refreshRibbonActions } from "./actions/ribbon";
 
 export class ParaZkSettingTab extends PluginSettingTab {
   constructor(private readonly plugin: ParaZkPluginContext) {

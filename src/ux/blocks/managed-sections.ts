@@ -4,9 +4,9 @@ import {
   TFile,
   type MarkdownPostProcessorContext
 } from "obsidian";
-import type { ParaZkPluginContext } from "../plugin-interface";
-import { managedUiBlockForType } from "../templates";
-import { applyBlockKind, renderBlockNotice } from "./block-shell";
+import type { ParaZkPluginContext } from "../../plugin-interface";
+import { managedUiBlockForType } from "../../templates";
+import { applyBlockKind, renderBlockNotice } from "./shell";
 
 export function registerManagedSectionRenderers(plugin: ParaZkPluginContext): void {
   plugin.registerMarkdownCodeBlockProcessor("para-zk-managed", (source, el, ctx) => {

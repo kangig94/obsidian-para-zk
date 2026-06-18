@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createCliHarness, type CliHarness } from "../harness/cli";
-import { referenceTitle } from "../../src/ux/reference-link";
+import { referenceTitle } from "../../src/ux/citations/reference-link";
 import type { ReferenceRead } from "../../src/workflows";
 import { expectGeneratedReferenceId } from "../unit/reference-id-test-helpers";
 

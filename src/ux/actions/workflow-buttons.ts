@@ -1,7 +1,7 @@
 import { ButtonComponent, Notice } from "obsidian";
-import { localePack } from "../i18n";
-import type { ParaZkPluginContext } from "../plugin-interface";
-import { runGuiWorkflow } from "./workflow-commands";
+import { localePack } from "../../i18n";
+import type { ParaZkPluginContext } from "../../plugin-interface";
+import { runGuiWorkflow } from "./workflows";
 
 type WorkflowButtonOptions = {
   icon?: string;

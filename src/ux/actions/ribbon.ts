@@ -1,7 +1,7 @@
-import { localePack } from "../i18n";
-import type { ParaZkPluginContext } from "../plugin-interface";
-import { RIBBON_ACTIONS } from "./locale-labels";
-import { runGuiWorkflow } from "./workflow-commands";
+import { localePack } from "../../i18n";
+import type { ParaZkPluginContext } from "../../plugin-interface";
+import { RIBBON_ACTIONS } from "../locale-labels";
+import { runGuiWorkflow } from "./workflows";
 
 const RIBBON_ACTION_CLASS = "para-zk-ribbon-action";
 

@@ -2,26 +2,26 @@ import { Plugin } from "obsidian";
 import { registerNativeCliHandlers } from "./cli/handlers";
 import { loadSettings as loadRuntimeSettings, saveSettings as saveRuntimeSettings } from "./runtime/settings";
 import { DEFAULT_SETTINGS, type SetupOptions, type SetupResult, type ParaZkSettings } from "./types";
-import { createCitationEditorExtension } from "./ux/citation-editor";
-import { registerCitationRenderers } from "./ux/citation-renderer";
-import { CitationSuggest } from "./ux/citation-suggest";
-import { registerDashboardActionRenderers } from "./ux/dashboard-actions";
-import { registerDashboardSummaryRenderers } from "./ux/dashboard-summary";
-import { registerDataviewViewRenderers } from "./ux/dataview-views";
+import { createCitationEditorExtension } from "./ux/citations/editor";
+import { registerCitationRenderers } from "./ux/citations/renderer";
+import { CitationSuggest } from "./ux/citations/suggest";
+import { registerDashboardActionRenderers } from "./ux/actions/dashboard";
+import { registerDashboardSummaryRenderers } from "./ux/blocks/dashboard-summary";
+import { registerDataviewViewRenderers } from "./ux/blocks/dataview";
 import { registerEditorWidthControl } from "./ux/editor-width";
-import { registerExplorerActions } from "./ux/explorer-actions";
-import { registerLatestRetroSummaryRenderers } from "./ux/latest-retro-summary";
+import { registerExplorerActions } from "./ux/actions/explorer";
+import { registerLatestRetroSummaryRenderers } from "./ux/blocks/latest-retro-summary";
 import { refreshRegisteredLocaleLabels } from "./ux/locale-labels";
-import { registerManagedSectionRenderers } from "./ux/managed-sections";
+import { registerManagedSectionRenderers } from "./ux/blocks/managed-sections";
 import { registerPropsControlRenderers } from "./ux/props-controls";
-import { registerRibbonActions } from "./ux/ribbon-actions";
+import { registerRibbonActions } from "./ux/actions/ribbon";
 import { ParaZkSettingTab } from "./ux/settings";
-import { registerReferenceRenderers } from "./ux/reference-renderer";
-import { registerTaskRenderers } from "./ux/task-renderer";
+import { registerReferenceRenderers } from "./ux/blocks/references";
+import { registerTaskRenderers } from "./ux/blocks/tasks";
 import {
   registerStatusAndInitCommands,
   registerWorkflowCommands
-} from "./ux/workflow-commands";
+} from "./ux/actions/workflows";
 
 export default class ParaZkPlugin extends Plugin {
   settings: ParaZkSettings = DEFAULT_SETTINGS;

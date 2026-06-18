@@ -5,16 +5,16 @@ import {
   TFile,
   type MarkdownPostProcessorContext
 } from "obsidian";
-import { localePack } from "../i18n";
-import type { ParaZkPluginContext } from "../plugin-interface";
-import { DATAVIEW_VIEW_KEYS, dataviewViewBlock, type DataviewViewKey } from "../templates";
+import { localePack } from "../../i18n";
+import type { ParaZkPluginContext } from "../../plugin-interface";
+import { DATAVIEW_VIEW_KEYS, dataviewViewBlock, type DataviewViewKey } from "../../templates";
 import {
   renderBlockNotice,
   renderBlockShell,
   renderShellAction
-} from "./block-shell";
-import { parseCodeBlockKeyValues } from "./code-block-args";
-import { runGuiWorkflow } from "./workflow-commands";
+} from "./shell";
+import { parseCodeBlockKeyValues } from "../code-block-args";
+import { runGuiWorkflow } from "../actions/workflows";
 
 type DataviewViewArgs = {
   key: string;

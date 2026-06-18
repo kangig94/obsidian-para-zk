@@ -1,13 +1,13 @@
 import { Notice } from "obsidian";
-import type { ParaZkPluginContext } from "../plugin-interface";
-import { splitObsidianSubpath } from "../vault/paths";
+import type { ParaZkPluginContext } from "../../plugin-interface";
+import { splitObsidianSubpath } from "../../vault/paths";
 import {
   isExternalReference,
   parseWikiLink,
   pathBasenameWithoutExtension,
   type ReferenceRead
-} from "../workflows";
-import { registryErrorMessage } from "./registry-block";
+} from "../../workflows";
+import { registryErrorMessage } from "../blocks/registry";
 
 // Render a reference (registry item) as a clickable anchor, shared by the references
 // block rows and inline `PZ[<id>]` citations. Note/file/wiki refs get native internal-link

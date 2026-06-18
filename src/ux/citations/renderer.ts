@@ -1,8 +1,8 @@
 import { MarkdownRenderChild, TFile, type MarkdownPostProcessorContext } from "obsidian";
-import { type CitationKey, parseCitationKeys } from "../citation-token";
-import type { ParaZkPluginContext } from "../plugin-interface";
-import { workflowContext } from "../vault/host";
-import { readReferenceItemsFromFrontmatter, type ReferenceRead } from "../workflows";
+import { type CitationKey, parseCitationKeys } from "../../citation-token";
+import type { ParaZkPluginContext } from "../../plugin-interface";
+import { workflowContext } from "../../vault/host";
+import { readReferenceItemsFromFrontmatter, type ReferenceRead } from "../../workflows";
 import { referenceTitle, renderReferenceAnchor } from "./reference-link";
 
 // Synchronous reference lookup from the note's cached frontmatter — both the reading-view

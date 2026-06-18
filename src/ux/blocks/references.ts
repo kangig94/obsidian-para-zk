@@ -8,10 +8,10 @@ import {
   TFile,
   type MarkdownPostProcessorContext
 } from "obsidian";
-import { localePack } from "../i18n";
-import type { ParaZkPluginContext } from "../plugin-interface";
-import { splitObsidianSubpath } from "../vault/paths";
-import { workflowContext } from "../vault/host";
+import { localePack } from "../../i18n";
+import type { ParaZkPluginContext } from "../../plugin-interface";
+import { splitObsidianSubpath } from "../../vault/paths";
+import { workflowContext } from "../../vault/host";
 import {
   canonicalWikiLink,
   createResource,
@@ -24,8 +24,8 @@ import {
   updateReferenceItem,
   type ReferenceRead,
   type WorkflowContext
-} from "../workflows";
-import { promptText } from "./prompts";
+} from "../../workflows";
+import { promptText } from "../prompts";
 import {
   beginRegistryBlockRender,
   canRegistryDragReorder,
@@ -38,14 +38,14 @@ import {
   runRegistryBlockAction,
   type RegistryBlockState,
   type RegistryDragOptions
-} from "./registry-block";
+} from "./registry";
 import {
   renderBlockEmpty,
   renderBlockShell,
   renderShellAction
-} from "./block-shell";
-import { parseCodeBlockKeyValues } from "./code-block-args";
-import { referenceTargetHint, referenceTitle, renderReferenceAnchor } from "./reference-link";
+} from "./shell";
+import { parseCodeBlockKeyValues } from "../code-block-args";
+import { referenceTargetHint, referenceTitle, renderReferenceAnchor } from "../citations/reference-link";
 
 type ReferenceBlockArgs = {
   root: "current" | string;

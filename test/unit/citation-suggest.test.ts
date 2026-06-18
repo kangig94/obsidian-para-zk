@@ -5,9 +5,9 @@ import type {
   EditorSuggestContext,
   TFile
 } from "obsidian";
-import { CitationSuggest } from "../../src/ux/citation-suggest";
+import { CitationSuggest } from "../../src/ux/citations/suggest";
 import type { ParaZkPluginContext } from "../../src/plugin-interface";
-import type { AnchorSuggestion } from "../../src/ux/anchor-suggestions";
+import type { AnchorSuggestion } from "../../src/ux/citations/anchor-suggestions";
 import { DEFAULT_SETTINGS } from "../../src/types";
 import { MockApp } from "../harness/vault";
 import { expectGeneratedReferenceId } from "./reference-id-test-helpers";

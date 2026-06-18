@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { referenceTitle } from "../../src/ux/reference-link";
+import { referenceTitle } from "../../src/ux/citations/reference-link";
 import type { ReferenceRead } from "../../src/workflows";
 
 describe("referenceTitle", () => {

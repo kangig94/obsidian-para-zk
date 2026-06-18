@@ -42,7 +42,7 @@ import {
   renderBlockNotice,
   renderBlockShell,
   renderShellAction
-} from "./block-shell";
+} from "./blocks/shell";
 import { parseCodeBlockKeyValues } from "./code-block-args";
 
 type Frontmatter = Record<string, unknown>;

@@ -7,15 +7,15 @@ import {
   type EditorSuggestContext,
   type EditorSuggestTriggerInfo
 } from "obsidian";
-import type { ParaZkPluginContext } from "../plugin-interface";
-import { workflowContext } from "../vault/host";
-import { splitObsidianSubpath } from "../vault/paths";
+import type { ParaZkPluginContext } from "../../plugin-interface";
+import { workflowContext } from "../../vault/host";
+import { splitObsidianSubpath } from "../../vault/paths";
 import {
   ensureReferenceItemId,
   type ReferenceRead
-} from "../workflows";
-import { registryErrorMessage } from "./registry-block";
-import { resolveReferences } from "./citation-renderer";
+} from "../../workflows";
+import { registryErrorMessage } from "../blocks/registry";
+import { resolveReferences } from "./renderer";
 import { referenceTitle } from "./reference-link";
 import { anchorSuggestionsForFile, type AnchorSuggestion } from "./anchor-suggestions";
 

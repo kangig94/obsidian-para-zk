@@ -1,7 +1,7 @@
 import { Notice, setIcon } from "obsidian";
-import { localePack } from "../i18n";
-import type { ParaZkPluginContext } from "../plugin-interface";
-import { isRecord } from "../records";
+import { localePack } from "../../i18n";
+import type { ParaZkPluginContext } from "../../plugin-interface";
+import { isRecord } from "../../records";
 
 const EMPTY_TRASH_COMMAND_ID = "obsidian-trash-explorer:empty-trash";
 const EMPTY_TRASH_CLASS = "para-zk-explorer-action-empty-trash";

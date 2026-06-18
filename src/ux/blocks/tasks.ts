@@ -8,13 +8,13 @@ import {
   type CachedMetadata,
   type MarkdownPostProcessorContext
 } from "obsidian";
-import { localePack } from "../i18n";
-import type { ParaZkPluginContext } from "../plugin-interface";
-import { localDate } from "../time";
-import { readFileFrontmatterFresh } from "../vault/frontmatter";
-import { normalizeVaultPath } from "../vault/paths";
-import { workflowContext } from "../vault/host";
-import { parseCodeBlockKeyValues } from "./code-block-args";
+import { localePack } from "../../i18n";
+import type { ParaZkPluginContext } from "../../plugin-interface";
+import { localDate } from "../../time";
+import { readFileFrontmatterFresh } from "../../vault/frontmatter";
+import { normalizeVaultPath } from "../../vault/paths";
+import { workflowContext } from "../../vault/host";
+import { parseCodeBlockKeyValues } from "../code-block-args";
 import {
   cycleTaskCheckbox,
   deleteRootTask,
@@ -25,9 +25,9 @@ import {
   setRootTaskField,
   type TaskRead,
   type WorkflowContext
-} from "../workflows";
-import { ROOT_ID_FRONTMATTER_KEY, rootIdFromFrontmatter } from "../workflows/tasks";
-import { promptText } from "./prompts";
+} from "../../workflows";
+import { ROOT_ID_FRONTMATTER_KEY, rootIdFromFrontmatter } from "../../workflows/tasks";
+import { promptText } from "../prompts";
 import {
   beginRegistryBlockRender,
   canRegistryDragReorder,
@@ -40,13 +40,13 @@ import {
   runRegistryBlockAction,
   type RegistryBlockState,
   type RegistryDragOptions
-} from "./registry-block";
+} from "./registry";
 import {
   renderBlockEmpty,
   renderBlockShell,
   renderShellAction,
   renderShellSelect
-} from "./block-shell";
+} from "./shell";
 
 type TaskBlockArgs = {
   root: "current" | "all";
