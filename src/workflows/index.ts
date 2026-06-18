@@ -61,7 +61,6 @@ export {
   readReferenceItemsFresh,
   readReferenceItemsFromFrontmatter,
   reorderReferenceItems,
-  splitObsidianSubpath,
   updateReferenceItem
 } from "./references";
 export {

@@ -2,7 +2,7 @@ import type { ParaZkSettings } from "./types";
 import { localePack } from "./i18n";
 import type { PropsViewType } from "./props/schema";
 import { escapeRegExp } from "./text";
-import { parentFolder } from "./vault/files";
+import { parentFolder } from "./vault/paths";
 import { ZK_KIND_CODES } from "./zk/kinds";
 
 export type ManagedArtifact = {
@@ -24,6 +24,26 @@ export const TEMPLATE_NAMES = [
 ] as const;
 
 export type TemplateName = typeof TEMPLATE_NAMES[number];
+type TemplateLocalePack = ReturnType<typeof localePack>;
+type TemplateRenderContext = {
+  t: TemplateLocalePack;
+  tags: TemplateLocalePack["tags"];
+  slugPlaceholder: string;
+};
+type TemplateRenderer = (context: TemplateRenderContext) => string;
+
+const TEMPLATE_RENDERERS: Record<TemplateName, TemplateRenderer> = {
+  project: renderProjectTemplate,
+  area: renderAreaTemplate,
+  resource: renderResourceTemplate,
+  "llm-wiki": renderLlmWikiTemplate,
+  journal: renderJournalTemplate,
+  retro: renderRetroTemplate,
+  subnote: renderSubnoteTemplate,
+  spark: renderSparkTemplate,
+  digest: renderDigestTemplate,
+  permanent: renderPermanentTemplate
+};
 
 export function managedArtifacts(settings: ParaZkSettings): ManagedArtifact[] {
   const t = localePack(settings.locale);
@@ -84,221 +104,241 @@ export function managedArtifacts(settings: ParaZkSettings): ManagedArtifact[] {
 
 export function renderTemplate(name: TemplateName, settings: ParaZkSettings): string {
   const t = localePack(settings.locale);
-  const tags = t.tags;
-  const slugPlaceholder = "{{slug}}";
+  return TEMPLATE_RENDERERS[name]({
+    t,
+    tags: t.tags,
+    slugPlaceholder: "{{slug}}"
+  });
+}
 
-  switch (name) {
-    case "project":
-      return [
-        frontmatter([
-          "type: project",
-          "tags:",
-          `  - ${tags.project}/${slugPlaceholder}`,
-          "created:",
-          "updated:",
-          "aliases:",
-          "areas:",
-          "due_date:",
-          "status: \"{{status}}\"",
-          "start_date:",
-          "priority: \"{{priority}}\"",
-          "done_date:"
-        ]),
-        paraZkPropsBlock("project"),
-        `# ${t.labels.summary}`,
-        ...latestRetroSummaryBlock(),
-        "{{cursor}}",
-        "",
-        `# ${t.labels.goals}`,
-        "",
-        `| ${t.labels.content} | ${t.labels.successCriteria} |`,
-        "| --- | --- |",
-        "| | |",
-        "",
-        paraZkManagedBlock(),
-        ""
-      ].join("\n");
-    case "area":
-      return [
-        frontmatter([
-          "type: area",
-          "tags:",
-          `  - ${tags.area}/${slugPlaceholder}`,
-          "created:",
-          "updated:",
-          "parent:"
-        ]),
-        paraZkPropsBlock("area"),
-        `# ${t.labels.overview}`,
-        "",
-        "{{cursor}}",
-        "",
-        paraZkManagedBlock(),
-        ""
-      ].join("\n");
-    case "resource":
-      return [
-        frontmatter([
-          "type: resource",
-          "tags:",
-          `  - ${tags.resource}`,
-          "created:",
-          "updated:",
-          "aliases:",
-          "url:",
-          "first_author:",
-          "license:",
-          "kind:"
-        ]),
-        paraZkPropsBlock("resource"),
-        "{{cursor}}",
-        "",
-        paraZkManagedBlock(),
-        ""
-      ].join("\n");
-    case "llm-wiki":
-      return [
-        frontmatter([
-          "type: llm-wiki",
-          "tags:",
-          `  - ${tags.llmWiki}`,
-          "created:",
-          "updated:",
-          "created_by:",
-          "updated_by:",
-          "aliases:"
-        ]),
-        paraZkPropsBlock("llm-wiki"),
-        "{{cursor}}",
-        "",
-        paraZkManagedBlock(),
-        ""
-      ].join("\n");
-    case "journal":
-      return [
-        frontmatter([
-          "type: journal",
-          "tags:",
-          `  - ${tags.journal}`,
-          "created:",
-          "updated:",
-          "date: \"{{date}}\"",
-          "energy: \"{{energy}}\""
-        ]),
-        paraZkPropsBlock("journal"),
-        `# ${t.labels.focus}`,
-        "- [ ] {{cursor}}",
-        "",
-        `# ${t.labels.quickMemo}`,
-        "",
-        `# ${t.labels.timeline}`,
-        "- 09:00 ",
-        "- 14:30 ",
-        "",
-        `# ${t.labels.shortReview}`,
-        `- ${t.labels.whatWentWell}:`,
-        `- ${t.labels.improvements}:`,
-        "",
-        paraZkManagedBlock(),
-        ""
-      ].join("\n");
-    case "retro":
-      return [
-        frontmatter([
-          "type: retro",
-          "tags:",
-          `  - ${tags.retro}`,
-          "created:",
-          "updated:",
-          "project: \"{{project_frontmatter}}\"",
-          "date: \"{{date}}\"",
-          "week_iso: \"{{week_iso}}\"",
-          "week_start: \"{{week_start}}\"",
-          "week_end: \"{{week_end}}\"",
-          "areas: \"{{areas_frontmatter}}\""
-        ]),
-        paraZkPropsBlock("retro"),
-        "---",
-        `# ${t.labels.weekProgress}`,
-        "- {{cursor}}",
-        "",
-        `# ${t.labels.good}`,
-        "- ",
-        "",
-        `# ${t.labels.improve}`,
-        "- ",
-        "",
-        `# ${t.labels.risks}`,
-        "- ",
-        "",
-        `# ${t.labels.retroSummary}`,
-        ""
-      ].join("\n");
-    case "subnote":
-      return [
-        frontmatter([
-          "type: subnote",
-          "created:",
-          "updated:",
-          "subnote_type: \"{{subnote_type}}\"",
-          "parent:"
-        ]),
-        paraZkPropsBlock("subnote"),
-        "{{cursor}}",
-        "",
-        paraZkManagedBlock(),
-        ""
-      ].join("\n");
-    case "spark":
-      return [
-        frontmatter([
-          "type: spark",
-          "tags:",
-          "created:",
-          "updated:",
-          "processed: false"
-        ]),
-        paraZkPropsBlock("spark"),
-        "{{cursor}}",
-        "",
-        paraZkManagedBlock(),
-        ""
-      ].join("\n");
-    case "digest":
-      return [
-        frontmatter([
-          "type: digest",
-          "tags:",
-          "created:",
-          "updated:",
-          "sourceTitle:",
-          "url:",
-          "first_author:",
-          "published:"
-        ]),
-        paraZkPropsBlock("digest"),
-        "{{cursor}}",
-        "",
-        paraZkManagedBlock(),
-        ""
-      ].join("\n");
-    case "permanent":
-      return [
-        frontmatter([
-          "type: permanent",
-          "tags:",
-          "created:",
-          "updated:",
-          "maturity: \"{{maturity}}\"",
-          "aliases:"
-        ]),
-        paraZkPropsBlock("permanent"),
-        "{{cursor}}",
-        "",
-        paraZkManagedBlock(),
-        ""
-      ].join("\n");
-  }
+function renderProjectTemplate({ t, tags, slugPlaceholder }: TemplateRenderContext): string {
+  return [
+    frontmatter([
+      "type: project",
+      "tags:",
+      `  - ${tags.project}/${slugPlaceholder}`,
+      "created:",
+      "updated:",
+      "aliases:",
+      "areas:",
+      "due_date:",
+      "status: \"{{status}}\"",
+      "start_date:",
+      "priority: \"{{priority}}\"",
+      "done_date:"
+    ]),
+    paraZkPropsBlock("project"),
+    `# ${t.labels.summary}`,
+    ...latestRetroSummaryBlock(),
+    "{{cursor}}",
+    "",
+    `# ${t.labels.goals}`,
+    "",
+    `| ${t.labels.content} | ${t.labels.successCriteria} |`,
+    "| --- | --- |",
+    "| | |",
+    "",
+    paraZkManagedBlock(),
+    ""
+  ].join("\n");
+}
+
+function renderAreaTemplate({ t, tags, slugPlaceholder }: TemplateRenderContext): string {
+  return [
+    frontmatter([
+      "type: area",
+      "tags:",
+      `  - ${tags.area}/${slugPlaceholder}`,
+      "created:",
+      "updated:",
+      "parent:"
+    ]),
+    paraZkPropsBlock("area"),
+    `# ${t.labels.overview}`,
+    "",
+    "{{cursor}}",
+    "",
+    paraZkManagedBlock(),
+    ""
+  ].join("\n");
+}
+
+function renderResourceTemplate({ tags }: TemplateRenderContext): string {
+  return [
+    frontmatter([
+      "type: resource",
+      "tags:",
+      `  - ${tags.resource}`,
+      "created:",
+      "updated:",
+      "aliases:",
+      "url:",
+      "first_author:",
+      "license:",
+      "kind:"
+    ]),
+    paraZkPropsBlock("resource"),
+    "{{cursor}}",
+    "",
+    paraZkManagedBlock(),
+    ""
+  ].join("\n");
+}
+
+function renderLlmWikiTemplate({ tags }: TemplateRenderContext): string {
+  return [
+    frontmatter([
+      "type: llm-wiki",
+      "tags:",
+      `  - ${tags.llmWiki}`,
+      "created:",
+      "updated:",
+      "created_by:",
+      "updated_by:",
+      "aliases:"
+    ]),
+    paraZkPropsBlock("llm-wiki"),
+    "{{cursor}}",
+    "",
+    paraZkManagedBlock(),
+    ""
+  ].join("\n");
+}
+
+function renderJournalTemplate({ t, tags }: TemplateRenderContext): string {
+  return [
+    frontmatter([
+      "type: journal",
+      "tags:",
+      `  - ${tags.journal}`,
+      "created:",
+      "updated:",
+      "date: \"{{date}}\"",
+      "energy: \"{{energy}}\""
+    ]),
+    paraZkPropsBlock("journal"),
+    `# ${t.labels.focus}`,
+    "- [ ] {{cursor}}",
+    "",
+    `# ${t.labels.quickMemo}`,
+    "",
+    `# ${t.labels.timeline}`,
+    "- 09:00 ",
+    "- 14:30 ",
+    "",
+    `# ${t.labels.shortReview}`,
+    `- ${t.labels.whatWentWell}:`,
+    `- ${t.labels.improvements}:`,
+    "",
+    paraZkManagedBlock(),
+    ""
+  ].join("\n");
+}
+
+function renderRetroTemplate({ t, tags }: TemplateRenderContext): string {
+  return [
+    frontmatter([
+      "type: retro",
+      "tags:",
+      `  - ${tags.retro}`,
+      "created:",
+      "updated:",
+      "project: \"{{project_frontmatter}}\"",
+      "date: \"{{date}}\"",
+      "week_iso: \"{{week_iso}}\"",
+      "week_start: \"{{week_start}}\"",
+      "week_end: \"{{week_end}}\"",
+      "areas: \"{{areas_frontmatter}}\""
+    ]),
+    paraZkPropsBlock("retro"),
+    "---",
+    `# ${t.labels.weekProgress}`,
+    "- {{cursor}}",
+    "",
+    `# ${t.labels.good}`,
+    "- ",
+    "",
+    `# ${t.labels.improve}`,
+    "- ",
+    "",
+    `# ${t.labels.risks}`,
+    "- ",
+    "",
+    `# ${t.labels.retroSummary}`,
+    ""
+  ].join("\n");
+}
+
+function renderSubnoteTemplate(): string {
+  return [
+    frontmatter([
+      "type: subnote",
+      "created:",
+      "updated:",
+      "subnote_type: \"{{subnote_type}}\"",
+      "parent:"
+    ]),
+    paraZkPropsBlock("subnote"),
+    "{{cursor}}",
+    "",
+    paraZkManagedBlock(),
+    ""
+  ].join("\n");
+}
+
+function renderSparkTemplate(): string {
+  return [
+    frontmatter([
+      "type: spark",
+      "tags:",
+      "created:",
+      "updated:",
+      "processed: false"
+    ]),
+    paraZkPropsBlock("spark"),
+    "{{cursor}}",
+    "",
+    paraZkManagedBlock(),
+    ""
+  ].join("\n");
+}
+
+function renderDigestTemplate(): string {
+  return [
+    frontmatter([
+      "type: digest",
+      "tags:",
+      "created:",
+      "updated:",
+      "sourceTitle:",
+      "url:",
+      "first_author:",
+      "published:"
+    ]),
+    paraZkPropsBlock("digest"),
+    "{{cursor}}",
+    "",
+    paraZkManagedBlock(),
+    ""
+  ].join("\n");
+}
+
+function renderPermanentTemplate(): string {
+  return [
+    frontmatter([
+      "type: permanent",
+      "tags:",
+      "created:",
+      "updated:",
+      "maturity: \"{{maturity}}\"",
+      "aliases:"
+    ]),
+    paraZkPropsBlock("permanent"),
+    "{{cursor}}",
+    "",
+    paraZkManagedBlock(),
+    ""
+  ].join("\n");
 }
 
 function frontmatter(lines: string[]): string {
@@ -427,10 +467,14 @@ function joinManagedUiBlocks(blocks: Array<string | string[]>): string {
 }
 
 function dataviewProjectRetros(t: ReturnType<typeof localePack>, settings: ParaZkSettings, sourcePath?: string): string[] {
+  return dataviewRetros(t, settings, `project = ${dataviewCurrentFileLink(sourcePath)}`);
+}
+
+function dataviewRetros(t: ReturnType<typeof localePack>, settings: ParaZkSettings, whereClause: string): string[] {
   return fenced("dataview", [
     `TABLE WITHOUT ID link(file.path, replace(week_iso, "-", "_")) AS "${t.labels.retros}", file.mtime AS "${t.labels.updated}"`,
     `FROM ${dataviewSource(settings.paths.retrosFolder)}`,
-    `WHERE project = ${dataviewCurrentFileLink(sourcePath)}`,
+    `WHERE ${whereClause}`,
     "SORT date DESC",
     "LIMIT 10"
   ]);
@@ -476,13 +520,7 @@ function dataviewChildSubfolder(sourcePath: string | undefined): string {
 }
 
 function dataviewAreaRetros(t: ReturnType<typeof localePack>, settings: ParaZkSettings, sourcePath?: string): string[] {
-  return fenced("dataview", [
-    `TABLE WITHOUT ID link(file.path, replace(week_iso, "-", "_")) AS "${t.labels.retros}", file.mtime AS "${t.labels.updated}"`,
-    `FROM ${dataviewSource(settings.paths.retrosFolder)}`,
-    `WHERE contains(areas, ${dataviewCurrentFileLink(sourcePath)})`,
-    "SORT date DESC",
-    "LIMIT 10"
-  ]);
+  return dataviewRetros(t, settings, `contains(areas, ${dataviewCurrentFileLink(sourcePath)})`);
 }
 
 // Notes (in ZK folders) that reference the current file. Read-only derived view

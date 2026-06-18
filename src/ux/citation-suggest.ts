@@ -9,9 +9,9 @@ import {
 } from "obsidian";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { workflowContext } from "../vault/host";
+import { splitObsidianSubpath } from "../vault/paths";
 import {
   ensureReferenceItemId,
-  splitObsidianSubpath,
   type ReferenceRead
 } from "../workflows";
 import { registryErrorMessage } from "./registry-block";

@@ -1,10 +1,11 @@
 import { TFile } from "obsidian";
 import { hasOwn, isRecord } from "../records";
 import {
+  frontmatterLinks,
   readFileFrontmatterFresh,
   type Frontmatter
 } from "../vault/frontmatter";
-import { normalizeVaultPath } from "../vault/paths";
+import { normalizeVaultPath, splitObsidianSubpath } from "../vault/paths";
 import { serializeFileWrite } from "../vault/write-serializer";
 import type {
   AddReferenceOptions,
@@ -41,21 +42,6 @@ function parseMarkdownLink(value: string): { target: string } | undefined {
   return { target };
 }
 
-export function splitObsidianSubpath(value: string): { base: string; subpath: string } {
-  const normalizedSeparators = value.trim().replace(/\\/g, "/");
-  const hash = normalizedSeparators.indexOf("#");
-  if (hash === -1) {
-    return {
-      base: normalizeVaultPath(normalizedSeparators),
-      subpath: ""
-    };
-  }
-  return {
-    base: normalizeVaultPath(normalizedSeparators.slice(0, hash)),
-    subpath: normalizedSeparators.slice(hash).trim()
-  };
-}
-
 function normalizedReferenceTargetWithSubpath(value: string): string {
   const split = splitObsidianSubpath(value);
   return referenceTargetWithSubpath(split.base, split.subpath);
@@ -75,6 +61,20 @@ export function isExternalReference(value: string): boolean {
   return /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) || /^(mailto|tel):/i.test(trimmed);
 }
 
+export function isSourceScopedRetro(
+  ctx: WorkflowContext,
+  retro: TFile,
+  frontmatter: Frontmatter,
+  source: TFile,
+  domain: "project" | "area"
+): boolean {
+  if (domain === "project") {
+    return frontmatterLinks(frontmatter.project).some((link) => stringReferencesAnyTarget(ctx, retro.path, link, [source]));
+  }
+
+  if (frontmatterLinks(frontmatter.project).length > 0) return false;
+  return frontmatterLinks(frontmatter.areas).some((link) => stringReferencesAnyTarget(ctx, retro.path, link, [source]));
+}
 
 export async function addReference(ctx: WorkflowContext, options: AddReferenceOptions): Promise<AddReferenceResult> {
   // GUI command-palette callers add a reference to the active/source note.

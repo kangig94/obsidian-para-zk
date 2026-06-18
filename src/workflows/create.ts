@@ -8,8 +8,8 @@ import {
 } from "../time";
 import type { NoteResult, ZkKind } from "../types";
 import { frontmatterLinks, parseFrontmatterFromContent, readFileFrontmatterFresh, yamlScalar } from "../vault/frontmatter";
-import { ensureFolder, parentFolder } from "../vault/files";
-import { joinVaultPath, sanitizeFileName, wikiLink } from "../vault/paths";
+import { ensureFolder } from "../vault/files";
+import { joinVaultPath, parentFolder, sanitizeFileName, wikiLink } from "../vault/paths";
 import { setEditableBody } from "../vault/sections";
 import {
   MATURITY_CODE_HELP,

@@ -69,6 +69,17 @@ type PropsRerenderState = {
   generation: number;
 };
 
+type PropsControlRenderContext = {
+  plugin: ParaZkPluginContext;
+  field: PropsField;
+  frontmatter: Frontmatter;
+  container: HTMLElement;
+  sourcePath: string | undefined;
+  blockEl: HTMLElement;
+  rerender: PropsRerender;
+};
+type PropsControlRenderer = (context: PropsControlRenderContext) => void;
+
 const FRONTMATTER_WORKFLOW_UPDATES: Record<WorkflowFrontmatterType, FrontmatterWorkflowUpdate> = {
   project: updateProject,
   area: updateArea,
@@ -78,6 +89,39 @@ const FRONTMATTER_WORKFLOW_UPDATES: Record<WorkflowFrontmatterType, FrontmatterW
   spark: updateZk,
   digest: updateZk,
   permanent: updateZk
+};
+
+const PROPS_CONTROL_RENDERERS: Record<PropsField["control"], PropsControlRenderer> = {
+  text: ({ plugin, field, frontmatter, container, sourcePath, blockEl }) => {
+    renderTextInput(plugin, field, frontmatter, container, sourcePath, blockEl);
+  },
+  "text-list": ({ plugin, field, frontmatter, container, sourcePath, blockEl }) => {
+    renderTextInput(plugin, field, frontmatter, container, sourcePath, blockEl, { list: true });
+  },
+  url: ({ plugin, field, frontmatter, container, sourcePath, blockEl, rerender }) => {
+    renderUrlField(plugin, field, frontmatter, container, sourcePath, blockEl, rerender);
+  },
+  date: ({ plugin, field, frontmatter, container, sourcePath, blockEl }) => {
+    renderDateInput(plugin, field, frontmatter, container, sourcePath, blockEl, "date");
+  },
+  datetime: ({ plugin, field, frontmatter, container, sourcePath, blockEl }) => {
+    renderDateInput(plugin, field, frontmatter, container, sourcePath, blockEl, "datetime-local");
+  },
+  select: ({ plugin, field, frontmatter, container, sourcePath, blockEl }) => {
+    renderSelectInput(plugin, field, frontmatter, container, sourcePath, blockEl);
+  },
+  "area-list": ({ plugin, field, frontmatter, container, sourcePath, blockEl, rerender }) => {
+    renderAreaListInput(plugin, field, frontmatter, container, sourcePath, blockEl, rerender);
+  },
+  "datetime-display": ({ field, frontmatter, container }) => {
+    renderDateTimeDisplay(field, frontmatter, container);
+  },
+  "relative-time": ({ plugin, field, frontmatter, container }) => {
+    renderRelativeTime(plugin, field, frontmatter, container);
+  },
+  display: ({ plugin, field, frontmatter, container, sourcePath }) => {
+    renderDisplayValue(plugin, field, frontmatter, container, sourcePath);
+  }
 };
 
 const propsRerenderStates = new WeakMap<HTMLElement, PropsRerenderState>();
@@ -372,38 +416,15 @@ function renderFieldControl(
   blockEl: HTMLElement,
   rerender: PropsRerender
 ): void {
-  switch (field.control) {
-    case "text":
-      renderTextInput(plugin, field, frontmatter, container, sourcePath, blockEl);
-      return;
-    case "text-list":
-      renderTextInput(plugin, field, frontmatter, container, sourcePath, blockEl, { list: true });
-      return;
-    case "url":
-      renderUrlField(plugin, field, frontmatter, container, sourcePath, blockEl, rerender);
-      return;
-    case "date":
-      renderDateInput(plugin, field, frontmatter, container, sourcePath, blockEl, "date");
-      return;
-    case "datetime":
-      renderDateInput(plugin, field, frontmatter, container, sourcePath, blockEl, "datetime-local");
-      return;
-    case "select":
-      renderSelectInput(plugin, field, frontmatter, container, sourcePath, blockEl);
-      return;
-    case "area-list":
-      renderAreaListInput(plugin, field, frontmatter, container, sourcePath, blockEl, rerender);
-      return;
-    case "datetime-display":
-      renderDateTimeDisplay(field, frontmatter, container);
-      return;
-    case "relative-time":
-      renderRelativeTime(plugin, field, frontmatter, container);
-      return;
-    case "display":
-      renderDisplayValue(plugin, field, frontmatter, container, sourcePath);
-      return;
-  }
+  PROPS_CONTROL_RENDERERS[field.control]({
+    plugin,
+    field,
+    frontmatter,
+    container,
+    sourcePath,
+    blockEl,
+    rerender
+  });
 }
 
 const TIMESTAMP_CLS = "para-zk-block__display para-zk-block__timestamp";

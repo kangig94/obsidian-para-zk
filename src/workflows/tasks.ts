@@ -10,9 +10,9 @@ import {
   trimTextRange,
   type TextRange
 } from "../vault/sections";
-import { ensureFolder, isInFolder, parentFolder } from "../vault/files";
+import { ensureFolder, isInFolder } from "../vault/files";
 import { readFileFrontmatterFresh, readFileTypeFresh, type Frontmatter } from "../vault/frontmatter";
-import { joinVaultPath, normalizeVaultPath, sanitizeFileName } from "../vault/paths";
+import { joinVaultPath, normalizeVaultPath, parentFolder, sanitizeFileName } from "../vault/paths";
 import { serializeFileWrite } from "../vault/write-serializer";
 import type { RootTaskItem, TaskRead, TaskWritableField, WorkflowContext } from "./context";
 

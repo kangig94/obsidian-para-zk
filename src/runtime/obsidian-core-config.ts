@@ -2,7 +2,7 @@ import type { App } from "obsidian";
 import { isRecord } from "../records";
 import { appendUniqueStrings } from "../text";
 import type { SetupResult, ParaZkSettings } from "../types";
-import { joinVaultPath, normalizeVaultPath } from "../vault/paths";
+import { joinVaultPath, normalizeVaultPath, parentFolder } from "../vault/paths";
 
 const APP_CONFIG_PATH = ".obsidian/app.json";
 const TEMPLATES_CONFIG_PATH = ".obsidian/templates.json";
@@ -158,12 +158,6 @@ function updateRuntimeTemplatesConfig(app: App, config: Record<string, unknown>)
   if (!isRecord(instance) || !isRecord(instance.options)) return;
 
   Object.assign(instance.options, config);
-}
-
-function parentFolder(path: string): string {
-  const normalized = normalizeVaultPath(path);
-  const index = normalized.lastIndexOf("/");
-  return index === -1 ? "" : normalized.slice(0, index);
 }
 
 function addUnique(items: string[], value: string): void {

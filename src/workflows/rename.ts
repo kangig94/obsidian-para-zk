@@ -1,8 +1,8 @@
 import { TFile } from "obsidian";
 import { localePack } from "../i18n";
 import { frontmatterLinks, fileFrontmatter, readType, type Frontmatter } from "../vault/frontmatter";
-import { ensureFolder, isInFolder, parentFolder } from "../vault/files";
-import { joinVaultPath, sanitizeFileName, sanitizeVaultRelativePath } from "../vault/paths";
+import { ensureFolder, isInFolder } from "../vault/files";
+import { joinVaultPath, parentFolder, sanitizeFileName, sanitizeVaultRelativePath } from "../vault/paths";
 import { slugify, uniqueStrings } from "../text";
 import type { RenameByTitleOptions, RenameLlmWikiOptions, RenameResult, RenameZkOptions, WorkflowContext } from "./context";
 import {
@@ -17,7 +17,7 @@ import {
   resolveRequiredResource,
   resolveRequiredZk
 } from "./locations";
-import { stringReferencesAnyTarget } from "./references";
+import { isSourceScopedRetro } from "./references";
 
 export async function renameProject(ctx: WorkflowContext, options: RenameByTitleOptions): Promise<RenameResult> {
   const container = await resolveRequiredProject(ctx, options);
@@ -183,21 +183,6 @@ async function dependentRetroRenamePlans(
   }
 
   return plans.sort((left, right) => left.fromPath.localeCompare(right.fromPath));
-}
-
-function isSourceScopedRetro(
-  ctx: WorkflowContext,
-  retro: TFile,
-  frontmatter: Frontmatter,
-  source: TFile,
-  domain: "project" | "area"
-): boolean {
-  if (domain === "project") {
-    return frontmatterLinks(frontmatter.project).some((link) => stringReferencesAnyTarget(ctx, retro.path, link, [source]));
-  }
-
-  if (frontmatterLinks(frontmatter.project).length > 0) return false;
-  return frontmatterLinks(frontmatter.areas).some((link) => stringReferencesAnyTarget(ctx, retro.path, link, [source]));
 }
 
 function retroWeekSegment(file: TFile, frontmatter: Frontmatter): string | undefined {

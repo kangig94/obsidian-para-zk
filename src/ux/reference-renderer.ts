@@ -10,6 +10,7 @@ import {
 } from "obsidian";
 import { localePack } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
+import { splitObsidianSubpath } from "../vault/paths";
 import { workflowContext } from "../vault/host";
 import {
   canonicalWikiLink,
@@ -20,7 +21,6 @@ import {
   parseWikiLink,
   readReferenceItemsFresh,
   reorderReferenceItems,
-  splitObsidianSubpath,
   updateReferenceItem,
   type ReferenceRead,
   type WorkflowContext

@@ -13,9 +13,9 @@ import {
   trailingManagedBlockStart,
   type TextRange
 } from "../vault/sections";
-import { ensureFolder, parentFolder } from "../vault/files";
+import { ensureFolder } from "../vault/files";
 import { readFileFrontmatterFresh, readFileTypeFresh, readType } from "../vault/frontmatter";
-import { joinVaultPath, normalizeVaultPath } from "../vault/paths";
+import { joinVaultPath, normalizeVaultPath, parentFolder } from "../vault/paths";
 import { serializeFileWrite } from "../vault/write-serializer";
 import {
   ENERGY_CODE_HELP,
@@ -178,6 +178,31 @@ type WritableSurfaceTarget =
     field?: ReferenceWritableField;
   };
 
+type TextOperationSplitGuard = {
+  headingLevel?: number;
+  sectionKey: string;
+};
+type TextOperationContext = {
+  current: string;
+  options: UpdatePayloadOptions;
+  splitGuard: TextOperationSplitGuard;
+};
+type TextOperationResult = TextUpdateResult & { value: string };
+type TextOperationHandler = (context: TextOperationContext) => TextOperationResult;
+
+const TEXT_OPERATION_HANDLERS: Partial<Record<UpdateOperation, TextOperationHandler>> = {
+  set: applyTextSetOperation,
+  append: applyTextAppendOperation,
+  prepend: applyTextPrependOperation,
+  replace: applyTextReplaceOperation
+};
+
+const TEXT_OPERATION_ERRORS: Partial<Record<UpdateOperation, string>> = {
+  insert: "op=insert only supports task/reference collection keys",
+  delete: "op=delete only supports structured item keys",
+  backfill: "op=backfill only supports key=references"
+};
+
 type TextUpdateResult = {
   changed: boolean;
   matches?: number;
@@ -220,29 +245,7 @@ async function updateSurfaceUnlocked(
   const shape = resolveTargetUpdateShape(spec, key, target, options.operation);
   requireTargetUpdateValue(target, key, shape.allowedOps, shape.operation, options);
   const operation = shape.operation;
-  let result: TextUpdateResult;
-  switch (target.kind) {
-    case "frontmatter":
-      result = await updateFrontmatterSurface(ctx, target, operation, options);
-      break;
-    case "text":
-      result = await updateTextSurface(ctx, target, operation, options);
-      break;
-    case "taskCollection":
-      result = await updateTaskCollectionSurface(ctx, target, operation, options);
-      break;
-    case "taskItem":
-      result = await updateTaskItemSurface(ctx, target, operation, options);
-      break;
-    case "referenceCollection":
-      result = await updateReferenceCollectionSurface(ctx, target, operation, options);
-      break;
-    case "referenceItem":
-      result = await updateReferenceItemSurface(ctx, target, operation, options);
-      break;
-    default:
-      throw new Error("unknown update target");
-  }
+  const result = await updateWritableSurface(ctx, target, operation, options);
   const resultFile = result.file ?? target.file;
 
   return {
@@ -263,6 +266,28 @@ async function updateSurfaceUnlocked(
     toPath: result.toPath,
     ...(result.value !== undefined ? { value: result.value } : {})
   };
+}
+
+function updateWritableSurface(
+  ctx: WorkflowContext,
+  target: WritableSurfaceTarget,
+  operation: UpdateOperation,
+  options: UpdatePayloadOptions
+): Promise<TextUpdateResult> {
+  switch (target.kind) {
+    case "frontmatter":
+      return updateFrontmatterSurface(ctx, target, operation, options);
+    case "text":
+      return updateTextSurface(ctx, target, operation, options);
+    case "taskCollection":
+      return updateTaskCollectionSurface(ctx, target, operation, options);
+    case "taskItem":
+      return updateTaskItemSurface(ctx, target, operation, options);
+    case "referenceCollection":
+      return updateReferenceCollectionSurface(ctx, target, operation, options);
+    case "referenceItem":
+      return updateReferenceItemSurface(ctx, target, operation, options);
+  }
 }
 
 // True only for keys that resolve to plain text targets (body/non-collection
@@ -638,71 +663,64 @@ function applyTextOperation(
   current: string,
   operation: UpdateOperation,
   options: UpdatePayloadOptions,
-  splitGuard: {
-    headingLevel?: number;
-    sectionKey: string;
+  splitGuard: TextOperationSplitGuard
+): TextOperationResult {
+  const handler = TEXT_OPERATION_HANDLERS[operation];
+  if (!handler) throw new Error(TEXT_OPERATION_ERRORS[operation] ?? `unsupported text operation: ${operation}`);
+  return handler({ current, options, splitGuard });
+}
+
+function applyTextSetOperation({ current, options, splitGuard }: TextOperationContext): TextOperationResult {
+  const value = requireUpdateText(options, { allowEmpty: true });
+  assertTextUpdateDoesNotSplitSection(value, splitGuard);
+  return {
+    changed: current !== value,
+    value
+  };
+}
+
+function applyTextAppendOperation({ current, options, splitGuard }: TextOperationContext): TextOperationResult {
+  const value = requireUpdateText(options, { allowEmpty: false });
+  assertTextUpdateDoesNotSplitSection(value, splitGuard);
+  const next = current.trim() ? `${current}${current.endsWith("\n") ? "" : "\n"}${value}` : value;
+  return {
+    changed: current !== next,
+    value: next
+  };
+}
+
+function applyTextPrependOperation({ current, options, splitGuard }: TextOperationContext): TextOperationResult {
+  const value = requireUpdateText(options, { allowEmpty: false });
+  assertTextUpdateDoesNotSplitSection(value, splitGuard);
+  const next = current.trim() ? `${value}${value.endsWith("\n") ? "" : "\n"}${current}` : value;
+  return {
+    changed: current !== next,
+    value: next
+  };
+}
+
+function applyTextReplaceOperation({ current, options, splitGuard }: TextOperationContext): TextOperationResult {
+  const match = requireReplaceMatch(options);
+  const replacement = requireReplacementText(options);
+  assertTextUpdateDoesNotSplitSection(replacement, splitGuard);
+  const matches = literalOccurrences(current, match);
+  if (matches === 0) throw new Error("replace text was not found");
+  if (matches > 1 && !options.all) {
+    throw new Error(`replace text matched ${matches} times; pass all=true to replace all`);
   }
-): TextUpdateResult & { value: string } {
-  switch (operation) {
-    case "set": {
-      const value = requireUpdateText(options, { allowEmpty: true });
-      assertTextUpdateDoesNotSplitSection(value, splitGuard);
-      return {
-        changed: current !== value,
-        value
-      };
-    }
-    case "insert":
-      throw new Error("op=insert only supports task/reference collection keys");
-    case "append": {
-      const value = requireUpdateText(options, { allowEmpty: false });
-      assertTextUpdateDoesNotSplitSection(value, splitGuard);
-      const next = current.trim() ? `${current}${current.endsWith("\n") ? "" : "\n"}${value}` : value;
-      return {
-        changed: current !== next,
-        value: next
-      };
-    }
-    case "prepend": {
-      const value = requireUpdateText(options, { allowEmpty: false });
-      assertTextUpdateDoesNotSplitSection(value, splitGuard);
-      const next = current.trim() ? `${value}${value.endsWith("\n") ? "" : "\n"}${current}` : value;
-      return {
-        changed: current !== next,
-        value: next
-      };
-    }
-    case "replace": {
-      const match = requireReplaceMatch(options);
-      const replacement = requireReplacementText(options);
-      assertTextUpdateDoesNotSplitSection(replacement, splitGuard);
-      const matches = literalOccurrences(current, match);
-      if (matches === 0) throw new Error("replace text was not found");
-      if (matches > 1 && !options.all) {
-        throw new Error(`replace text matched ${matches} times; pass all=true to replace all`);
-      }
-      const value = options.all
-        ? current.split(match).join(replacement)
-        : replaceFirstLiteral(current, match, replacement);
-      return {
-        changed: current !== value,
-        matches,
-        value
-      };
-    }
-    case "delete":
-      throw new Error("op=delete only supports structured item keys");
-    case "backfill":
-      throw new Error("op=backfill only supports key=references");
-  }
+  const value = options.all
+    ? current.split(match).join(replacement)
+    : replaceFirstLiteral(current, match, replacement);
+  return {
+    changed: current !== value,
+    matches,
+    value
+  };
 }
 
 function assertTextUpdateDoesNotSplitSection(
   value: string,
-  splitGuard: {
-    headingLevel?: number;
-    sectionKey: string;
-  }
+  splitGuard: TextOperationSplitGuard
 ): void {
   if (splitGuard.headingLevel === undefined) return;
   const hazard = findSectionSplitHazard(value, splitGuard.headingLevel);

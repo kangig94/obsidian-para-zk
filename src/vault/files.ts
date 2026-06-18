@@ -24,12 +24,6 @@ export function isInFolder(file: TFile, folder: string): boolean {
   return file.path === normalized || file.path.startsWith(`${normalized}/`);
 }
 
-export function parentFolder(path: string): string {
-  const normalized = normalizeVaultPath(path);
-  const index = normalized.lastIndexOf("/");
-  return index === -1 ? "" : normalized.slice(0, index);
-}
-
 export function uniqueFiles(files: TFile[]): TFile[] {
   const seen = new Set<string>();
   const result: TFile[] = [];

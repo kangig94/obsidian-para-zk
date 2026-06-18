@@ -1,4 +1,4 @@
-import { Notice } from "obsidian";
+import { Notice, type TFile } from "obsidian";
 import { localePack, normalizeLocale } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { isRecord } from "../records";
@@ -8,6 +8,36 @@ import {
   workflowCommandEntries
 } from "./locale-labels";
 import { chooseValue, confirmAction, promptDistill, promptSetupOptions, promptText } from "./prompts";
+
+type WorkflowsModule = typeof import("../workflows");
+type InteractiveWorkflowLabels = ReturnType<typeof localePack>["labels"];
+type InteractiveWorkflowContext = {
+  plugin: ParaZkPluginContext;
+  workflows: WorkflowsModule;
+  ctx: ReturnType<typeof workflowContext>;
+  labels: InteractiveWorkflowLabels;
+  activePath?: string;
+  sourcePath?: string;
+  sourceFile: TFile | null;
+};
+type InteractiveWorkflowHandler = (context: InteractiveWorkflowContext) => Promise<unknown | undefined>;
+
+const INTERACTIVE_WORKFLOW_HANDLERS: Record<string, InteractiveWorkflowHandler> = {
+  "create-project": createProjectWorkflow,
+  "create-area": createAreaWorkflow,
+  "add-reference": addReferenceWorkflow,
+  "create-resource": createResourceWorkflow,
+  "create-subnote": createSubnoteWorkflow,
+  "create-subarea": createSubareaWorkflow,
+  "create-retro": createRetroWorkflow,
+  "create-zk": createZkWorkflow,
+  "open-journal": openJournalWorkflow,
+  "capture-journal": captureJournalWorkflow,
+  "create-from-resource": createFromResourceWorkflow,
+  "distill-spark": distillSparkWorkflow,
+  "discard-spark": discardSparkWorkflow,
+  "create-from-digest": createFromDigestWorkflow
+};
 
 export function registerStatusAndInitCommands(plugin: ParaZkPluginContext): void {
   const labels = localePack(plugin.settings.locale).labels;
@@ -87,99 +117,114 @@ async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: 
   const labels = localePack(plugin.settings.locale).labels;
   const activePath = sourcePath ?? plugin.app.workspace.getActiveFile()?.path;
   const sourceFile = activePath ? plugin.app.vault.getFileByPath(activePath) : null;
+  const handler = INTERACTIVE_WORKFLOW_HANDLERS[command];
 
-  switch (command) {
-    case "create-project": {
-      const title = await prompt(plugin, labels.createProjectCommandName, labels.promptProjectTitle);
-      return title ? workflows.createProject(ctx, { title, open: true }) : undefined;
-    }
-    case "create-area": {
-      const title = await prompt(plugin, labels.createAreaCommandName, labels.promptAreaTitle);
-      return title ? workflows.createArea(ctx, { title, open: true }) : undefined;
-    }
-    case "add-reference": {
-      if (!activePath) return undefined;
-      const target = await prompt(plugin, labels.addReferenceCommandName, labels.promptReferenceTarget);
-      return target ? workflows.addReference(ctx, { sourcePath: activePath, target, open: false }) : undefined;
-    }
-    case "create-resource": {
-      const title = await prompt(plugin, labels.createResourceCommandName, labels.promptResourceTitle);
-      return title ? workflows.createResource(ctx, {
-        title,
-        sourcePath,
-        linkToSource: Boolean(sourcePath),
-        open: true
-      }) : undefined;
-    }
-    case "create-subnote": {
-      const title = await prompt(plugin, labels.createSubnoteCommandName, labels.promptSubnoteTitle);
-      return title ? workflows.createSubnote(ctx, { title, sourcePath: activePath, open: true }) : undefined;
-    }
-    case "create-subarea": {
-      if (!activePath) {
-        new Notice(`PARA-ZK: ${localePack(plugin.settings.locale).messages.createSubareaNeedsActiveArea}`);
-        return undefined;
-      }
-      const title = await prompt(plugin, labels.createSubareaCommandName, labels.promptSubareaTitle);
-      return title ? workflows.createArea(ctx, { title, sourcePath: activePath, inheritParentTag: true, open: true }) : undefined;
-    }
-    case "create-retro":
-      return workflows.createRetro(ctx, { sourcePath: activePath, open: true });
-    case "create-zk": {
-      const kind = await chooseValue(plugin.app, labels.promptCreateKind, [
-        { label: "Spark", value: "spark" },
-        { label: "Digest", value: "digest" },
-        { label: "Permanent", value: "permanent" }
-      ]);
-      if (!kind) return undefined;
-      const title = await prompt(plugin, labels.createZkCommandName, labels.promptZkTitle, sourceFile?.basename ?? "");
-      return title ? workflows.createZk(ctx, { title, kind, open: true }) : undefined;
-    }
-    case "open-journal":
-      return workflows.openJournal(ctx, { open: true });
-    case "capture-journal": {
-      const content = await prompt(plugin, labels.captureJournalCommandName, labels.promptCaptureContent);
-      return content ? workflows.captureJournal(ctx, { content, open: true }) : undefined;
-    }
-    case "create-from-resource": {
-      const kind = await chooseValue(plugin.app, labels.promptCreateKind, [
-        { label: "Digest", value: "digest" },
-        { label: "Permanent", value: "permanent" }
-      ]);
-      if (!kind) return undefined;
-      const title = await prompt(plugin, labels.createZkButton, labels.promptZkTitle, sourceFile?.basename ?? "");
-      return title ? workflows.createFromResource(ctx, { sourcePath: activePath, title, kind, open: true }) : undefined;
-    }
-    case "distill-spark": {
-      const result = await promptDistill(
-        plugin.app,
-        labels.distillButton,
-        labels.promptZkTitle,
-        sourceFile?.basename ?? "",
-        labels.distillDiscardToggle,
-        labels.confirm,
-        labels.cancel
-      );
-      return result ? workflows.distillSpark(ctx, { sourcePath: activePath, title: result.title, discard: result.discard, open: true }) : undefined;
-    }
-    case "discard-spark": {
-      if (!activePath) return undefined;
-      const confirmed = await confirmAction(
-        plugin.app,
-        labels.discardSparkConfirmTitle,
-        labels.discardSparkConfirmMessage,
-        labels.discardButton,
-        labels.cancel
-      );
-      return confirmed ? workflows.deleteZk(ctx, { path: activePath }) : undefined;
-    }
-    case "create-from-digest": {
-      const title = await prompt(plugin, labels.createPermanentButton, labels.promptZkTitle, sourceFile?.basename ?? "");
-      return title ? workflows.createFromDigest(ctx, { sourcePath: activePath, title, open: true }) : undefined;
-    }
-    default:
-      throw new Error(`${localePack(plugin.settings.locale).messages.unknownCommand}: ${command}`);
+  if (!handler) throw new Error(`${localePack(plugin.settings.locale).messages.unknownCommand}: ${command}`);
+  return handler({ plugin, workflows, ctx, labels, activePath, sourcePath, sourceFile });
+}
+
+async function createProjectWorkflow({ plugin, workflows, ctx, labels }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+  const title = await prompt(plugin, labels.createProjectCommandName, labels.promptProjectTitle);
+  return title ? workflows.createProject(ctx, { title, open: true }) : undefined;
+}
+
+async function createAreaWorkflow({ plugin, workflows, ctx, labels }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+  const title = await prompt(plugin, labels.createAreaCommandName, labels.promptAreaTitle);
+  return title ? workflows.createArea(ctx, { title, open: true }) : undefined;
+}
+
+async function addReferenceWorkflow({ plugin, workflows, ctx, labels, activePath }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+  if (!activePath) return undefined;
+  const target = await prompt(plugin, labels.addReferenceCommandName, labels.promptReferenceTarget);
+  return target ? workflows.addReference(ctx, { sourcePath: activePath, target, open: false }) : undefined;
+}
+
+async function createResourceWorkflow({ plugin, workflows, ctx, labels, sourcePath }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+  const title = await prompt(plugin, labels.createResourceCommandName, labels.promptResourceTitle);
+  return title ? workflows.createResource(ctx, {
+    title,
+    sourcePath,
+    linkToSource: Boolean(sourcePath),
+    open: true
+  }) : undefined;
+}
+
+async function createSubnoteWorkflow({ plugin, workflows, ctx, labels, activePath }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+  const title = await prompt(plugin, labels.createSubnoteCommandName, labels.promptSubnoteTitle);
+  return title ? workflows.createSubnote(ctx, { title, sourcePath: activePath, open: true }) : undefined;
+}
+
+async function createSubareaWorkflow({ plugin, workflows, ctx, labels, activePath }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+  if (!activePath) {
+    new Notice(`PARA-ZK: ${localePack(plugin.settings.locale).messages.createSubareaNeedsActiveArea}`);
+    return undefined;
   }
+  const title = await prompt(plugin, labels.createSubareaCommandName, labels.promptSubareaTitle);
+  return title ? workflows.createArea(ctx, { title, sourcePath: activePath, inheritParentTag: true, open: true }) : undefined;
+}
+
+async function createRetroWorkflow({ workflows, ctx, activePath }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+  return workflows.createRetro(ctx, { sourcePath: activePath, open: true });
+}
+
+async function createZkWorkflow({ plugin, workflows, ctx, labels, sourceFile }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+  const kind = await chooseValue(plugin.app, labels.promptCreateKind, [
+    { label: "Spark", value: "spark" },
+    { label: "Digest", value: "digest" },
+    { label: "Permanent", value: "permanent" }
+  ]);
+  if (!kind) return undefined;
+  const title = await prompt(plugin, labels.createZkCommandName, labels.promptZkTitle, sourceFile?.basename ?? "");
+  return title ? workflows.createZk(ctx, { title, kind, open: true }) : undefined;
+}
+
+async function openJournalWorkflow({ workflows, ctx }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+  return workflows.openJournal(ctx, { open: true });
+}
+
+async function captureJournalWorkflow({ plugin, workflows, ctx, labels }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+  const content = await prompt(plugin, labels.captureJournalCommandName, labels.promptCaptureContent);
+  return content ? workflows.captureJournal(ctx, { content, open: true }) : undefined;
+}
+
+async function createFromResourceWorkflow({ plugin, workflows, ctx, labels, activePath, sourceFile }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+  const kind = await chooseValue(plugin.app, labels.promptCreateKind, [
+    { label: "Digest", value: "digest" },
+    { label: "Permanent", value: "permanent" }
+  ]);
+  if (!kind) return undefined;
+  const title = await prompt(plugin, labels.createZkButton, labels.promptZkTitle, sourceFile?.basename ?? "");
+  return title ? workflows.createFromResource(ctx, { sourcePath: activePath, title, kind, open: true }) : undefined;
+}
+
+async function distillSparkWorkflow({ plugin, workflows, ctx, labels, activePath, sourceFile }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+  const result = await promptDistill(
+    plugin.app,
+    labels.distillButton,
+    labels.promptZkTitle,
+    sourceFile?.basename ?? "",
+    labels.distillDiscardToggle,
+    labels.confirm,
+    labels.cancel
+  );
+  return result ? workflows.distillSpark(ctx, { sourcePath: activePath, title: result.title, discard: result.discard, open: true }) : undefined;
+}
+
+async function discardSparkWorkflow({ plugin, workflows, ctx, labels, activePath }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+  if (!activePath) return undefined;
+  const confirmed = await confirmAction(
+    plugin.app,
+    labels.discardSparkConfirmTitle,
+    labels.discardSparkConfirmMessage,
+    labels.discardButton,
+    labels.cancel
+  );
+  return confirmed ? workflows.deleteZk(ctx, { path: activePath }) : undefined;
+}
+
+async function createFromDigestWorkflow({ plugin, workflows, ctx, labels, activePath, sourceFile }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+  const title = await prompt(plugin, labels.createPermanentButton, labels.promptZkTitle, sourceFile?.basename ?? "");
+  return title ? workflows.createFromDigest(ctx, { sourcePath: activePath, title, open: true }) : undefined;
 }
 
 function readCommandArgs(rawArgs: unknown[]): Record<string, unknown> {

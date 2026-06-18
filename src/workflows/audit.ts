@@ -4,6 +4,7 @@ import { localePack } from "../i18n";
 import { slugify, uniqueStrings } from "../text";
 import { frontmatterTimeMs } from "../time";
 import { fileFrontmatter, frontmatterLinks, readFileFrontmatterFresh, readType, type Frontmatter } from "../vault/frontmatter";
+import { splitObsidianSubpath } from "../vault/paths";
 import type {
   AuditCheckCode,
   AuditFinding,
@@ -15,7 +16,7 @@ import type {
   WorkflowContext
 } from "./context";
 import { isArchivedFile, isUnderAnyFolder, templateFolderPaths } from "./locations";
-import { backfillReferenceIds, canonicalWikiLink, parseWikiLink, readReferenceItemsFresh, splitObsidianSubpath, updateReferenceItem } from "./references";
+import { backfillReferenceIds, canonicalWikiLink, parseWikiLink, readReferenceItemsFresh, updateReferenceItem } from "./references";
 
 type AuditableNote = {
   file: TFile;

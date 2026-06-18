@@ -10,6 +10,7 @@ import {
   type TextRange
 } from "../vault/sections";
 import { pickFrontmatter, readFileFrontmatterFresh, readFileTypeFresh, readType, type Frontmatter } from "../vault/frontmatter";
+import { splitObsidianSubpath } from "../vault/paths";
 import type {
   CollectionKind,
   CollectionReadOptions,
@@ -40,7 +41,7 @@ import {
 } from "./describe";
 import { countBacklinks, readBacklinks } from "./backlinks";
 import { childFiles, drillToChild, isArchivedFile, resolveRequiredArea, resolveRequiredJournal, resolveRequiredLlmWiki, resolveRequiredProject, resolveRequiredResource, resolveRequiredRetro, resolveRequiredZk } from "./locations";
-import { parseWikiLink, pathBasenameWithoutExtension, splitObsidianSubpath } from "./references";
+import { parseWikiLink, pathBasenameWithoutExtension } from "./references";
 
 type ReadMap = Record<string, unknown>;
 type ReadCollectionKind = CollectionKind;

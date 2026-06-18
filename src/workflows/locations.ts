@@ -3,13 +3,13 @@ import { localePack } from "../i18n";
 import { frontmatterLinks, fileFrontmatter, readFileFrontmatterFresh, readFileTypeFresh, readType, type Frontmatter } from "../vault/frontmatter";
 import { dateFromCli, isoWeekInfo, localDate } from "../time";
 import type { ParaZkSettings, ZkKind } from "../types";
-import { ensureFolder, isInFolder, parentFolder } from "../vault/files";
+import { ensureFolder, isInFolder } from "../vault/files";
 import type { WorkflowHost } from "../vault/host";
-import { joinVaultPath, normalizeVaultPath, sanitizeFileName, sanitizeVaultRelativePath, wikiLink } from "../vault/paths";
+import { joinVaultPath, normalizeVaultPath, parentFolder, sanitizeFileName, sanitizeVaultRelativePath, splitObsidianSubpath, wikiLink } from "../vault/paths";
 import { uniqueStrings } from "../text";
 import { readOptionalCode } from "./code-options";
 import type { ReadAreaOptions, ReadJournalOptions, ReadLlmWikiOptions, ReadProjectOptions, ReadResourceOptions, ReadRetroOptions, ReadZkOptions, WorkflowContext } from "./context";
-import { stringReferencesAnyTarget } from "./references";
+import { isSourceScopedRetro } from "./references";
 import { ZK_KIND_CODE_HELP, isZkType, parseZkKind, zkKindCode } from "../zk/kinds";
 
 
@@ -210,21 +210,6 @@ function isCanonicalFolderNote(file: TFile, rootFolder: string): boolean {
   const directPath = joinVaultPath(rootFolder, `${file.basename}.md`);
   const folderStylePath = joinVaultPath(rootFolder, file.basename, `${file.basename}.md`);
   return file.path === directPath || file.path === folderStylePath;
-}
-
-function isSourceScopedRetro(
-  ctx: WorkflowContext,
-  retro: TFile,
-  frontmatter: Frontmatter,
-  source: TFile,
-  domain: "project" | "area"
-): boolean {
-  if (domain === "project") {
-    return frontmatterLinks(frontmatter.project).some((link) => stringReferencesAnyTarget(ctx, retro.path, link, [source]));
-  }
-
-  if (frontmatterLinks(frontmatter.project).length > 0) return false;
-  return frontmatterLinks(frontmatter.areas).some((link) => stringReferencesAnyTarget(ctx, retro.path, link, [source]));
 }
 
 function retroWeekSegment(file: TFile, frontmatter: Frontmatter): string | undefined {
@@ -658,21 +643,6 @@ function resolveLinkPath(ctx: WorkflowContext, sourcePath: string, linkPath: str
   const withSubpath = `${split.base}${split.subpath}`;
   return ctx.host.getFirstLinkpathDest(withSubpath, sourcePath)
     ?? (split.base ? ctx.host.getFirstLinkpathDest(split.base, sourcePath) : null);
-}
-
-function splitObsidianSubpath(value: string): { base: string; subpath: string } {
-  const normalizedSeparators = value.trim().replace(/\\/g, "/");
-  const hash = normalizedSeparators.indexOf("#");
-  if (hash === -1) {
-    return {
-      base: normalizeVaultPath(normalizedSeparators),
-      subpath: ""
-    };
-  }
-  return {
-    base: normalizeVaultPath(normalizedSeparators.slice(0, hash)),
-    subpath: normalizedSeparators.slice(hash).trim()
-  };
 }
 
 function wikiLinkTarget(value: string): string | undefined {

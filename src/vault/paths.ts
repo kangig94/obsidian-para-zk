@@ -10,6 +10,27 @@ export function joinVaultPath(...parts: Array<string | undefined>): string {
   return normalizeVaultPath(parts.filter(Boolean).join("/"));
 }
 
+export function parentFolder(path: string): string {
+  const normalized = normalizeVaultPath(path);
+  const index = normalized.lastIndexOf("/");
+  return index === -1 ? "" : normalized.slice(0, index);
+}
+
+export function splitObsidianSubpath(value: string): { base: string; subpath: string } {
+  const normalizedSeparators = value.trim().replace(/\\/g, "/");
+  const hash = normalizedSeparators.indexOf("#");
+  if (hash === -1) {
+    return {
+      base: normalizeVaultPath(normalizedSeparators),
+      subpath: ""
+    };
+  }
+  return {
+    base: normalizeVaultPath(normalizedSeparators.slice(0, hash)),
+    subpath: normalizedSeparators.slice(hash).trim()
+  };
+}
+
 export function sanitizeFileName(value: string): string {
   return value
     .trim()

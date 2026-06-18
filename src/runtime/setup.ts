@@ -6,7 +6,7 @@ import {
   type ManagedFileState,
   type ParaZkSettings
 } from "../types";
-import { joinVaultPath, normalizeVaultPath } from "../vault/paths";
+import { joinVaultPath, normalizeVaultPath, parentFolder } from "../vault/paths";
 import { resolveDependencies } from "./dependencies";
 import { configureObsidianCoreSettings } from "./obsidian-core-config";
 
@@ -214,12 +214,6 @@ async function writeManagedFile(
     await app.vault.modify(existing, content);
     options.managedFiles[normalized] = managedFileState(contentHash);
   }
-}
-
-function parentFolder(path: string): string {
-  const normalized = normalizeVaultPath(path);
-  const index = normalized.lastIndexOf("/");
-  return index === -1 ? "" : normalized.slice(0, index);
 }
 
 function addUnique(items: string[], value: string): void {
