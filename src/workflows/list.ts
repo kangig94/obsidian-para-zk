@@ -31,8 +31,13 @@ export async function listNotes(ctx: WorkflowContext, options: ListOptions = {})
     const stored = readType(fileFrontmatter(ctx, file));
     if (!matches(stored)) continue;
     if (isArchivedFile(ctx, file) !== wantArchived) continue;
-    if (query && !file.basename.toLowerCase().includes(query)) continue;
-    all.push({ type: stored, addr: addressPath(file.path) });
+    // Match the note's address path, not just its basename, so `query=<subpath>/`
+    // scopes a listing to a subfolder (a wiki domain, a Resources folder, a
+    // project's subnotes) — title substrings still match since the basename is
+    // part of the address.
+    const addr = addressPath(file.path);
+    if (query && !addr.toLowerCase().includes(query)) continue;
+    all.push({ type: stored, addr });
   }
   all.sort((left, right) => left.addr.localeCompare(right.addr));
 

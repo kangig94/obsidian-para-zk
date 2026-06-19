@@ -2,6 +2,17 @@
 
 Notable changes for PARA-ZK are tracked here.
 
+## 0.0.3 - In development
+
+### Changed
+
+- `para-zk:list` `query` now matches the note's full address path, not just its
+  basename, so `query=<subpath>/` scopes a listing to a subfolder — a wiki domain
+  (`type=llm-wiki query=AI/`), a Resources folder, or a project's subnotes. Title
+  substrings still match (the basename is part of the address), so existing queries
+  are unaffected. The wiki read-flow's no-index fallback uses this to enumerate a
+  single domain's pages.
+
 ## 0.0.2 - 2026-06-19
 
 ### Added

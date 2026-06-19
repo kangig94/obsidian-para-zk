@@ -204,9 +204,8 @@ Important fields:
 - `wiki` — reading the LLM-Wiki: narrow to the domain the conversation is about,
   list domains with `para-zk:wiki-domains`, then read that domain's hub with
   `read-llm-wiki title=<domain>/index` and follow its body `[[links]]` to concept
-  pages. When a domain reports `has_index:false`, enumerate pages with
-  `list type=llm-wiki` and read the ones whose name starts with `<domain>/`
-  instead. Reading never writes.
+  pages. When a domain reports `has_index:false`, enumerate that domain's pages
+  with `list type=llm-wiki` instead. Reading never writes.
 - `citation` — body prose cites the note's own registry references with backtick
   code-span citations such as `` `PZ[<id>]` ``, `` `PZ[<id>, <id>]` ``, or
   `` `PZ[<id>#<section>]` ``. The id is the stable reference id from
@@ -277,7 +276,7 @@ Options:
 | --- | --- | --- |
 | `type` | `project`, `area`, `resource`, `llm-wiki`, `zk`, `retro`, `journal`, `subnote` | Optional. Omit to list all active PARA-ZK notes, including active `llm-wiki` notes. `zk` spans all stored ZK kinds. `area` includes nested areas. |
 | `archived` | boolean | `true` lists archived notes; default lists active notes. |
-| `query` | string | Optional case-insensitive title substring filter. |
+| `query` | string | Optional case-insensitive substring filter over the note's name or address path. Use `query=<subpath>/` to scope a listing to a subfolder (a wiki domain, a Resources folder, a project's subnotes). |
 | `offset` | number | Zero-based item offset (default `0`). |
 | `limit` | number or `all` | Maximum items to return (default `50`). |
 
@@ -285,6 +284,7 @@ Options:
 optsidian para-zk:list type=project query=eval
 optsidian para-zk:list type=zk limit=all
 optsidian para-zk:list type=llm-wiki limit=all
+optsidian para-zk:list type=llm-wiki query=AI/          # scope to the AI domain
 ```
 
 Returns `{ count, offset, limit, returned, has_more, items }`. A `project`,
@@ -445,9 +445,8 @@ JSON output fields:
   is the name to pass back as `read-llm-wiki title="<domain>/index"`; `pages` is the
   count of concept pages in the domain, **excluding** the `index` hub; `has_index` is
   whether the `<domain>/index` hub exists. When `has_index` is `false`, enumerate
-  pages with `list type=llm-wiki` and read the ones whose name starts with
-  `<domain>/` (the listing's `query` matches only the page basename, not the domain
-  folder) instead of reading an index.
+  that domain's pages with `list type=llm-wiki query=<domain>/` instead of reading
+  an index.
 
 ### `para-zk:setup`
 

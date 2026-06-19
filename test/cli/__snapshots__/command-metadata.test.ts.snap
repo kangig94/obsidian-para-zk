@@ -673,7 +673,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<number>",
       },
       "query": {
-        "description": "Optional case-insensitive title substring filter.",
+        "description": "Optional case-insensitive substring filter over the note's name or address path. Use query=<subpath>/ to scope to a subfolder (e.g. a wiki domain or Resources folder).",
         "value": "<text>",
       },
       "type": {

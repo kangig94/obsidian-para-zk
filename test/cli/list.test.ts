@@ -52,6 +52,23 @@ describe("list", () => {
     expect(page).toMatchObject({ count: 3, offset: 1, limit: 1, returned: 1, has_more: true });
   });
 
+  it("query matches the address path so query=<subpath>/ scopes to a subfolder", async () => {
+    await cli.run("para-zk:create-llm-wiki", { title: "AI/Diffusion Policy" });
+    await cli.run("para-zk:create-llm-wiki", { title: "AI/PPO" });
+    await cli.run("para-zk:create-llm-wiki", { title: "Robotics/TWIST" });
+
+    const scoped = await cli.run("para-zk:list", { type: "llm-wiki", query: "AI/" });
+    const items = scoped.items as string[];
+    // AI/ scopes to that domain (Diffusion Policy, PPO, and the auto-minted index).
+    expect(scoped.count).toBe(3);
+    expect(items).toContain("AI/index");
+    expect(items.some((name) => name.startsWith("Robotics/"))).toBe(false);
+
+    // A bare title substring still matches (basename is part of the address path).
+    const byTitle = await cli.run("para-zk:list", { type: "llm-wiki", query: "policy" });
+    expect((byTitle.items as string[])).toContain("AI/Diffusion Policy");
+  });
+
   it("excludes archived by default; archived notes list under their archive location", async () => {
     await cli.run("para-zk:create-project", { title: "Live", open: "false" });
     await cli.run("para-zk:create-project", { title: "Old", open: "false" });
