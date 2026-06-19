@@ -1,6 +1,6 @@
 {
   "name": "para-zk",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Thin MCP that surfaces the PARA-ZK Obsidian CLI contract so any LLM can discover and operate the vault.",
   "author": {
     "name": "kangig94",
@@ -8,13 +8,20 @@
   },
   "repository": "https://github.com/kangig94/obsidian-para-zk",
   "license": "MIT",
-  "keywords": ["obsidian", "para", "zettelkasten"],
+  "keywords": [
+    "obsidian",
+    "para",
+    "zettelkasten"
+  ],
   "mcpServers": "./.mcp.codex.json",
   "skills": "./skills/",
   "interface": {
     "displayName": "PARA-ZK",
     "shortDescription": "Discover and edit a PARA-ZK Obsidian vault via its CLI",
     "category": "Productivity",
-    "capabilities": ["Read", "Write"]
+    "capabilities": [
+      "Read",
+      "Write"
+    ]
   }
 }
