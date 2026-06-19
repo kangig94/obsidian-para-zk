@@ -7,6 +7,9 @@ export type {
   ReferenceRead,
   SurfaceDescription,
   TaskRead,
+  WikiDomainSummary,
+  WikiDomainsOptions,
+  WikiDomainsResult,
   WikiIngestCandidate,
   WikiIngestCandidatesOptions,
   WikiIngestCandidatesResult,
@@ -47,6 +50,7 @@ export { deleteArea, deleteJournal, deleteLlmWiki, deleteProject, deleteResource
 export { listNotes } from "./list";
 export { auditVault } from "./audit";
 export { INGESTABLE_TYPES, ingestableCanonicalSource, wikiIngestCandidates } from "./wiki-ingest-candidates";
+export { wikiDomains } from "./wiki-domains";
 export { captureJournal, openJournal, distillSpark, createFromDigest, createFromResource } from "./promote";
 export {
   addReference,

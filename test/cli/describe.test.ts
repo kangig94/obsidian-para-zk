@@ -19,7 +19,8 @@ describe("describe", () => {
       "compounding",
       "ok",
       "scope",
-      "vault"
+      "vault",
+      "wiki"
     ]);
     expect(String(result.vault)).toContain("LLM-maintained PARA + Zettelkasten wiki");
     expect(String(result.scope)).toContain("host's file/search tools");
@@ -30,6 +31,9 @@ describe("describe", () => {
     expect(String(result.citation)).toContain("positional `PZ[0]` are not supported");
     expect(String(result.compounding)).toContain("propose filing it back");
     expect(String(result.compounding)).toContain("write only on the user's confirmation");
+    expect(String(result.wiki)).toContain("para-zk:wiki-domains");
+    expect(String(result.wiki)).toContain("read-llm-wiki title=<domain>/index");
+    expect(String(result.wiki)).toContain("has_index:false");
   });
 
   it("describes a single surface type with compact read keys and op-detailed write keys", async () => {

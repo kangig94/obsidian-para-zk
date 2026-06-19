@@ -4,6 +4,18 @@ Notable changes for PARA-ZK are tracked here.
 
 ## 0.0.2 - 2026-06-19
 
+### Added
+
+- `para-zk:wiki-domains` CLI workflow lists the LLM-Wiki domains (folders directly
+  under the wiki root) as the entry-point roster for reading the wiki. Each domain
+  reports `{ domain, pages, has_index }` — concept-page count excluding the `index`
+  hub, and whether the `<domain>/index` hub exists — sorted by domain. Surfaced
+  through `describe.workflows` (no new MCP tool; MCP reaches it as a CLI proxy).
+- `para-zk:conventions` gains a `wiki` field guiding the wiki read flow: narrow to
+  the conversation's domain, list domains with `wiki-domains`, read
+  `<domain>/index` first, follow body `[[links]]`, and fall back to
+  `list type=llm-wiki` when a domain has no index.
+
 ### Breaking
 
 - Identity tags now classify (group) instead of being per-note slugs. LLM-Wiki pages tag

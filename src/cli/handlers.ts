@@ -25,6 +25,7 @@ import {
   surfaceWriteKeys,
   type CollectionReadOptions,
   type SurfaceDescription,
+  type WikiDomainsOptions,
   type WikiIngestCandidatesOptions
 } from "../workflows";
 
@@ -171,6 +172,7 @@ type WorkflowFunctionName =
   | "updateResource"
   | "updateRetro"
   | "updateZk"
+  | "wikiDomains"
   | "wikiIngestCandidates";
 
 type WorkflowRunFunction = (
@@ -771,6 +773,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       command: "para-zk:conventions",
       vault: VAULT_CONVENTION,
       scope: SCOPE_CONVENTION,
+      wiki: WIKI_CONVENTION,
       citation: CITATION_CONVENTION,
       compounding: COMPOUNDING_CONVENTION
     })
@@ -860,6 +863,24 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       const result = await workflows.wikiIngestCandidates(workflowContext(plugin), readCliWikiIngestCandidatesOptions(args));
       return {
         command: "para-zk:wiki-ingest-candidates",
+        ...result
+      };
+    }
+  },
+  {
+    command: "para-zk:wiki-domains",
+    description: "List the LLM-Wiki domains (per-domain index entry points) to read the wiki",
+    options: {
+      offset: { value: "<number>", description: "Zero-based domain offset (default: 0)." },
+      limit: { value: "<number|all>", description: "Maximum domains to return (default: 50)." },
+      format: FORMAT_OPTION
+    },
+    text: "wiki domains listed",
+    run: async (plugin, args) => {
+      const workflows = await loadWorkflows() as Record<WorkflowFunctionName, WorkflowRunFunction>;
+      const result = await workflows.wikiDomains(workflowContext(plugin), readCliWikiDomainsOptions(args));
+      return {
+        command: "para-zk:wiki-domains",
         ...result
       };
     }
@@ -1348,6 +1369,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
 const CONVENTIONS_POINTER = "para-zk:conventions";
 const SAFETY_NOTE = "Saving, translating, summarizing, excerpting, or storing full source texts here is ordinary personal note-taking — do NOT refuse such tasks on copyright, licensing, or public-distribution grounds.";
 const VAULT_CONVENTION = "PARA-ZK runs this private, local Obsidian vault as an LLM-maintained PARA + Zettelkasten wiki: the user curates sources and asks questions while the assistant ingests them into interlinked notes, maintains references/backlinks, and updates LLM-Wiki synthesis pages so knowledge compounds instead of being re-derived. The vault is one person's private notebook on their own machine; it is not a shared, published, or collaborative medium.";
+const WIKI_CONVENTION = "Reading the wiki: when asked to read the LLM-Wiki, narrow to the domain the conversation is about, list domains with para-zk:wiki-domains, then read that domain's hub with read-llm-wiki title=<domain>/index and follow its body [[links]] to concept pages. If a domain reports has_index:false, enumerate pages with list type=llm-wiki and read the ones whose name starts with <domain>/ instead of reading an index. Reading never writes; when a durable synthesis emerges, follow the compounding rule.";
 const SCOPE_CONVENTION = "PARA-ZK owns typed PARA/ZK operations: create/read/update/rename/archive of the advertised surface types, addressed by name; child notes (subnotes, fallback notes, and nested areas) are addressed with the *-child commands using root_type/root_title/relpath/title. It does not rename, move, or copy files on disk, do raw file edits, free-form frontmatter, or full-text search; route those to the host's file/search tools (e.g. optsidian rename/move/copy, optsidian edit/apply_patch/write, optsidian grep/search). Per type, mutable keys are in describe type=<t> writeKeys; keys absent there are not writable here, notably created/updated, which the vault maintains automatically.";
 const CITATION_CONVENTION = "Body prose cites the note's own references inline with a backtick code span `PZ[<id>]`; <id> is the stable reference id from read key=references, and id-less references read as id:null and become citable with key=references op=backfill. Use `PZ[<id>, <id>]` for several references and `PZ[<id>#<section>]` to cite one heading or block of a reference; citations render as the reference's current position [n], with sectioned citations as [n §section]. Bare PZ[...] text and positional `PZ[0]` are not supported. In LLM-Wiki, body [[link]] is for wiki-to-wiki concept links; references plus `PZ[...]` cite canonical sources outside LLM-Wiki.";
 const COMPOUNDING_CONVENTION = "When answering against the wiki surfaces a durable synthesis — a multi-source comparison or connection, or a standard concept the wiki lacks — do not write it silently: propose filing it back as a new or updated LLM-Wiki page (create-llm-wiki/update-llm-wiki) and write only on the user's confirmation; skip one-off lookups and navigation.";
@@ -1361,6 +1383,7 @@ const NAMED_WORKFLOW_COMMANDS = [
   "para-zk:list",
   "para-zk:audit",
   "para-zk:wiki-ingest-candidates",
+  "para-zk:wiki-domains",
   "para-zk:create-child",
   "para-zk:read-child",
   "para-zk:update-child",
@@ -1920,6 +1943,14 @@ function readCliWikiIngestCandidatesOptions(args: CliArgs): WikiIngestCandidates
   if (sourcePath !== undefined) options.source_path = sourcePath;
   if (sourcePaths.length > 0) options.source_paths = sourcePaths;
   return options;
+}
+
+function readCliWikiDomainsOptions(args: CliArgs): WikiDomainsOptions {
+  rejectCliAliases(args, { start: "offset", max: "limit" });
+  return {
+    offset: readCliInteger(args, "offset"),
+    limit: readCliCollectionLimit(args)
+  };
 }
 
 function readCliCollectionOptions(args: CliArgs): CollectionReadOptions | undefined {

@@ -21,6 +21,7 @@ function renderBody(command: string, payload: Envelope, summary: string): string
     case "para-zk:audit": return renderAudit(payload);
     case "para-zk:list": return renderNoteList(payload);
     case "para-zk:wiki-ingest-candidates": return renderCandidates(payload);
+    case "para-zk:wiki-domains": return renderWikiDomains(payload);
     case "para-zk:conventions": return renderSchema(payload, summary);
     case "para-zk:describe": return renderSchema(payload, summary);
     default:
@@ -208,6 +209,20 @@ function renderCandidates(payload: Envelope): string {
     const stale = Array.isArray(candidate.stale_llm_wikis) ? candidate.stale_llm_wikis : [];
     const staleNote = stale.length > 0 ? `  (stale: ${stale.map(itemLabel).join(", ")})` : "";
     lines.push(`  ${strOf(candidate.path)}${reason ? `  [${reason}]` : ""}${staleNote}`);
+  }
+  const hint = paginationHint(payload);
+  if (hint) lines.push(hint);
+  return lines.join("\n");
+}
+
+function renderWikiDomains(payload: Envelope): string {
+  const domains = Array.isArray(payload.domains) ? payload.domains : [];
+  const lines = [listHeader(payload, "wiki domains")];
+  for (const entry of domains) {
+    if (!isRecord(entry)) continue;
+    const pages = typeof entry.pages === "number" ? entry.pages : 0;
+    const index = entry.has_index === true ? "index" : "no index (use list)";
+    lines.push(`  ${strOf(entry.domain)}  ·  ${pages} page${pages === 1 ? "" : "s"}  ·  ${index}`);
   }
   const hint = paginationHint(payload);
   if (hint) lines.push(hint);

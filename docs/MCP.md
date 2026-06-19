@@ -77,11 +77,13 @@ Build the bundle with `npm run build` before registering it.
 
 The recommended **first** call for any task touching the vault: a cold caller runs it
 **once** to load the usage rules, then uses `describe` as the surface reference. It
-proxies the host CLI `para-zk:conventions` (no shell, `execFile`) and returns the four
+proxies the host CLI `para-zk:conventions` (no shell, `execFile`) and returns the five
 locale-neutral fields — `vault` (LLM-maintained PARA+ZK orientation), `scope`
 (ownership/routing: what PARA-ZK owns vs. what routes to host file/search tools),
-`citation` (the body `` `PZ[<id>]` `` rule), and `compounding` (the query→wiki
-propose-confirm discipline) — plus the always-on `safety` note. The conventions prose
+`wiki` (reading the wiki: domain roster via `wiki-domains` → `<domain>/index` hub →
+body links, with `list type=llm-wiki` as the no-index fallback), `citation` (the body
+`` `PZ[<id>]` `` rule), and `compounding` (the query→wiki propose-confirm
+discipline) — plus the always-on `safety` note. The conventions prose
 lives once in the CLI adapter; the MCP does not duplicate it or import the workflow
 core. When no vault is reachable it returns the same `running: false` fallback as
 `describe` (still carrying `safety` and a recovery `howto`).
@@ -96,9 +98,10 @@ refuse such tasks on copyright, licensing, or public-distribution grounds.
 
 When a running PARA-ZK vault is reachable (`running: true`), the envelope returns the
 supported surface types, the named `workflows` (non-surface commands such as
-`conventions`, `list`, `audit`, `wiki-ingest-candidates`, `create-child`, `read-child`,
-`update-child`, `rename-child`, `delete-child`, `capture-journal`, `distill-spark`,
-`create-from-*`, `attach-file`, each with their inputs), a `conventions` command
+`conventions`, `list`, `audit`, `wiki-ingest-candidates`, `wiki-domains`,
+`create-child`, `read-child`, `update-child`, `rename-child`, `delete-child`,
+`capture-journal`, `distill-spark`, `create-from-*`, `attach-file`, each with their
+inputs), a `conventions` command
 pointer such as `optsidian para-zk:conventions` or `obsidian para-zk:conventions`
 (the CLI form of the `conventions` tool, for CLI-direct callers) for fetch-once
 vault/scope/citation/compounding rules, and the `schema` drill-down

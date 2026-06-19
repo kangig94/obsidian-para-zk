@@ -201,6 +201,12 @@ Important fields:
   frontmatter, and full-text search go to optsidian/host file and search tools.
   Per-type mutable keys are in `describe type=<t>` `writeKeys`; keys absent there
   are not writable here, notably vault-managed `created`/`updated`.
+- `wiki` — reading the LLM-Wiki: narrow to the domain the conversation is about,
+  list domains with `para-zk:wiki-domains`, then read that domain's hub with
+  `read-llm-wiki title=<domain>/index` and follow its body `[[links]]` to concept
+  pages. When a domain reports `has_index:false`, enumerate pages with
+  `list type=llm-wiki` and read the ones whose name starts with `<domain>/`
+  instead. Reading never writes.
 - `citation` — body prose cites the note's own registry references with backtick
   code-span citations such as `` `PZ[<id>]` ``, `` `PZ[<id>, <id>]` ``, or
   `` `PZ[<id>#<section>]` ``. The id is the stable reference id from
@@ -228,10 +234,11 @@ Important fields:
 - `surfaceTypes` — addressable/createable note types, including the derived
   `llm-wiki` surface.
 - `workflows` — named (non-surface) commands with their inputs:
-  `conventions`, `list`, `audit`, `wiki-ingest-candidates`, `create-child`, `read-child`,
-  `update-child`, `rename-child`, `delete-child`, `capture-journal`,
-  `distill-spark`, `create-from-digest`, `create-from-resource`, `attach-file`.
-  This is how you discover those commands and args without a separate help lookup.
+  `conventions`, `list`, `audit`, `wiki-ingest-candidates`, `wiki-domains`,
+  `create-child`, `read-child`, `update-child`, `rename-child`, `delete-child`,
+  `capture-journal`, `distill-spark`, `create-from-digest`, `create-from-resource`,
+  `attach-file`. This is how you discover those commands and args without a
+  separate help lookup.
 - `collectionFilters`
 - `conventions` — pointer to `para-zk:conventions`; fetch it once per task for
   vault orientation, routing, citation, and wiki-compounding rules.
@@ -405,6 +412,42 @@ Reason codes:
 `stale_llm_wikis` is always present. For `source_newer_than_wiki` it lists the older
 citing wiki pages as `{ path, title, updated_ms }`; for every other reason it is
 an empty array.
+
+### `para-zk:wiki-domains`
+
+Lists the LLM-Wiki domains — the folders directly under the wiki root — as the
+entry-point roster for reading the wiki. Each domain's `<domain>/index` hub is the
+deterministic per-domain entry point, so the read flow is: narrow to the domain
+the conversation is about, run this to confirm it exists, read
+`read-llm-wiki title="<domain>/index"`, then follow its body `[[links]]`. This is
+frontmatter/path-only discovery; it does not read note bodies.
+
+Options:
+
+| Option | Values | Notes |
+| --- | --- | --- |
+| `offset` | number | Zero-based domain offset (default `0`). |
+| `limit` | number or `all` | Maximum domains to return (default `50`). |
+| `format` | `json`, `text` | Default `text` renders the data readably; use `json` when the output is machine-parsed. |
+
+```bash
+optsidian para-zk:wiki-domains
+optsidian para-zk:wiki-domains limit=all
+```
+
+JSON output fields:
+
+- `ok`: true on success.
+- `command`: `para-zk:wiki-domains`.
+- `count`, `offset`, `limit`, `returned`, `has_more`: pagination envelope over the
+  domain list.
+- `domains`: array of `{ domain, pages, has_index }`, sorted by `domain`. `domain`
+  is the name to pass back as `read-llm-wiki title="<domain>/index"`; `pages` is the
+  count of concept pages in the domain, **excluding** the `index` hub; `has_index` is
+  whether the `<domain>/index` hub exists. When `has_index` is `false`, enumerate
+  pages with `list type=llm-wiki` and read the ones whose name starts with
+  `<domain>/` (the listing's `query` matches only the page basename, not the domain
+  folder) instead of reading an index.
 
 ### `para-zk:setup`
 

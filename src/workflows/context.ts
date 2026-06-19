@@ -252,6 +252,26 @@ export type WikiIngestCandidatesResult = {
   candidates: WikiIngestCandidate[];
 };
 
+export type WikiDomainSummary = {
+  domain: string;
+  pages: number;
+  has_index: boolean;
+};
+
+export type WikiDomainsOptions = {
+  offset?: number;
+  limit?: number | "all";
+};
+
+export type WikiDomainsResult = {
+  count: number;
+  offset: number;
+  limit: number | "all";
+  returned: number;
+  has_more: boolean;
+  domains: WikiDomainSummary[];
+};
+
 export type AuditSeverity = "high" | "medium" | "low";
 
 export type AuditCheckCode =

@@ -1701,6 +1701,24 @@ exports[`native CLI command metadata is stable 1`] = `
     },
   },
   {
+    "command": "para-zk:wiki-domains",
+    "description": "List the LLM-Wiki domains (per-domain index entry points) to read the wiki",
+    "options": {
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "limit": {
+        "description": "Maximum domains to return (default: 50).",
+        "value": "<number|all>",
+      },
+      "offset": {
+        "description": "Zero-based domain offset (default: 0).",
+        "value": "<number>",
+      },
+    },
+  },
+  {
     "command": "para-zk:wiki-ingest-candidates",
     "description": "List canonical source notes that should be folded into the LLM-Wiki",
     "options": {
