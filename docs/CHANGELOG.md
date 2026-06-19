@@ -2,7 +2,7 @@
 
 Notable changes for PARA-ZK are tracked here.
 
-## 0.0.1 - In development
+## 0.0.2 - 2026-06-19
 
 ### Breaking
 
