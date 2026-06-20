@@ -73,6 +73,42 @@ function settings(): ParaZkSettings {
   return structuredClone(DEFAULT_SETTINGS);
 }
 
+// The baseline nested order custom-sort.ts mints inside the ZK group.
+const ZK_ORDER = ["Spark", "Digest", "Permanent"];
+
+// A complete top-level sortspec whose ZK group carries the given nested groups (others empty).
+function bookmarksWithZkChildren(zkTitles: string[]): { items: Item[] } {
+  const top = BASELINE_ORDER.map((title, i) =>
+    title === "ZK" ? group("ZK", i + 2, groups(zkTitles)) : group(title, i + 2)
+  );
+  return sortspecBookmarks(top);
+}
+
+function zkChildren(files: Map<string, string>): string[] {
+  const zk = sortspecChildren(files).find((item) => item.title === "ZK");
+  return (zk?.items ?? []).map((item) => item.title ?? "");
+}
+
+// A complete sortspec whose PARA group is fully populated, with Archives carrying the given
+// nested groups — exercises reconcile two levels deep (sortspec → PARA → Archives → children).
+function bookmarksWithArchivesChildren(archiveTitles: string[]): { items: Item[] } {
+  const para = group("PARA", 3, [
+    group("Projects", 30),
+    group("Areas", 31),
+    group("Resources", 32),
+    group("Archives", 33, groups(archiveTitles)),
+    group("Retros", 34)
+  ]);
+  const top = BASELINE_ORDER.map((title, i) => (title === "PARA" ? para : group(title, i + 2)));
+  return sortspecBookmarks(top);
+}
+
+function archivesChildren(files: Map<string, string>): string[] {
+  const para = sortspecChildren(files).find((item) => item.title === "PARA");
+  const archives = para?.items?.find((item) => item.title === "Archives");
+  return (archives?.items ?? []).map((item) => item.title ?? "");
+}
+
 describe("custom-sort bookmarks reconcile", () => {
   it("inserts a missing baseline folder (LLM-Wiki) right after its predecessor (ZK)", async () => {
     const files = new Map([[BOOKMARKS_PATH, `${JSON.stringify(staleBookmarks(), null, 2)}\n`]]);
@@ -167,5 +203,99 @@ describe("custom-sort bookmarks reconcile", () => {
 
     const children = sortspecChildren(files);
     expect(children.findIndex((item) => item.type === "group" && item.title === "LLM-Wiki")).toBe(3); // right after ZK
+  });
+
+  it("heals a missing nested folder (Digest) inside a populated ZK group", async () => {
+    const files = new Map([[BOOKMARKS_PATH, `${JSON.stringify(bookmarksWithZkChildren(["Spark", "Permanent"]), null, 2)}\n`]]);
+    const app = fakeApp(files);
+
+    await customSortDependencyConfiguration.configure(fileBackedServices(), app, noManager, settings());
+
+    expect(sortspecTitles(files)).toEqual(BASELINE_ORDER); // top level untouched
+    expect(zkChildren(files)).toEqual(ZK_ORDER); // Digest inserted between Spark and Permanent
+  });
+
+  it("preserves a user reorder of nested folders inside a populated group", async () => {
+    const reordered = ["Permanent", "Spark", "Digest"];
+    const files = new Map([[BOOKMARKS_PATH, `${JSON.stringify(bookmarksWithZkChildren(reordered), null, 2)}\n`]]);
+    const app = fakeApp(files);
+    const before = files.get(BOOKMARKS_PATH);
+
+    // Complete (just permuted) → reconcile makes no change, so bookmarks.json is never rewritten.
+    await customSortDependencyConfiguration.configure(fileBackedServices(), app, noManager, settings());
+
+    expect(files.get(BOOKMARKS_PATH)).toBe(before);
+    expect(zkChildren(files)).toEqual(reordered);
+  });
+
+  it("leaves an EMPTY managed group's nested folders unpopulated (never force-filled)", async () => {
+    const files = new Map([[BOOKMARKS_PATH, `${JSON.stringify(bookmarksWithZkChildren([]), null, 2)}\n`]]);
+    const app = fakeApp(files);
+    const before = files.get(BOOKMARKS_PATH);
+
+    // ZK is present but empty, so reconcile must not descend and fill it — bookmarks.json untouched.
+    await customSortDependencyConfiguration.configure(fileBackedServices(), app, noManager, settings());
+
+    expect(files.get(BOOKMARKS_PATH)).toBe(before);
+    expect(zkChildren(files)).toEqual([]);
+  });
+
+  it("isConfigured detects nested drift after settings are already configured", async () => {
+    const files = new Map([[BOOKMARKS_PATH, `${JSON.stringify(bookmarksWithZkChildren(ZK_ORDER), null, 2)}\n`]]);
+    const app = fakeApp(files);
+    const services = fileBackedServices();
+
+    // First configure writes custom-sort settings; with readRuntimePluginSettings returning
+    // undefined (see fileBackedServices), isConfigured's check below is driven only by bookmarks.
+    await customSortDependencyConfiguration.configure(services, app, noManager, settings());
+    expect(await customSortDependencyConfiguration.isConfigured(services, app, noManager, settings())).toBe(true);
+
+    // Drop Digest from the populated ZK group; a top-level-only check would still report configured.
+    files.set(BOOKMARKS_PATH, `${JSON.stringify(bookmarksWithZkChildren(["Spark", "Permanent"]), null, 2)}\n`);
+
+    expect(await customSortDependencyConfiguration.isConfigured(services, app, noManager, settings())).toBe(false);
+  });
+
+  it("heals a folder two levels deep (PARA → Archives → Resources)", async () => {
+    const files = new Map([[BOOKMARKS_PATH, `${JSON.stringify(bookmarksWithArchivesChildren(["Projects", "Areas"]), null, 2)}\n`]]);
+    const app = fakeApp(files);
+
+    await customSortDependencyConfiguration.configure(fileBackedServices(), app, noManager, settings());
+
+    // Descends sortspec → PARA → Archives; a flat (recurse-once) impl would never reach this depth.
+    expect(archivesChildren(files)).toEqual(["Projects", "Areas", "Resources"]);
+  });
+
+  it("does not descend into a group whose only child is a file bookmark", async () => {
+    const top = BASELINE_ORDER.map((title, i) =>
+      title === "ZK" ? group("ZK", i + 2, [fileItem("Spark", 50)]) : group(title, i + 2)
+    );
+    const files = new Map([[BOOKMARKS_PATH, `${JSON.stringify(sortspecBookmarks(top), null, 2)}\n`]]);
+    const app = fakeApp(files);
+    const before = files.get(BOOKMARKS_PATH);
+
+    // ZK holds a file (length > 0) but no nested GROUP, so hasNestedGroups is false — no descent.
+    await customSortDependencyConfiguration.configure(fileBackedServices(), app, noManager, settings());
+
+    expect(files.get(BOOKMARKS_PATH)).toBe(before);
+    expect(zkChildren(files)).toEqual(["Spark"]); // the file bookmark, untouched; no groups added
+  });
+
+  it("heals a missing FIRST nested folder (Spark) at the front of ZK", async () => {
+    const files = new Map([[BOOKMARKS_PATH, `${JSON.stringify(bookmarksWithZkChildren(["Digest", "Permanent"]), null, 2)}\n`]]);
+    const app = fakeApp(files);
+
+    await customSortDependencyConfiguration.configure(fileBackedServices(), app, noManager, settings());
+
+    expect(zkChildren(files)).toEqual(ZK_ORDER); // anchor -1 → inserted at the front
+  });
+
+  it("heals a missing LAST nested folder (Permanent) at the end of ZK", async () => {
+    const files = new Map([[BOOKMARKS_PATH, `${JSON.stringify(bookmarksWithZkChildren(["Spark", "Digest"]), null, 2)}\n`]]);
+    const app = fakeApp(files);
+
+    await customSortDependencyConfiguration.configure(fileBackedServices(), app, noManager, settings());
+
+    expect(zkChildren(files)).toEqual(ZK_ORDER); // appended after Digest
   });
 });

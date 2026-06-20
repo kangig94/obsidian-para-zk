@@ -77,28 +77,39 @@ function mergeCustomSortSettings(current: Record<string, unknown>): Record<strin
 }
 
 // The sortspec group is PARA-ZK's managed folder order. The baseline grows over time (e.g.
-// LLM-Wiki was added after ZK), so a vault whose group was built from an older baseline is
-// missing the newer top-level folders. The group is complete only when it already contains
-// every baseline top-level folder.
+// LLM-Wiki was added after ZK, Digest after Spark), so a vault whose group was built from an
+// older baseline misses newer folders. The group is complete only when every baseline group is
+// present — checked recursively, but descending into a managed group only once the user has
+// populated it with nested groups (an empty group is intentionally left alone).
 async function hasCompleteCustomSortBookmarksGroup(app: App, settings: ParaZkSettings): Promise<boolean> {
   const bookmarks = await readBookmarksConfig(app);
   const existing = findCustomSortBookmarksGroup(bookmarks.items);
   if (!existing || !Array.isArray(existing.items) || existing.items.length === 0) return false;
-  const present = new Set(existing.items.map(bookmarkGroupTitle).filter(Boolean));
-  return topLevelTitles(createCustomSortBookmarksGroup(settings)).every((title) => present.has(title));
+  return bookmarkGroupsComplete(existing.items as BookmarkItem[], groupItems(createCustomSortBookmarksGroup(settings)));
+}
+
+function bookmarkGroupsComplete(existingItems: BookmarkItem[], baselineItems: BookmarkItem[]): boolean {
+  for (const baselineItem of baselineItems) {
+    const title = bookmarkGroupTitle(baselineItem);
+    if (!title) continue;
+    const found = existingItems.find((item) => bookmarkGroupTitle(item) === title);
+    if (!found) return false;
+    if (hasNestedGroups(found) && !bookmarkGroupsComplete(groupItems(found), groupItems(baselineItem))) return false;
+  }
+  return true;
 }
 
 async function ensureCustomSortBookmarksGroup(app: App, settings: ParaZkSettings): Promise<boolean> {
   const bookmarks = await readBookmarksConfig(app);
   const existing = findCustomSortBookmarksGroup(bookmarks.items);
   const baseline = createCustomSortBookmarksGroup(settings);
-  const baselineItems = Array.isArray(baseline.items) ? (baseline.items as BookmarkItem[]) : [];
+  const baselineItems = groupItems(baseline);
 
   if (!existing) {
     bookmarks.items.push(baseline);
   } else if (!Array.isArray(existing.items) || existing.items.length === 0) {
     existing.items = baselineItems;
-  } else if (!reconcileTopLevelBookmarks(existing.items as BookmarkItem[], baselineItems)) {
+  } else if (!reconcileBookmarkGroups(existing.items as BookmarkItem[], baselineItems)) {
     return false;
   }
 
@@ -106,18 +117,25 @@ async function ensureCustomSortBookmarksGroup(app: App, settings: ParaZkSettings
   return true;
 }
 
-// Add each baseline top-level folder missing from the existing group, positioned right after
-// its baseline predecessor that is present, so a newly-added folder lands where the baseline
-// puts it (LLM-Wiki after ZK). Entries already present keep their order untouched.
-function reconcileTopLevelBookmarks(existingItems: BookmarkItem[], baselineItems: BookmarkItem[]): boolean {
+// Mutates existingItems in place (and, on descent, the live nested array from groupItems) via
+// splice. Add each baseline group missing from the existing items, positioned right after its
+// baseline predecessor that is present, so a newly-added folder lands where the baseline puts it
+// (LLM-Wiki after ZK, Digest after Spark). Entries already present keep their order; descend
+// into a managed group the user has populated with nested groups so missing nested folders are
+// healed too — an empty group is left untouched, never force-populated.
+function reconcileBookmarkGroups(existingItems: BookmarkItem[], baselineItems: BookmarkItem[]): boolean {
   let changed = false;
-  let anchor = -1; // index of the last baseline folder found-or-inserted in existingItems
+  let anchor = -1; // index of the last baseline group found-or-inserted in existingItems
   for (const baselineItem of baselineItems) {
     const title = bookmarkGroupTitle(baselineItem);
     if (!title) continue;
     const found = existingItems.findIndex((item) => bookmarkGroupTitle(item) === title);
     if (found !== -1) {
       anchor = found;
+      const existingGroup = existingItems[found];
+      if (hasNestedGroups(existingGroup) && reconcileBookmarkGroups(groupItems(existingGroup), groupItems(baselineItem))) {
+        changed = true;
+      }
       continue;
     }
     const insertAt = anchor + 1;
@@ -128,9 +146,14 @@ function reconcileTopLevelBookmarks(existingItems: BookmarkItem[], baselineItems
   return changed;
 }
 
-function topLevelTitles(group: BookmarkItem): string[] {
-  const items = Array.isArray(group.items) ? group.items : [];
-  return items.map(bookmarkGroupTitle).filter((title): title is string => Boolean(title));
+function groupItems(item: BookmarkItem): BookmarkItem[] {
+  return Array.isArray(item.items) ? (item.items as BookmarkItem[]) : [];
+}
+
+// A managed group counts as "populated" once it holds at least one nested group; only then do
+// reconcile and the completeness check descend into it, so an empty group is never force-filled.
+function hasNestedGroups(item: BookmarkItem): boolean {
+  return groupItems(item).some((child) => bookmarkGroupTitle(child) !== undefined);
 }
 
 async function readBookmarksConfig(app: App): Promise<{ items: BookmarkItem[] }> {

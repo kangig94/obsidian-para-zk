@@ -32,6 +32,16 @@ Notable changes for PARA-ZK are tracked here.
   are unaffected. The wiki read-flow's no-index fallback uses this to enumerate a
   single domain's pages.
 
+### Fixed
+
+- Custom-sort dependency config now reconciles the managed `sortspec` bookmarks group
+  recursively, not just at the top level. A vault built from an older baseline whose `ZK`
+  group drifted (e.g. missing `Digest` between `Spark` and `Permanent`) was reported
+  "configured" and never healed. `setup` now descends into a managed group the user has
+  already populated with nested groups and inserts missing nested folders at their baseline
+  position. Empty groups are never force-populated, and existing top-level and nested orders
+  are preserved.
+
 ## 0.0.2 - 2026-06-19
 
 ### Added
