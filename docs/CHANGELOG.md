@@ -13,6 +13,11 @@ Notable changes for PARA-ZK are tracked here.
   backtick-wrapped formula rendered as monospace text instead of math. `wiki-lint` gains a
   broken-math detection finding (backtick-wrapped formulas, `\(...\)`/`\[...\]` delimiters,
   doubled backslashes), reported for a `wiki-ingest` re-ingest or a manual fix.
+- `import-resource` now removes dead intra-document page-anchor scaffolding — the empty
+  `<span id="page-…">` anchors and the `[text](#page-…)` links that point at them, neither of
+  which resolves in Obsidian (the link renders as a dead "not found" link). Anchors are stripped
+  and links delinked to their plain visible text; heading-embedded anchors also broke PARA-ZK's
+  `#heading` citation matching.
 - `para-zk:list` `query` now matches the note's full address path, not just its
   basename, so `query=<subpath>/` scopes a listing to a subfolder — a wiki domain
   (`type=llm-wiki query=AI/`), a Resources folder, or a project's subnotes. Title

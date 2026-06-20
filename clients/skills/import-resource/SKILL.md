@@ -125,7 +125,7 @@ tables, and figure references unless instructed otherwise. Keep citation markers
 Across all of them: real headings (`#`/`##`), valid Markdown tables (no empty cells, no
 equations trapped in cells), math as Obsidian MathJax LaTeX (`$…$` inline, `$$…$$` block;
 do not use `\(...\)`/`\[...\]`), figures embedded (web images by URL,
-local images attached), boilerplate dropped. Source provenance lives in the frontmatter (step 6);
+local images attached), boilerplate dropped, and any dead intra-document **page-anchor scaffolding** stripped. Empty `<span id="page-N-M"></span>` anchors and the `[text](#page-N-M)` links that point at them do NOT resolve in Obsidian (the link renders as a dead "page-N-M not found" link), so strip every such anchor and delink every `[text](#page-N-M)` to its plain visible text (`그림 [1](#page-0-0)a` → `그림 1a`; a `[Author et al.](#page-13-0)` citation → `Author et al.`); a heading-embedded anchor also breaks PARA-ZK's `#heading` citation matching. Source provenance lives in the frontmatter (step 6);
 only when there is useful overflow detail beyond `url`/`first_author`/`license`/`kind` (DOI,
 version, extra URLs) add a short **Source / provenance** section at the top — otherwise omit it.
 
@@ -180,7 +180,7 @@ hub — an area, a project, or an index resource — so the set is navigable.
 
 Run `para-zk:read-resource title="<title>" key=body` and re-scan for artifacts;
 confirm links via the origin note's `key=references` and the resource's `key=backlinks`. Fix and
-repeat if anything is still broken. For notes with math, confirm Obsidian delimiters are used:
+repeat if anything is still broken. Confirm no `<span id="page-…">` page anchors and no `[text](#page-N-M)` dead links survive anywhere. For notes with math, confirm Obsidian delimiters are used:
 `$…$` for inline math and `$$…$$` for blocks; no `\(...\)` or `\[...\]` should remain.
 
 ## 8. Launch wiki ingest
