@@ -76,6 +76,9 @@ content an existing page already fully covers. If nothing durable emerged, stop 
    - **Cite & link**: cite the canonical sources the answer used as `references` (`key=references
      op=insert`) + inline body `` `PZ[<id>]` ``; wiki↔wiki concept links as body `[[link]]`. Keep
      links **single-direction** — never link a canonical note back into the wiki.
+   - **Math**: write formulas and symbols as Obsidian MathJax — `$…$` inline, `$$…$$` display on its
+     own line, with LITERAL single backslashes; NEVER wrap math in backticks (those are only for `` `PZ[<id>]` ``
+     citations — a backtick-wrapped formula renders as monospace, not math) and never use `\(...\)`/`\[...\]`.
    - **Hub light-touch** (new page only): add the new leaf to its domain `<domain>/index` under the
      fitting group with a one-line gist (not a bare link). If it fits no group cleanly, leave it and
      flag for the next `wiki-ingest` synthesize — do not force a malformed entry. Full hub

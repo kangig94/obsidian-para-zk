@@ -6,6 +6,13 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Changed
 
+- LLM-Wiki authoring surfaces now carry an explicit Obsidian-MathJax rule: the
+  `wiki-weaver` agent, the `wiki-capture` skill, and `wiki-ingest`'s insight-fold step
+  write formulas as `$…$`/`$$…$$` with literal single backslashes and never inside backtick
+  code-spans (backticks are reserved for `PZ[id]` citations and code/identifiers) — a
+  backtick-wrapped formula rendered as monospace text instead of math. `wiki-lint` gains a
+  broken-math detection finding (backtick-wrapped formulas, `\(...\)`/`\[...\]` delimiters,
+  doubled backslashes), reported for a `wiki-ingest` re-ingest or a manual fix.
 - `para-zk:list` `query` now matches the note's full address path, not just its
   basename, so `query=<subpath>/` scopes a listing to a subfolder — a wiki domain
   (`type=llm-wiki query=AI/`), a Resources folder, or a project's subnotes. Title

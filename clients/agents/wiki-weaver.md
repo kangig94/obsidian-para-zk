@@ -109,6 +109,15 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
       `` `PZ[<id>]` ``) are for citing canonical SOURCES (notes OUTSIDE LLM-Wiki) only — never for
       wiki↔wiki links.
 
+    MATH (Obsidian MathJax): write EVERY formula and standalone symbol (a Greek letter, subscript, or
+    operator used mathematically) as MathJax — `$…$` inline,
+    `$$…$$` on its own line for a display equation — with LITERAL single backslashes
+    (`$\phi \in [0,1]$`, `$\exp(-x/\sigma)$`, `$q^{tar}_t = q^{ref}_t + a_t$`); never double them
+    (`\\phi` is wrong). NEVER wrap math in a backtick code-span: backticks are ONLY for `` `PZ[<id>]` ``
+    citations and literal code/identifiers, and a backtick-wrapped formula renders as monospace TEXT,
+    not math — e.g. the code-span `` `\phi \in [0,1]` `` is broken, whereas `$\phi \in [0,1]$` renders.
+    Do not use `\(...\)` or `\[...\]` delimiters; Obsidian ignores them.
+
     COMPARE-AND-SWAP: when extending an existing page (`existing:true`), continuing your own page after
     a context boundary, or in a re-ingest, your write is a compare-and-swap — `op=replace` whose
     `match` is the exact current text you read (for a whole recompose, the entire current body), `with`
@@ -125,6 +134,8 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
     - Each source woven into the page has a stable `references` id, cited inline as `` `PZ[<id>]` ``
       (never bare), with a verbatim `#section` or none.
     - Cross-links to `page.links` (and any related `plan_pages` discovered) are full-path wikilinks.
+    - Every formula and symbol is Obsidian MathJax (`$…$`/`$$…$$`, single backslashes — not `\\phi`) —
+      never wrapped in backtick code-spans, never `\(...\)`/`\[...\]`.
     - Hub: the page is a RELATIONAL MAP — `children` grouped, each with a one-line gist and how they
       relate — with full-path wikilinks; no bare link list, no `PZ[id]` citations, no source reads.
     - Extending an existing page uses compare-and-swap; re-running does not duplicate paragraphs/citations.
@@ -142,6 +153,7 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
     | Fold `page.sections` (and any genuinely-new facet of this page) as in-page headings. | Spin a new page for a mechanism/sub-concept — report it under `unplanned_concepts` instead. |
     | Cross-link with FULL-PATH `[[LLM-Wiki/<domain>/<concept>|<display>]]` to `page.links` and related `plan_pages`. | Bare `[[Concept]]` links, or put wiki↔wiki links in `references`. |
     | Cite sources inline as backtick `` `PZ[<id>]` `` with a VERBATIM `#heading` (incl. leading number/symbol) or no `#section`. | Bare PZ[id] without backticks, numeric `PZ[0]`, or a paraphrased/number-dropped `#section`. |
+    | Render math/symbols as Obsidian MathJax — `$…$` inline, `$$…$$` display, LITERAL single backslashes. | Wrap a formula/symbol in backtick code-spans, double-escape backslashes (write `$\phi$`, not `$\\phi$`), or use `\(...\)`/`\[...\]`. |
     | Pass `by=<model-id>` on every create/update; insert a source into `references` by its FULL vault path (`[[PARA/Resources/Paper/X.md|X]]`, never bare). | Omit `by`, or insert a bare-title reference (ambiguous, rejected). |
     | Extend/continue/re-ingest via compare-and-swap `op=replace`; `op=set` only to seed an EMPTY-body page (one you created, or an auto-created `<domain>/index` scaffold). | Clobber a changed page with `op=set`, or retry a stale `match` after a rejection. |
     | Hub mode: read `children` page leads and write a RELATIONAL MAP (grouped children + one-line gist each + how they relate), full-path links. | Write a bare link list, read source bodies, or add `PZ[id]` citations in a hub. |

@@ -162,7 +162,8 @@ the concrete routing error — do not ask the user.
    their packets. If THIS conversation surfaced a genuine, wiki-worthy insight the source bodies alone
    do not capture (a synthesis, a key tension, a correction the user raised), fold it into the relevant
    touched page(s) via `update-llm-wiki key=body op=... by=<model-id>` after verification, citing any
-   canonical source as a backtick `` `PZ[id]` `` and keeping links single-direction. Guardrails: ONLY
+   canonical source as a backtick `` `PZ[id]` ``, keeping links single-direction, and writing any formula
+   as Obsidian MathJax (`$…$`/`$$…$$`, single backslashes, never backtick-wrapped or `\(...\)`/`\[...\]`). Guardrails: ONLY
    genuine user-surfaced insight — never invent, embellish, or inject tangential conversation; if
    unsure whether it belongs, surface it to the user instead of writing it; if nothing genuine
    emerged, skip. Report what was folded in.
