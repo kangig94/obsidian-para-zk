@@ -572,14 +572,14 @@ function dataviewAreaRetros(t: ReturnType<typeof localePack>, settings: ParaZkSe
 
 function dataviewCitedBy(t: ReturnType<typeof localePack>, settings: ParaZkSettings, sourcePath?: string): string[] {
   return fenced("dataview", [
-    `TABLE WITHOUT ID ${dataviewCitedByName(settings)} AS "${t.labels.filename}", ${dataviewCitedByType(t)} AS "${t.labels.noteType}", file.mtime AS "${t.labels.updated}"`,
+    `TABLE WITHOUT ID ${dataviewCitedByName(settings)} AS "${t.labels.filename}", ${dataviewNoteTypeLabel(t)} AS "${t.labels.noteType}", file.mtime AS "${t.labels.updated}"`,
     `FROM ""`,
     `WHERE contains(file.outlinks, ${dataviewCurrentFileLink(sourcePath)}) AND ${dataviewNotArchived(settings)}`,
     "SORT file.mtime DESC"
   ]);
 }
 
-function dataviewCitedByType(t: ReturnType<typeof localePack>): string {
+function dataviewNoteTypeLabel(t: ReturnType<typeof localePack>): string {
   return `choice(type = "project", "${t.labels.project}", choice(type = "area", "${t.labels.area}", choice(type = "resource", "${t.labels.typeResource}", choice(type = "spark", "${t.labels.typeSpark}", choice(type = "digest", "${t.labels.typeDigest}", choice(type = "permanent", "${t.labels.typePermanent}", choice(type = "llm-wiki", "${t.labels.llmWiki}", type)))))))`;
 }
 
@@ -986,7 +986,7 @@ function dashboardRecentCoreNotes(t: ReturnType<typeof localePack>, settings: Pa
     .map((type) => `type = "${type}"`)
     .join(" OR ");
   return fenced("dataview", [
-    `TABLE WITHOUT ID file.link AS "${t.labels.references}", type AS "${t.labels.kind}", file.mtime AS "${t.labels.updated}"`,
+    `TABLE WITHOUT ID file.link AS "${t.labels.references}", ${dataviewNoteTypeLabel(t)} AS "${t.labels.noteType}", file.mtime AS "${t.labels.updated}"`,
     `FROM ${dataviewSources([
       settings.paths.projectsFolder,
       settings.paths.areasFolder,
