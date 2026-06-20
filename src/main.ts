@@ -6,6 +6,7 @@ import { createCitationEditorExtension } from "./ux/citations/editor";
 import { registerCitationRenderers } from "./ux/citations/renderer";
 import { CitationSuggest } from "./ux/citations/suggest";
 import { registerDashboardActionRenderers } from "./ux/actions/dashboard";
+import { registerActionBlockRenderers } from "./ux/blocks/action";
 import { registerDashboardSummaryRenderers } from "./ux/blocks/dashboard-summary";
 import { registerDataviewViewRenderers } from "./ux/blocks/dataview";
 import { registerEditorWidthControl } from "./ux/editor-width";
@@ -35,6 +36,7 @@ export default class ParaZkPlugin extends Plugin {
     registerRibbonActions(this);
     registerExplorerActions(this);
     registerDashboardActionRenderers(this);
+    registerActionBlockRenderers(this);
     registerDashboardSummaryRenderers(this);
     registerDataviewViewRenderers(this);
     registerLatestRetroSummaryRenderers(this);

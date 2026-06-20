@@ -362,10 +362,14 @@ function paraZkManagedBlock(): string {
 }
 
 function paraZkViewBlock(key: DataviewViewKey, title?: string): string {
-  return fenced("para-zk-view", title ? [
+  return fenced("para-zk-view", [
     `key: ${key}`,
-    `title: ${title}`
-  ] : [key]).join("\n");
+    ...(title ? [`title: ${title}`] : [])
+  ]).join("\n");
+}
+
+function paraZkActionBlock(actions: ReadonlyArray<{ command: string; icon: string; label: string }>): string[] {
+  return fenced("para-zk-action", actions.map((a) => `${a.command}|${a.icon}|${a.label}`));
 }
 
 function paraZkTasksBlock(root: "current" | "all", extra: string[] = [], title?: string): string[] {
@@ -397,51 +401,71 @@ function fenced(language: string, lines: string[]): string[] {
 
 type TemplateLabelKey = keyof TemplateLocalePack["labels"];
 type ManagedUiType = Exclude<TemplateName, "retro">;
+type ManagedUiAction = { command: string; label: TemplateLabelKey; icon: string };
 type ManagedUiBlockRecipeItem =
   | { kind: "tasks"; label: TemplateLabelKey }
   | { kind: "view"; key: DataviewViewKey; label: TemplateLabelKey }
-  | { kind: "references"; label: TemplateLabelKey };
+  | { kind: "references"; label: TemplateLabelKey }
+  | { kind: "action"; actions: readonly ManagedUiAction[] };
 
 const MANAGED_UI_BLOCK_RECIPES: Record<ManagedUiType, readonly ManagedUiBlockRecipeItem[]> = {
   project: [
     { kind: "tasks", label: "tasks" },
+    { kind: "action", actions: [{ command: "create-subnote", label: "createSubnote", icon: "file-plus" }] },
     { kind: "view", key: "project-subnotes", label: "subnotes" },
+    { kind: "action", actions: [{ command: "create-retro", label: "createRetro", icon: "calendar-plus" }] },
     { kind: "view", key: "project-retros", label: "retros" },
+    { kind: "view", key: "cited-by", label: "citedBy" },
     { kind: "references", label: "references" }
   ],
   area: [
     { kind: "view", key: "area-projects", label: "dashboardProjects" },
     { kind: "tasks", label: "tasks" },
+    { kind: "action", actions: [{ command: "create-subarea", label: "createSubarea", icon: "folder-plus" }] },
     { kind: "view", key: "area-subareas", label: "subareas" },
+    { kind: "action", actions: [{ command: "create-subnote", label: "createSubnote", icon: "file-plus" }] },
     { kind: "view", key: "area-subnotes", label: "subnotes" },
+    { kind: "action", actions: [{ command: "create-retro", label: "createRetro", icon: "calendar-plus" }] },
     { kind: "view", key: "area-retros", label: "retros" },
+    { kind: "view", key: "cited-by", label: "citedBy" },
     { kind: "references", label: "references" }
   ],
   subnote: [
+    { kind: "view", key: "cited-by", label: "citedBy" },
     { kind: "references", label: "references" }
   ],
   resource: [
-    { kind: "view", key: "resource-cited-by", label: "createdFromThis" },
+    { kind: "action", actions: [{ command: "create-from-resource", label: "createZkButton", icon: "arrow-up-right" }] },
+    { kind: "view", key: "cited-by", label: "citedBy" },
     { kind: "references", label: "references" }
   ],
   "llm-wiki": [
-    { kind: "view", key: "llm-wiki-cited-by", label: "citedBy" },
+    { kind: "view", key: "cited-by", label: "citedBy" },
     { kind: "references", label: "references" }
   ],
   journal: [
     { kind: "tasks", label: "tasks" },
+    { kind: "view", key: "cited-by", label: "citedBy" },
     { kind: "references", label: "references" }
   ],
   spark: [
+    {
+      kind: "action",
+      actions: [
+        { command: "discard-spark", label: "discardButton", icon: "trash-2" },
+        { command: "distill-spark", label: "distillButton", icon: "arrow-up-right" }
+      ]
+    },
     { kind: "view", key: "spark-distill", label: "createdFromThis" },
     { kind: "references", label: "references" }
   ],
   digest: [
-    { kind: "view", key: "digest-cited-by", label: "createdFromThis" },
+    { kind: "action", actions: [{ command: "create-from-digest", label: "createPermanentButton", icon: "arrow-up-right" }] },
+    { kind: "view", key: "cited-by", label: "citedBy" },
     { kind: "references", label: "references" }
   ],
   permanent: [
-    { kind: "view", key: "permanent-cited-by", label: "citedBy" },
+    { kind: "view", key: "cited-by", label: "citedBy" },
     { kind: "references", label: "references" }
   ]
 };
@@ -464,14 +488,15 @@ function renderManagedUiBlockRecipeItem(
   item: ManagedUiBlockRecipeItem,
   t: TemplateLocalePack
 ): string | string[] {
-  const label = t.labels[item.label];
   switch (item.kind) {
     case "tasks":
-      return paraZkTasksBlock("current", [], label);
+      return paraZkTasksBlock("current", [], t.labels[item.label]);
     case "view":
-      return paraZkViewBlock(item.key, label);
+      return paraZkViewBlock(item.key, t.labels[item.label]);
     case "references":
-      return paraZkReferencesBlock("current", label);
+      return paraZkReferencesBlock("current", t.labels[item.label]);
+    case "action":
+      return paraZkActionBlock(item.actions.map((a) => ({ command: a.command, icon: a.icon, label: t.labels[a.label] })));
   }
 }
 
@@ -545,24 +570,28 @@ function dataviewAreaRetros(t: ReturnType<typeof localePack>, settings: ParaZkSe
   return dataviewRetros(t, settings, `contains(areas, ${dataviewCurrentFileLink(sourcePath)})`);
 }
 
-// Notes (in ZK folders) that reference the current file. Read-only derived view
-// over Obsidian's link graph — the single-direction reference made on the citing
-// side surfaces here without any reverse link being stored (see ZK redesign).
 function dataviewCitedBy(t: ReturnType<typeof localePack>, settings: ParaZkSettings, sourcePath?: string): string[] {
-  return dataviewCitedByFromFolders(t, zkSourceFolders(settings), sourcePath);
-}
-
-function dataviewWikiCitedBy(t: ReturnType<typeof localePack>, settings: ParaZkSettings, sourcePath?: string): string[] {
-  return dataviewCitedByFromFolders(t, [settings.paths.wikiFolder], sourcePath);
-}
-
-function dataviewCitedByFromFolders(t: ReturnType<typeof localePack>, folders: string[], sourcePath?: string): string[] {
   return fenced("dataview", [
-    `TABLE WITHOUT ID file.link AS "${t.labels.filename}", file.mtime AS "${t.labels.updated}"`,
-    `FROM ${dataviewSources(folders)}`,
-    `WHERE contains(file.outlinks, ${dataviewCurrentFileLink(sourcePath)})`,
+    `TABLE WITHOUT ID ${dataviewCitedByName(settings)} AS "${t.labels.filename}", ${dataviewCitedByType(t)} AS "${t.labels.noteType}", file.mtime AS "${t.labels.updated}"`,
+    `FROM ""`,
+    `WHERE contains(file.outlinks, ${dataviewCurrentFileLink(sourcePath)}) AND ${dataviewNotArchived(settings)}`,
     "SORT file.mtime DESC"
   ]);
+}
+
+function dataviewCitedByType(t: ReturnType<typeof localePack>): string {
+  return `choice(type = "project", "${t.labels.project}", choice(type = "area", "${t.labels.area}", choice(type = "resource", "${t.labels.typeResource}", choice(type = "spark", "${t.labels.typeSpark}", choice(type = "digest", "${t.labels.typeDigest}", choice(type = "permanent", "${t.labels.typePermanent}", choice(type = "llm-wiki", "${t.labels.llmWiki}", type)))))))`;
+}
+
+function dataviewCitedByName(settings: ParaZkSettings): string {
+  const roots = [
+    settings.paths.projectsFolder, settings.paths.areasFolder, settings.paths.resourcesFolder,
+    settings.paths.sparkFolder, settings.paths.digestFolder, settings.paths.permanentFolder,
+    settings.paths.wikiFolder, settings.paths.journalFolder, settings.paths.retrosFolder
+  ];
+  const alt = roots.map((r) => escapeRegExp(`${r}/`)).join("|");
+  const pattern = `^(${alt})|\\.md$`;
+  return `link(file.path, regexreplace(file.path, ${JSON.stringify(pattern)}, ""))`;
 }
 
 // The permanents a spark has been distilled into. The `distilled_to` pointer lives
@@ -582,11 +611,8 @@ export const DATAVIEW_VIEW_KEYS = [
   "area-subareas",
   "area-subnotes",
   "area-retros",
-  "resource-cited-by",
-  "llm-wiki-cited-by",
-  "permanent-cited-by",
-  "spark-distill",
-  "digest-cited-by"
+  "cited-by",
+  "spark-distill"
 ] as const;
 
 export type DataviewViewKey = typeof DATAVIEW_VIEW_KEYS[number];
@@ -604,11 +630,8 @@ const DATAVIEW_VIEW_RENDERERS: Record<DataviewViewKey, DataviewViewRenderer> = {
   "area-subareas": ({ t, settings, sourcePath }) => dataviewChildAreas(t, settings, sourcePath),
   "area-subnotes": ({ t, sourcePath }) => dataviewChildDocs(t, sourcePath),
   "area-retros": ({ t, settings, sourcePath }) => dataviewAreaRetros(t, settings, sourcePath),
-  "resource-cited-by": ({ t, settings, sourcePath }) => dataviewCitedBy(t, settings, sourcePath),
-  "llm-wiki-cited-by": ({ t, settings, sourcePath }) => dataviewWikiCitedBy(t, settings, sourcePath),
-  "permanent-cited-by": ({ t, settings, sourcePath }) => dataviewCitedBy(t, settings, sourcePath),
-  "spark-distill": ({ t }) => dataviewDistilledInto(t),
-  "digest-cited-by": ({ t, settings, sourcePath }) => dataviewCitedBy(t, settings, sourcePath)
+  "cited-by": ({ t, settings, sourcePath }) => dataviewCitedBy(t, settings, sourcePath),
+  "spark-distill": ({ t }) => dataviewDistilledInto(t)
 };
 
 /**

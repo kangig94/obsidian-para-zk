@@ -1,42 +1,28 @@
 import {
   MarkdownRenderChild,
   MarkdownRenderer,
-  Notice,
   TFile,
   type MarkdownPostProcessorContext
 } from "obsidian";
-import { localePack } from "../../i18n";
 import type { ParaZkPluginContext } from "../../plugin-interface";
 import { DATAVIEW_VIEW_KEYS, dataviewViewBlock, type DataviewViewKey } from "../../templates";
 import {
   renderBlockNotice,
-  renderBlockShell,
-  renderShellAction
+  renderBlockShell
 } from "./shell";
 import { parseCodeBlockKeyValues } from "../code-block-args";
-import { runGuiWorkflow } from "../actions/workflows";
 
 type DataviewViewArgs = {
   key: string;
   title?: string;
 };
 
-type DataviewViewAction = {
-  command: string;
-  label: string;
-  icon: string;
-};
-
-type DataviewViewToolbar = {
-  actions: DataviewViewAction[];
-};
-
 const DATAVIEW_INITIAL_RERENDER_DELAYS_MS = [1600, 3600] as const;
 const DATAVIEW_CHANGE_RERENDER_DELAYS_MS = [300, 3200] as const;
 
 // Renders a compact `para-zk-view` block by expanding its view key into a
-// managed Dataview query and optional PARA-ZK workflow toolbar. The source path
-// is passed so the query's `this.file` resolves to the host note.
+// managed Dataview query. The source path is passed so the query's `this.file`
+// resolves to the host note.
 export function registerDataviewViewRenderers(plugin: ParaZkPluginContext): void {
   plugin.registerMarkdownCodeBlockProcessor("para-zk-view", (source, el, ctx) => {
     ctx.addChild(new DataviewViewRenderChild(plugin, el, readViewArgs(source), ctx.sourcePath));
@@ -123,31 +109,30 @@ async function renderDataviewView(
 ): Promise<void> {
   if (!isCurrent()) return;
   const key = args.key;
-  const block = dataviewViewBlock(key, plugin.settings, sourcePath);
 
   el.empty();
+  if (!isDataviewViewKey(key)) {
+    renderBlockNotice(el, viewBlockKind(key), `Unknown PARA-ZK view: ${key || "(empty)"}`);
+    return Promise.resolve();
+  }
+
+  const block = dataviewViewBlock(key, plugin.settings, sourcePath);
   if (!block) {
     renderBlockNotice(el, viewBlockKind(key), `Unknown PARA-ZK view: ${key || "(empty)"}`);
     return Promise.resolve();
   }
 
-  const viewKey = readDataviewViewKey(key);
-  const body = renderDataviewViewShell(plugin, el, viewKey, sourcePath, key, args.title);
+  const body = renderDataviewViewShell(el, key, args.title);
   await MarkdownRenderer.render(plugin.app, block, body, sourcePath ?? "", child);
   if (!isCurrent()) return;
 }
 
 function readViewArgs(source: string): DataviewViewArgs {
   const raw = parseCodeBlockKeyValues(source);
-  const key = raw.key?.trim() || raw.view?.trim() || legacyViewKey(source);
   return {
-    key,
+    key: raw.key?.trim() ?? "",
     title: raw.title?.trim() || undefined
   };
-}
-
-function legacyViewKey(source: string): string {
-  return source.split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? "";
 }
 
 function renderDataviewViewError(el: HTMLElement, error: unknown): void {
@@ -155,86 +140,19 @@ function renderDataviewViewError(el: HTMLElement, error: unknown): void {
 }
 
 function renderDataviewViewShell(
-  plugin: ParaZkPluginContext,
   el: HTMLElement,
-  key: DataviewViewKey | undefined,
-  sourcePath: string | undefined,
   rawKey: string,
   title?: string
 ): HTMLElement {
-  const toolbar = key ? dataviewViewToolbar(plugin, key) : undefined;
-  const actions = toolbar?.actions ?? [];
   const titleText = title?.trim();
   return renderBlockShell(el, {
     kind: viewBlockKind(rawKey),
-    title: titleText,
-    renderActions: actions.length > 0 ? (controls) => {
-      for (const action of actions) {
-        renderShellAction(controls, {
-          label: action.label,
-          icon: action.icon,
-          cta: true,
-          onClick: async (_button, component) => {
-            if (!action.command) {
-              new Notice(localePack(plugin.settings.locale).messages.buttonMissingCommand);
-              return;
-            }
-
-            component.setDisabled(true);
-            try {
-              await runGuiWorkflow(plugin, action.command, sourcePath);
-            } finally {
-              component.setDisabled(false);
-            }
-          }
-        });
-      }
-    } : undefined
+    title: titleText
   }).body;
 }
 
-function dataviewViewToolbar(plugin: ParaZkPluginContext, key: DataviewViewKey): DataviewViewToolbar | undefined {
-  const labels = localePack(plugin.settings.locale).labels;
-  switch (key) {
-    case "project-subnotes":
-    case "area-subnotes":
-      return actionToolbar("create-subnote", labels.createSubnote, "file-plus");
-    case "project-retros":
-    case "area-retros":
-      return actionToolbar("create-retro", labels.createRetro, "calendar-plus");
-    case "area-subareas":
-      return actionToolbar("create-subarea", labels.createSubarea, "folder-plus");
-    case "resource-cited-by":
-      return actionToolbar("create-from-resource", labels.createZkButton, "arrow-up-right");
-    case "spark-distill":
-      return {
-        actions: [
-          { command: "discard-spark", label: labels.discardButton, icon: "trash-2" },
-          { command: "distill-spark", label: labels.distillButton, icon: "arrow-up-right" }
-        ]
-      };
-    case "digest-cited-by":
-      return actionToolbar("create-from-digest", labels.createPermanentButton, "arrow-up-right");
-    case "permanent-cited-by":
-    case "area-projects":
-      return undefined;
-  }
-}
-
-function actionToolbar(command: string, actionLabel: string, icon: string): DataviewViewToolbar {
-  return {
-    actions: [
-      {
-        command,
-        label: actionLabel,
-        icon
-      }
-    ]
-  };
-}
-
-function readDataviewViewKey(key: string): DataviewViewKey | undefined {
-  return DATAVIEW_VIEW_KEYS.includes(key as DataviewViewKey) ? key as DataviewViewKey : undefined;
+function isDataviewViewKey(key: string): key is DataviewViewKey {
+  return DATAVIEW_VIEW_KEYS.includes(key as DataviewViewKey);
 }
 
 function viewClassName(key: string): string {

@@ -6,6 +6,13 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Changed
 
+- Managed-block UI: the four per-type "cited by" Dataview views collapse into one general
+  `cited-by` view on every note type except spark — a vault-wide backlink scan that classifies
+  each citing note by its `type` (raw `type` shown for unlisted kinds) and renders a
+  root-relative, `.md`-stripped path (fixing the `<domain>/index` filename collision where
+  multiple index pages all showed as "index"). All managed-block buttons (create subnote/retro/
+  subarea, distill/discard, create-from-resource/digest) move from per-view toolbars into
+  declarative `para-zk-action` blocks; the legacy bare-token `para-zk-view` key fallback is removed.
 - LLM-Wiki authoring surfaces now carry an explicit Obsidian-MathJax rule: the
   `wiki-weaver` agent, the `wiki-capture` skill, and `wiki-ingest`'s insight-fold step
   write formulas as `$…$`/`$$…$$` with literal single backslashes and never inside backtick

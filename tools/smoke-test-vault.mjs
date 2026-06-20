@@ -404,12 +404,12 @@ function assertDataviewToolbarLayout(path) {
       const root = leaf.view.containerEl;
       taskToolbar = root.querySelector(".para-zk-block--tasks .para-zk-block__toolbar");
       referenceToolbar = root.querySelector(".para-zk-block--references .para-zk-block__toolbar");
-      viewToolbar = root.querySelector(".para-zk-block--view-project-subnotes .para-zk-block__toolbar");
+      viewToolbar = root.querySelector(".para-zk-block--action .para-zk-block__toolbar");
       viewRoot = root.querySelector(".para-zk-block--view-project-subnotes");
-      viewButton = root.querySelector(".para-zk-block--view-project-subnotes .para-zk-block__toolbar .para-zk-block__action");
+      viewButton = root.querySelector(".para-zk-block--action .para-zk-block__action");
       taskTitle = taskToolbar?.querySelector(".para-zk-block__title")?.textContent?.trim() ?? "";
       referenceTitle = referenceToolbar?.querySelector(".para-zk-block__title")?.textContent?.trim() ?? "";
-      viewTitle = viewToolbar?.querySelector(".para-zk-block__title")?.textContent?.trim() ?? "";
+      viewTitle = viewRoot?.querySelector(".para-zk-block__title")?.textContent?.trim() ?? "";
       if (taskToolbar && referenceToolbar && viewToolbar && viewRoot) break;
       await sleep(100);
     }
@@ -676,7 +676,7 @@ function assertLlmWikiCitedByRenderer() {
     let links = [];
     let hasCiting = false;
     for (let index = 0; index < 60; index += 1) {
-      block = leaf.view.containerEl.querySelector(".para-zk-block--view-llm-wiki-cited-by");
+      block = leaf.view.containerEl.querySelector(".para-zk-block--view-cited-by");
       title = block?.querySelector(".para-zk-block__title")?.textContent?.trim() ?? "";
       text = block?.textContent ?? "";
       links = block ? Array.from(block.querySelectorAll("a.internal-link")).map((link) => ({
@@ -1356,8 +1356,10 @@ function assertCreateRetroButtonProjectLink() {
     await leaf.setViewState({ type: "markdown", state: { file: path, mode: "preview" }, active: true });
 
     let button = null;
+    const retroLabel = ${JSON.stringify(L.createRetro)};
     for (let index = 0; index < 30; index += 1) {
-      button = leaf.view.containerEl.querySelector(".para-zk-block--view-project-retros .para-zk-block__toolbar .para-zk-block__action");
+      button = Array.from(leaf.view.containerEl.querySelectorAll(".para-zk-block--action .para-zk-block__action"))
+        .find((candidate) => (candidate.textContent ?? "").includes(retroLabel)) ?? null;
       if (button) break;
       await sleep(100);
     }
