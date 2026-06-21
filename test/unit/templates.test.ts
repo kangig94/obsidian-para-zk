@@ -164,6 +164,20 @@ describe("managed templates", () => {
     expect(citedBy).not.toContain('!startswith(file.path, "Archive/Custom/")');
   });
 
+  it("excludes a folder note's own subtree from cited-by, but keeps flat-note siblings", () => {
+    const project = dataviewViewBlock("cited-by", DEFAULT_SETTINGS, "PARA/Projects/Alpha/Alpha.md") ?? "";
+    const area = dataviewViewBlock("cited-by", DEFAULT_SETTINGS, "PARA/Areas/Ops/Ops.md") ?? "";
+    const resource = dataviewViewBlock("cited-by", DEFAULT_SETTINGS, "PARA/Resources/Paper.md") ?? "";
+
+    // Folder notes (project/area): exclude the whole own subtree at any depth via the prefix.
+    expect(project).toContain('AND !startswith(file.path, "PARA/Projects/Alpha/")');
+    expect(area).toContain('AND !startswith(file.path, "PARA/Areas/Ops/")');
+    // Flat notes: NO own-subtree exclusion (a sibling resource citing this one is a real cited-by);
+    // only the archive guard remains.
+    expect(resource).not.toContain('!startswith(file.path, "PARA/Resources/');
+    expect(resource).toContain('!startswith(file.path, "PARA/Archives/")');
+  });
+
   it("matches Dataview relationship views against the source note link", () => {
     const sourcePath = "PARA/Projects/Alpha/Alpha.md";
     const sourceLink = `link(${JSON.stringify(sourcePath)})`;

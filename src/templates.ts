@@ -626,12 +626,30 @@ function dataviewAreaRetros(t: ReturnType<typeof localePack>, sourcePath?: strin
 }
 
 function dataviewCitedBy(t: ReturnType<typeof localePack>, sourcePath?: string): string[] {
+  const ownSubtree = dataviewCitedByExcludeOwnSubtree(sourcePath);
   return fenced("dataview", [
     `TABLE WITHOUT ID ${dataviewCitedByName()} AS "${t.labels.filename}", ${dataviewNoteTypeLabel(t)} AS "${t.labels.noteType}", file.mtime AS "${t.labels.updated}"`,
     `FROM ""`,
-    `WHERE contains(file.outlinks, ${dataviewCurrentFileLink(sourcePath)}) AND ${dataviewNotArchived()}`,
+    `WHERE contains(file.outlinks, ${dataviewCurrentFileLink(sourcePath)}) AND ${dataviewNotArchived()}${ownSubtree ? ` AND ${ownSubtree}` : ""}`,
     "SORT file.mtime DESC"
   ]);
+}
+
+// In cited-by, drop the folder note's OWN subtree: a project/area note's children link back to it
+// (parent: [[…]]) and already appear in the subnotes view, so they would otherwise duplicate. The
+// startswith prefix excludes every descendant at any depth; the trailing "/" keeps sibling folders
+// that share a name prefix (Alpha vs AlphaBeta). Only when the current note IS a folder note (its
+// file sits in a folder named after it) — flat notes keep every citation (a sibling resource/wiki
+// page citing this one is a real cited-by). Computed from the baked source path so the literal is
+// regex-free (paren-safe); a path-less render keeps every citation.
+function dataviewCitedByExcludeOwnSubtree(sourcePath: string | undefined): string | undefined {
+  if (sourcePath === undefined) return undefined;
+  const folder = parentFolder(sourcePath);
+  if (!folder) return undefined;
+  const base = sourcePath.slice(sourcePath.lastIndexOf("/") + 1).replace(/\.md$/i, "");
+  const enclosingName = folder.slice(folder.lastIndexOf("/") + 1);
+  if (enclosingName !== base) return undefined;
+  return `!startswith(file.path, ${jsString(`${folder}/`)})`;
 }
 
 function dataviewNoteTypeLabel(t: ReturnType<typeof localePack>): string {
