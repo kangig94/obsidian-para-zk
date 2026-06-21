@@ -9,6 +9,7 @@ import {
   type MarkdownPostProcessorContext
 } from "obsidian";
 import { localePack } from "../../i18n";
+import { PARA_ZK_PATHS } from "../../layout";
 import type { ParaZkPluginContext } from "../../plugin-interface";
 import { localDate } from "../../time";
 import { readFileFrontmatterFresh } from "../../vault/frontmatter";
@@ -153,7 +154,7 @@ class TaskBlockRenderChild extends MarkdownRenderChild {
   private affectsTasks(path: string | undefined): boolean {
     if (!path) return false;
     if (path === this.ctx.sourcePath) return true;
-    const tasksFolder = normalizeVaultPath(this.plugin.settings.paths.tasksFolder);
+    const tasksFolder = normalizeVaultPath(PARA_ZK_PATHS.tasksFolder);
     const normalized = normalizeVaultPath(path);
     return normalized === tasksFolder || normalized.startsWith(`${tasksFolder}/`);
   }

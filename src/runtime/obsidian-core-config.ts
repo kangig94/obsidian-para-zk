@@ -1,7 +1,8 @@
 import type { App } from "obsidian";
+import { PARA_ZK_PATHS } from "../layout";
 import { isRecord } from "../records";
 import { appendUniqueStrings } from "../text";
-import type { SetupResult, ParaZkSettings } from "../types";
+import type { SetupResult } from "../types";
 import { joinVaultPath, normalizeVaultPath, parentFolder } from "../vault/paths";
 
 const APP_CONFIG_PATH = ".obsidian/app.json";
@@ -16,20 +17,19 @@ type ConfigState = {
 
 export async function configureObsidianCoreSettings(
   app: App,
-  settings: ParaZkSettings,
   result: SetupResult,
   dryRun: boolean
 ): Promise<void> {
   const appConfig = await readConfig(app, APP_CONFIG_PATH, result);
   if (appConfig) {
-    const nextAppConfig = mergeAppConfig(appConfig.value, settings);
+    const nextAppConfig = mergeAppConfig(appConfig.value);
     await writeConfig(app, appConfig, nextAppConfig, result, dryRun);
     if (!dryRun) updateRuntimeAppConfig(app, nextAppConfig);
   }
 
   const templatesConfig = await readConfig(app, TEMPLATES_CONFIG_PATH, result);
   if (templatesConfig) {
-    const nextTemplatesConfig = mergeTemplatesConfig(templatesConfig.value, settings);
+    const nextTemplatesConfig = mergeTemplatesConfig(templatesConfig.value);
     await writeConfig(app, templatesConfig, nextTemplatesConfig, result, dryRun);
     if (!dryRun) updateRuntimeTemplatesConfig(app, nextTemplatesConfig);
   }
@@ -79,8 +79,8 @@ async function writeConfig(
   await app.vault.adapter.write(current.path, `${JSON.stringify(next, null, 2)}\n`);
 }
 
-function mergeAppConfig(current: Record<string, unknown>, settings: ParaZkSettings): Record<string, unknown> {
-  const legacyLogFilter = cleanIgnoreFilter(joinVaultPath(settings.paths.wikiFolder, "log.md"));
+function mergeAppConfig(current: Record<string, unknown>): Record<string, unknown> {
+  const legacyLogFilter = cleanIgnoreFilter(joinVaultPath(PARA_ZK_PATHS.wikiFolder, "log.md"));
   const prunedIgnoreFilters = Array.isArray(current.userIgnoreFilters)
     ? current.userIgnoreFilters.filter((item): item is string =>
       typeof item === "string" && item !== legacyLogFilter)
@@ -92,22 +92,22 @@ function mergeAppConfig(current: Record<string, unknown>, settings: ParaZkSettin
     attachmentFolderPath: ATTACHMENT_FOLDER,
     trashOption: "local",
     userIgnoreFilters: appendUniqueStrings(prunedIgnoreFilters, [
-      ignoreFilterFolder(settings.paths.templatesFolder),
+      ignoreFilterFolder(PARA_ZK_PATHS.templatesFolder),
       // Obsidian's excluded-files filters are not recursive, so the nested managed
       // templates folder needs its own entry even though it sits under templatesFolder.
-      ignoreFilterFolder(settings.paths.managedTemplatesFolder),
-      ignoreFilterFolder(settings.paths.dashboardFolder),
-      ignoreFilterFolder(settings.paths.tasksFolder),
+      ignoreFilterFolder(PARA_ZK_PATHS.managedTemplatesFolder),
+      ignoreFilterFolder(PARA_ZK_PATHS.dashboardFolder),
+      ignoreFilterFolder(PARA_ZK_PATHS.tasksFolder),
       "README"
     ].map(cleanIgnoreFilter)),
     propertiesInDocument: "hidden"
   };
 }
 
-function mergeTemplatesConfig(current: Record<string, unknown>, settings: ParaZkSettings): Record<string, unknown> {
+function mergeTemplatesConfig(current: Record<string, unknown>): Record<string, unknown> {
   return {
     ...current,
-    folder: normalizeVaultPath(settings.paths.templatesFolder)
+    folder: normalizeVaultPath(PARA_ZK_PATHS.templatesFolder)
   };
 }
 

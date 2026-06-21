@@ -1302,10 +1302,6 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Plan changes without writing.",
         "value": "<true|false>",
       },
-      "force": {
-        "description": "Overwrite PARA-ZK managed files when content differs.",
-        "value": "<true|false>",
-      },
       "format": {
         "description": "Output format (default: text)",
         "value": "<text|json>",

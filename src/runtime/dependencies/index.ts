@@ -1,6 +1,6 @@
 import { App, requestUrl, type PluginManifest } from "obsidian";
 import { isRecord } from "../../records";
-import type { DependencyResult, ParaZkSettings } from "../../types";
+import type { DependencyResult } from "../../types";
 import {
   customSortDependencyConfiguration,
   CUSTOM_SORT_PLUGIN_ID
@@ -32,7 +32,6 @@ type RequiredDependency = {
 type DependencyResolutionOptions = {
   installDeps: boolean;
   dryRun: boolean;
-  settings: ParaZkSettings;
   warnings: string[];
 };
 
@@ -42,14 +41,12 @@ export type DependencyConfiguration = {
   isConfigured: (
     services: DependencyConfigurationServices,
     app: App,
-    manager: PluginManager,
-    settings: ParaZkSettings
+    manager: PluginManager
   ) => Promise<boolean>;
   configure: (
     services: DependencyConfigurationServices,
     app: App,
-    manager: PluginManager,
-    settings: ParaZkSettings
+    manager: PluginManager
   ) => Promise<boolean>;
 };
 
@@ -237,13 +234,13 @@ async function configureDependency(
 
   try {
     if (options.dryRun) {
-      if (!await configuration.isConfigured(dependencyConfigurationServices, app, manager, options.settings)) {
+      if (!await configuration.isConfigured(dependencyConfigurationServices, app, manager)) {
         addConfigured(result, configuration.wouldConfigure);
       }
       return;
     }
 
-    if (await configuration.configure(dependencyConfigurationServices, app, manager, options.settings)) {
+    if (await configuration.configure(dependencyConfigurationServices, app, manager)) {
       addConfigured(result, configuration.configured);
     }
   } catch (error) {

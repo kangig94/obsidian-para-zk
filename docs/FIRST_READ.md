@@ -121,6 +121,7 @@ action blocks, and native CLI handlers call this workflow layer instead of
 duplicating business logic.
 
 - `src/workflows/` — canonical PARA/ZK operations and vault side effects (create, read, update, rename, delete, promote, references, backlinks, tasks, describe).
+- `src/layout.ts` — fixed plugin-owned vault layout constants.
 - `src/templates.ts` — managed templates, vault guide, dashboard artifacts.
 - `src/cli/handlers.ts` — LLM-friendly native CLI adapter over workflows.
 - `src/ux/workflow-commands.ts` — human-friendly Obsidian command adapter.
@@ -143,8 +144,9 @@ workflow/template modules independent from CLI, UX, and runtime adapters.
 `para-zk:setup` is idempotent. It creates the PARA/ZK layout, managed templates
 under `Templates/para-zk`, dashboards under `Dashboard`, the derived
 `LLM-Wiki/` folder, and a root vault guide.
-Existing non-managed files are skipped; managed files update only when safe or with
-`force=true`.
+Managed scaffolding (templates, dashboards, READMEs) is plugin-owned and is
+overwritten when generated content differs; matching files are left alone. User
+content notes are never touched by setup.
 
 Generated templates do not depend on Meta Bind, QuickAdd, or Templater. Native
 plugin blocks replace those mechanisms:

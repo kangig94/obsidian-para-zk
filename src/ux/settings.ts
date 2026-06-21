@@ -2,7 +2,6 @@ import { ButtonComponent, Notice, PluginSettingTab, Setting } from "obsidian";
 import { localePack, normalizeLocale } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import type { SetupOptions, SetupResult } from "../types";
-import { normalizeVaultPath } from "../vault/paths";
 import { refreshEditorWidthControl } from "./editor-width";
 import { refreshExplorerActions } from "./actions/explorer";
 import { refreshRegisteredLocaleLabels } from "./locale-labels";
@@ -103,21 +102,6 @@ export class ParaZkSettingTab extends PluginSettingTab {
           });
       });
 
-    new Setting(containerEl)
-      .setName(labels.layoutFolders)
-      .setDesc(labels.layoutFoldersDesc)
-      .addTextArea((text) => {
-        text
-          .setValue(this.plugin.settings.layoutFolders.join("\n"))
-          .onChange(async (value) => {
-            this.plugin.settings.layoutFolders = value
-              .split(/\r?\n/)
-              .map(normalizeVaultPath)
-              .filter((folder) => folder.length > 0);
-            await this.plugin.saveSettings();
-          });
-        text.inputEl.rows = 12;
-      });
   }
 
   private async runSetupAction(button: ButtonComponent, options: Pick<SetupOptions, "installDeps">): Promise<void> {
@@ -125,7 +109,6 @@ export class ParaZkSettingTab extends PluginSettingTab {
     try {
       const result = await this.plugin.setupVault({
         locale: this.plugin.settings.locale,
-        force: false,
         installDeps: options.installDeps
       });
       new Notice(this.setupNotice(result));

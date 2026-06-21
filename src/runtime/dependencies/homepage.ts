@@ -1,6 +1,6 @@
 import type { App } from "obsidian";
+import { PARA_ZK_PATHS } from "../../layout";
 import { isRecord } from "../../records";
-import type { ParaZkSettings } from "../../types";
 import { normalizeVaultPath } from "../../vault/paths";
 import type { DependencyConfiguration, DependencyConfigurationServices, PluginManager } from "./index";
 
@@ -19,30 +19,28 @@ export const homepageDependencyConfiguration: DependencyConfiguration = {
 async function isHomepageConfigured(
   services: DependencyConfigurationServices,
   app: App,
-  manager: PluginManager,
-  settings: ParaZkSettings
+  manager: PluginManager
 ): Promise<boolean> {
   const currentSettings = await services.readSettingsFile(app, HOMEPAGE_SETTINGS_PATH);
-  const nextSettings = mergeHomepageSettings(currentSettings, settings);
+  const nextSettings = mergeHomepageSettings(currentSettings);
   if (JSON.stringify(currentSettings) !== JSON.stringify(nextSettings)) return false;
 
   const runtimeSettings = services.readRuntimePluginSettings(manager, HOMEPAGE_PLUGIN_ID);
   if (!runtimeSettings) return true;
-  return JSON.stringify(runtimeSettings) === JSON.stringify(mergeHomepageSettings(runtimeSettings, settings))
+  return JSON.stringify(runtimeSettings) === JSON.stringify(mergeHomepageSettings(runtimeSettings))
     && isRunningHomepageReady(manager);
 }
 
 async function ensureHomepageConfigured(
   services: DependencyConfigurationServices,
   app: App,
-  manager: PluginManager,
-  settings: ParaZkSettings
+  manager: PluginManager
 ): Promise<boolean> {
   const currentSettings = await services.readSettingsFile(app, HOMEPAGE_SETTINGS_PATH);
-  const nextSettings = mergeHomepageSettings(currentSettings, settings);
+  const nextSettings = mergeHomepageSettings(currentSettings);
   const runtimeSettings = services.readRuntimePluginSettings(manager, HOMEPAGE_PLUGIN_ID);
   const runtimeChanged = runtimeSettings
-    ? JSON.stringify(runtimeSettings) !== JSON.stringify(mergeHomepageSettings(runtimeSettings, settings))
+    ? JSON.stringify(runtimeSettings) !== JSON.stringify(mergeHomepageSettings(runtimeSettings))
     : false;
   const diskChanged = JSON.stringify(currentSettings) !== JSON.stringify(nextSettings);
   const changed = diskChanged || runtimeChanged || !isRunningHomepageReady(manager);
@@ -55,10 +53,7 @@ async function ensureHomepageConfigured(
   return true;
 }
 
-function mergeHomepageSettings(
-  current: Record<string, unknown>,
-  settings: ParaZkSettings
-): Record<string, unknown> {
+function mergeHomepageSettings(current: Record<string, unknown>): Record<string, unknown> {
   const homepages = isRecord(current.homepages) ? current.homepages : {};
   const currentHomepage = isRecord(homepages[HOMEPAGE_NAME]) ? homepages[HOMEPAGE_NAME] : {};
 
@@ -69,7 +64,7 @@ function mergeHomepageSettings(
       ...homepages,
       [HOMEPAGE_NAME]: {
         ...currentHomepage,
-        value: normalizeVaultPath(`${settings.paths.dashboardFolder}/HomePage`),
+        value: normalizeVaultPath(`${PARA_ZK_PATHS.dashboardFolder}/HomePage`),
         kind: "File",
         openOnStartup: true,
         openMode: "Replace all open notes",

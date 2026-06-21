@@ -4,7 +4,6 @@ import type { Locale } from "../types";
 
 export type SetupPromptOptions = {
   locale: Locale;
-  force: boolean;
   installDeps: boolean;
 };
 
@@ -182,17 +181,6 @@ class SetupOptionsModal extends ResolvingModal<SetupPromptOptions> {
           .onChange((value) => {
             this.value.locale = value === "en" ? "en" : "ko";
             this.render();
-          });
-      });
-
-    new Setting(contentEl)
-      .setName(labels.setupForce)
-      .setDesc(labels.setupForceDesc)
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.value.force)
-          .onChange((value) => {
-            this.value.force = value;
           });
       });
 

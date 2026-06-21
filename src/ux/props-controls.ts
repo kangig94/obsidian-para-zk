@@ -13,6 +13,7 @@ import {
   type WorkspaceLeaf
 } from "obsidian";
 import { formatRelativeTime, localePack } from "../i18n";
+import { PARA_ZK_PATHS } from "../layout";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { singleItemList } from "../text";
 import { formatDateTimeMinutes, frontmatterTimeMs, minutesFromMs, relativeTimeParts } from "../time";
@@ -926,7 +927,7 @@ function readFieldValue(field: PropsField, frontmatter: Frontmatter): unknown {
 }
 
 function areaSuggestions(plugin: ParaZkPluginContext): AreaSuggestion[] {
-  const folder = normalizeVaultPath(plugin.settings.paths.areasFolder);
+  const folder = normalizeVaultPath(PARA_ZK_PATHS.areasFolder);
   return plugin.app.vault.getMarkdownFiles()
     .filter((file) => {
       if (!file.path.startsWith(`${folder}/`)) return false;

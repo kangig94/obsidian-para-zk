@@ -1,6 +1,6 @@
 import type { App } from "obsidian";
+import { PARA_ZK_PATHS } from "../../layout";
 import { isRecord } from "../../records";
-import type { ParaZkSettings } from "../../types";
 import { normalizeVaultPath } from "../../vault/paths";
 import type { DependencyConfiguration, DependencyConfigurationServices, PluginManager } from "./index";
 
@@ -23,13 +23,12 @@ export const customSortDependencyConfiguration: DependencyConfiguration = {
 async function isCustomSortConfigured(
   services: DependencyConfigurationServices,
   app: App,
-  manager: PluginManager,
-  settings: ParaZkSettings
+  manager: PluginManager
 ): Promise<boolean> {
   const currentSettings = await services.readSettingsFile(app, CUSTOM_SORT_SETTINGS_PATH);
   const nextSettings = mergeCustomSortSettings(currentSettings);
   if (JSON.stringify(currentSettings) !== JSON.stringify(nextSettings)) return false;
-  if (!await hasCompleteCustomSortBookmarksGroup(app, settings)) return false;
+  if (!await hasCompleteCustomSortBookmarksGroup(app)) return false;
 
   const runtimeSettings = services.readRuntimePluginSettings(manager, CUSTOM_SORT_PLUGIN_ID);
   if (!runtimeSettings) return true;
@@ -39,8 +38,7 @@ async function isCustomSortConfigured(
 async function ensureCustomSortConfigured(
   services: DependencyConfigurationServices,
   app: App,
-  manager: PluginManager,
-  settings: ParaZkSettings
+  manager: PluginManager
 ): Promise<boolean> {
   const currentSettings = await services.readSettingsFile(app, CUSTOM_SORT_SETTINGS_PATH);
   const nextSettings = mergeCustomSortSettings(currentSettings);
@@ -49,7 +47,7 @@ async function ensureCustomSortConfigured(
     ? JSON.stringify(runtimeSettings) !== JSON.stringify(mergeCustomSortSettings(runtimeSettings))
     : false;
   const settingsChanged = JSON.stringify(currentSettings) !== JSON.stringify(nextSettings) || runtimeChanged;
-  const bookmarksChanged = await ensureCustomSortBookmarksGroup(app, settings);
+  const bookmarksChanged = await ensureCustomSortBookmarksGroup(app);
 
   if (settingsChanged) {
     await services.writeSettingsFile(app, CUSTOM_SORT_SETTINGS_PATH, nextSettings);
@@ -81,11 +79,11 @@ function mergeCustomSortSettings(current: Record<string, unknown>): Record<strin
 // older baseline misses newer folders. The group is complete only when every baseline group is
 // present — checked recursively, but descending into a managed group only once the user has
 // populated it with nested groups (an empty group is intentionally left alone).
-async function hasCompleteCustomSortBookmarksGroup(app: App, settings: ParaZkSettings): Promise<boolean> {
+async function hasCompleteCustomSortBookmarksGroup(app: App): Promise<boolean> {
   const bookmarks = await readBookmarksConfig(app);
   const existing = findCustomSortBookmarksGroup(bookmarks.items);
   if (!existing || !Array.isArray(existing.items) || existing.items.length === 0) return false;
-  return bookmarkGroupsComplete(existing.items as BookmarkItem[], groupItems(createCustomSortBookmarksGroup(settings)));
+  return bookmarkGroupsComplete(existing.items as BookmarkItem[], groupItems(createCustomSortBookmarksGroup()));
 }
 
 function bookmarkGroupsComplete(existingItems: BookmarkItem[], baselineItems: BookmarkItem[]): boolean {
@@ -99,10 +97,10 @@ function bookmarkGroupsComplete(existingItems: BookmarkItem[], baselineItems: Bo
   return true;
 }
 
-async function ensureCustomSortBookmarksGroup(app: App, settings: ParaZkSettings): Promise<boolean> {
+async function ensureCustomSortBookmarksGroup(app: App): Promise<boolean> {
   const bookmarks = await readBookmarksConfig(app);
   const existing = findCustomSortBookmarksGroup(bookmarks.items);
-  const baseline = createCustomSortBookmarksGroup(settings);
+  const baseline = createCustomSortBookmarksGroup();
   const baselineItems = groupItems(baseline);
 
   if (!existing) {
@@ -166,38 +164,38 @@ async function readBookmarksConfig(app: App): Promise<{ items: BookmarkItem[] }>
   return { ...parsed, items };
 }
 
-function createCustomSortBookmarksGroup(settings: ParaZkSettings): BookmarkItem {
+function createCustomSortBookmarksGroup(): BookmarkItem {
   const nextCtime = bookmarkCtimeGenerator();
   return bookmarkGroup(CUSTOM_SORT_BOOKMARKS_GROUP, nextCtime, [
-    bookmarkGroup(folderName(settings.paths.dashboardFolder), nextCtime, [
-      bookmarkFile(`${settings.paths.dashboardFolder}/HomePage.md`, nextCtime),
-      bookmarkFile(`${settings.paths.dashboardFolder}/Review.md`, nextCtime),
-      bookmarkFile(`${settings.paths.dashboardFolder}/Projects.md`, nextCtime),
-      bookmarkFile(`${settings.paths.dashboardFolder}/Areas.md`, nextCtime),
-      bookmarkFile(`${settings.paths.dashboardFolder}/Resources.md`, nextCtime),
-      bookmarkFile(`${settings.paths.dashboardFolder}/ZK.md`, nextCtime),
-      bookmarkFile(`${settings.paths.dashboardFolder}/Tasks.md`, nextCtime)
+    bookmarkGroup(folderName(PARA_ZK_PATHS.dashboardFolder), nextCtime, [
+      bookmarkFile(`${PARA_ZK_PATHS.dashboardFolder}/HomePage.md`, nextCtime),
+      bookmarkFile(`${PARA_ZK_PATHS.dashboardFolder}/Review.md`, nextCtime),
+      bookmarkFile(`${PARA_ZK_PATHS.dashboardFolder}/Projects.md`, nextCtime),
+      bookmarkFile(`${PARA_ZK_PATHS.dashboardFolder}/Areas.md`, nextCtime),
+      bookmarkFile(`${PARA_ZK_PATHS.dashboardFolder}/Resources.md`, nextCtime),
+      bookmarkFile(`${PARA_ZK_PATHS.dashboardFolder}/ZK.md`, nextCtime),
+      bookmarkFile(`${PARA_ZK_PATHS.dashboardFolder}/Tasks.md`, nextCtime)
     ]),
-    bookmarkGroup(folderName(settings.paths.projectsFolder, 0), nextCtime, [
-      bookmarkGroup(folderName(settings.paths.projectsFolder), nextCtime),
-      bookmarkGroup(folderName(settings.paths.areasFolder), nextCtime),
-      bookmarkGroup(folderName(settings.paths.resourcesFolder), nextCtime),
-      bookmarkGroup(folderName(settings.paths.archivesFolder), nextCtime, [
-        bookmarkGroup(folderName(settings.paths.projectsFolder), nextCtime),
-        bookmarkGroup(folderName(settings.paths.areasFolder), nextCtime),
-        bookmarkGroup(folderName(settings.paths.resourcesFolder), nextCtime)
+    bookmarkGroup(folderName(PARA_ZK_PATHS.projectsFolder, 0), nextCtime, [
+      bookmarkGroup(folderName(PARA_ZK_PATHS.projectsFolder), nextCtime),
+      bookmarkGroup(folderName(PARA_ZK_PATHS.areasFolder), nextCtime),
+      bookmarkGroup(folderName(PARA_ZK_PATHS.resourcesFolder), nextCtime),
+      bookmarkGroup(folderName(PARA_ZK_PATHS.archivesFolder), nextCtime, [
+        bookmarkGroup(folderName(PARA_ZK_PATHS.projectsFolder), nextCtime),
+        bookmarkGroup(folderName(PARA_ZK_PATHS.areasFolder), nextCtime),
+        bookmarkGroup(folderName(PARA_ZK_PATHS.resourcesFolder), nextCtime)
       ]),
-      bookmarkGroup(folderName(settings.paths.retrosFolder), nextCtime)
+      bookmarkGroup(folderName(PARA_ZK_PATHS.retrosFolder), nextCtime)
     ]),
-    bookmarkGroup(folderName(settings.paths.zkFolder), nextCtime, [
-      bookmarkGroup(folderName(settings.paths.sparkFolder), nextCtime),
-      bookmarkGroup(folderName(settings.paths.digestFolder), nextCtime),
-      bookmarkGroup(folderName(settings.paths.permanentFolder), nextCtime)
+    bookmarkGroup(folderName(PARA_ZK_PATHS.zkFolder), nextCtime, [
+      bookmarkGroup(folderName(PARA_ZK_PATHS.sparkFolder), nextCtime),
+      bookmarkGroup(folderName(PARA_ZK_PATHS.digestFolder), nextCtime),
+      bookmarkGroup(folderName(PARA_ZK_PATHS.permanentFolder), nextCtime)
     ]),
-    bookmarkGroup(folderName(settings.paths.wikiFolder), nextCtime),
-    bookmarkGroup(folderName(settings.paths.journalFolder), nextCtime),
-    bookmarkGroup(folderName(settings.paths.tasksFolder), nextCtime),
-    bookmarkGroup(folderName(settings.paths.templatesFolder), nextCtime),
+    bookmarkGroup(folderName(PARA_ZK_PATHS.wikiFolder), nextCtime),
+    bookmarkGroup(folderName(PARA_ZK_PATHS.journalFolder), nextCtime),
+    bookmarkGroup(folderName(PARA_ZK_PATHS.tasksFolder), nextCtime),
+    bookmarkGroup(folderName(PARA_ZK_PATHS.templatesFolder), nextCtime),
     bookmarkGroup(ATTACHMENT_FOLDER, nextCtime)
   ]);
 }

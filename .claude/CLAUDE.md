@@ -13,7 +13,9 @@ server. It ships as both an Obsidian community plugin and a Claude Code / Codex 
   duplicate business logic in an adapter.
 - CLI/MCP values are locale-neutral codes (`status=in_progress`); localized labels are
   rendered only in the GUI and generated Markdown.
-- Never corrupt vault data; `para-zk:setup` is idempotent.
+- Never corrupt vault data; `para-zk:setup` is idempotent. Managed scaffolding
+  (templates, dashboards, READMEs) is plugin-owned and overwritten when generated
+  content differs; user content notes are never touched by setup.
 - `isDesktopOnly: false` — the plugin bundle must load on mobile: no eager top-level
   Node imports. GUI/core/vault/runtime use no Node APIs; the desktop-only CLI adapter
   (`src/cli/`) may use Node but only via lazy `import()` inside handlers (never top-level).
@@ -37,6 +39,17 @@ Rules in `.claude/rules/` are auto-loaded. Domain-specific rules activate based 
 paths being edited via `paths:` frontmatter.
 
 Good code guides readers naturally — structure reveals intent without requiring explanation.
+
+## Source Tree Policy
+
+| Directory | Layer | Contents |
+|-----------|-------|----------|
+| `src/` root (`layout`, `types`, `records`, `text`, `time`, `i18n`, `vocabulary`, `plugin-interface`) | L0 Foundation | Fixed layout constants, leaf utilities, and shared types |
+| `src/zk/`, `src/props/` | L0 Foundation | ZK-kind and frontmatter-prop schemas |
+| `src/vault/` | L1 Vault primitives | Obsidian file/frontmatter/section/path access |
+| `src/workflows/`, `src/templates.ts` | L2 CORE | Canonical PARA/ZK operations and managed scaffolding |
+| `src/cli/`, `src/ux/`, `src/runtime/` | L3 Adapters | CLI, GUI, setup/settings, and dependency configuration |
+| `src/main.ts`, `src/mcp/server.ts` | L4 Entry | Plugin and MCP process composition |
 
 ## Workflow
 

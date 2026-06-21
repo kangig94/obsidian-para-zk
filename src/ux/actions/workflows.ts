@@ -60,13 +60,11 @@ export function registerStatusAndInitCommands(plugin: ParaZkPluginContext): void
       const options = hasCommandArgs(args)
         ? {
           locale: normalizeLocale(readCommandString(args, "locale"), plugin.settings.locale),
-          force: readCommandBoolean(args, "force") ?? false,
           dryRun: readCommandBoolean(args, "dryRun") ?? readCommandBoolean(args, "dry-run") ?? false,
           installDeps: readCommandBoolean(args, "installDeps") ?? readCommandBoolean(args, "install-deps") ?? false
         }
         : await promptSetupOptions(plugin.app, {
           locale: plugin.settings.locale,
-          force: false,
           installDeps: false
         });
       if (!options) {

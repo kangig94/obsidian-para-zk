@@ -17,8 +17,9 @@ paths:
   `require` lands in `main.js`. (The MCP server in `src/mcp/` runs in Node and is exempt.)
 - Settings load tolerates missing/extra fields: `loadSettings` merges over defaults; a
   vault saved by an older version still loads.
-- Vault writes are non-destructive: `para-zk:setup` stays idempotent; existing
-  non-managed files are not overwritten without `force=true`.
+- Vault writes are bounded: `para-zk:setup` stays idempotent, always overwrites
+  plugin-owned scaffolding when generated content differs, and never touches user
+  content notes.
 - `pnpm run lint:architecture` passes — no layer-boundary or content-blank violations.
 - Changed code has corresponding tests (Vitest), or a documented reason it is
   smoke-only.

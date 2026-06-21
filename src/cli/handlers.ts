@@ -891,7 +891,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     options: {
       locale: { value: "<ko|en>", description: "Language for UI, generated files, and tags." },
       dryRun: { value: "<true|false>", description: "Plan changes without writing." },
-      force: { value: "<true|false>", description: "Overwrite PARA-ZK managed files when content differs." },
       installDeps: { value: "<true|false>", description: "Install and enable required community plugins." },
       format: { value: "<text|json>", description: "Output format (default: text)" }
     },
@@ -901,7 +900,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       const result = await plugin.setupVault({
         locale,
         dryRun: readCliBoolean(args, "dryRun") ?? false,
-        force: readCliBoolean(args, "force") ?? false,
         installDeps: readCliBoolean(args, "installDeps") ?? false
       });
       return {

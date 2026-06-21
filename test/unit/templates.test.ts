@@ -160,13 +160,8 @@ describe("managed templates", () => {
       expect(dataviewViewBlock(key, DEFAULT_SETTINGS)).toBeUndefined();
     }
 
-    const customSettings = structuredClone(DEFAULT_SETTINGS);
-    customSettings.paths.wikiFolder = "Generated/Wiki";
-    expect(dataviewViewBlock("cited-by", customSettings)).toContain("Generated/Wiki/");
-
-    const archiveSettings = structuredClone(DEFAULT_SETTINGS);
-    archiveSettings.paths.archivesFolder = "Archive/Custom";
-    expect(dataviewViewBlock("cited-by", archiveSettings)).toContain('!startswith(file.path, "Archive/Custom/")');
+    expect(citedBy).not.toContain("Generated/Wiki/");
+    expect(citedBy).not.toContain('!startswith(file.path, "Archive/Custom/")');
   });
 
   it("matches Dataview relationship views against the source note link", () => {

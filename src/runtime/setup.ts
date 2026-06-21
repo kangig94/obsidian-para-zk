@@ -1,9 +1,9 @@
 import { App, TFile, TFolder } from "obsidian";
+import { LAYOUT_FOLDERS, PARA_ZK_PATHS } from "../layout";
 import { managedArtifacts } from "../templates";
 import {
   type SetupOptions,
   type SetupResult,
-  type ManagedFileState,
   type ParaZkSettings
 } from "../types";
 import { joinVaultPath, normalizeVaultPath, parentFolder } from "../vault/paths";
@@ -17,13 +17,9 @@ export async function setupVault(
 ): Promise<{ result: SetupResult; settings: ParaZkSettings }> {
   const nextSettings: ParaZkSettings = {
     ...settings,
-    paths: { ...settings.paths },
-    layoutFolders: [...settings.layoutFolders],
-    locale: options.locale ?? settings.locale,
-    managedFiles: { ...settings.managedFiles }
+    locale: options.locale ?? settings.locale
   };
   const dryRun = options.dryRun ?? false;
-  const force = options.force ?? false;
   const result: SetupResult = {
     dryRun,
     created: [],
@@ -34,38 +30,29 @@ export async function setupVault(
     dependencies: []
   };
 
-  await migrateLegacyTaskRootsFolder(app, nextSettings, result, dryRun);
-  addUnique(nextSettings.layoutFolders, nextSettings.paths.wikiFolder);
+  await migrateLegacyTaskRootsFolder(app, result, dryRun);
 
-  const folders = Array.from(new Set(nextSettings.layoutFolders.map(normalizeVaultPath).filter(Boolean)));
+  const folders = Array.from(new Set(LAYOUT_FOLDERS.map(normalizeVaultPath).filter(Boolean)));
   for (const folder of folders) {
     await ensureFolder(app, folder, result, dryRun);
   }
 
-  await configureObsidianCoreSettings(app, nextSettings, result, dryRun);
+  await configureObsidianCoreSettings(app, result, dryRun);
 
   for (const artifact of managedArtifacts(nextSettings)) {
-    await writeManagedFile(app, artifact.path, artifact.content, result, {
-      dryRun,
-      force,
-      managedFiles: nextSettings.managedFiles
-    });
+    await writeManagedFile(app, artifact.path, artifact.content, result, dryRun);
   }
 
   result.dependencies = await resolveDependencies(app, {
     installDeps: options.installDeps ?? false,
     dryRun,
-    settings: nextSettings,
     warnings: result.warnings
   });
 
   if (!dryRun) {
     return {
       result,
-      settings: {
-        ...nextSettings,
-        setupAt: new Date().toISOString()
-      }
+      settings: nextSettings
     };
   }
 
@@ -97,12 +84,11 @@ async function ensureFolder(app: App, folder: string, result: SetupResult, dryRu
 
 async function migrateLegacyTaskRootsFolder(
   app: App,
-  settings: ParaZkSettings,
   result: SetupResult,
   dryRun: boolean
 ): Promise<void> {
-  const legacyPath = joinVaultPath(settings.paths.tasksFolder, "roots");
-  const currentPath = joinVaultPath(settings.paths.tasksFolder, "current");
+  const legacyPath = joinVaultPath(PARA_ZK_PATHS.tasksFolder, "roots");
+  const currentPath = joinVaultPath(PARA_ZK_PATHS.tasksFolder, "current");
   if (legacyPath === currentPath) return;
 
   const legacyFolder = app.vault.getAbstractFileByPath(legacyPath);
@@ -148,14 +134,9 @@ async function writeManagedFile(
   path: string,
   content: string,
   result: SetupResult,
-  options: {
-    dryRun: boolean;
-    force: boolean;
-    managedFiles: Record<string, ManagedFileState>;
-  }
+  dryRun: boolean
 ): Promise<void> {
   const normalized = normalizeVaultPath(path);
-  const contentHash = hashText(content);
   const existing = app.vault.getAbstractFileByPath(normalized);
 
   if (existing instanceof TFolder) {
@@ -165,11 +146,10 @@ async function writeManagedFile(
   }
 
   if (!existing) {
-    await ensureFolder(app, parentFolder(normalized), result, options.dryRun);
+    await ensureFolder(app, parentFolder(normalized), result, dryRun);
     addUnique(result.created, normalized);
-    if (!options.dryRun) {
+    if (!dryRun) {
       await app.vault.create(normalized, content);
-      options.managedFiles[normalized] = managedFileState(contentHash);
     }
     return;
   }
@@ -181,58 +161,19 @@ async function writeManagedFile(
   }
 
   const current = await app.vault.read(existing);
-  const currentHash = hashText(current);
-  const known = options.managedFiles[normalized];
 
   if (current === content) {
     addUnique(result.existing, normalized);
-    if (!options.dryRun) {
-      options.managedFiles[normalized] = managedFileState(contentHash);
-    }
     return;
   }
 
-  if (!known && !options.force) {
-    addUnique(result.skipped, normalized);
-    addUnique(result.warnings, `Skipped user-managed file at ${normalized}`);
-    return;
-  }
-
-  if (known && known.hash !== currentHash && !options.force) {
-    addUnique(result.skipped, normalized);
-    addUnique(result.warnings, `Skipped user-modified PARA-ZK file at ${normalized}; pass force=true to overwrite`);
-    return;
-  }
-
-  // Past the guards above, this is a file PARA-ZK wrote that the user has not
-  // modified (known.hash === currentHash) but whose generated content is now
-  // stale — e.g. after a locale or settings change. Regenerate it to match the
-  // current settings without requiring force; force only gates user-managed
-  // (untracked) or user-modified files, which are handled above.
   addUnique(result.updated, normalized);
-  if (!options.dryRun) {
+  if (!dryRun) {
     await app.vault.modify(existing, content);
-    options.managedFiles[normalized] = managedFileState(contentHash);
   }
 }
 
 function addUnique(items: string[], value: string): void {
   if (!value) return;
   if (!items.includes(value)) items.push(value);
-}
-
-function managedFileState(hash: string): ManagedFileState {
-  return {
-    hash,
-    updatedAt: new Date().toISOString()
-  };
-}
-
-function hashText(value: string): string {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < value.length; i += 1) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(16).padStart(8, "0");
 }

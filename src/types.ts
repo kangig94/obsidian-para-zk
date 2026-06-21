@@ -13,39 +13,12 @@ export type ResourceCreateKind = "Digest" | "Permanent";
 
 export type Locale = "en" | "ko";
 
-type ParaZkPaths = {
-  projectsFolder: string;
-  areasFolder: string;
-  resourcesFolder: string;
-  wikiFolder: string;
-  retrosFolder: string;
-  archivesFolder: string;
-  zkFolder: string;
-  sparkFolder: string;
-  digestFolder: string;
-  permanentFolder: string;
-  journalFolder: string;
-  dashboardFolder: string;
-  tasksFolder: string;
-  templatesFolder: string;
-  managedTemplatesFolder: string;
-};
-
 export type ParaZkSettings = {
-  paths: ParaZkPaths;
-  layoutFolders: string[];
   locale: Locale;
   showRibbon: boolean;
   showEmptyTrashAction: boolean;
   editorWidthSliderEnabled: boolean;
   editorLineWidth: number;
-  setupAt?: string;
-  managedFiles: Record<string, ManagedFileState>;
-};
-
-export type ManagedFileState = {
-  hash: string;
-  updatedAt: string;
 };
 
 export type SetupResult = {
@@ -60,7 +33,6 @@ export type SetupResult = {
 
 export type SetupOptions = {
   locale?: Locale;
-  force?: boolean;
   dryRun?: boolean;
   installDeps?: boolean;
 };
@@ -106,57 +78,14 @@ export type CaptureResult = {
   created: boolean;
 };
 
-const DEFAULT_PATHS: ParaZkPaths = {
-  projectsFolder: "PARA/Projects",
-  areasFolder: "PARA/Areas",
-  resourcesFolder: "PARA/Resources",
-  wikiFolder: "LLM-Wiki",
-  retrosFolder: "PARA/Retros",
-  archivesFolder: "PARA/Archives",
-  zkFolder: "ZK",
-  sparkFolder: "ZK/Spark",
-  digestFolder: "ZK/Digest",
-  permanentFolder: "ZK/Permanent",
-  journalFolder: "Journal",
-  dashboardFolder: "Dashboard",
-  tasksFolder: "Tasks",
-  templatesFolder: "Templates",
-  managedTemplatesFolder: "Templates/para-zk"
-};
-
-const DEFAULT_LAYOUT_FOLDERS = [
-  "PARA",
-  "PARA/Projects",
-  "PARA/Areas",
-  "PARA/Resources",
-  "PARA/Retros",
-  "PARA/Archives",
-  "LLM-Wiki",
-  "ZK",
-  "ZK/Spark",
-  "ZK/Digest",
-  "ZK/Permanent",
-  "Journal",
-  "Dashboard",
-  "Tasks",
-  "Tasks/current",
-  "Tasks/archives",
-  "Templates",
-  "Templates/para-zk",
-  "assets"
-];
-
 export const EDITOR_LINE_WIDTH_MIN = 600;
 export const EDITOR_LINE_WIDTH_MAX = 1600;
 export const EDITOR_LINE_WIDTH_STEP = 20;
 
 export const DEFAULT_SETTINGS: ParaZkSettings = {
-  paths: DEFAULT_PATHS,
-  layoutFolders: DEFAULT_LAYOUT_FOLDERS,
   locale: "en",
   showRibbon: true,
   showEmptyTrashAction: true,
   editorWidthSliderEnabled: true,
-  editorLineWidth: 700,
-  managedFiles: {}
+  editorLineWidth: 700
 };

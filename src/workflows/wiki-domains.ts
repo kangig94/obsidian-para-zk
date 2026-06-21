@@ -1,3 +1,4 @@
+import { PARA_ZK_PATHS } from "../layout";
 import { fileFrontmatter, readType } from "../vault/frontmatter";
 import { normalizeVaultPath } from "../vault/paths";
 import type { WikiDomainSummary, WikiDomainsOptions, WikiDomainsResult, WorkflowContext } from "./context";
@@ -17,7 +18,7 @@ export async function wikiDomains(
   ctx: WorkflowContext,
   options: WikiDomainsOptions = {}
 ): Promise<WikiDomainsResult> {
-  const wikiRoot = normalizeVaultPath(ctx.settings.paths.wikiFolder);
+  const wikiRoot = normalizeVaultPath(PARA_ZK_PATHS.wikiFolder);
   const tallies = new Map<string, DomainTally>();
 
   for (const file of ctx.host.getMarkdownFiles()) {

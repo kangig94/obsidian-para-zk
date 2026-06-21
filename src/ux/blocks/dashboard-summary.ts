@@ -1,5 +1,6 @@
 import { MarkdownRenderChild, TFile, type App } from "obsidian";
 import { localePack } from "../../i18n";
+import { PARA_ZK_PATHS } from "../../layout";
 import type { ParaZkPluginContext } from "../../plugin-interface";
 import type { ParaZkSettings } from "../../types";
 import { frontmatterLinks } from "../../vault/frontmatter";
@@ -72,16 +73,15 @@ class DashboardSummaryRenderChild extends MarkdownRenderChild {
   private affectsSummary(path: string | undefined): boolean {
     if (!path) return false;
     const normalized = normalizeVaultPath(path);
-    const paths = this.plugin.settings.paths;
     return [
-      paths.projectsFolder,
-      paths.areasFolder,
-      paths.resourcesFolder,
-      paths.sparkFolder,
-      paths.digestFolder,
-      paths.permanentFolder,
-      paths.wikiFolder,
-      paths.zkFolder
+      PARA_ZK_PATHS.projectsFolder,
+      PARA_ZK_PATHS.areasFolder,
+      PARA_ZK_PATHS.resourcesFolder,
+      PARA_ZK_PATHS.sparkFolder,
+      PARA_ZK_PATHS.digestFolder,
+      PARA_ZK_PATHS.permanentFolder,
+      PARA_ZK_PATHS.wikiFolder,
+      PARA_ZK_PATHS.zkFolder
     ].some((folder) => {
       const root = normalizeVaultPath(folder);
       return normalized === root || normalized.startsWith(`${root}/`);
@@ -160,9 +160,9 @@ function summaryCards(plugin: ParaZkPluginContext, type: DashboardSummaryType): 
     }
     case "resources": {
       const reverseLinks = reverseLinkIndex(plugin.app);
-      const projectSourcePrefix = `${normalizeVaultPath(plugin.settings.paths.projectsFolder)}/`;
-      const areaSourcePrefix = `${normalizeVaultPath(plugin.settings.paths.areasFolder)}/`;
-      const zkSourcePrefix = `${normalizeVaultPath(plugin.settings.paths.zkFolder)}/`;
+      const projectSourcePrefix = `${normalizeVaultPath(PARA_ZK_PATHS.projectsFolder)}/`;
+      const areaSourcePrefix = `${normalizeVaultPath(PARA_ZK_PATHS.areasFolder)}/`;
+      const zkSourcePrefix = `${normalizeVaultPath(PARA_ZK_PATHS.zkFolder)}/`;
       const inUse = groups.resources.filter((resource) => {
         const inlinks = reverseLinks.get(resource.file.path) ?? [];
         return inlinks.some((path) => path.startsWith(projectSourcePrefix) || path.startsWith(areaSourcePrefix));
@@ -217,13 +217,13 @@ function dashboardRecordGroups(records: FileRecord[], settings: ParaZkSettings):
   wiki: FileRecord[];
 } {
   return {
-    projects: records.filter((record) => record.frontmatter.type === "project" && isInFolder(record.file, settings.paths.projectsFolder)),
-    areas: records.filter((record) => record.frontmatter.type === "area" && isInFolder(record.file, settings.paths.areasFolder)),
-    resources: records.filter((record) => record.frontmatter.type === "resource" && isInFolder(record.file, settings.paths.resourcesFolder)),
-    spark: records.filter((record) => isInFolder(record.file, settings.paths.sparkFolder) && record.frontmatter.processed !== true),
-    digest: records.filter((record) => isInFolder(record.file, settings.paths.digestFolder)),
-    permanent: records.filter((record) => isInFolder(record.file, settings.paths.permanentFolder)),
-    wiki: records.filter((record) => record.frontmatter.type === "llm-wiki" && isInFolder(record.file, settings.paths.wikiFolder))
+    projects: records.filter((record) => record.frontmatter.type === "project" && isInFolder(record.file, PARA_ZK_PATHS.projectsFolder)),
+    areas: records.filter((record) => record.frontmatter.type === "area" && isInFolder(record.file, PARA_ZK_PATHS.areasFolder)),
+    resources: records.filter((record) => record.frontmatter.type === "resource" && isInFolder(record.file, PARA_ZK_PATHS.resourcesFolder)),
+    spark: records.filter((record) => isInFolder(record.file, PARA_ZK_PATHS.sparkFolder) && record.frontmatter.processed !== true),
+    digest: records.filter((record) => isInFolder(record.file, PARA_ZK_PATHS.digestFolder)),
+    permanent: records.filter((record) => isInFolder(record.file, PARA_ZK_PATHS.permanentFolder)),
+    wiki: records.filter((record) => record.frontmatter.type === "llm-wiki" && isInFolder(record.file, PARA_ZK_PATHS.wikiFolder))
   };
 }
 

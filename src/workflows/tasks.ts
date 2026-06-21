@@ -1,4 +1,5 @@
 import type { TFile } from "obsidian";
+import { PARA_ZK_PATHS } from "../layout";
 import { hasOwn, isRecord } from "../records";
 import {
   findSectionContentRangeByHeading,
@@ -334,15 +335,15 @@ function taskShardFolder(ctx: WorkflowContext, archived: boolean): string {
 }
 
 function taskCurrentFolder(ctx: WorkflowContext): string {
-  return joinVaultPath(ctx.settings.paths.tasksFolder, "current");
+  return joinVaultPath(PARA_ZK_PATHS.tasksFolder, "current");
 }
 
 function taskArchivesFolder(ctx: WorkflowContext): string {
-  return joinVaultPath(ctx.settings.paths.tasksFolder, "archives");
+  return joinVaultPath(PARA_ZK_PATHS.tasksFolder, "archives");
 }
 
 function taskRegistryFolder(ctx: WorkflowContext): string {
-  return normalizeVaultPath(ctx.settings.paths.tasksFolder);
+  return normalizeVaultPath(PARA_ZK_PATHS.tasksFolder);
 }
 
 function taskShardTaskRange(content: string): TextRange | undefined {
@@ -816,5 +817,5 @@ function normalizeCheckboxFilter(value: string | undefined): string | undefined 
 }
 
 function isArchivedFile(ctx: WorkflowContext, file: TFile): boolean {
-  return isInFolder(file, ctx.settings.paths.archivesFolder);
+  return isInFolder(file, PARA_ZK_PATHS.archivesFolder);
 }

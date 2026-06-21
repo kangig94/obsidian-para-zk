@@ -1,8 +1,9 @@
 import { TFolder, type TFile } from "obsidian";
 import { localePack } from "../i18n";
+import { PARA_ZK_PATHS, type ParaZkPaths } from "../layout";
 import { frontmatterLinks, fileFrontmatter, readFileFrontmatterFresh, readFileTypeFresh, readType, type Frontmatter } from "../vault/frontmatter";
 import { dateFromCli, isoWeekInfo, localDate } from "../time";
-import type { ParaZkSettings, ZkKind } from "../types";
+import type { ZkKind } from "../types";
 import { ensureFolder, isInFolder } from "../vault/files";
 import type { WorkflowHost } from "../vault/host";
 import { joinVaultPath, normalizeVaultPath, parentFolder, sanitizeFileName, sanitizeVaultRelativePath, splitObsidianSubpath, wikiLink } from "../vault/paths";
@@ -12,6 +13,14 @@ import type { ReadAreaOptions, ReadJournalOptions, ReadLlmWikiOptions, ReadProje
 import { isSourceScopedRetro } from "./references";
 import { ZK_KIND_CODE_HELP, isZkType, parseZkKind, zkKindCode } from "../zk/kinds";
 
+type ParaZkPathValue = ParaZkPaths[keyof ParaZkPaths];
+
+const ARCHIVE_AWARE_FOLDERS: readonly ParaZkPathValue[] = [
+  PARA_ZK_PATHS.projectsFolder,
+  PARA_ZK_PATHS.areasFolder,
+  PARA_ZK_PATHS.resourcesFolder,
+  PARA_ZK_PATHS.retrosFolder
+];
 
 export function folderStyleContainer(file: TFile): TFolder | undefined {
   const folder = file.parent;
@@ -86,10 +95,10 @@ export function folderStyleMarkdownPath(
   return { title, folder, path, existing };
 }
 
-export function folderForZkKind(settings: ParaZkSettings, kind: ZkKind): string {
-  if (kind === "Digest") return settings.paths.digestFolder;
-  if (kind === "Permanent") return settings.paths.permanentFolder;
-  return settings.paths.sparkFolder;
+export function folderForZkKind(kind: ZkKind): string {
+  if (kind === "Digest") return PARA_ZK_PATHS.digestFolder;
+  if (kind === "Permanent") return PARA_ZK_PATHS.permanentFolder;
+  return PARA_ZK_PATHS.sparkFolder;
 }
 
 export function isUnderAnyFolder(path: string, folders: string[]): boolean {
@@ -101,7 +110,7 @@ export function isUnderAnyFolder(path: string, folders: string[]): boolean {
 }
 
 export function templateFolderPaths(ctx: WorkflowContext): string[] {
-  return [ctx.settings.paths.templatesFolder, ctx.settings.paths.managedTemplatesFolder]
+  return [PARA_ZK_PATHS.templatesFolder, PARA_ZK_PATHS.managedTemplatesFolder]
     .map(normalizeVaultPath)
     .filter(Boolean);
 }
@@ -120,20 +129,15 @@ function archiveAwareFolders(
 
 export function archivedCounterpartFolder(ctx: WorkflowContext, activeFolder: string): string {
   const normalized = normalizeVaultPath(activeFolder);
-  const mappings = [
-    ctx.settings.paths.projectsFolder,
-    ctx.settings.paths.areasFolder,
-    ctx.settings.paths.resourcesFolder,
-    ctx.settings.paths.retrosFolder
-  ].map((folder) => normalizeVaultPath(folder));
+  const mappings = ARCHIVE_AWARE_FOLDERS.map((folder) => normalizeVaultPath(folder));
 
   for (const base of mappings) {
     if (normalized !== base && !normalized.startsWith(`${base}/`)) continue;
     const relative = normalized === base ? "" : normalized.slice(base.length + 1);
-    return joinVaultPath(ctx.settings.paths.archivesFolder, folderName(base), relative);
+    return joinVaultPath(PARA_ZK_PATHS.archivesFolder, folderName(base), relative);
   }
 
-  return joinVaultPath(ctx.settings.paths.archivesFolder, folderName(normalized));
+  return joinVaultPath(PARA_ZK_PATHS.archivesFolder, folderName(normalized));
 }
 
 function folderStyleCanonicalPaths(folder: string, title: string): string[] {
@@ -144,13 +148,13 @@ function folderStyleCanonicalPaths(folder: string, title: string): string[] {
 }
 
 export function isArchivedFile(ctx: WorkflowContext, file: TFile): boolean {
-  const archiveRoot = normalizeVaultPath(ctx.settings.paths.archivesFolder);
+  const archiveRoot = normalizeVaultPath(PARA_ZK_PATHS.archivesFolder);
   const normalized = normalizeVaultPath(file.path);
   return normalized === archiveRoot || normalized.startsWith(`${archiveRoot}/`);
 }
 
 export function isArchivedPath(ctx: WorkflowContext, path: string): boolean {
-  const archiveRoot = normalizeVaultPath(ctx.settings.paths.archivesFolder);
+  const archiveRoot = normalizeVaultPath(PARA_ZK_PATHS.archivesFolder);
   const normalized = normalizeVaultPath(path);
   return normalized === archiveRoot || normalized.startsWith(`${archiveRoot}/`);
 }
@@ -173,8 +177,8 @@ function ensureMdPath(path: string): string {
 export function retroSourceType(ctx: WorkflowContext, file: TFile, frontmatter: Frontmatter): string {
   const type = String(frontmatter.type ?? "").trim().toLowerCase();
   if (type) return type;
-  if (isCanonicalFolderNote(file, ctx.settings.paths.projectsFolder)) return "project";
-  if (isCanonicalFolderNote(file, ctx.settings.paths.areasFolder)) return "area";
+  if (isCanonicalFolderNote(file, PARA_ZK_PATHS.projectsFolder)) return "project";
+  if (isCanonicalFolderNote(file, PARA_ZK_PATHS.areasFolder)) return "area";
   return "";
 }
 
@@ -189,7 +193,7 @@ export async function findExistingSourceRetroForWeek(
 
   const matches: TFile[] = [];
   for (const file of ctx.host.getMarkdownFiles()) {
-    if (!isInFolder(file, ctx.settings.paths.retrosFolder)) continue;
+    if (!isInFolder(file, PARA_ZK_PATHS.retrosFolder)) continue;
     const frontmatter = await readFileFrontmatterFresh(ctx, file);
     if (readType(frontmatter) !== "retro") continue;
     if (retroWeekSegment(file, frontmatter) !== weekSegment) continue;
@@ -367,7 +371,7 @@ export function resolveOptionalFile(ctx: WorkflowContext, path: string | undefin
 }
 
 function findProjectByTitle(ctx: WorkflowContext, title: string, archived: boolean | undefined): TFile | undefined {
-  const folders = archiveAwareFolders(ctx, ctx.settings.paths.projectsFolder, archived);
+  const folders = archiveAwareFolders(ctx, PARA_ZK_PATHS.projectsFolder, archived);
   const canonicalPaths = folders.flatMap((folder) => folderStyleCanonicalPaths(folder, title));
 
   for (const path of canonicalPaths) {
@@ -384,7 +388,7 @@ function findProjectByTitle(ctx: WorkflowContext, title: string, archived: boole
 }
 
 function findAreaByTitleForRead(ctx: WorkflowContext, title: string, archived: boolean | undefined): TFile | undefined {
-  const folders = archiveAwareFolders(ctx, ctx.settings.paths.areasFolder, archived);
+  const folders = archiveAwareFolders(ctx, PARA_ZK_PATHS.areasFolder, archived);
   const canonicalPaths = folders.flatMap((folder) => folderStyleCanonicalPaths(folder, title));
 
   for (const path of canonicalPaths) {
@@ -429,7 +433,7 @@ export function subnoteTitlePath(value: string | undefined): ResourceTitlePath {
 }
 
 function findResourceByTitle(ctx: WorkflowContext, title: ResourceTitlePath, archived: boolean | undefined): TFile | undefined {
-  const folders = archiveAwareFolders(ctx, ctx.settings.paths.resourcesFolder, archived);
+  const folders = archiveAwareFolders(ctx, PARA_ZK_PATHS.resourcesFolder, archived);
 
   if (title.qualified) {
     for (const folder of folders) {
@@ -453,7 +457,7 @@ function findResourceByTitle(ctx: WorkflowContext, title: ResourceTitlePath, arc
 }
 
 function findLlmWikiByTitle(ctx: WorkflowContext, title: ResourceTitlePath): TFile | undefined {
-  const folders = [ctx.settings.paths.wikiFolder];
+  const folders = [PARA_ZK_PATHS.wikiFolder];
 
   if (title.qualified) {
     return ctx.host.getFile(joinVaultPath(folders[0], `${title.relpath}.md`)) ?? undefined;
@@ -476,7 +480,7 @@ function findLlmWikiByTitle(ctx: WorkflowContext, title: ResourceTitlePath): TFi
 export function findLlmWikiConcept(ctx: WorkflowContext, concept: string): TFile | undefined {
   return findUniqueNoteByTitle(ctx, {
     title: concept,
-    folders: [ctx.settings.paths.wikiFolder],
+    folders: [PARA_ZK_PATHS.wikiFolder],
     type: "llm-wiki",
     label: "llm-wiki note"
   });
@@ -531,8 +535,8 @@ function findRetroByTitle(
   archived: boolean | undefined
 ): TFile | undefined {
   const activeFolder = date
-    ? joinVaultPath(ctx.settings.paths.retrosFolder, isoWeekInfo(dateFromCli(date)).weekIso.replace("-", "_"))
-    : ctx.settings.paths.retrosFolder;
+    ? joinVaultPath(PARA_ZK_PATHS.retrosFolder, isoWeekInfo(dateFromCli(date)).weekIso.replace("-", "_"))
+    : PARA_ZK_PATHS.retrosFolder;
   return findUniqueNoteByTitle(ctx, {
     title,
     folders: archiveAwareFolders(ctx, activeFolder, archived),
@@ -576,13 +580,13 @@ function findUniqueNoteByTitle(
 
 function journalPath(ctx: WorkflowContext, date: string | undefined): string {
   const dateText = localDate(dateFromCli(date));
-  return joinVaultPath(ctx.settings.paths.journalFolder, dateText.slice(0, 7), `${dateText}.md`);
+  return joinVaultPath(PARA_ZK_PATHS.journalFolder, dateText.slice(0, 7), `${dateText}.md`);
 }
 
 function zkSearchFolders(ctx: WorkflowContext, kind: ZkKind | undefined): string[] {
   return kind
-    ? [folderForZkKind(ctx.settings, kind)]
-    : [ctx.settings.paths.sparkFolder, ctx.settings.paths.digestFolder, ctx.settings.paths.permanentFolder];
+    ? [folderForZkKind(kind)]
+    : [PARA_ZK_PATHS.sparkFolder, PARA_ZK_PATHS.digestFolder, PARA_ZK_PATHS.permanentFolder];
 }
 
 export function requireTitle(value: string | undefined, label: string): string {
@@ -596,7 +600,7 @@ export function linkToFile(file: TFile): string {
 }
 
 export function findAreaByTitle(ctx: WorkflowContext, title: string): TFile | undefined {
-  const canonicalPaths = folderStyleCanonicalPaths(ctx.settings.paths.areasFolder, title);
+  const canonicalPaths = folderStyleCanonicalPaths(PARA_ZK_PATHS.areasFolder, title);
 
   for (const path of canonicalPaths) {
     const file = ctx.host.getFile(path);
@@ -605,7 +609,7 @@ export function findAreaByTitle(ctx: WorkflowContext, title: string): TFile | un
 
   return findUniqueNoteByTitle(ctx, {
     title,
-    folders: [ctx.settings.paths.areasFolder],
+    folders: [PARA_ZK_PATHS.areasFolder],
     type: "area",
     requireRootArea: true,
     label: "area"

@@ -1,6 +1,7 @@
 import type { TFile } from "obsidian";
 import { CITATION_TOKEN_RE, parseCitationKeys } from "../citation-token";
 import { localePack } from "../i18n";
+import { PARA_ZK_PATHS } from "../layout";
 import { slugify, uniqueStrings } from "../text";
 import { frontmatterTimeMs } from "../time";
 import { fileFrontmatter, frontmatterLinks, readFileFrontmatterFresh, readType, type Frontmatter } from "../vault/frontmatter";
@@ -454,7 +455,7 @@ function orphanNoteFindings(ctx: WorkflowContext, notes: AuditableNote[]): Audit
 function isOrphanCandidate(ctx: WorkflowContext, note: AuditableNote): boolean {
   if (!["resource", "digest", "permanent"].includes(note.type)) return false;
   if (isFolderMainNote(note.file)) return false;
-  if (isUnderAnyFolder(note.file.path, [ctx.settings.paths.dashboardFolder])) {
+  if (isUnderAnyFolder(note.file.path, [PARA_ZK_PATHS.dashboardFolder])) {
     return false;
   }
   return true;
@@ -579,7 +580,7 @@ async function fixWikiTagDomains(
 
 // A `<domain>/index` hub: exactly one folder under the wiki root, basename `index`.
 function isWikiDomainIndex(ctx: WorkflowContext, file: TFile): boolean {
-  const root = `${ctx.settings.paths.wikiFolder}/`;
+  const root = `${PARA_ZK_PATHS.wikiFolder}/`;
   if (!file.path.startsWith(root)) return false;
   const segments = file.path.slice(root.length).split("/");
   return segments.length === 2 && segments[1] === "index.md";
@@ -587,7 +588,7 @@ function isWikiDomainIndex(ctx: WorkflowContext, file: TFile): boolean {
 
 // The page's domain = the first folder segment under the wiki folder (`<domain>/<concept>.md`).
 function expectedWikiDomainTag(ctx: WorkflowContext, file: TFile, prefix: string): string | undefined {
-  const root = `${ctx.settings.paths.wikiFolder}/`;
+  const root = `${PARA_ZK_PATHS.wikiFolder}/`;
   if (!file.path.startsWith(root)) return undefined;
   const segments = file.path.slice(root.length).split("/");
   return segments.length >= 2 ? `${prefix}/${slugify(segments[0])}` : undefined;

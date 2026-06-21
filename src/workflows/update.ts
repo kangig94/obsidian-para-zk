@@ -1,4 +1,5 @@
 import { TFile } from "obsidian";
+import { PARA_ZK_PATHS } from "../layout";
 import { hasOwn, isRecord } from "../records";
 import { normalizeAliasList } from "../text";
 import {
@@ -939,19 +940,19 @@ function projectStatusMovePlan(
 ): { fromRoot: string; toRoot: string } | undefined {
   if (frontmatterKey !== "status" || type !== "project") return undefined;
 
-  const archiveRoot = archivedCounterpartFolder(ctx, ctx.settings.paths.projectsFolder);
+  const archiveRoot = archivedCounterpartFolder(ctx, PARA_ZK_PATHS.projectsFolder);
   const shouldBeArchived = value === "archived";
   const archived = isArchivedFile(ctx, file);
   if (shouldBeArchived && !archived) {
     return {
-      fromRoot: ctx.settings.paths.projectsFolder,
+      fromRoot: PARA_ZK_PATHS.projectsFolder,
       toRoot: archiveRoot
     };
   }
   if (!shouldBeArchived && archived) {
     return {
       fromRoot: archiveRoot,
-      toRoot: ctx.settings.paths.projectsFolder
+      toRoot: PARA_ZK_PATHS.projectsFolder
     };
   }
   return undefined;

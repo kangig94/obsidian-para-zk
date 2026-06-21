@@ -31,7 +31,8 @@ folder — e.g. with [`optsidian`](https://github.com/kangig94/optsidian):
 
 Then scaffold the vault with the **PARA-ZK: Set up PARA-ZK vault** command (or
 `para-zk:setup`). Setup is idempotent: it creates the PARA/ZK layout, templates,
-and dashboards, and offers to install the required community plugins
+and dashboards, overwrites plugin-owned scaffolding when generated content differs,
+and offers to install the required community plugins
 (`installDeps=true`).
 
 ### Claude Code / Codex (MCP)

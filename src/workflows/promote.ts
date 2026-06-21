@@ -1,5 +1,6 @@
 import { TFile } from "obsidian";
 import { localePack } from "../i18n";
+import { PARA_ZK_PATHS } from "../layout";
 import {
   dateFromCli,
   localDate,
@@ -101,7 +102,7 @@ async function createZkFromOrigin(
   }
   const maturityCode = readOptionalCode(options.maturity, parseMaturityCode, "maturity", MATURITY_CODE_HELP);
   const title = requireTitle(options.title || source.basename, "ZK title");
-  const folder = folderForZkKind(ctx.settings, kind);
+  const folder = folderForZkKind(kind);
   const path = joinVaultPath(folder, `${title}.md`);
   const { file, created } = await createZkFile(ctx, kind, path, title, { maturityCode });
   return { source, file, created };
@@ -233,7 +234,7 @@ async function ensureJournal(ctx: WorkflowContext, options: OpenJournalOptions):
   const dateText = localDate(date);
   const energyCode = readOptionalCode(options.energy, parseEnergyCode, "energy", ENERGY_CODE_HELP);
   const energy = energyCode ?? "normal";
-  const folder = joinVaultPath(ctx.settings.paths.journalFolder, dateText.slice(0, 7));
+  const folder = joinVaultPath(PARA_ZK_PATHS.journalFolder, dateText.slice(0, 7));
   await ensureFolder(ctx.host, folder);
   const path = joinVaultPath(folder, `${dateText}.md`);
 

@@ -4,6 +4,7 @@ import {
   parseYaml
 } from "obsidian";
 import { localePack, type LocalePack } from "../../i18n";
+import { PARA_ZK_PATHS } from "../../layout";
 import type { ParaZkPluginContext } from "../../plugin-interface";
 import { isRecord } from "../../records";
 import { normalizeVaultPath } from "../../vault/paths";
@@ -165,7 +166,7 @@ function isInRetrosFolder(plugin: ParaZkPluginContext, file: TFile): boolean {
 
 function isInRetrosFolderPath(plugin: ParaZkPluginContext, path: string | undefined): boolean {
   if (!path) return false;
-  const retroFolder = normalizeVaultPath(plugin.settings.paths.retrosFolder);
+  const retroFolder = normalizeVaultPath(PARA_ZK_PATHS.retrosFolder);
   const normalized = normalizeVaultPath(path);
   return normalized === retroFolder || normalized.startsWith(`${retroFolder}/`);
 }

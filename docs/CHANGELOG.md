@@ -18,6 +18,15 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Changed
 
+- `data.json` now persists only runtime-mutable user settings (`locale`,
+  `showRibbon`, `showEmptyTrashAction`, `editorWidthSliderEnabled`, and
+  `editorLineWidth`). The PARA/ZK layout is fixed in `src/layout.ts`; removed
+  `paths`, `layoutFolders`, `setupAt`, and `managedFiles` keys are ignored when
+  loading older vault data.
+- `para-zk:setup` now treats managed scaffolding (templates, dashboards, READMEs) as
+  fully plugin-owned: it overwrites those files whenever generated content differs,
+  leaves matching files alone, and no longer exposes a managed-file `force` option.
+  User content notes remain outside the setup write set.
 - Managed-block UI: the four per-type "cited by" Dataview views collapse into one general
   `cited-by` view on every note type except spark — a vault-wide backlink scan that classifies
   each citing note by its `type` (raw `type` shown for unlisted kinds) and renders a

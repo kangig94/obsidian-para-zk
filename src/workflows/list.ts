@@ -1,3 +1,4 @@
+import { PARA_ZK_PATHS } from "../layout";
 import { fileFrontmatter, readType } from "../vault/frontmatter";
 import { isZkType } from "../zk/kinds";
 import type { ListOptions, WorkflowContext } from "./context";
@@ -62,7 +63,7 @@ export async function listNotes(ctx: WorkflowContext, options: ListOptions = {})
   // date/basename-addressed types (journal/retro), folder-spanning subnotes, and
   // archived notes (which live under archivesFolder, not the type root) keep an
   // explicit {name, type} per item.
-  const root = type ? rootForListType(ctx, type) : undefined;
+  const root = type ? rootForListType(type) : undefined;
   if (root && all.every((entry) => isUnderRoot(entry.addr, root))) {
     return { ...envelope, type, root, items: page.map((entry) => relativeName(entry.addr, root)) };
   }
@@ -95,13 +96,12 @@ function relativeName(addr: string, root: string): string {
 // resource, llm-wiki. journal (addressed by date), retro (basename title), the zk
 // family (spark/digest/permanent), and folder-spanning subnotes have no such
 // round-trip and return undefined, so they list as {name, type}.
-function rootForListType(ctx: WorkflowContext, type: string): string | undefined {
-  const paths = ctx.settings.paths;
+function rootForListType(type: string): string | undefined {
   switch (type) {
-    case "project": return paths.projectsFolder;
-    case "area": return paths.areasFolder;
-    case "resource": return paths.resourcesFolder;
-    case "llm-wiki": return paths.wikiFolder;
+    case "project": return PARA_ZK_PATHS.projectsFolder;
+    case "area": return PARA_ZK_PATHS.areasFolder;
+    case "resource": return PARA_ZK_PATHS.resourcesFolder;
+    case "llm-wiki": return PARA_ZK_PATHS.wikiFolder;
     default: return undefined;
   }
 }

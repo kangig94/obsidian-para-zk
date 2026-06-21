@@ -17,7 +17,7 @@ L2  CORE        │      workflows/* + templates.ts
                 │            │
 L1  Vault       │      vault/ (files, frontmatter, sections, paths, host)
                 │            │
-L0  Foundation  └─ types · records · text · time · i18n · vocabulary ·
+L0  Foundation  └─ layout · types · records · text · time · i18n · vocabulary ·
                    plugin-interface · zk/kinds · props/schema
 ```
 
@@ -40,6 +40,16 @@ It also rejects content-blank filenames (`utils.ts`, `helpers.ts`, `shared.ts`, 
 One intentional exception: `src/vault/host.ts` imports the `WorkflowContext` **type**
 from `workflows/context` (a type-only L1→L2 edge). The lint forbids only core→adapter
 edges, so this is allowed.
+
+## Foundation Module Roles
+
+| Module | Responsibility |
+|--------|----------------|
+| `layout.ts` | Fixed PARA-ZK vault layout constants (`PARA_ZK_PATHS`, `LAYOUT_FOLDERS`) |
+| `types.ts` | Runtime-mutable settings, CLI/result option types, setup/dependency result types |
+| `records.ts`, `text.ts`, `time.ts`, `i18n.ts`, `vocabulary.ts` | Leaf utilities and locale/code dictionaries |
+| `plugin-interface.ts` | Minimal plugin surface shared by adapters and renderers |
+| `zk/kinds.ts`, `props/schema.ts` | ZK-kind and frontmatter-prop schemas |
 
 ## Surfaces
 
@@ -76,7 +86,7 @@ mapping, not core changes.**
 | `code-options.ts` | Locale-neutral code parsing/validation |
 
 `src/templates.ts` (also L2) generates managed templates, dashboards, and the vault
-guide; it imports only `types`, `i18n`, and `props/schema`.
+guide; it imports only L0/L1 modules.
 
 `llm-wiki` is a first-class workflow surface in the same L2 modules above:
 create/read/update/rename/delete, describe, locations, list, references, backlinks,

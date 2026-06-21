@@ -1,5 +1,6 @@
 import { TFile } from "obsidian";
 import { localePack } from "../i18n";
+import { PARA_ZK_PATHS } from "../layout";
 import { renderTemplate, type TemplateName } from "../templates";
 import {
   dateFromCli,
@@ -80,7 +81,7 @@ export async function applyBody(ctx: WorkflowContext, file: TFile, body: string 
 
 export async function createProject(ctx: WorkflowContext, options: CreateProjectOptions): Promise<CreateProjectResult> {
   const title = requireTitle(options.title, "project title");
-  const target = folderStyleMarkdownPath(ctx, ctx.settings.paths.projectsFolder, title);
+  const target = folderStyleMarkdownPath(ctx, PARA_ZK_PATHS.projectsFolder, title);
   if (target.existing) {
     await openIfRequested(ctx, target.existing, options.open);
     return noteResult(target.existing, false, options.open);
@@ -132,7 +133,7 @@ export async function createArea(ctx: WorkflowContext, options: CreateAreaOption
   // `parent` link, not a separate type, is what distinguishes the two everywhere else. The
   // two branches differ only in path strategy and frontmatter; ensureAreaNote is shared.
   if (options.parentTitle === undefined && options.sourcePath === undefined) {
-    const target = folderStyleMarkdownPath(ctx, ctx.settings.paths.areasFolder, title);
+    const target = folderStyleMarkdownPath(ctx, PARA_ZK_PATHS.areasFolder, title);
     if (target.existing) {
       await openIfRequested(ctx, target.existing, options.open);
       return noteResult(target.existing, false, options.open);
@@ -218,7 +219,7 @@ async function resolveRequiredParent(
 
 export async function createResource(ctx: WorkflowContext, options: CreateResourceOptions): Promise<CreateResourceResult> {
   const title = resourceTitlePath(options.title);
-  const path = joinVaultPath(ctx.settings.paths.resourcesFolder, `${title.relpath}.md`);
+  const path = joinVaultPath(PARA_ZK_PATHS.resourcesFolder, `${title.relpath}.md`);
   const existing = existingMarkdownFile(ctx.host, path);
   if (existing) {
     await openIfRequested(ctx, existing, options.open);
@@ -306,7 +307,7 @@ export async function createLlmWiki(ctx: WorkflowContext, options: CreateLlmWiki
 }
 
 function domainIndexPath(ctx: WorkflowContext, domain: string): string {
-  return joinVaultPath(ctx.settings.paths.wikiFolder, `${domain}/${DOMAIN_INDEX_CONCEPT}.md`);
+  return joinVaultPath(PARA_ZK_PATHS.wikiFolder, `${domain}/${DOMAIN_INDEX_CONCEPT}.md`);
 }
 
 async function ensureDomainIndex(ctx: WorkflowContext, domain: string, by: string | undefined): Promise<void> {
@@ -322,7 +323,7 @@ async function writeLlmWikiPage(
   concept: string,
   options: { alias?: string; by?: string; body?: string }
 ): Promise<TFile> {
-  const path = joinVaultPath(ctx.settings.paths.wikiFolder, `${domain}/${concept}.md`);
+  const path = joinVaultPath(PARA_ZK_PATHS.wikiFolder, `${domain}/${concept}.md`);
   const file = await createMarkdownFile(ctx, "llm-wiki", path, { slug: slugify(concept) });
   const tags = localePack(ctx.settings.locale).tags;
   const by = llmWikiBy(options.by);
@@ -424,7 +425,7 @@ export async function createRetro(ctx: WorkflowContext, options: CreateRetroOpti
   }
 
   const name = sanitizeFileName(options.title || defaultName) || "General";
-  const folder = joinVaultPath(ctx.settings.paths.retrosFolder, weekSegment);
+  const folder = joinVaultPath(PARA_ZK_PATHS.retrosFolder, weekSegment);
   await ensureFolder(ctx.host, folder);
 
   const path = joinVaultPath(folder, `${sanitizeFileName(`Retro-${name}-${weekSegment}`)}.md`);
@@ -471,7 +472,7 @@ export async function createZk(ctx: WorkflowContext, options: CreateZkOptions): 
   const title = requireTitle(options.title, "ZK title");
   const kind = readOptionalCode(options.kind, parseZkKind, "kind", ZK_KIND_CODE_HELP) ?? "Spark";
   const maturityCode = readOptionalCode(options.maturity, parseMaturityCode, "maturity", MATURITY_CODE_HELP);
-  const folder = folderForZkKind(ctx.settings, kind);
+  const folder = folderForZkKind(kind);
   const path = joinVaultPath(folder, `${title}.md`);
   const { file, created } = await createZkFile(ctx, kind, path, title, { maturityCode, alias: options.alias });
 
@@ -529,7 +530,7 @@ function applyAlias(frontmatter: Record<string, unknown>, alias: string | undefi
 }
 
 async function readTemplate(ctx: WorkflowContext, templateName: TemplateName): Promise<string> {
-  const templatePath = joinVaultPath(ctx.settings.paths.managedTemplatesFolder, `template_${templateName}.md`);
+  const templatePath = joinVaultPath(PARA_ZK_PATHS.managedTemplatesFolder, `template_${templateName}.md`);
   const templateFile = ctx.host.getFile(templatePath);
   if (templateFile) return ctx.host.read(templateFile);
   return renderTemplate(templateName, ctx.settings);

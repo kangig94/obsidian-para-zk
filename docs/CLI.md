@@ -459,9 +459,12 @@ Options:
 | --- | --- | --- |
 | `locale` | `ko`, `en` | Locale for generated labels and tags. |
 | `dryRun` | boolean | Plan without writing. |
-| `force` | boolean | Overwrite changed managed files when allowed. |
 | `installDeps` | boolean | Install and enable required plugins. |
 | `format` | `json`, `text` | Default `text` renders the data readably; use `json` when the output is machine-parsed. |
+
+Managed scaffolding (templates, dashboards, READMEs) is plugin-owned. Setup
+overwrites those files when generated content differs and leaves matching files
+alone; user content notes are never touched by setup.
 
 Required dependencies:
 

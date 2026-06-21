@@ -89,20 +89,16 @@ For a clean run, preserve `.obsidian`, clear the rest of the vault, and remove
 ## Setup Managed Files
 
 `para-zk:setup` treats generated templates, dashboards, and vault guide files as
-managed artifacts. The persisted `managedFiles` hash is the ownership record used to
-separate safe regeneration from user-managed or user-modified content.
+plugin-owned scaffolding. Setup always reconciles those files to the current
+generated content, but it stays idempotent by skipping writes when content already
+matches. User content notes outside the managed scaffolding set are never touched.
 
-| Managed-file state | Default run | `force=true` | `dryRun=true` |
-|--------------------|-------------|--------------|---------------|
-| Missing path | Create file and record the generated hash; no warning | Same as default; no warning | Report `created`; write nothing; no warning |
-| Existing file already matches generated content, tracked or untracked | Report `existing` and refresh the managed hash; no warning | Same as default; no warning | Report `existing`; write nothing; no warning |
-| Known managed file, current hash matches the recorded hash, generated content changed | Overwrite with current generated content and record the new hash; no warning | Same as default; no warning | Report `updated`; write nothing; no warning |
-| Existing untracked file with different content | Skip and warn `Skipped user-managed file at <path>` | Overwrite and record the generated hash; no warning | Skip, write nothing, and warn `Skipped user-managed file at <path>` |
-| Known managed file, current hash differs from the recorded hash | Skip and warn `Skipped user-modified PARA-ZK file at <path>; pass force=true to overwrite` | Overwrite and record the generated hash; no warning | Skip, write nothing, and warn `Skipped user-modified PARA-ZK file at <path>; pass force=true to overwrite` |
-| Path is a folder or unsupported vault item | Skip and warn that the path cannot be created or is unsupported | Same as default | Same as default; write nothing |
-
-When `dryRun=true` is combined with `force=true`, setup reports the forced overwrite as
-`updated` but still does not write files or managed hashes.
+| Managed path state | Default run | `dryRun=true` |
+|--------------------|-------------|---------------|
+| Missing path | Report `created` and create the generated file | Report `created`; write nothing |
+| Existing file already matches generated content | Report `existing`; write nothing | Report `existing`; write nothing |
+| Existing file differs from generated content | Report `updated` and overwrite with current generated content | Report `updated`; write nothing |
+| Path is a folder or unsupported vault item | Skip and warn that the path cannot be created or is unsupported | Same as default; write nothing |
 
 ## Environment Variables
 

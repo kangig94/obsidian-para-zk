@@ -26,8 +26,10 @@ it via backlinks / its *Cited by* view. No reverse link is stored. Distill moves
 spark's idea into a new permanent and marks the spark `processed: true` — it does not
 link back.
 
-**Idempotent, Non-Destructive Setup**: `para-zk:setup` re-runs safely. Existing
-non-managed files are skipped; managed files update only when safe or with `force=true`.
+**Idempotent Setup With Plugin-Owned Scaffolding**: `para-zk:setup` re-runs safely.
+Managed scaffolding (templates, dashboards, READMEs) is plugin-owned and is
+overwritten when generated content differs. User content notes are never touched by
+setup.
 
 **No Content-Blank Modules**: No `utils.ts`/`helpers.ts`/`shared/`; every module has a
 role-specific name. Re-exports live only in `index.ts`.
@@ -77,8 +79,9 @@ rules easier to audit. It is not allowed merely because a file is long.
 - Same-note mutations must preserve the existing write-serialization boundaries. Do not
   bypass `serializeFileWrite` for task shards, references, body edits, or other
   read-modify-write flows.
-- `para-zk:setup` remains idempotent and non-destructive by default. Refactors must not
-  weaken managed-file hash checks, `force=true`, or `dryRun=true` semantics.
+- `para-zk:setup` remains idempotent: matching managed scaffolding is not rewritten,
+  differing managed scaffolding is overwritten, and `dryRun=true` reports without
+  writing. Refactors must not expand setup writes to user content notes.
 
 **Keep platform boundaries visible**:
 - The plugin bundle must stay mobile-loadable: no eager top-level Node imports outside
@@ -108,7 +111,7 @@ rules easier to audit. It is not allowed merely because a file is long.
 
 | Directory | Layer | Contents | Modification Rule |
 |-----------|-------|----------|-------------------|
-| `src/` root (types, records, text, time, i18n, vocabulary, plugin-interface) | L0 Foundation | Leaf utilities & types | Depend only on each other; no Obsidian/adapter imports |
+| `src/` root (layout, types, records, text, time, i18n, vocabulary, plugin-interface) | L0 Foundation | Fixed vault layout, leaf utilities & types | Depend only on each other; no Obsidian/adapter imports |
 | `src/zk/`, `src/props/` | L0 Foundation | ZK-kind & frontmatter-prop schemas | Same as L0 |
 | `src/vault/` | L1 Vault primitives | Obsidian file/frontmatter/section/path access | May import L0; type-only edge to `workflows/context` allowed |
 | `src/workflows/`, `src/templates.ts` | L2 CORE | Canonical PARA/ZK operations, managed templates | May import L0/L1 only — NEVER `cli/`, `ux/`, `runtime/` |

@@ -1,5 +1,6 @@
 import type { App } from "obsidian";
 import { describe, expect, it } from "vitest";
+import { LAYOUT_FOLDERS, PARA_ZK_PATHS } from "../../src/layout";
 import { setupVault } from "../../src/runtime/setup";
 import { managedArtifacts, type ManagedArtifact } from "../../src/templates";
 import { DEFAULT_SETTINGS, type ParaZkSettings, type SetupOptions } from "../../src/types";
@@ -22,7 +23,7 @@ function managedArtifactAt(settings: ParaZkSettings, path: string): ManagedArtif
 }
 
 function targetArtifact(settings: ParaZkSettings): ManagedArtifact {
-  return managedArtifactAt(settings, `${settings.paths.managedTemplatesFolder}/template_project.md`);
+  return managedArtifactAt(settings, `${PARA_ZK_PATHS.managedTemplatesFolder}/template_project.md`);
 }
 
 function createSetupApp(): MockApp {
@@ -81,7 +82,7 @@ async function prepareKnownUserModifiedFile(): Promise<{
   };
 }
 
-describe("setup managed-file state machine", () => {
+describe("setup managed scaffolding", () => {
   it("prunes a legacy LLM-Wiki log graph exclusion idempotently without creating the log", async () => {
     const settings = baseSettings();
     const app = createSetupApp();
@@ -109,25 +110,27 @@ describe("setup managed-file state machine", () => {
     expect(app.readPath("LLM-Wiki/log.md")).toBeUndefined();
   });
 
-  it("creates the LLM-Wiki folder for old saved layout folder arrays", async () => {
+  it("creates every fixed layout folder from code constants", async () => {
     const settings = baseSettings();
-    settings.layoutFolders = settings.layoutFolders.filter((folder) => folder !== "LLM-Wiki");
     const app = createSetupApp();
 
     const initial = await runSetup(app, settings);
 
-    expect(initial.result.created).toContain("LLM-Wiki");
-    expect(app.vault.getAbstractFileByPath("LLM-Wiki")).toBeTruthy();
-    expect(initial.settings.layoutFolders).toContain("LLM-Wiki");
+    for (const folder of LAYOUT_FOLDERS) {
+      expect(initial.result.created).toContain(folder);
+      expect(app.vault.getAbstractFileByPath(folder)).toBeTruthy();
+    }
 
     const rerun = await runSetup(app, initial.settings);
-    expect(rerun.result.created).not.toContain("LLM-Wiki");
-    expect(rerun.result.existing).toContain("LLM-Wiki");
+    for (const folder of LAYOUT_FOLDERS) {
+      expect(rerun.result.created).not.toContain(folder);
+      expect(rerun.result.existing).toContain(folder);
+    }
   });
 
   it("reports the llm-wiki managed template as existing on a second setup run", async () => {
     const settings = baseSettings();
-    const target = managedArtifactAt(settings, `${settings.paths.managedTemplatesFolder}/template_llm-wiki.md`);
+    const target = managedArtifactAt(settings, `${PARA_ZK_PATHS.managedTemplatesFolder}/template_llm-wiki.md`);
     const app = createSetupApp();
 
     const initial = await runSetup(app, settings);
@@ -152,24 +155,15 @@ describe("setup managed-file state machine", () => {
 
     expect(dryRun.result.created).toContain(target.path);
     expect(dryRunApp.readPath(target.path)).toBeUndefined();
-    expect(dryRun.settings.managedFiles[target.path]).toBeUndefined();
 
     const app = createSetupApp();
     const actual = await runSetup(app, settings);
 
     expect(actual.result.created).toContain(target.path);
     expect(app.readPath(target.path)).toBe(target.content);
-    expect(actual.settings.managedFiles[target.path]?.hash).toEqual(expect.any(String));
-
-    const forceApp = createSetupApp();
-    const forceRun = await runSetup(forceApp, settings, { force: true });
-
-    expect(forceRun.result.created).toContain(target.path);
-    expect(forceApp.readPath(target.path)).toBe(target.content);
-    expect(forceRun.settings.managedFiles[target.path]?.hash).toEqual(expect.any(String));
   });
 
-  it("accepts matching generated content as existing and records managed state", async () => {
+  it("accepts matching generated content as existing", async () => {
     const settings = baseSettings();
     const target = targetArtifact(settings);
     const app = createSetupApp();
@@ -179,15 +173,6 @@ describe("setup managed-file state machine", () => {
 
     expect(actual.result.existing).toContain(target.path);
     expect(actual.result.skipped).not.toContain(target.path);
-    expect(actual.settings.managedFiles[target.path]?.hash).toEqual(expect.any(String));
-
-    const forceApp = createSetupApp();
-    await forceApp.vault.create(target.path, target.content);
-    const forceRun = await runSetup(forceApp, settings, { force: true });
-
-    expect(forceRun.result.existing).toContain(target.path);
-    expect(forceRun.result.updated).not.toContain(target.path);
-    expect(forceRun.settings.managedFiles[target.path]?.hash).toEqual(expect.any(String));
 
     const dryRunApp = createSetupApp();
     await dryRunApp.vault.create(target.path, target.content);
@@ -195,10 +180,9 @@ describe("setup managed-file state machine", () => {
 
     expect(dryRun.result.existing).toContain(target.path);
     expect(dryRun.result.updated).not.toContain(target.path);
-    expect(dryRun.settings.managedFiles[target.path]).toBeUndefined();
   });
 
-  it("updates known unmodified managed files when generated output changes", async () => {
+  it("updates managed files when generated output changes", async () => {
     const settings = baseSettings();
     const target = targetArtifact(settings);
     const app = createSetupApp();
@@ -215,88 +199,47 @@ describe("setup managed-file state machine", () => {
 
     expect(actual.result.updated).toContain(target.path);
     expect(app.readPath(target.path)).toBe(koTarget.content);
-    expect(actual.settings.managedFiles[target.path]?.hash).toEqual(expect.any(String));
-
-    const forceApp = createSetupApp();
-    const forceInitial = await runSetup(forceApp, settings);
-    const forceRun = await runSetup(forceApp, forceInitial.settings, { force: true, locale: "ko" });
-
-    expect(forceRun.result.updated).toContain(target.path);
-    expect(forceApp.readPath(target.path)).toBe(koTarget.content);
   });
 
-  it("skips unknown existing files unless force is used", async () => {
+  it("overwrites existing managed files by default", async () => {
     const settings = baseSettings();
     const target = targetArtifact(settings);
-    const userContent = "# User-managed template\n";
-    const warning = `Skipped user-managed file at ${target.path}`;
+    const userContent = "# User-edited managed template\n";
 
     const defaultApp = createSetupApp();
     await defaultApp.vault.create(target.path, userContent);
     const defaultRun = await runSetup(defaultApp, settings);
 
-    expect(defaultRun.result.skipped).toContain(target.path);
-    expect(defaultRun.result.warnings).toContain(warning);
-    expect(defaultApp.readPath(target.path)).toBe(userContent);
+    expect(defaultRun.result.updated).toContain(target.path);
+    expect(defaultRun.result.skipped).not.toContain(target.path);
+    expect(defaultRun.result.warnings.some((warning) => warning.includes(target.path))).toBe(false);
+    expect(defaultApp.readPath(target.path)).toBe(target.content);
 
     const dryRunApp = createSetupApp();
     await dryRunApp.vault.create(target.path, userContent);
     const dryRun = await runSetup(dryRunApp, settings, { dryRun: true });
 
-    expect(dryRun.result.skipped).toContain(target.path);
-    expect(dryRun.result.warnings).toContain(warning);
+    expect(dryRun.result.updated).toContain(target.path);
+    expect(dryRun.result.skipped).not.toContain(target.path);
     expect(dryRunApp.readPath(target.path)).toBe(userContent);
-
-    const forceApp = createSetupApp();
-    await forceApp.vault.create(target.path, userContent);
-    const forceRun = await runSetup(forceApp, settings, { force: true });
-
-    expect(forceRun.result.updated).toContain(target.path);
-    expect(forceRun.result.skipped).not.toContain(target.path);
-    expect(forceApp.readPath(target.path)).toBe(target.content);
-
-    const forceDryRunApp = createSetupApp();
-    await forceDryRunApp.vault.create(target.path, userContent);
-    const forceDryRun = await runSetup(forceDryRunApp, settings, { force: true, dryRun: true });
-
-    expect(forceDryRun.result.updated).toContain(target.path);
-    expect(forceDryRun.result.skipped).not.toContain(target.path);
-    expect(forceDryRunApp.readPath(target.path)).toBe(userContent);
   });
 
-  it("skips user-modified known managed files unless force is used", async () => {
+  it("overwrites user-modified managed files from previous setup runs", async () => {
     const defaultState = await prepareKnownUserModifiedFile();
-    const warning = `Skipped user-modified PARA-ZK file at ${defaultState.target.path}; pass force=true to overwrite`;
 
     const defaultRun = await runSetup(defaultState.app, defaultState.settings);
 
-    expect(defaultRun.result.skipped).toContain(defaultState.target.path);
-    expect(defaultRun.result.warnings).toContain(warning);
-    expect(defaultState.app.readPath(defaultState.target.path)).toBe(defaultState.userContent);
+    expect(defaultRun.result.updated).toContain(defaultState.target.path);
+    expect(defaultRun.result.skipped).not.toContain(defaultState.target.path);
+    expect(defaultRun.result.warnings.some((warning) => warning.includes(defaultState.target.path))).toBe(false);
+    expect(defaultState.app.readPath(defaultState.target.path)).toBe(defaultState.target.content);
 
     const dryRunState = await prepareKnownUserModifiedFile();
     const dryRun = await runSetup(dryRunState.app, dryRunState.settings, { dryRun: true });
 
-    expect(dryRun.result.skipped).toContain(dryRunState.target.path);
-    expect(dryRun.result.warnings).toContain(warning);
+    expect(dryRun.result.updated).toContain(dryRunState.target.path);
+    expect(dryRun.result.skipped).not.toContain(dryRunState.target.path);
     expect(dryRunState.app.readPath(dryRunState.target.path)).toBe(dryRunState.userContent);
-
-    const forceState = await prepareKnownUserModifiedFile();
-    const forceRun = await runSetup(forceState.app, forceState.settings, { force: true });
-
-    expect(forceRun.result.updated).toContain(forceState.target.path);
-    expect(forceRun.result.skipped).not.toContain(forceState.target.path);
-    expect(forceState.app.readPath(forceState.target.path)).toBe(forceState.target.content);
-
-    const forceDryRunState = await prepareKnownUserModifiedFile();
-    const forceDryRun = await runSetup(forceDryRunState.app, forceDryRunState.settings, {
-      force: true,
-      dryRun: true
-    });
-
-    expect(forceDryRun.result.updated).toContain(forceDryRunState.target.path);
-    expect(forceDryRun.result.skipped).not.toContain(forceDryRunState.target.path);
-    expect(forceDryRunState.app.readPath(forceDryRunState.target.path)).toBe(forceDryRunState.userContent);
   });
 
   it("skips managed file paths occupied by folders", async () => {
@@ -304,7 +247,7 @@ describe("setup managed-file state machine", () => {
     const target = targetArtifact(settings);
     const warning = `Cannot create file because a folder already exists at ${target.path}`;
 
-    for (const options of [{}, { force: true }, { dryRun: true }] satisfies SetupOptions[]) {
+    for (const options of [{}, { dryRun: true }] satisfies SetupOptions[]) {
       const app = createSetupApp();
       await app.vault.createFolder(target.path);
 
