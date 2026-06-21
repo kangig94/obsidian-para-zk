@@ -475,8 +475,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<project|area>",
       },
       "title": {
-        "description": "Child title. The full child drill path is [...relpath, title].",
-        "value": "<title>",
+        "description": "Child title. The full child drill path is [...relpath, title]; subfoldered subnotes may also be addressed as subdir/title(.md).",
+        "value": "<title|subdir/title>",
       },
     },
   },
@@ -801,8 +801,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<project|area>",
       },
       "title": {
-        "description": "Child title. The full child drill path is [...relpath, title].",
-        "value": "<title>",
+        "description": "Child title. The full child drill path is [...relpath, title]; subfoldered subnotes may also be addressed as subdir/title(.md).",
+        "value": "<title|subdir/title>",
       },
       "type": {
         "description": "Backlink collection reads only: filter source notes by frontmatter type.",
@@ -1205,8 +1205,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<project|area>",
       },
       "title": {
-        "description": "Child title. The full child drill path is [...relpath, title].",
-        "value": "<title>",
+        "description": "Child title. The full child drill path is [...relpath, title]; subfoldered subnotes may also be addressed as subdir/title(.md).",
+        "value": "<title|subdir/title>",
       },
     },
   },
@@ -1403,8 +1403,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<project|area>",
       },
       "title": {
-        "description": "Child title. The full child drill path is [...relpath, title].",
-        "value": "<title>",
+        "description": "Child title. The full child drill path is [...relpath, title]; subfoldered subnotes may also be addressed as subdir/title(.md).",
+        "value": "<title|subdir/title>",
       },
       "value": {
         "description": "Text value for scalar set, append, or prepend operations.",

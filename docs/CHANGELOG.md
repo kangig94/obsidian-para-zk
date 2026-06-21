@@ -179,9 +179,10 @@ Notable changes for PARA-ZK are tracked here.
 - Subnotes can now be created in a subfolder under their parent: `create-child type=subnote`
   (and the GUI "create subnote" prompt) accepts a `subdir/title` path for `title`, mirroring
   `create-resource`. The subfolder(s) are created and the note is filed there, but it stays the
-  parent's child by frontmatter (so the parent's subnote view is unaffected) and is still
-  addressed by its basename through the `*-child` commands. A flat title equal to the parent
-  still conflicts; a same-basename title inside a subfolder does not.
+  parent's child by frontmatter (so the parent's subnote view is unaffected). It can be
+  addressed by basename when unique, or by `subdir/title(.md)` through the `*-child` commands
+  when a same-basename child needs disambiguation. A flat title equal to the parent still
+  conflicts; a same-basename title inside a subfolder does not.
 - Added a `bad_citation_subpath` audit check: a body citation `PZ[<id>#<section>]` whose
   `#section` matches no heading or `^block` id in the cited source (e.g. a paraphrased heading or a
   dropped leading number like `3. `) is reported, so a citation that silently lands at the

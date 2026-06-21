@@ -69,7 +69,7 @@ Structured operations outside those string shapes stay CLI-only, including task 
 
 ## Child Notes
 
-For MCP mutation tools, `child: ["Generation", "Vision"]` is accepted only with `type=project` or `type=area`. The server routes that internally to `para-zk:update-child` with `root_type`, `root_title`, `relpath`, and `title`. The `key` belongs to the addressed child note, not the root.
+For MCP mutation tools, `child: ["Generation", "Vision"]` is accepted only with `type=project` or `type=area`. The server routes that internally to `para-zk:update-child` with `root_type`, `root_title`, `relpath`, and `title`. For a subfoldered subnote, pass the folder path in the final child element, such as `child: ["Notes/Plan.md"]`; a bare basename still works when unique. The `key` belongs to the addressed child note, not the root.
 
 For non-mutation child operations, use the CLI commands returned by `describe`: `create-child`, `read-child`, `rename-child`, and `delete-child`.
 

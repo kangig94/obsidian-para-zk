@@ -265,7 +265,7 @@ const CHILD_ADDRESS_OPTIONS: Record<string, CliOptionSpec> = {
   root_type: { value: "<project|area>", description: "Directly-addressable root ancestor type. Must be project or area." },
   root_title: { value: "<title>", description: "Directly-addressable root ancestor title." },
   relpath: { value: `<["title", ...]>`, description: "Optional ancestor chain from the root to the immediate parent. Empty or omitted means directly under the root." },
-  title: { value: "<title>", description: "Child title. The full child drill path is [...relpath, title]." }
+  title: { value: "<title|subdir/title>", description: "Child title. The full child drill path is [...relpath, title]; subfoldered subnotes may also be addressed as subdir/title(.md)." }
 };
 const CHILD_COMMANDS_HINT = "para-zk:read-child|update-child|delete-child|rename-child";
 const CRUD_CHILD_MIGRATION_ERROR = `child= is not accepted here — address a child note with ${CHILD_COMMANDS_HINT} (root_type/root_title/relpath/title)`;

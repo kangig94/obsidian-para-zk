@@ -107,7 +107,7 @@ Examples:
 - `source_title` for source notes used by create/distill workflows
 - `root_type`, `root_title`, `relpath`, and `title` for `create-child`, `read-child`, `update-child`, `rename-child`, and `delete-child`
 
-Notes are addressed by name, not by vault file path.
+Notes are addressed by name, not by vault file path. Subfoldered child subnotes can be addressed by basename when unique or by `subdir/title(.md)` through the `title` field.
 
 Top-level parent CRUD commands do not accept `child=`. Address child notes, fallback notes, and nested areas through the dedicated `*-child` command family.
 

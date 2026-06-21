@@ -57,6 +57,14 @@ describe("*-child commands", () => {
     });
     expect(read.path).toBe("PARA/Projects/Alpha/Notes/Plan.md");
     expect(String(read.value)).toContain("Sub-foldered plan.");
+
+    const qualified = await cli.run("para-zk:read-child", {
+      root_type: "project",
+      root_title: "Alpha",
+      title: "Notes/Plan.md",
+      key: "body"
+    });
+    expect(qualified.path).toBe("PARA/Projects/Alpha/Notes/Plan.md");
   });
 
   it("allows a qualified subnote whose basename equals the parent, and nested subfolders", async () => {
@@ -79,6 +87,61 @@ describe("*-child commands", () => {
     });
     expect(conflict.ok).toBe(false);
     expect(String(conflict.error)).toContain("conflicts with parent note");
+  });
+
+  it("updates a subfoldered subnote by qualified path when the basename is ambiguous", async () => {
+    await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
+    await cli.run("para-zk:create-child", {
+      type: "subnote",
+      root_type: "project",
+      root_title: "Alpha",
+      title: "Notes/Plan",
+      body: "Notes plan.",
+      open: "false"
+    });
+    await cli.run("para-zk:create-child", {
+      type: "subnote",
+      root_type: "project",
+      root_title: "Alpha",
+      title: "Archive/Plan",
+      body: "Archive plan.",
+      open: "false"
+    });
+
+    const bare = await cli.run("para-zk:read-child", {
+      root_type: "project",
+      root_title: "Alpha",
+      title: "Plan",
+      key: "body"
+    });
+    expect(bare.ok).toBe(false);
+    expect(String(bare.error)).toContain("child title is ambiguous");
+
+    const updated = await cli.run("para-zk:update-child", {
+      root_type: "project",
+      root_title: "Alpha",
+      title: "Archive/Plan.md",
+      key: "body",
+      op: "append",
+      value: "Archive only."
+    });
+    expect(updated.ok).toBe(true);
+    expect(updated.path).toBe("PARA/Projects/Alpha/Archive/Plan.md");
+
+    const notesPlan = await cli.run("para-zk:read-child", {
+      root_type: "project",
+      root_title: "Alpha",
+      title: "Notes/Plan",
+      key: "body"
+    });
+    const archivePlan = await cli.run("para-zk:read-child", {
+      root_type: "project",
+      root_title: "Alpha",
+      title: "Archive/Plan.md",
+      key: "body"
+    });
+    expect(String(notesPlan.value)).not.toContain("Archive only.");
+    expect(String(archivePlan.value)).toContain("Archive only.");
   });
 
   it("rejects a subnote title that escapes its parent folder", async () => {

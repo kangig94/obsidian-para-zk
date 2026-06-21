@@ -72,7 +72,7 @@ const BASE_MUTATION_PROPERTIES = {
   child: {
     type: "array",
     items: { type: "string" },
-    description: "Optional child drill path under a project or root area, left-to-right. Internally routed to update-child as relpath plus title, e.g. [\"Plan\"] or [\"Hiring\", \"Plan\"]."
+    description: "Optional child drill path under a project or root area, left-to-right. Internally routed to update-child as relpath plus title, e.g. [\"Plan\"], [\"Hiring\", \"Plan\"], or [\"Notes/Plan.md\"] for a subfoldered subnote."
   },
   date: {
     type: "string",

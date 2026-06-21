@@ -719,8 +719,56 @@ function folderStyleChildFolder(file: TFile): string | undefined {
   return parentPath && parentName === file.basename ? parentPath : undefined;
 }
 
+type ChildTitleAddress = {
+  basename: string;
+  qualified: boolean;
+  relpath: string;
+};
+
+function childTitleAddressCandidates(title: string): ChildTitleAddress[] {
+  const trimmed = title.trim();
+  const withoutMd = trimmed.replace(/\.md$/i, "");
+  const values = withoutMd && withoutMd !== trimmed ? [withoutMd, trimmed] : [trimmed];
+  const candidates = new Map<string, ChildTitleAddress>();
+
+  for (const value of values) {
+    const segments = sanitizeVaultRelativePath(value, "child title");
+    const candidate = {
+      basename: segments[segments.length - 1],
+      qualified: segments.length > 1,
+      relpath: segments.join("/")
+    };
+    candidates.set(candidate.relpath, candidate);
+  }
+
+  return Array.from(candidates.values());
+}
+
+function childRelativeTitle(parent: TFile, file: TFile): string | undefined {
+  const baseFolder = folderStyleChildFolder(parent) ?? parent.parent?.path ?? "";
+
+  try {
+    return relativePathUnderRoot(file.path, baseFolder).replace(/\.md$/i, "");
+  } catch {
+    return undefined;
+  }
+}
+
 function findChild(ctx: WorkflowContext, parent: TFile, title: string): TFile | undefined {
-  const matches = childFiles(ctx, parent).filter((file) => file.basename === title);
+  const candidates = childTitleAddressCandidates(title);
+  const children = childFiles(ctx, parent);
+  const qualifiedCandidates = candidates.filter((candidate) => candidate.qualified);
+
+  for (const candidate of qualifiedCandidates) {
+    const pathMatches = children.filter((file) => childRelativeTitle(parent, file) === candidate.relpath);
+    if (pathMatches.length === 1) return pathMatches[0];
+    if (pathMatches.length > 1) throw new Error("child path is ambiguous: " + candidate.relpath);
+  }
+
+  if (qualifiedCandidates.length > 0) return undefined;
+
+  const basenames = candidates.map((candidate) => candidate.basename);
+  const matches = children.filter((file) => basenames.includes(file.basename));
   if (matches.length === 1) return matches[0];
   if (matches.length > 1) throw new Error("child title is ambiguous: " + title);
   return undefined;

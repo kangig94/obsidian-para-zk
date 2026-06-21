@@ -221,6 +221,10 @@ type=area title="AI" child=["Generation","Vision"]
 → para-zk:update-child root_type=area root_title="AI" relpath=["Generation"] title="Vision"
 ```
 
+For a subfoldered subnote, keep the folder path in the final child element:
+`child=["Notes/Plan.md"]` routes to `title="Notes/Plan.md"`. A bare basename
+still works when it uniquely identifies a child.
+
 The `key` is the addressed child's own key (for example `body` for subnotes/fallback notes or `overview` for nested areas). Child updates on non-project/area roots are rejected because the public CLI child family requires `root_type=project|area`.
 
 Structured types (`project`, `area`, `journal`, `retro`) use template section

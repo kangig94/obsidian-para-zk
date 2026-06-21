@@ -98,6 +98,22 @@ describe("MCP update arg builder", () => {
     ]);
   });
 
+  it("passes a qualified subfolder child title through to update-child", () => {
+    expect(buildUpdateArgs({
+      tool: "set",
+      params: { type: "project", title: "Alpha", child: ["Notes/Plan.md"], key: "body", content: "x" }
+    })).toEqual([
+      "para-zk:update-child",
+      "root_type=project",
+      "root_title=Alpha",
+      "title=Notes/Plan.md",
+      "key=body",
+      "op=set",
+      "value=x",
+      "format=json"
+    ]);
+  });
+
   it("rejects child updates on non-project/area types", () => {
     expect(() => buildUpdateArgs({
       tool: "set",

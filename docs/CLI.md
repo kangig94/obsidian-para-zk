@@ -32,7 +32,9 @@ optional `relpath` (ancestor chain from the root to the immediate parent), and
 `title` (the child itself). The full drill path is `[...relpath, title]`. On
 `create-child type=subnote`, `title` may be a relative path (`subdir/title`) to
 file the subnote in a subfolder under its parent — it stays the parent's child
-by frontmatter regardless of subfolder, so address it afterward by its basename.
+by frontmatter regardless of subfolder. Address it afterward by basename when
+that basename is unique, or by the same relative path (`subdir/title(.md)`) when
+you need to disambiguate.
 ZK notes derived from an origin name it with `source_title` (and `source_type`
 where the origin type is ambiguous, e.g. scoped retro / resource link). Each
 concept uses exactly one option name: `title`, `kind`, `area_titles`,
@@ -613,7 +615,7 @@ Options:
 | `root_type` | `project` or `area` | Required directly-addressable root ancestor type. |
 | `root_title` | string | Required directly-addressable root ancestor title. |
 | `relpath` | JSON list | Optional ancestor chain from root to immediate parent. Empty or omitted means directly under the root. |
-| `title` | string | Required child title. Full drill path is `[...relpath, title]`. For `type=subnote`, may be a `subdir/title` path to file the note in a subfolder under the parent; it stays the parent's child by frontmatter, so address it afterward by its basename (give two subnotes the same basename only in distinct parents, not distinct subfolders of one parent). |
+| `title` | string | Required child title. Full drill path is `[...relpath, title]`. For `type=subnote`, may be a `subdir/title` path to file the note in a subfolder under the parent; it stays the parent's child by frontmatter. Existing subfoldered subnotes may be addressed by basename when unique or by `subdir/title(.md)` to disambiguate. |
 | `subnote_type` | subnote type code | `type=subnote` only. Defaults to `free`. |
 | `body` | markdown | `type=subnote` only. Optional initial free-form body content. Accepts `@<absolute-path>`. |
 | `inherit_parent_tag` | boolean | `type=area` only. Include the parent area tag too. Default `true`. |
@@ -1120,7 +1122,7 @@ Use `para-zk:update-child` for child notes:
 | `root_type` | `project` or `area` | Required directly-addressable root ancestor type. |
 | `root_title` | string | Required root ancestor title. |
 | `relpath` | JSON list | Optional ancestor chain to the immediate parent. |
-| `title` | string | Required child title. |
+| `title` | string | Required child title. Subfoldered subnotes may be addressed by basename when unique or by `subdir/title(.md)`. |
 | `key`/`op`/`value`/`value_json`/`match`/`with`/`all` | same as update commands | The `key` is the addressed child's key. |
 
 ### Rename Commands

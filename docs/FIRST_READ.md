@@ -97,7 +97,9 @@ Directly-addressable notes use their own selectors (`title`, `date`, `kind`).
 Child notes — subnotes, fallback notes, and nested areas — use the dedicated
 `create/read/update/rename/delete-child` CLI family with `root_type`,
 `root_title`, optional `relpath` (ancestor chain to the immediate parent), and
-`title` (the child). Parent CRUD commands do not accept `child=`.
+`title` (the child). Subfoldered child subnotes can use `subdir/title(.md)` in
+`title` when the basename alone is ambiguous. Parent CRUD commands do not accept
+`child=`.
 Free-form types (`resource`, `llm-wiki`, child `subnote`, fallback `note`, and
 the ZK kinds `spark`/`digest`/`permanent`) expose
 prose as one `body` key for the whole editable Markdown body before the managed
