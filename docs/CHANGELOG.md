@@ -42,6 +42,8 @@ Notable changes for PARA-ZK are tracked here.
 - The general `cited-by` view now excludes a project/area folder note's own subtree — its subnotes
   already appear in the subnotes section, so they no longer double up in "cited by" — at any nesting
   depth, while flat notes (resource, ZK, LLM-Wiki, …) keep every citation including same-folder siblings.
+- The project/area subnotes view now sorts by recency (most recently edited first, `file.mtime`),
+  matching the cited-by view, instead of by filename.
 - LLM-Wiki authoring surfaces now carry an explicit Obsidian-MathJax rule: the
   `wiki-weaver` agent, the `wiki-capture` skill, and `wiki-ingest`'s insight-fold step
   write formulas as `$…$`/`$$…$$` with literal single backslashes and never inside backtick

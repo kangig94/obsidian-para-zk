@@ -605,7 +605,7 @@ function dataviewChildDocs(t: ReturnType<typeof localePack>, sourcePath?: string
     `TABLE WITHOUT ID file.link AS "${t.labels.filename}", ${dataviewChildSubfolder(sourcePath)} AS "${t.labels.subfolder}", file.mtime AS "${t.labels.updated}"`,
     "FROM \"\"",
     `WHERE parent = ${dataviewCurrentFileLink(sourcePath)} AND type = "subnote"`,
-    "SORT file.path ASC"
+    "SORT file.mtime DESC"
   ]);
 }
 
