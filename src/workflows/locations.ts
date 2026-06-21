@@ -14,6 +14,8 @@ import { isSourceScopedRetro } from "./references";
 import { ZK_KIND_CODE_HELP, isZkType, parseZkKind, zkKindCode } from "../zk/kinds";
 
 type ParaZkPathValue = ParaZkPaths[keyof ParaZkPaths];
+type ManagedFlatNoteType = "resource" | "spark" | "digest" | "permanent" | "subnote";
+export type ManagedNoteLocation = { type: ManagedFlatNoteType; parent?: TFile };
 
 const ARCHIVE_AWARE_FOLDERS: readonly ParaZkPathValue[] = [
   PARA_ZK_PATHS.projectsFolder,
@@ -25,6 +27,23 @@ const ARCHIVE_AWARE_FOLDERS: readonly ParaZkPathValue[] = [
 export function folderStyleContainer(file: TFile): TFolder | undefined {
   const folder = file.parent;
   return folder && folder.name === file.basename ? folder : undefined;
+}
+
+function folderStyleNoteInFolder(
+  ctx: WorkflowContext,
+  folderPath: string,
+  excludedPath?: string
+): TFile | undefined {
+  const folder = normalizeVaultPath(folderPath);
+  const name = folderName(folder);
+  if (!folder || !name) return undefined;
+
+  const notePath = joinVaultPath(folder, `${name}.md`);
+  if (notePath === normalizeVaultPath(excludedPath)) return undefined;
+
+  const file = ctx.host.getFile(notePath);
+  if (!file) return undefined;
+  return folderStyleContainer(file)?.path === folder ? file : undefined;
 }
 
 export function assertVacantPath(ctx: WorkflowContext, path: string): void {
@@ -109,6 +128,22 @@ export function isUnderAnyFolder(path: string, folders: string[]): boolean {
     .some((folder) => normalized === folder || normalized.startsWith(`${folder}/`));
 }
 
+export function classifyManagedNoteLocation(ctx: WorkflowContext, path: string): ManagedNoteLocation | null {
+  const normalized = normalizeVaultPath(path);
+  if (!normalized || isArchivedPath(ctx, normalized)) return null;
+
+  if (isUnderAnyFolder(normalized, [PARA_ZK_PATHS.resourcesFolder])) return { type: "resource" };
+  if (isUnderAnyFolder(normalized, [folderForZkKind("Spark")])) return { type: "spark" };
+  if (isUnderAnyFolder(normalized, [folderForZkKind("Digest")])) return { type: "digest" };
+  if (isUnderAnyFolder(normalized, [folderForZkKind("Permanent")])) return { type: "permanent" };
+
+  const folder = normalizeVaultPath(parentFolder(normalized));
+  if (!isManagedSubnoteFolder(folder)) return null;
+
+  const parent = folderStyleNoteInFolder(ctx, folder, normalized);
+  return parent ? { type: "subnote", parent } : null;
+}
+
 export function templateFolderPaths(ctx: WorkflowContext): string[] {
   return [PARA_ZK_PATHS.templatesFolder, PARA_ZK_PATHS.managedTemplatesFolder]
     .map(normalizeVaultPath)
@@ -125,6 +160,14 @@ function archiveAwareFolders(
   if (archived === true) return [archive];
   if (archived === false) return [active];
   return [active, archive];
+}
+
+function isManagedSubnoteFolder(folder: string): boolean {
+  const normalized = normalizeVaultPath(folder);
+  return [PARA_ZK_PATHS.projectsFolder, PARA_ZK_PATHS.areasFolder].some((root) => {
+    const managedRoot = normalizeVaultPath(root);
+    return normalized !== managedRoot && normalized.startsWith(`${managedRoot}/`);
+  });
 }
 
 export function archivedCounterpartFolder(ctx: WorkflowContext, activeFolder: string): string {

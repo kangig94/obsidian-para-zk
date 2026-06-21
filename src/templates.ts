@@ -1,9 +1,12 @@
+import type { TFile } from "obsidian";
 import type { ParaZkSettings } from "./types";
 import { localePack } from "./i18n";
 import { PARA_ZK_PATHS } from "./layout";
 import type { PropsViewType } from "./props/schema";
 import { escapeRegExp } from "./text";
-import { parentFolder } from "./vault/paths";
+import { ensureFolder } from "./vault/files";
+import type { WorkflowHost } from "./vault/host";
+import { joinVaultPath, parentFolder } from "./vault/paths";
 import { ZK_KIND_CODES } from "./zk/kinds";
 
 export type ManagedArtifact = {
@@ -25,6 +28,11 @@ export const TEMPLATE_NAMES = [
 ] as const;
 
 export type TemplateName = typeof TEMPLATE_NAMES[number];
+export type TemplateVariables = Record<string, string | undefined>;
+type TemplateContext = {
+  host: Pick<WorkflowHost, "create" | "createFolder" | "getAbstractFile" | "getFile" | "read">;
+  settings: ParaZkSettings;
+};
 type TemplateLocalePack = ReturnType<typeof localePack>;
 type TemplateRenderContext = {
   t: TemplateLocalePack;
@@ -110,6 +118,52 @@ export function renderTemplate(name: TemplateName, settings: ParaZkSettings): st
     tags: t.tags,
     slugPlaceholder: "{{slug}}"
   });
+}
+
+export async function readTemplate(ctx: TemplateContext, templateName: TemplateName): Promise<string> {
+  const templatePath = joinVaultPath(PARA_ZK_PATHS.managedTemplatesFolder, `template_${templateName}.md`);
+  const templateFile = ctx.host.getFile(templatePath);
+  if (templateFile) return ctx.host.read(templateFile);
+  return renderTemplate(templateName, ctx.settings);
+}
+
+export function applyTemplateVariables(content: string, variables: TemplateVariables): string {
+  let result = content;
+  for (const [key, value] of Object.entries(variables)) {
+    if (key === "created") continue;
+    result = result.replace(placeholderPattern(escapeRegExp(key)), () => value ?? "");
+  }
+  // Drop any unresolved placeholder so it never lands in a saved note.
+  return normalizeTemplateOutput(collapseExcessBlankLines(result.replace(placeholderPattern("[A-Za-z0-9_]+"), "")));
+}
+
+export async function createMarkdownFile(
+  ctx: TemplateContext,
+  templateName: TemplateName,
+  path: string,
+  variables: TemplateVariables
+): Promise<TFile> {
+  await ensureFolder(ctx.host, parentFolder(path));
+  const template = await readTemplate(ctx, templateName);
+  const content = applyTemplateVariables(template, variables);
+  return ctx.host.create(path, content);
+}
+
+// Matches a `{{ inner }}` placeholder, optionally wrapped in the double quotes the templates use
+// to keep frontmatter valid YAML. The quotes are part of the match, so substitution consumes them
+// and the rendered value stays unquoted (or carries the value's own quotes); bare body and
+// mid-scalar placeholders match the unquoted alternative.
+function placeholderPattern(inner: string): RegExp {
+  const token = `\\{\\{\\s*${inner}\\s*\\}\\}`;
+  return new RegExp(`"${token}"|${token}`, "g");
+}
+
+function collapseExcessBlankLines(content: string): string {
+  return content.replace(/\n[ \t]*\n[ \t]*\n+/g, "\n\n");
+}
+
+function normalizeTemplateOutput(content: string): string {
+  return content.replace(/\n+$/, "\n");
 }
 
 function renderProjectTemplate({ t, tags, slugPlaceholder }: TemplateRenderContext): string {

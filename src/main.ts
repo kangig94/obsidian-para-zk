@@ -5,6 +5,7 @@ import { DEFAULT_SETTINGS, type SetupOptions, type SetupResult, type ParaZkSetti
 import { createCitationEditorExtension } from "./ux/citations/editor";
 import { registerCitationRenderers } from "./ux/citations/renderer";
 import { CitationSuggest } from "./ux/citations/suggest";
+import { registerAutoTemplate } from "./ux/actions/auto-template";
 import { registerDashboardActionRenderers } from "./ux/actions/dashboard";
 import { registerActionBlockRenderers } from "./ux/blocks/action";
 import { registerDashboardSummaryRenderers } from "./ux/blocks/dashboard-summary";
@@ -34,6 +35,7 @@ export default class ParaZkPlugin extends Plugin {
     registerWorkflowCommands(this);
     registerEditorWidthControl(this);
     registerRibbonActions(this);
+    registerAutoTemplate(this);
     registerExplorerActions(this);
     registerDashboardActionRenderers(this);
     registerActionBlockRenderers(this);

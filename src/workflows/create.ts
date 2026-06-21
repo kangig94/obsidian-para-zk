@@ -1,7 +1,7 @@
 import { TFile } from "obsidian";
 import { localePack } from "../i18n";
 import { PARA_ZK_PATHS } from "../layout";
-import { renderTemplate, type TemplateName } from "../templates";
+import { createMarkdownFile, type TemplateName } from "../templates";
 import {
   dateFromCli,
   isoWeekInfo,
@@ -10,7 +10,7 @@ import {
 import type { NoteResult, ZkKind } from "../types";
 import { frontmatterLinks, parseFrontmatterFromContent, readFileFrontmatterFresh, yamlScalar } from "../vault/frontmatter";
 import { ensureFolder } from "../vault/files";
-import { joinVaultPath, parentFolder, sanitizeFileName, wikiLink } from "../vault/paths";
+import { joinVaultPath, sanitizeFileName, wikiLink } from "../vault/paths";
 import { setEditableBody } from "../vault/sections";
 import {
   MATURITY_CODE_HELP,
@@ -26,7 +26,7 @@ import {
   type MaturityCode
 } from "../vocabulary";
 import { ZK_KIND_CODE_HELP, parseZkKind, zkKindCode } from "../zk/kinds";
-import { escapeRegExp, singleItemList, slugify, uniqueStrings } from "../text";
+import { slugify, uniqueStrings } from "../text";
 import { readOptionalCode } from "./code-options";
 import type {
   CreateAreaOptions,
@@ -44,9 +44,15 @@ import type {
   CreateZkOptions,
   CreateZkResult,
   ProjectAreaResult,
-  TemplateVariables,
   WorkflowContext
 } from "./context";
+import {
+  applyAlias,
+  applyCreatedUpdatedDefaults,
+  applyResourceFrontmatter,
+  applySubnoteFrontmatter,
+  applyZkFrontmatter
+} from "./frontmatter-builders";
 import {
   drillToChild,
   ensureFolderStyleParent,
@@ -67,7 +73,6 @@ import {
   folderStyleMarkdownPath
 } from "./locations";
 import { insertReferenceItem } from "./references";
-import { ROOT_ID_FRONTMATTER_KEY, newRootId, rootIdFromFrontmatter } from "./tasks";
 
 // Fill the free-form editable body of a just-created note. Uses the same body
 // region + splice as `update key=body op=set`, so create-with-body and a later
@@ -232,19 +237,13 @@ export async function createResource(ctx: WorkflowContext, options: CreateResour
     cursor: ""
   });
 
-  const tags = localePack(ctx.settings.locale).tags;
-  await ctx.host.processFrontMatter(file, (fm) => {
-    fm.type = "resource";
-    applyAlias(fm, options.alias);
-    const resourceDomain = options.domain?.trim();
-    fm.tags = [resourceDomain ? `${tags.resource}/${slugify(resourceDomain)}` : tags.resource];
-    applyCreatedUpdatedDefaults(fm);
-    // Provenance: write only what was provided. url/first_author/license are free text;
-    // kind is already validated to a code (or undefined) by readOptionalCode above.
-    if (options.url?.trim()) fm.url = options.url.trim();
-    if (options.firstAuthor?.trim()) fm.first_author = options.firstAuthor.trim();
-    if (options.license?.trim()) fm.license = options.license.trim();
-    if (kind) fm.kind = kind;
+  await applyResourceFrontmatter(ctx, file, {
+    alias: options.alias,
+    domain: options.domain,
+    firstAuthor: options.firstAuthor,
+    kind,
+    license: options.license,
+    url: options.url
   });
 
   let linkedFromSource = false;
@@ -370,12 +369,7 @@ export async function createSubnote(ctx: WorkflowContext, options: CreateSubnote
       subnote_type: subnoteType,
       cursor: ""
     });
-    await ctx.host.processFrontMatter(file, (fm) => {
-      fm.type = fm.type || "subnote";
-      fm.parent = linkToFile(parent.file);
-      fm.subnote_type = fm.subnote_type ?? subnoteType;
-      applyCreatedUpdatedDefaults(fm);
-    });
+    await applySubnoteFrontmatter(ctx, file, { parent: parent.file, subnoteType });
     await applyBody(ctx, file, options.body);
   } else {
     created = false;
@@ -501,66 +495,8 @@ export async function createZkFile(
     cursor: ""
   });
 
-  await ctx.host.processFrontMatter(file, (fm) => {
-    fm.type = zkKindCode(kind);
-    applyAlias(fm, options.alias);
-    applyCreatedUpdatedDefaults(fm);
-    if (kind === "Spark" && fm.processed === undefined) fm.processed = false;
-    if (kind === "Permanent") fm.maturity = fm.maturity ?? maturity;
-  });
+  await applyZkFrontmatter(ctx, file, kind, { alias: options.alias, maturityCode: options.maturityCode });
   return { file, created: true };
-}
-
-export async function createMarkdownFile(
-  ctx: WorkflowContext,
-  templateName: TemplateName,
-  path: string,
-  variables: TemplateVariables
-): Promise<TFile> {
-  await ensureFolder(ctx.host, parentFolder(path));
-  const template = await readTemplate(ctx, templateName);
-  const content = applyTemplateVariables(template, variables);
-  return ctx.host.create(path, content);
-}
-
-function applyAlias(frontmatter: Record<string, unknown>, alias: string | undefined): void {
-  if (alias === undefined) return;
-  const aliases = singleItemList(alias);
-  if (aliases.length > 0) frontmatter.aliases = aliases;
-}
-
-async function readTemplate(ctx: WorkflowContext, templateName: TemplateName): Promise<string> {
-  const templatePath = joinVaultPath(PARA_ZK_PATHS.managedTemplatesFolder, `template_${templateName}.md`);
-  const templateFile = ctx.host.getFile(templatePath);
-  if (templateFile) return ctx.host.read(templateFile);
-  return renderTemplate(templateName, ctx.settings);
-}
-
-function applyTemplateVariables(content: string, variables: TemplateVariables): string {
-  let result = content;
-  for (const [key, value] of Object.entries(variables)) {
-    if (key === "created") continue;
-    result = result.replace(placeholderPattern(escapeRegExp(key)), () => value ?? "");
-  }
-  // Drop any unresolved placeholder so it never lands in a saved note.
-  return normalizeTemplateOutput(collapseExcessBlankLines(result.replace(placeholderPattern("[A-Za-z0-9_]+"), "")));
-}
-
-// Matches a `{{ inner }}` placeholder, optionally wrapped in the double quotes the templates use
-// to keep frontmatter valid YAML. The quotes are part of the match, so substitution consumes them
-// and the rendered value stays unquoted (or carries the value's own quotes); bare body and
-// mid-scalar placeholders match the unquoted alternative.
-function placeholderPattern(inner: string): RegExp {
-  const token = `\\{\\{\\s*${inner}\\s*\\}\\}`;
-  return new RegExp(`"${token}"|${token}`, "g");
-}
-
-function collapseExcessBlankLines(content: string): string {
-  return content.replace(/\n[ \t]*\n[ \t]*\n+/g, "\n\n");
-}
-
-function normalizeTemplateOutput(content: string): string {
-  return content.replace(/\n+$/, "\n");
 }
 
 export function noteResult(file: TFile, created: boolean, open?: boolean): NoteResult {
@@ -570,14 +506,6 @@ export function noteResult(file: TFile, created: boolean, open?: boolean): NoteR
     created,
     opened: open || undefined
   };
-}
-
-export function applyCreatedUpdatedDefaults(frontmatter: {
-  updated?: unknown;
-  [ROOT_ID_FRONTMATTER_KEY]?: unknown;
-}): void {
-  if (frontmatter.updated === undefined) frontmatter.updated = "";
-  if (!rootIdFromFrontmatter(frontmatter)) frontmatter[ROOT_ID_FRONTMATTER_KEY] = newRootId();
 }
 
 async function resolveProjectAreas(ctx: WorkflowContext, areaTitles: string[] | undefined): Promise<ProjectAreaResult[]> {

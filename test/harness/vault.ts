@@ -12,6 +12,9 @@ import { workflowContext } from "../../src/vault/host";
 import type { WorkflowContext } from "../../src/workflows";
 import { TAbstractFile, TFile, TFolder } from "../mocks/obsidian";
 
+type VaultEventName = "create";
+type VaultEventCallback = (file: TAbstractFile) => unknown;
+
 function parentPath(path: string): string {
   const index = path.lastIndexOf("/");
   return index === -1 ? "" : path.slice(0, index);
@@ -46,6 +49,8 @@ export class MockApp {
   private binaryContents = new Map<string, Uint8Array>();
   private fileObjs = new Map<string, TFile>();
   private folderObjs = new Map<string, TFolder>();
+  private pendingVaultEvents: Promise<unknown>[] = [];
+  private vaultEventListeners = new Map<VaultEventName, Set<VaultEventCallback>>();
   private root = new TFolder();
 
   readonly trashed: Array<{ path: string; system: boolean }> = [];
@@ -64,9 +69,16 @@ export class MockApp {
     ],
     read: async (file: TFile): Promise<string> => this.contents.get(file.path) ?? "",
     cachedRead: async (file: TFile): Promise<string> => this.contents.get(file.path) ?? "",
-    create: async (path: string, content: string): Promise<TFile> => this.createFile(path, content),
-    createBinary: async (path: string, content: ArrayBuffer): Promise<TFile> =>
-      this.createBinaryFile(path, new Uint8Array(content)),
+    create: async (path: string, content: string): Promise<TFile> => {
+      const file = this.createFile(path, content);
+      this.emitVaultEvent("create", file);
+      return file;
+    },
+    createBinary: async (path: string, content: ArrayBuffer): Promise<TFile> => {
+      const file = this.createBinaryFile(path, new Uint8Array(content));
+      this.emitVaultEvent("create", file);
+      return file;
+    },
     createFolder: async (path: string): Promise<void> => {
       this.ensureFolderPath(path);
     },
@@ -84,6 +96,16 @@ export class MockApp {
     adapter: {
       exists: async (path: string): Promise<boolean> =>
         this.fileObjs.has(path) || this.folderObjs.has(path)
+    },
+    on: (name: VaultEventName, callback: VaultEventCallback): { detach: () => void } => {
+      const listeners = this.vaultEventListeners.get(name) ?? new Set<VaultEventCallback>();
+      listeners.add(callback);
+      this.vaultEventListeners.set(name, listeners);
+      return {
+        detach: () => {
+          listeners.delete(callback);
+        }
+      };
     }
   };
 
@@ -125,6 +147,10 @@ export class MockApp {
   };
 
   workspace = {
+    onLayoutReady: (callback: () => void): void => {
+      callback();
+    },
+    on: (_name: string, _callback: () => void): { detach: () => void } => ({ detach: () => {} }),
     getLeaf: (_newLeaf?: boolean | string) => ({
       openFile: async (file: TFile): Promise<void> => {
         this.opened.push(file.path);
@@ -146,6 +172,14 @@ export class MockApp {
   /** Test-only: list every file path that currently exists. */
   listPaths(): string[] {
     return [...this.fileObjs.keys()];
+  }
+
+  /** Test-only: wait for async vault event handlers currently in flight. */
+  async flushVaultEvents(): Promise<void> {
+    while (this.pendingVaultEvents.length > 0) {
+      const pending = this.pendingVaultEvents.splice(0);
+      await Promise.all(pending);
+    }
   }
 
   /** Test-only: read a binary file's current content by path. */
@@ -179,6 +213,21 @@ export class MockApp {
     this.binaryContents.set(path, content);
     this.rewire();
     return file;
+  }
+
+  private emitVaultEvent(name: VaultEventName, file: TAbstractFile): void {
+    const listeners = this.vaultEventListeners.get(name);
+    if (!listeners) return;
+    for (const listener of listeners) {
+      try {
+        const result = listener(file);
+        if (isPromiseLike(result)) {
+          this.pendingVaultEvents.push(result.catch(() => {}));
+        }
+      } catch {
+        // Obsidian event listeners are isolated from vault operations.
+      }
+    }
   }
 
   private ensureFolderPath(path: string): void {
@@ -363,6 +412,10 @@ function incrementLinkCount(
 ): void {
   links[sourcePath] ??= {};
   links[sourcePath][target] = (links[sourcePath][target] ?? 0) + 1;
+}
+
+function isPromiseLike(value: unknown): value is Promise<unknown> {
+  return !!value && typeof (value as { then?: unknown }).then === "function";
 }
 
 export function createTestContext(

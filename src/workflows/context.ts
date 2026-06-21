@@ -10,8 +10,6 @@ export type WorkflowContext = {
   settings: ParaZkSettings;
 };
 
-export type TemplateVariables = Record<string, string | undefined>;
-
 export type CreateProjectOptions = {
   title: string;
   alias?: string;

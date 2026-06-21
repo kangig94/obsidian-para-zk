@@ -1,6 +1,7 @@
 import { TFile } from "obsidian";
 import { localePack } from "../i18n";
 import { PARA_ZK_PATHS } from "../layout";
+import { createMarkdownFile } from "../templates";
 import {
   dateFromCli,
   localDate,
@@ -23,12 +24,11 @@ import { appendUniqueStrings, escapeRegExp } from "../text";
 import { readOptionalCode } from "./code-options";
 import {
   applyBody,
-  applyCreatedUpdatedDefaults,
-  createMarkdownFile,
   createZkFile,
   noteResult,
   openIfRequested
 } from "./create";
+import { applyCreatedUpdatedDefaults } from "./frontmatter-builders";
 import type {
   CaptureJournalOptions,
   OpenJournalOptions,

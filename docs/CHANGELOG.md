@@ -6,6 +6,11 @@ Notable changes for PARA-ZK are tracked here.
 
 ### Added
 
+- Native file-tree "New note" auto-templating for flat managed note types. Empty Markdown files
+  created under Resources, ZK Spark, ZK Digest, ZK Permanent, or an existing project/area
+  folder-note folder now receive the matching PARA-ZK template body and frontmatter while
+  preserving the user-chosen filename; archived, journal, LLM-Wiki, retro, project, area, and
+  unmanaged paths remain untouched.
 - SessionStart hook (`clients/hooks/wiki-domains-hook.mjs`) that injects the LLM-Wiki
   **domain roster** at the start of each Claude Code session (and after compaction), so the
   assistant consults the wiki for in-domain questions on its own. It reads only the Obsidian

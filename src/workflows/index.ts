@@ -84,3 +84,4 @@ export {
   surfaceWriteKeys
 } from "./describe";
 export { backlinkReadInstrumentation } from "./backlinks";
+export { applyManagedTemplate } from "./auto-template";
