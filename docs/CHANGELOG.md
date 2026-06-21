@@ -2,7 +2,7 @@
 
 Notable changes for PARA-ZK are tracked here.
 
-## 0.0.3 - In development
+## 0.0.3 - 2026-06-21
 
 ### Added
 
@@ -39,6 +39,9 @@ Notable changes for PARA-ZK are tracked here.
   multiple index pages all showed as "index"). All managed-block buttons (create subnote/retro/
   subarea, distill/discard, create-from-resource/digest) move from per-view toolbars into
   declarative `para-zk-action` blocks; the legacy bare-token `para-zk-view` key fallback is removed.
+- The general `cited-by` view now excludes a project/area folder note's own subtree — its subnotes
+  already appear in the subnotes section, so they no longer double up in "cited by" — at any nesting
+  depth, while flat notes (resource, ZK, LLM-Wiki, …) keep every citation including same-folder siblings.
 - LLM-Wiki authoring surfaces now carry an explicit Obsidian-MathJax rule: the
   `wiki-weaver` agent, the `wiki-capture` skill, and `wiki-ingest`'s insight-fold step
   write formulas as `$…$`/`$$…$$` with literal single backslashes and never inside backtick
