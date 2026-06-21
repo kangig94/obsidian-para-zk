@@ -13,6 +13,7 @@
     "para",
     "zettelkasten"
   ],
+  "hooks": "./hooks/hooks.json",
   "mcpServers": {
     "para-zk": {
       "command": "node",

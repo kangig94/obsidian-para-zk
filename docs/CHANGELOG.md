@@ -4,6 +4,18 @@ Notable changes for PARA-ZK are tracked here.
 
 ## 0.0.3 - In development
 
+### Added
+
+- SessionStart hook (`clients/hooks/wiki-domains-hook.mjs`) that injects the LLM-Wiki
+  **domain roster** at the start of each Claude Code session (and after compaction), so the
+  assistant consults the wiki for in-domain questions on its own. It reads only the Obsidian
+  vault registry and each para-zk vault's `LLM-Wiki/` folder listing — no running Obsidian, no
+  para-zk runtime — and stays silent when no wiki is present. The injected guidance routes
+  reads through the para-zk CLI (`read-llm-wiki` or `list`, never raw file paths) and, when
+  Obsidian is not running, asks the user before `optsidian open-gui vault-path=<path>`. The roster is
+  domain-only (no page titles) so it stays bounded as the wiki grows. A consistency test
+  pins the hook's domain enumeration to the canonical `para-zk:wiki-domains` workflow.
+
 ### Changed
 
 - Managed-block UI: the four per-type "cited by" Dataview views collapse into one general

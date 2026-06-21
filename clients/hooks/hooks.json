@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "test -f \"${CLAUDE_PLUGIN_ROOT}/hooks/wiki-domains-hook.mjs\" || exit 0; node \"${CLAUDE_PLUGIN_ROOT}/hooks/wiki-domains-hook.mjs\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "test -f \"${CLAUDE_PLUGIN_ROOT}/hooks/wiki-domains-hook.mjs\" || exit 0; node \"${CLAUDE_PLUGIN_ROOT}/hooks/wiki-domains-hook.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
