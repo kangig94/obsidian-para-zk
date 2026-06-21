@@ -46,6 +46,20 @@ function folderStyleNoteInFolder(
   return folderStyleContainer(file)?.path === folder ? file : undefined;
 }
 
+// Walk up from the new note's folder to the NEAREST folder-note within PARA/Projects or PARA/Areas
+// (stopping below the managed root), so a note in any organizational subfolder of a project — or in a
+// nested sub-area — is parented to the closest enclosing folder note, at any depth. Returns undefined
+// when no folder-note ancestor exists below the root.
+function nearestSubnoteParent(ctx: WorkflowContext, folder: string, excludedPath: string): TFile | undefined {
+  let current = normalizeVaultPath(folder);
+  while (isManagedSubnoteFolder(current)) {
+    const note = folderStyleNoteInFolder(ctx, current, excludedPath);
+    if (note) return note;
+    current = normalizeVaultPath(parentFolder(current));
+  }
+  return undefined;
+}
+
 export function assertVacantPath(ctx: WorkflowContext, path: string): void {
   const normalized = normalizeVaultPath(path);
   if (ctx.host.getAbstractFile(normalized)) {
@@ -137,10 +151,7 @@ export function classifyManagedNoteLocation(ctx: WorkflowContext, path: string):
   if (isUnderAnyFolder(normalized, [folderForZkKind("Digest")])) return { type: "digest" };
   if (isUnderAnyFolder(normalized, [folderForZkKind("Permanent")])) return { type: "permanent" };
 
-  const folder = normalizeVaultPath(parentFolder(normalized));
-  if (!isManagedSubnoteFolder(folder)) return null;
-
-  const parent = folderStyleNoteInFolder(ctx, folder, normalized);
+  const parent = nearestSubnoteParent(ctx, parentFolder(normalized), normalized);
   return parent ? { type: "subnote", parent } : null;
 }
 

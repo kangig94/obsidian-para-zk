@@ -62,6 +62,27 @@ describe("classifyManagedNoteLocation", () => {
 
     expect(classifyManagedNoteLocation(ctx, "PARA/Projects/Loose/Plan.md")).toBeNull();
     expect(classifyManagedNoteLocation(ctx, "PARA/Areas/Loose/Plan.md")).toBeNull();
+    // Deep path with no folder-note at any level: the walk-up must terminate at the managed root → null.
+    expect(classifyManagedNoteLocation(ctx, "PARA/Projects/Loose/deep/sub/Note.md")).toBeNull();
+  });
+
+  it("classifies a note in a project's deeper subfolder as a subnote of the project (any depth)", async () => {
+    const { ctx } = createTestContext();
+    const project = await createProject(ctx, { title: "Alpha", open: false });
+
+    const deep = classifyManagedNoteLocation(ctx, "PARA/Projects/Alpha/notes/research/Deep.md");
+    expect(deep).toMatchObject({ type: "subnote" });
+    expect(deep?.parent?.path).toBe(project.path);
+  });
+
+  it("parents a subnote to the nearest enclosing folder-note, not the outermost", async () => {
+    const { ctx } = createTestContext();
+    await createArea(ctx, { title: "Ops", open: false });
+    const sub = await createArea(ctx, { title: "Incidents", parentTitle: "Ops", open: false });
+
+    const location = classifyManagedNoteLocation(ctx, "PARA/Areas/Ops/Incidents/logs/Today.md");
+    expect(location).toMatchObject({ type: "subnote" });
+    expect(location?.parent?.path).toBe(sub.path);
   });
 });
 
