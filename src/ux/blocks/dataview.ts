@@ -18,11 +18,13 @@ type DataviewViewArgs = {
 };
 
 type DataviewRenderOptions = {
+  bufferInitial?: boolean;
   preserveCurrent?: boolean;
 };
 
 const DATAVIEW_CHANGE_RERENDER_DELAY_MS = 300;
 const DATAVIEW_BUFFER_SETTLE_TIMEOUT_MS = 2500;
+const DATAVIEW_INITIAL_BUFFER_SETTLE_TIMEOUT_MS = 700;
 
 // Renders a compact `para-zk-view` block by expanding its view key into a
 // managed Dataview query. The source path is passed so the query's `this.file`
@@ -51,7 +53,7 @@ class DataviewViewRenderChild extends MarkdownRenderChild {
 
   onload(): void {
     this.unloaded = false;
-    this.renderNow();
+    this.renderNow({ bufferInitial: true });
     this.registerEvent(this.plugin.app.vault.on("modify", (file) => this.onVaultFile(file)));
     this.registerEvent(this.plugin.app.vault.on("create", (file) => this.onVaultFile(file)));
     this.registerEvent(this.plugin.app.vault.on("delete", (file) => this.onVaultFile(file)));
@@ -114,7 +116,17 @@ async function renderDataviewView(
 ): Promise<void> {
   if (!isCurrent()) return;
   if (options.preserveCurrent && hasSettledDataviewRender(el)) {
-    await renderDataviewViewBuffered(plugin, args, el, sourcePath, child, isCurrent);
+    await renderDataviewViewBuffered(plugin, args, el, sourcePath, child, isCurrent, {
+      replaceUnsettled: false,
+      timeoutMs: DATAVIEW_BUFFER_SETTLE_TIMEOUT_MS
+    });
+    return;
+  }
+  if (options.bufferInitial) {
+    await renderDataviewViewBuffered(plugin, args, el, sourcePath, child, isCurrent, {
+      replaceUnsettled: true,
+      timeoutMs: DATAVIEW_INITIAL_BUFFER_SETTLE_TIMEOUT_MS
+    });
     return;
   }
 
@@ -128,7 +140,8 @@ async function renderDataviewViewBuffered(
   el: HTMLElement,
   sourcePath: string | undefined,
   child: MarkdownRenderChild,
-  isCurrent: () => boolean
+  isCurrent: () => boolean,
+  options: { replaceUnsettled: boolean; timeoutMs: number }
 ): Promise<void> {
   const buffer = el.ownerDocument.createElement("div");
   buffer.addClass("para-zk-view-buffer");
@@ -143,8 +156,9 @@ async function renderDataviewViewBuffered(
 
   try {
     await renderDataviewViewInto(plugin, args, buffer, sourcePath, child);
-    await waitForSettledDataviewRender(buffer, isCurrent);
-    if (!isCurrent() || !hasSettledDataviewRender(buffer)) return;
+    await waitForSettledDataviewRender(buffer, isCurrent, options.timeoutMs);
+    if (!isCurrent()) return;
+    if (!hasSettledDataviewRender(buffer) && !options.replaceUnsettled) return;
     replaceDataviewView(el, buffer);
   } finally {
     buffer.remove();
@@ -214,14 +228,18 @@ function replaceDataviewView(el: HTMLElement, rendered: HTMLElement): void {
   el.replaceChildren(...Array.from(rendered.childNodes));
 }
 
-function waitForSettledDataviewRender(el: HTMLElement, isCurrent: () => boolean): Promise<void> {
+function waitForSettledDataviewRender(
+  el: HTMLElement,
+  isCurrent: () => boolean,
+  timeoutMs: number
+): Promise<void> {
   if (hasSettledDataviewRender(el) || !isCurrent()) return Promise.resolve();
 
   return new Promise((resolve) => {
     const timer = window.setTimeout(() => {
       observer.disconnect();
       resolve();
-    }, DATAVIEW_BUFFER_SETTLE_TIMEOUT_MS);
+    }, timeoutMs);
     const observer = new MutationObserver(() => {
       if (!isCurrent() || hasSettledDataviewRender(el)) {
         window.clearTimeout(timer);
