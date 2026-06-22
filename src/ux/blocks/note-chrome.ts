@@ -192,11 +192,16 @@ class NoteChromeController {
     const generation = ++this.renderGeneration;
     const child = this.ensureManagedChild(managedEl);
     renderPropsPanel(this.plugin, propsEl, this.sourcePath);
+    refreshPreviewChromeSections(this.plugin, this.container);
     void renderManagedPanel(this.plugin, managedEl, this.sourcePath, child)
+      .then(() => {
+        if (this.isCurrentRender(generation)) refreshPreviewChromeSections(this.plugin, this.container);
+      })
       .catch((error: unknown) => {
         if (this.isCurrentRender(generation)) {
           managedEl.style.removeProperty("display");
           renderBlockNotice(managedEl, "managed", error instanceof Error ? error.message : String(error));
+          refreshPreviewChromeSections(this.plugin, this.container);
         }
       });
     this.renderedSignature = signature;
@@ -208,25 +213,29 @@ class NoteChromeController {
 
   private ensurePropsEl(): HTMLElement {
     if (!this.propsEl) {
-      this.propsEl = this.container.querySelector<HTMLElement>(":scope > .para-zk-note-chrome--props") ?? undefined;
+      this.propsEl = this.container.querySelector<HTMLElement>(
+        ":scope > .para-zk-note-chrome--props, :scope > .mod-header > .para-zk-note-chrome--props"
+      ) ?? undefined;
     }
     if (!this.propsEl) {
       this.propsEl = this.container.ownerDocument.createElement("div");
       this.propsEl.addClass("para-zk-note-chrome", "para-zk-note-chrome--props");
     }
-    removeDuplicatePanels(this.container, ".para-zk-note-chrome--props", this.propsEl);
+    removeDuplicatePropsPanels(this.container, this.propsEl);
     return this.propsEl;
   }
 
   private ensureManagedEl(): HTMLElement {
     if (!this.managedEl) {
-      this.managedEl = this.container.querySelector<HTMLElement>(":scope > .para-zk-note-chrome--managed") ?? undefined;
+      this.managedEl = this.container.querySelector<HTMLElement>(
+        ":scope > .para-zk-note-chrome--managed, :scope > .mod-footer > .para-zk-note-chrome--managed"
+      ) ?? undefined;
     }
     if (!this.managedEl) {
       this.managedEl = this.container.ownerDocument.createElement("div");
       this.managedEl.addClass("para-zk-note-chrome", "para-zk-note-chrome--managed");
     }
-    removeDuplicatePanels(this.container, ".para-zk-note-chrome--managed", this.managedEl);
+    removeDuplicateManagedPanels(this.container, this.managedEl);
     return this.managedEl;
   }
 
@@ -408,33 +417,61 @@ function resolveContainer(el: HTMLElement): HTMLElement | undefined {
   return el.closest<HTMLElement>(".markdown-preview-sizer") ?? undefined;
 }
 
-function removeDuplicatePanels(container: HTMLElement, selector: string, keep: HTMLElement): void {
-  for (const panel of Array.from(container.querySelectorAll<HTMLElement>(`:scope > ${selector}`))) {
+function removeDuplicatePropsPanels(container: HTMLElement, keep: HTMLElement): void {
+  for (const panel of propsPanelCandidates(container)) {
+    if (panel !== keep) panel.remove();
+  }
+}
+
+function removeDuplicateManagedPanels(container: HTMLElement, keep: HTMLElement): void {
+  for (const panel of managedPanelCandidates(container)) {
     if (panel !== keep) panel.remove();
   }
 }
 
 function removeStaleInjectedPanels(container: HTMLElement, sourcePath: string | undefined): void {
-  for (const panel of Array.from(container.querySelectorAll<HTMLElement>(":scope > .para-zk-note-chrome"))) {
+  for (const panel of injectedPanelCandidates(container)) {
     if (panel.dataset.paraZkSourcePath !== sourcePath) panel.remove();
   }
 }
 
 function removeInjectedPanels(container: HTMLElement): void {
-  for (const panel of Array.from(container.querySelectorAll<HTMLElement>(":scope > .para-zk-note-chrome"))) {
+  for (const panel of injectedPanelCandidates(container)) {
     panel.remove();
   }
+}
+
+function injectedPanelCandidates(container: HTMLElement): HTMLElement[] {
+  return Array.from(container.querySelectorAll<HTMLElement>(
+    ":scope > .para-zk-note-chrome, :scope > .mod-header > .para-zk-note-chrome, :scope > .mod-footer > .para-zk-note-chrome"
+  ));
+}
+
+function propsPanelCandidates(container: HTMLElement): HTMLElement[] {
+  return Array.from(container.querySelectorAll<HTMLElement>(
+    ":scope > .para-zk-note-chrome--props, :scope > .mod-header > .para-zk-note-chrome--props"
+  ));
+}
+
+function managedPanelCandidates(container: HTMLElement): HTMLElement[] {
+  return Array.from(container.querySelectorAll<HTMLElement>(
+    ":scope > .para-zk-note-chrome--managed, :scope > .mod-footer > .para-zk-note-chrome--managed"
+  ));
 }
 
 function isVisibleElement(el: HTMLElement): boolean {
   return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
 }
 
-// Props sits directly under Obsidian's Properties block (`.mod-frontmatter`), falling
-// back to just after the inline-title header, then to the top of the content.
+// Props sits inside Obsidian's note header so Reading view's virtual renderer
+// accounts for its height in the header section when scrolling.
 function insertPropsHeader(container: HTMLElement, propsEl: HTMLElement): void {
-  const anchor = container.querySelector<HTMLElement>(":scope > .mod-frontmatter, :scope > .metadata-container, :scope > .frontmatter-container")
-    ?? container.querySelector<HTMLElement>(":scope > .mod-header");
+  const header = container.querySelector<HTMLElement>(":scope > .mod-header");
+  if (header) {
+    if (header.lastElementChild !== propsEl) header.appendChild(propsEl);
+    return;
+  }
+  const anchor = container.querySelector<HTMLElement>(":scope > .mod-frontmatter, :scope > .metadata-container, :scope > .frontmatter-container");
   if (anchor) {
     if (anchor.nextElementSibling !== propsEl) anchor.after(propsEl);
     return;
@@ -442,14 +479,48 @@ function insertPropsHeader(container: HTMLElement, propsEl: HTMLElement): void {
   if (container.firstElementChild !== propsEl) container.prepend(propsEl);
 }
 
-// Managed sits at the bottom of the body, before Obsidian's note footer (`.mod-footer`).
+// Managed sits inside Obsidian's note footer so Reading view's virtual renderer
+// accounts for its height in the footer section when scrolling.
 function insertManagedFooter(container: HTMLElement, managedEl: HTMLElement): void {
   const footer = container.querySelector<HTMLElement>(":scope > .mod-footer");
   if (footer) {
-    if (footer.previousElementSibling !== managedEl) footer.before(managedEl);
+    if (footer.firstElementChild !== managedEl) footer.prepend(managedEl);
     return;
   }
   if (container.lastElementChild !== managedEl) container.appendChild(managedEl);
+}
+
+function refreshPreviewChromeSections(plugin: ParaZkPluginContext, container: HTMLElement): void {
+  const renderer = previewRendererForContainer(plugin, container);
+  try {
+    renderer?.updateHeader?.();
+    renderer?.updateFooter?.();
+    renderer?.updateVirtualDisplay?.();
+  } catch {
+    // Obsidian's preview renderer hooks are private; failing to refresh height
+    // is better than breaking note rendering on a version mismatch.
+  }
+}
+
+function previewRendererForContainer(
+  plugin: ParaZkPluginContext,
+  container: HTMLElement
+): { updateHeader?: () => void; updateFooter?: () => void; updateVirtualDisplay?: () => void } | undefined {
+  for (const leaf of plugin.app.workspace.getLeavesOfType("markdown")) {
+    if (!(leaf.view instanceof MarkdownView)) continue;
+    if (leaf.view.containerEl.querySelector(".markdown-preview-sizer") !== container) continue;
+    const viewWithPreview = leaf.view as MarkdownView & {
+      previewMode?: {
+        renderer?: {
+          updateHeader?: () => void;
+          updateFooter?: () => void;
+          updateVirtualDisplay?: () => void;
+        };
+      };
+    };
+    return viewWithPreview.previewMode?.renderer;
+  }
+  return undefined;
 }
 
 function isParaZkNote(
