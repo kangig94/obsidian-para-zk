@@ -23,6 +23,7 @@ import { renderBlockNotice } from "./shell";
 
 const NOTE_CHROME_ATTACH_RETRY_LIMIT = 12;
 const NOTE_CHROME_ATTACH_RETRY_DELAY_MS = 30;
+const NOTE_CHROME_INITIAL_ATTACH_DELAY_MS = 60;
 const NOTE_CHROME_RERENDER_DELAY_MS = 120;
 // Keyed by the reading-view content container (`.markdown-preview-sizer`) so one note
 // renders one set of panels. A re-rendered preview builds a fresh sizer -> fresh entry.
@@ -50,14 +51,24 @@ export function registerNoteChromeRenderers(plugin: ParaZkPluginContext): void {
   plugin.registerEvent(
     plugin.app.workspace.on("layout-change", () => {
       cleanupDisconnectedNoteChromeControllers();
+      cleanupHiddenNoteChromeForOpenViews(plugin);
+      cleanupStaleNoteChromeForOpenViews(plugin);
       scheduleOpenReadingViewScan(plugin);
     })
   );
   plugin.registerEvent(
-    plugin.app.workspace.on("file-open", () => scheduleOpenReadingViewScan(plugin))
+    plugin.app.workspace.on("file-open", () => {
+      cleanupHiddenNoteChromeForOpenViews(plugin);
+      cleanupStaleNoteChromeForOpenViews(plugin);
+      scheduleOpenReadingViewScan(plugin);
+    })
   );
   plugin.registerEvent(
-    plugin.app.workspace.on("active-leaf-change", () => scheduleOpenReadingViewScan(plugin))
+    plugin.app.workspace.on("active-leaf-change", () => {
+      cleanupHiddenNoteChromeForOpenViews(plugin);
+      cleanupStaleNoteChromeForOpenViews(plugin);
+      scheduleOpenReadingViewScan(plugin);
+    })
   );
   plugin.app.workspace.onLayoutReady(() => scheduleOpenReadingViewScan(plugin));
   plugin.register(() => disposeAllNoteChromeControllers());
@@ -185,6 +196,7 @@ class NoteChromeController {
     const managedEl = this.ensureManagedEl();
     propsEl.dataset.paraZkSourcePath = this.sourcePath;
     managedEl.dataset.paraZkSourcePath = this.sourcePath;
+    if (!managedEl.hasChildNodes()) managedEl.style.display = "none";
     this.ensureLayout();
 
     const generation = ++this.renderGeneration;
@@ -193,6 +205,7 @@ class NoteChromeController {
     void renderManagedPanel(this.plugin, managedEl, this.sourcePath, child)
       .catch((error: unknown) => {
         if (this.isCurrentRender(generation)) {
+          managedEl.style.removeProperty("display");
           renderBlockNotice(managedEl, "managed", error instanceof Error ? error.message : String(error));
         }
       });
@@ -291,7 +304,7 @@ function scheduleNoteChromeAttach(
     if (attempt < NOTE_CHROME_ATTACH_RETRY_LIMIT) {
       scheduleNoteChromeAttach(plugin, el, sourcePath, typeHint, attempt + 1);
     }
-  }, attempt === 0 ? 0 : NOTE_CHROME_ATTACH_RETRY_DELAY_MS);
+  }, attempt === 0 ? NOTE_CHROME_INITIAL_ATTACH_DELAY_MS : NOTE_CHROME_ATTACH_RETRY_DELAY_MS);
 }
 
 function ensureNoteChromeController(
@@ -323,12 +336,16 @@ function refreshNoteChromeForPath(path: string): void {
 }
 
 function scheduleOpenReadingViewScan(plugin: ParaZkPluginContext): void {
-  window.setTimeout(() => scanOpenReadingViews(plugin), 0);
-  window.setTimeout(() => scanOpenReadingViews(plugin), NOTE_CHROME_ATTACH_RETRY_DELAY_MS);
+  cleanupHiddenNoteChromeForOpenViews(plugin);
+  cleanupStaleNoteChromeForOpenViews(plugin);
+  window.setTimeout(() => scanOpenReadingViews(plugin), NOTE_CHROME_INITIAL_ATTACH_DELAY_MS);
+  window.setTimeout(() => scanOpenReadingViews(plugin), NOTE_CHROME_INITIAL_ATTACH_DELAY_MS + NOTE_CHROME_ATTACH_RETRY_DELAY_MS);
 }
 
 function scanOpenReadingViews(plugin: ParaZkPluginContext): void {
   cleanupDisconnectedNoteChromeControllers();
+  cleanupHiddenNoteChromeForOpenViews(plugin);
+  cleanupStaleNoteChromeForOpenViews(plugin);
   for (const leaf of plugin.app.workspace.getLeavesOfType("markdown")) {
     if (!(leaf.view instanceof MarkdownView)) continue;
     if (leaf.view.getMode() !== "preview") continue;
@@ -336,12 +353,45 @@ function scanOpenReadingViews(plugin: ParaZkPluginContext): void {
     const file = leaf.view.file;
     if (!(file instanceof TFile)) continue;
 
+    const preview = leaf.view.containerEl.querySelector<HTMLElement>(".markdown-preview-view");
+    if (preview && !isVisibleElement(preview)) continue;
+
     const container = leaf.view.containerEl.querySelector<HTMLElement>(".markdown-preview-sizer");
     if (!container) continue;
 
     const typeHint = cachedFrontmatterType(plugin, file.path);
     if (!isParaZkNote(plugin, file.path, typeHint)) continue;
     ensureNoteChromeController(plugin, container, file.path, typeHint).scheduleRender(0);
+  }
+}
+
+function cleanupHiddenNoteChromeForOpenViews(plugin: ParaZkPluginContext): void {
+  for (const leaf of plugin.app.workspace.getLeavesOfType("markdown")) {
+    if (!(leaf.view instanceof MarkdownView)) continue;
+    const preview = leaf.view.containerEl.querySelector<HTMLElement>(".markdown-preview-view");
+    const container = leaf.view.containerEl.querySelector<HTMLElement>(".markdown-preview-sizer");
+    if (!container || (preview && isVisibleElement(preview))) continue;
+
+    noteChromeControllers.get(container)?.dispose();
+    removeInjectedPanels(container);
+  }
+}
+
+function cleanupStaleNoteChromeForOpenViews(plugin: ParaZkPluginContext): void {
+  for (const leaf of plugin.app.workspace.getLeavesOfType("markdown")) {
+    if (!(leaf.view instanceof MarkdownView)) continue;
+    const container = leaf.view.containerEl.querySelector<HTMLElement>(".markdown-preview-sizer");
+    if (!container) continue;
+
+    const file = leaf.view.file;
+    const sourcePath = file instanceof TFile ? file.path : undefined;
+    const controller = noteChromeControllers.get(container);
+    if (controller && controller.sourcePath !== sourcePath) {
+      controller.dispose();
+      continue;
+    }
+
+    removeStaleInjectedPanels(container, sourcePath);
   }
 }
 
@@ -379,6 +429,22 @@ function removeDuplicatePanels(container: HTMLElement, selector: string, keep: H
   for (const panel of Array.from(container.querySelectorAll<HTMLElement>(`:scope > ${selector}`))) {
     if (panel !== keep) panel.remove();
   }
+}
+
+function removeStaleInjectedPanels(container: HTMLElement, sourcePath: string | undefined): void {
+  for (const panel of Array.from(container.querySelectorAll<HTMLElement>(":scope > .para-zk-note-chrome"))) {
+    if (panel.dataset.paraZkSourcePath !== sourcePath) panel.remove();
+  }
+}
+
+function removeInjectedPanels(container: HTMLElement): void {
+  for (const panel of Array.from(container.querySelectorAll<HTMLElement>(":scope > .para-zk-note-chrome"))) {
+    panel.remove();
+  }
+}
+
+function isVisibleElement(el: HTMLElement): boolean {
+  return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
 }
 
 // Props sits directly under Obsidian's Properties block (`.mod-frontmatter`), falling
