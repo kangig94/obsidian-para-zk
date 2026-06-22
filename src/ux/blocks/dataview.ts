@@ -17,6 +17,10 @@ type DataviewViewArgs = {
   title?: string;
 };
 
+type DataviewRenderOptions = {
+  onlyIfUnsettled?: boolean;
+};
+
 const DATAVIEW_INITIAL_RERENDER_DELAYS_MS = [1600, 3600] as const;
 const DATAVIEW_CHANGE_RERENDER_DELAYS_MS = [300, 3200] as const;
 
@@ -48,7 +52,9 @@ class DataviewViewRenderChild extends MarkdownRenderChild {
   onload(): void {
     this.unloaded = false;
     this.renderNow();
-    for (const delay of DATAVIEW_INITIAL_RERENDER_DELAYS_MS) this.scheduleRender(delay);
+    for (const delay of DATAVIEW_INITIAL_RERENDER_DELAYS_MS) {
+      this.scheduleRender(delay, { onlyIfUnsettled: true });
+    }
     this.registerEvent(this.plugin.app.vault.on("modify", (file) => this.onVaultFile(file)));
     this.registerEvent(this.plugin.app.vault.on("create", (file) => this.onVaultFile(file)));
     this.registerEvent(this.plugin.app.vault.on("delete", (file) => this.onVaultFile(file)));
@@ -70,9 +76,10 @@ class DataviewViewRenderChild extends MarkdownRenderChild {
     for (const delay of DATAVIEW_CHANGE_RERENDER_DELAYS_MS) this.scheduleRender(delay);
   }
 
-  private scheduleRender(delayMs: number): void {
+  private scheduleRender(delayMs: number, options: DataviewRenderOptions = {}): void {
     const timer = window.setTimeout(() => {
       this.renderTimers.delete(timer);
+      if (options.onlyIfUnsettled && hasSettledDataviewRender(this.containerEl)) return;
       this.renderNow();
     }, delayMs);
     this.renderTimers.add(timer);
@@ -149,6 +156,19 @@ function renderDataviewViewShell(
     kind: viewBlockKind(rawKey),
     title: titleText
   }).body;
+}
+
+function hasSettledDataviewRender(el: HTMLElement): boolean {
+  const dataview = el.querySelector<HTMLElement>(".block-language-dataview");
+  if (!dataview) return false;
+
+  const text = dataview.textContent?.trim() ?? "";
+  if (!text || text === "Loading...") return false;
+
+  const loadingError = dataview.querySelector<HTMLElement>(".dataview-error")
+    ?.textContent
+    ?.trim();
+  return loadingError !== "Loading...";
 }
 
 function isDataviewViewKey(key: string): key is DataviewViewKey {
