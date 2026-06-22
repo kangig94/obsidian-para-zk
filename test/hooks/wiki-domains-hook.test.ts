@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -43,6 +43,21 @@ function writeRegistry(root: string, vaultPaths: string[]): string {
 }
 
 describe("wiki-domains SessionStart hook", () => {
+  it("registers the SessionStart context hook once", () => {
+    const hooksPath = path.resolve("clients/hooks/hooks.json");
+    const config = JSON.parse(readFileSync(hooksPath, "utf8")) as {
+      hooks?: {
+        SessionStart?: Array<{ hooks?: Array<{ command?: string }> }>;
+      };
+    };
+    const commands = (config.hooks?.SessionStart ?? [])
+      .flatMap((entry) => entry.hooks ?? [])
+      .map((hook) => hook.command)
+      .filter((command): command is string => typeof command === "string");
+
+    expect(commands.filter((command) => command.includes("wiki-domains-hook.mjs"))).toHaveLength(1);
+  });
+
   it("enumerates the same domain set as the wiki-domains workflow (drift guard)", async () => {
     const pages = ["ai/index", "ai/ppo", "ai/diffusion-policy", "robotics/twist", "perception/index", "floating"];
     const root = tempRoot();
