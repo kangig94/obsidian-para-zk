@@ -47,6 +47,7 @@ export function createNoteChromeEditorExtension(plugin: ParaZkPluginContext): Ex
     private readonly sourcePath: string;
     private readonly signature: string;
     private child: NoteChromeWidgetRenderChild | undefined;
+    private resizeObserver: ResizeObserver | undefined;
 
     constructor(
       kind: NoteChromeWidgetKind,
@@ -66,13 +67,17 @@ export function createNoteChromeEditorExtension(plugin: ParaZkPluginContext): Ex
         && widget.signature === this.signature;
     }
 
-    toDOM(): HTMLElement {
+    toDOM(view: EditorView): HTMLElement {
       const host = document.createElement("div");
       host.addClass("para-zk-note-chrome-widget", `para-zk-note-chrome-widget--${this.kind}`);
       host.dataset.paraZkSourcePath = this.sourcePath;
+      host.contentEditable = "false";
+      host.setAttribute("contenteditable", "false");
+      this.resizeObserver = observeWidgetResize(host, view);
 
       if (this.kind === "props") {
         renderPropsPanel(plugin, host, this.sourcePath);
+        view.requestMeasure();
         return host;
       }
 
@@ -80,15 +85,21 @@ export function createNoteChromeEditorExtension(plugin: ParaZkPluginContext): Ex
       child.load();
       this.child = child;
       void renderManagedPanel(plugin, host, this.sourcePath, child)
+        .then(() => {
+          if (!child.isUnloaded) view.requestMeasure();
+        })
         .catch((error: unknown) => {
           if (!child.isUnloaded) {
             renderBlockNotice(host, "managed", error instanceof Error ? error.message : String(error));
+            view.requestMeasure();
           }
         });
       return host;
     }
 
     destroy(): void {
+      this.resizeObserver?.disconnect();
+      this.resizeObserver = undefined;
       this.child?.unload();
       this.child = undefined;
     }
@@ -186,6 +197,13 @@ export function createNoteChromeEditorExtension(plugin: ParaZkPluginContext): Ex
   );
 
   return [noteChromeField, externalRefresh];
+}
+
+function observeWidgetResize(host: HTMLElement, view: EditorView): ResizeObserver | undefined {
+  if (typeof ResizeObserver === "undefined") return undefined;
+  const observer = new ResizeObserver(() => view.requestMeasure());
+  observer.observe(host);
+  return observer;
 }
 
 class NoteChromeWidgetRenderChild extends MarkdownRenderChild {
