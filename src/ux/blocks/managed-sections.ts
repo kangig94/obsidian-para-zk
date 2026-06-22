@@ -153,8 +153,12 @@ function createManagedPanelBuffer(el: HTMLElement): HTMLElement {
   buffer.style.width = `${Math.max(1, Math.round(el.getBoundingClientRect().width))}px`;
   buffer.style.pointerEvents = "none";
   buffer.style.opacity = "0";
+  buffer.contentEditable = "false";
+  buffer.setAttribute("contenteditable", "false");
   buffer.setAttribute("aria-hidden", "true");
-  el.after(buffer);
+  const parent = el.ownerDocument.body ?? el.parentElement;
+  if (parent) parent.appendChild(buffer);
+  else el.after(buffer);
   return buffer;
 }
 

@@ -67,6 +67,10 @@ export function createNoteChromeEditorExtension(plugin: ParaZkPluginContext): Ex
         && widget.signature === this.signature;
     }
 
+    get estimatedHeight(): number {
+      return this.kind === "managed" ? 360 : 160;
+    }
+
     toDOM(view: EditorView): HTMLElement {
       const host = document.createElement("div");
       host.addClass("para-zk-note-chrome-widget", `para-zk-note-chrome-widget--${this.kind}`);

@@ -69,7 +69,7 @@ function renderNoteChrome(
   ctx: MarkdownPostProcessorContext
 ): void {
   // Skip embedded previews and nested renders from managed note chrome.
-  if (el.closest(".markdown-embed") || el.closest(".para-zk-note-chrome")) return;
+  if (isNestedNoteChromeRender(el)) return;
 
   const typeHint = normalizeFrontmatterType(ctx.frontmatter?.type);
   if (!isParaZkNote(plugin, ctx.sourcePath, typeHint)) return;
@@ -309,7 +309,7 @@ function scheduleNoteChromeAttach(
   attempt: number
 ): void {
   window.setTimeout(() => {
-    if (el.closest(".markdown-embed") || el.closest(".para-zk-note-chrome")) return;
+    if (isNestedNoteChromeRender(el)) return;
 
     const container = resolveContainer(el);
     if (container) {
@@ -321,6 +321,12 @@ function scheduleNoteChromeAttach(
       scheduleNoteChromeAttach(plugin, el, sourcePath, typeHint, attempt + 1);
     }
   }, attempt === 0 ? NOTE_CHROME_INITIAL_ATTACH_DELAY_MS : NOTE_CHROME_ATTACH_RETRY_DELAY_MS);
+}
+
+function isNestedNoteChromeRender(el: HTMLElement): boolean {
+  return el.closest(
+    ".markdown-embed, .para-zk-note-chrome, .para-zk-note-chrome-widget, .para-zk-managed-buffer"
+  ) !== null;
 }
 
 function ensureNoteChromeController(
