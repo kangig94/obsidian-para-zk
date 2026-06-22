@@ -17,6 +17,7 @@ import { renderBlockNotice } from "./shell";
 // - Managed panel renders at the bottom of the note body (before the note footer).
 // - Notes with legacy para-zk-props/para-zk-managed fences render once because fences are swallowed.
 // - Frontmatter changes from CLI, MCP, or Properties editor trigger a re-render.
+// - Reading view mode switches attach even when the note has no body block for a post-processor.
 // Reading view only: Live Preview is handled by the CM6 editor extension. This processor
 // injects only when the element resolves to a `.markdown-preview-sizer` (the reading-view
 // content container), so Live Preview (no sizer) never double-renders.
@@ -29,6 +30,7 @@ const NOTE_CHROME_RERENDER_DELAY_MS = 120;
 // renders one set of panels. A re-rendered preview builds a fresh sizer -> fresh entry.
 const noteChromeControllers = new WeakMap<HTMLElement, NoteChromeController>();
 const activeNoteChromeControllers = new Set<NoteChromeController>();
+let openReadingViewScanTimers: number[] = [];
 
 export function registerNoteChromeRenderers(plugin: ParaZkPluginContext): void {
   plugin.registerMarkdownCodeBlockProcessor("para-zk-props", (_source, el) => {
@@ -60,8 +62,12 @@ export function registerNoteChromeRenderers(plugin: ParaZkPluginContext): void {
   plugin.registerEvent(
     plugin.app.workspace.on("active-leaf-change", () => scheduleOpenReadingViewScan(plugin))
   );
+  registerReadingViewMutationScan(plugin);
   plugin.app.workspace.onLayoutReady(() => scheduleOpenReadingViewScan(plugin));
-  plugin.register(() => disposeAllNoteChromeControllers());
+  plugin.register(() => {
+    clearOpenReadingViewScanTimers();
+    disposeAllNoteChromeControllers();
+  });
 }
 
 function swallowLegacyChromeBlock(el: HTMLElement): void {
@@ -352,8 +358,37 @@ function refreshNoteChromeForPath(path: string): void {
 
 function scheduleOpenReadingViewScan(plugin: ParaZkPluginContext): void {
   cleanupNoteChromeForOpenViews(plugin);
-  window.setTimeout(() => scanOpenReadingViews(plugin), NOTE_CHROME_INITIAL_ATTACH_DELAY_MS);
-  window.setTimeout(() => scanOpenReadingViews(plugin), NOTE_CHROME_INITIAL_ATTACH_DELAY_MS + NOTE_CHROME_ATTACH_RETRY_DELAY_MS);
+  clearOpenReadingViewScanTimers();
+  openReadingViewScanTimers = [
+    window.setTimeout(() => scanOpenReadingViews(plugin), NOTE_CHROME_INITIAL_ATTACH_DELAY_MS),
+    window.setTimeout(() => scanOpenReadingViews(plugin), NOTE_CHROME_INITIAL_ATTACH_DELAY_MS + NOTE_CHROME_ATTACH_RETRY_DELAY_MS)
+  ];
+}
+
+function clearOpenReadingViewScanTimers(): void {
+  for (const timer of openReadingViewScanTimers) window.clearTimeout(timer);
+  openReadingViewScanTimers = [];
+}
+
+function registerReadingViewMutationScan(plugin: ParaZkPluginContext): void {
+  const workspaceEl = plugin.app.workspace.containerEl;
+  const observer = new MutationObserver((mutations) => {
+    if (mutations.some(addsReadingViewPreview)) scheduleOpenReadingViewScan(plugin);
+  });
+  observer.observe(workspaceEl, { childList: true, subtree: true });
+  plugin.register(() => observer.disconnect());
+}
+
+function addsReadingViewPreview(mutation: MutationRecord): boolean {
+  for (const node of Array.from(mutation.addedNodes)) {
+    if (node instanceof HTMLElement && hasReadingViewPreview(node)) return true;
+  }
+  return false;
+}
+
+function hasReadingViewPreview(el: HTMLElement): boolean {
+  return el.matches(".markdown-preview-view, .markdown-preview-sizer")
+    || el.querySelector(".markdown-preview-view, .markdown-preview-sizer") !== null;
 }
 
 function scanOpenReadingViews(plugin: ParaZkPluginContext): void {
