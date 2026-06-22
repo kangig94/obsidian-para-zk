@@ -16,7 +16,8 @@ describe("registerAutoTemplate", () => {
 
     const content = app.readPath("PARA/Resources/Native.md") ?? "";
     expect(content).toContain("type: resource");
-    expect(content).toContain("```para-zk-props\ntype: resource\n```");
+    expect(content).not.toContain("```para-zk-props");
+    expect(content).not.toContain("```para-zk-managed");
   });
 
   it("leaves non-empty managed Markdown files untouched", async () => {

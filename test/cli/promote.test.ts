@@ -35,7 +35,7 @@ describe("create-from-resource", () => {
     const resourceContent = cli.app.readPath(String(resource.path)) ?? "";
     expect(resourceContent, "resource should remain after creating a ZK note").not.toBe("");
     expect(resourceContent).not.toContain(`[[${created.path}`);
-    expect(resourceContent).toContain("```para-zk-managed");
+    expect(resourceContent).not.toContain("```para-zk-managed");
   });
 
   it("returns the existing ZK note on a duplicate title without clobbering its body", async () => {

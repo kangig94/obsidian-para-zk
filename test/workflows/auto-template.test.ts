@@ -173,7 +173,8 @@ describe("applyManagedTemplate", () => {
     const content = app.readPath("PARA/Resources/Whitespace.md") ?? "";
     expect(content).not.toBe(initialContent);
     expect(content).toContain("type: resource");
-    expect(content).toContain("```para-zk-props\ntype: resource\n```");
+    expect(content).not.toContain("```para-zk-props");
+    expect(content).not.toContain("```para-zk-managed");
   });
 });
 

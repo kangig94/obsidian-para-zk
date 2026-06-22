@@ -76,8 +76,8 @@ describe("llm-wiki CLI adapters", () => {
     expect(content).toContain("tags:\n  - llm-wiki/ai");
     expect(content).toContain("aliases:\n  - Attention");
     expect(content).toContain("Machine-owned synthesis.");
-    expect(content).toContain("```para-zk-props\ntype: llm-wiki\n```");
-    expect(content).toContain("```para-zk-managed\n```");
+    expect(content).not.toContain("```para-zk-props");
+    expect(content).not.toContain("```para-zk-managed");
     expect(content).not.toContain("url:");
     expect(content).not.toContain("first_author:");
     expect(content).not.toContain("license:");

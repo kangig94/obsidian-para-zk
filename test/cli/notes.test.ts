@@ -514,7 +514,7 @@ describe("subarea and child bodies", () => {
 });
 
 describe("managed UI preservation", () => {
-  it("keeps the managed UI block when updating final human sections", async () => {
+  it("updates final human sections without writing managed UI fences", async () => {
     await cli.run("para-zk:create-area", { title: "Ops", open: "false" });
     const areaUpdate = await cli.run("para-zk:update-area", {
       title: "Ops",
@@ -524,8 +524,8 @@ describe("managed UI preservation", () => {
     });
     expect(areaUpdate.changed).toBe(true);
     const areaContent = cli.app.readPath("PARA/Areas/Ops/Ops.md") ?? "";
-    expect(areaContent).toContain("# Overview\nArea overview\n\n```para-zk-managed\n```");
-    expect(areaContent.match(/```para-zk-managed/g)).toHaveLength(1);
+    expect(areaContent).toContain("# Overview\nArea overview\n");
+    expect(areaContent).not.toContain("```para-zk-managed");
 
     await cli.run("para-zk:create-resource", { title: "Source", open: "false" });
     const resourceUpdate = await cli.run("para-zk:update-resource", {
@@ -536,9 +536,9 @@ describe("managed UI preservation", () => {
     });
     expect(resourceUpdate.changed).toBe(true);
     const resourceContent = cli.app.readPath("PARA/Resources/Source.md") ?? "";
-    expect(resourceContent).toContain("Resource body\n\n```para-zk-managed\n```");
+    expect(resourceContent).toContain("Resource body\n");
     expect(resourceContent).not.toContain("# Body");
-    expect(resourceContent.match(/```para-zk-managed/g)).toHaveLength(1);
+    expect(resourceContent).not.toContain("```para-zk-managed");
 
     await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
     const retro = await cli.run("para-zk:create-retro", {

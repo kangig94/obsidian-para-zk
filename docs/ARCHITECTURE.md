@@ -95,16 +95,17 @@ The `LLM-Wiki/` folder is a derived, LLM-owned synthesis layer in the vault:
 wiki pages cite canonical PARA/ZK/resource notes, but canonical notes should not
 depend on wiki pages.
 
-## Extension Points (native `para-zk-*` blocks)
+## Extension Points (note chrome + native blocks)
 
 Generated templates do not depend on Meta Bind, QuickAdd, or Templater. Native plugin
-blocks replace them, each with a renderer registered in `onload()`:
+blocks and frontmatter-driven note chrome replace them, each with a renderer
+registered in `onload()`:
 
 | Block | Role |
 |-------|------|
-| `para-zk-managed` | Generated template UI tails (one compact block) |
+| Frontmatter `type` note chrome | Auto-renders props at the top and managed UI at the bottom in Reading view and Live Preview; content templates no longer carry `para-zk-props`/`para-zk-managed` fences |
 | `para-zk-view` | Relationship Dataview queries + matching workflow buttons |
-| `para-zk-props` / `PZ_INPUT[...]` | Frontmatter input controls (replaces Meta Bind) |
+| `PZ_INPUT[...]` | Frontmatter input controls inside the props panel (replaces Meta Bind) |
 | `para-zk-tasks` / `para-zk-references` | Render the managed task registry / frontmatter references |
 | `para-zk-dashboard-actions` / `para-zk-dashboard-summary` | Home dashboard blocks |
 | `para-zk-latest-retro-summary` | Project latest-retro summary widget |
@@ -112,10 +113,11 @@ blocks replace them, each with a renderer registered in `onload()`:
 ## Plugin Lifecycle
 
 `ParaZkPlugin.onload()` registers (in order) status/init commands, workflow commands,
-ribbon actions, explorer actions, dashboard renderers, dataview-view renderers,
-latest-retro-summary, props-controls, task/reference/managed-section renderers, the
-setting tab, and finally `registerNativeCliHandlers(this)`. There is no explicit
-`onunload` — all teardown relies on Obsidian's automatic `register*` cleanup, so any new
+editor-width control, ribbon/auto-template/explorer actions, dashboard action/block/summary
+renderers, Dataview-view renderers, latest-retro-summary, props-controls, task renderers,
+reference renderers, citation renderers/editor extension, note-chrome renderers/editor
+extension, editor suggest, the setting tab, and finally `registerNativeCliHandlers(this)`.
+There is no explicit `onunload` — all teardown relies on Obsidian's automatic `register*` cleanup, so any new
 listener/interval/observer MUST go through a `register*` helper or add explicit teardown.
 `setupVault()` lazy-`import()`s `src/runtime/setup.ts` to keep setup off the load path.
 

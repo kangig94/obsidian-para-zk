@@ -137,8 +137,10 @@ describe("setup managed scaffolding", () => {
 
     expect(initial.result.created).toContain(target.path);
     expect(app.readPath(target.path)).toBe(target.content);
-    expect(target.content).toContain("```para-zk-props\ntype: llm-wiki\n```");
-    expect(target.content).toContain("```para-zk-managed\n```");
+    expect(target.content).toContain("type: llm-wiki");
+    expect(target.content).toContain("aliases:\n---\n{{cursor}}\n");
+    expect(target.content).not.toContain("```para-zk-props");
+    expect(target.content).not.toContain("```para-zk-managed");
 
     const rerun = await runSetup(app, initial.settings);
     expect(rerun.result.existing).toContain(target.path);

@@ -1,14 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ParaZkPluginContext } from "../../src/plugin-interface";
 import { DEFAULT_SETTINGS } from "../../src/types";
-import { registerPropsControlRenderers, writeFrontmatterValue } from "../../src/ux/props-controls";
+import { renderPropsPanel, writeFrontmatterValue } from "../../src/ux/props-controls";
 import { MockApp } from "../harness/vault";
-
-type CodeBlockProcessor = (
-  source: string,
-  el: HTMLElement,
-  ctx: { sourcePath: string; addChild: <T extends { load: () => void }>(child: T) => T }
-) => void;
 
 type FakeEvent = {
   type: string;
@@ -397,29 +391,18 @@ async function renderResourceProps(url: string): Promise<{
   return { app, root, control: propsFieldControl(root, "URL"), file };
 }
 
-async function renderPropsBlock(type: string, path: string, content: string): Promise<{
+async function renderPropsBlock(_type: string, path: string, content: string): Promise<{
   app: MockApp;
   root: FakeElement;
   file: Awaited<ReturnType<MockApp["vault"]["create"]>>;
 }> {
   const app = new MockApp();
   const file = await app.vault.create(path, content);
-  const processors = new Map<string, CodeBlockProcessor>();
 
   stubAppEvents(app);
-  const plugin = createPropsPlugin(app, processors);
-  registerPropsControlRenderers(plugin);
-  const processor = processors.get("para-zk-props");
-  if (!processor) throw new Error("props code block processor was not registered");
-
+  const plugin = createPropsPlugin(app);
   const root = new FakeElement("div");
-  processor(`type: ${type}`, root.asHtml(), {
-    sourcePath: file.path,
-    addChild: (child) => {
-      child.load();
-      return child;
-    }
-  });
+  renderPropsPanel(plugin, root.asHtml(), file.path);
 
   return { app, root, file };
 }
@@ -434,14 +417,11 @@ async function writePropsFrontmatter(
   await writeFrontmatterValue(plugin, file.path, new FakeElement("div").asHtml(), key, value);
 }
 
-function createPropsPlugin(app: MockApp, processors = new Map<string, CodeBlockProcessor>()): ParaZkPluginContext {
+function createPropsPlugin(app: MockApp): ParaZkPluginContext {
   return {
     app,
     settings: DEFAULT_SETTINGS,
-    registerMarkdownCodeBlockProcessor: (language: string, processor: CodeBlockProcessor) => {
-      processors.set(language, processor);
-      return processor;
-    },
+    registerMarkdownCodeBlockProcessor: () => {},
     registerMarkdownPostProcessor: () => {}
   } as unknown as ParaZkPluginContext;
 }

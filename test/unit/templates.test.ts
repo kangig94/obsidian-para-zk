@@ -3,7 +3,7 @@ import { dataviewViewBlock, managedUiBlockForType, renderTemplate, TEMPLATE_NAME
 import { DEFAULT_SETTINGS } from "../../src/types";
 
 describe("managed templates", () => {
-  it("collapses managed template UI into one block", () => {
+  it("omits auto-rendered props and managed fences from content templates", () => {
     const project = renderTemplate("project", DEFAULT_SETTINGS);
     const area = renderTemplate("area", DEFAULT_SETTINGS);
     const resource = renderTemplate("resource", DEFAULT_SETTINGS);
@@ -14,12 +14,25 @@ describe("managed templates", () => {
     const spark = renderTemplate("spark", DEFAULT_SETTINGS);
     const source = renderTemplate("digest", DEFAULT_SETTINGS);
     const permanent = renderTemplate("permanent", DEFAULT_SETTINGS);
-    const templates = [project, area, resource, llmWiki, journal, retro, subnote, spark, source, permanent];
+    const templates = [
+      ["project", project],
+      ["area", area],
+      ["resource", resource],
+      ["llm-wiki", llmWiki],
+      ["journal", journal],
+      ["retro", retro],
+      ["subnote", subnote],
+      ["spark", spark],
+      ["digest", source],
+      ["permanent", permanent]
+    ] as const;
 
-    for (const content of templates) {
-      expect(content).not.toContain("PZ[");
-      expect(content).toContain("created:\nupdated:");
-      expect(content).not.toContain("{{created}}");
+    for (const [name, content] of templates) {
+      expect(content, name).not.toContain("PZ[");
+      expect(content, name).toContain("created:\nupdated:");
+      expect(content, name).not.toContain("{{created}}");
+      expect(content, name).not.toContain("```para-zk-props");
+      expect(content, name).not.toContain("```para-zk-managed");
     }
 
     expect(project).not.toContain("dataviewjs");
@@ -27,7 +40,7 @@ describe("managed templates", () => {
     expect(project).toContain("updated:\naliases:\nareas:");
     expect(project).toContain("# Summary\n```para-zk-latest-retro-summary\n```\n{{cursor}}");
     expect(resource).toContain("updated:\naliases:\nurl:");
-    expect(resource).toContain("```para-zk-props\ntype: resource\n```\n{{cursor}}\n\n```para-zk-managed");
+    expect(resource).toContain("kind:\n---\n{{cursor}}\n");
     expect(resource).not.toContain("# Overview");
     expect(resource).not.toContain("# Body");
     expect(llmWiki).toContain("type: llm-wiki");
@@ -35,15 +48,15 @@ describe("managed templates", () => {
     expect(llmWiki).toContain("tags:\n  - llm-wiki\n");
     expect(llmWiki).not.toContain("llm-wiki/{{slug}}");
     expect(llmWiki).toContain("updated:\ncreated_by:\nupdated_by:\naliases:");
-    expect(llmWiki).toContain("```para-zk-props\ntype: llm-wiki\n```\n{{cursor}}\n\n```para-zk-managed\n```");
+    expect(llmWiki).toContain("aliases:\n---\n{{cursor}}\n");
     expect(llmWiki).not.toContain("url:");
     expect(llmWiki).not.toContain("first_author:");
     expect(llmWiki).not.toContain("license:");
     expect(llmWiki).not.toContain("kind:");
-    expect(spark).toContain("```para-zk-props\ntype: spark\n```\n{{cursor}}\n\n```para-zk-managed");
+    expect(spark).toContain("processed: false\n---\n{{cursor}}\n");
     expect(spark).not.toContain("# One-line thought summary");
     expect(spark).not.toContain("# Memo");
-    expect(source).toContain("```para-zk-props\ntype: digest\n```\n{{cursor}}\n\n```para-zk-managed");
+    expect(source).toContain("published:\n---\n{{cursor}}\n");
     // ZK templates carry no auto identity tag: `tags:` is empty so the human assigns tags.
     for (const zk of [spark, source, permanent]) {
       expect(zk).toContain("tags:\ncreated:");
@@ -53,17 +66,17 @@ describe("managed templates", () => {
     expect(source).not.toContain("# Summary");
     expect(source).not.toContain("# Key insights");
     expect(source).not.toContain("# Important quotes/evidence");
-    expect(permanent).toContain("```para-zk-props\ntype: permanent\n```\n{{cursor}}\n\n```para-zk-managed");
+    expect(permanent).toContain("aliases:\n---\n{{cursor}}\n");
     expect(permanent).not.toContain("# One-sentence summary");
     expect(permanent).not.toContain("# Body");
     expect(permanent).not.toContain("## Limitations");
     expect(permanent).not.toContain("## Related questions");
-    expect(subnote).toContain("```para-zk-props\ntype: subnote\n```\n{{cursor}}\n\n```para-zk-managed");
-    expect(retro).not.toContain("para-zk-managed");
+    expect(subnote).toContain("parent:\n---\n{{cursor}}\n");
+    const retroBody = retro.replace(/^---\n[\s\S]*?\n---\n/, "");
+    expect(retroBody).toMatch(/^# .+\n- \{\{cursor\}\}/);
+    expect(retroBody).not.toMatch(/^---\n/);
 
     for (const content of [project, area, resource, llmWiki, journal, spark, source, permanent, subnote]) {
-      expect(content.match(/```para-zk-managed/g)).toHaveLength(1);
-      expect(content).not.toContain("---\n```para-zk-managed");
       expect(content).not.toContain("project-subnotes");
       expect(content).not.toContain("area-subareas");
       expect(content).not.toContain("resource-cited-by");

@@ -1,52 +1,20 @@
 import {
   MarkdownRenderChild,
   MarkdownRenderer,
-  TFile,
-  type MarkdownPostProcessorContext
+  TFile
 } from "obsidian";
 import type { ParaZkPluginContext } from "../../plugin-interface";
 import { managedUiBlockForType } from "../../templates";
+import { normalizeFrontmatterType, readFrontmatterTypeFromContent } from "../../vault/sections";
 import { applyBlockKind, renderBlockNotice } from "./shell";
 
-export function registerManagedSectionRenderers(plugin: ParaZkPluginContext): void {
-  plugin.registerMarkdownCodeBlockProcessor("para-zk-managed", (source, el, ctx) => {
-    ctx.addChild(new ManagedSectionsRenderChild(plugin, el, source, ctx.sourcePath));
-  });
-}
-
-class ManagedSectionsRenderChild extends MarkdownRenderChild {
-  private unloaded = true;
-
-  constructor(
-    private readonly plugin: ParaZkPluginContext,
-    containerEl: HTMLElement,
-    private readonly source: string,
-    private readonly sourcePath: MarkdownPostProcessorContext["sourcePath"]
-  ) {
-    super(containerEl);
-  }
-
-  onload(): void {
-    this.unloaded = false;
-    void renderManagedSections(this.plugin, this.source, this.containerEl, this.sourcePath, this)
-      .catch((error: unknown) => {
-        if (!this.unloaded) renderManagedSectionsError(this.containerEl, error);
-      });
-  }
-
-  onunload(): void {
-    this.unloaded = true;
-  }
-}
-
-async function renderManagedSections(
+export async function renderManagedPanel(
   plugin: ParaZkPluginContext,
-  source: string,
   el: HTMLElement,
-  sourcePath: MarkdownPostProcessorContext["sourcePath"],
+  sourcePath: string | undefined,
   child: MarkdownRenderChild
 ): Promise<void> {
-  const type = await resolveManagedType(plugin, source, sourcePath);
+  const type = await resolveManagedType(plugin, sourcePath);
   const block = type ? managedUiBlockForType(type, plugin.settings) : undefined;
 
   el.empty();
@@ -59,59 +27,23 @@ async function renderManagedSections(
   applyBlockKind(el, `managed-${type}`);
   if (!block) return;
 
-  await MarkdownRenderer.render(plugin.app, block, el, sourcePath, child);
+  await MarkdownRenderer.render(plugin.app, block, el, sourcePath ?? "", child);
 }
 
 async function resolveManagedType(
   plugin: ParaZkPluginContext,
-  source: string,
-  sourcePath: MarkdownPostProcessorContext["sourcePath"]
+  sourcePath: string | undefined
 ): Promise<string | undefined> {
-  const inlineType = readManagedType(source);
-  if (inlineType) return inlineType;
-
   if (!sourcePath) return undefined;
   const file = plugin.app.vault.getFileByPath(sourcePath);
   if (!(file instanceof TFile)) return undefined;
 
   try {
-    const freshType = readFrontmatterTypeFromText(await plugin.app.vault.read(file));
+    const freshType = readFrontmatterTypeFromContent(await plugin.app.vault.read(file));
     if (freshType) return freshType;
   } catch {
     // Fall through to the cache only if the fresh file read cannot provide a type.
   }
 
-  return readFrontmatterType(plugin.app.metadataCache.getFileCache(file)?.frontmatter?.type);
-}
-
-function readManagedType(source: string): string | undefined {
-  for (const line of source.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    const typed = trimmed.match(/^type\s*:\s*(.+)$/i)?.[1];
-    const type = readFrontmatterType(typed ?? trimmed);
-    if (type) return type;
-  }
-  return undefined;
-}
-
-function readFrontmatterType(value: unknown): string | undefined {
-  if (typeof value !== "string") return undefined;
-  const type = value.trim().replace(/^["']|["']$/g, "");
-  return /^[A-Za-z0-9_-]+$/.test(type) ? type : undefined;
-}
-
-function readFrontmatterTypeFromText(content: string): string | undefined {
-  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!match) return undefined;
-  for (const line of match[1].split(/\r?\n/)) {
-    const typed = line.trim().match(/^type\s*:\s*(.+)$/i)?.[1];
-    const type = readFrontmatterType(typed);
-    if (type) return type;
-  }
-  return undefined;
-}
-
-function renderManagedSectionsError(el: HTMLElement, error: unknown): void {
-  renderBlockNotice(el, "managed", error instanceof Error ? error.message : String(error));
+  return normalizeFrontmatterType(plugin.app.metadataCache.getFileCache(file)?.frontmatter?.type);
 }

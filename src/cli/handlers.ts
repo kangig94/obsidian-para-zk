@@ -828,12 +828,12 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     command: "para-zk:audit",
     description: "Audit the vault for deterministic PARA-ZK content-health findings",
     options: {
-      check: { value: "<broken_link|dangling_reference|idless_reference|bare_reference|bad_citation_subpath|orphan_note|upward_wiki_link|orphan_wiki_page|wiki_tag_domain_mismatch|unprocessed_spark|stale_draft_permanent>", description: "Optional check code filter." },
+      check: { value: "<broken_link|dangling_reference|idless_reference|bare_reference|bad_citation_subpath|orphan_note|upward_wiki_link|orphan_wiki_page|wiki_tag_domain_mismatch|managed_block_in_body|unprocessed_spark|stale_draft_permanent>", description: "Optional check code filter." },
       severity: { value: "<high|medium|low>", description: "Optional severity filter." },
       type: { value: "<note-type>", description: "Optional stored frontmatter type filter, e.g. resource or permanent." },
       offset: { value: "<number>", description: "Zero-based finding offset (default: 0)." },
       limit: { value: "<number|all>", description: "Maximum findings to return (default: 50)." },
-      fix: { value: "<true|false>", description: "When true, apply auto-repairs vault-wide: backfill id-less reference ids, expand unique bare reference links to full paths, and correct llm-wiki tag domains; all other findings (including ambiguous bare references) remain report-only." },
+      fix: { value: "<true|false>", description: "When true, apply auto-repairs vault-wide: backfill id-less reference ids, expand unique bare reference links to full paths, correct llm-wiki tag domains, and remove legacy managed-block scaffolding fences (leading para-zk-props and trailing para-zk-managed); all other findings (including ambiguous bare references) remain report-only." },
       format: FORMAT_OPTION
     },
     text: "vault audited",

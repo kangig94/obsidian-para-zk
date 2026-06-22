@@ -28,6 +28,14 @@ Notable changes for PARA-ZK are tracked here.
   `editorLineWidth`). The PARA/ZK layout is fixed in `src/layout.ts`; removed
   `paths`, `layoutFolders`, `setupAt`, and `managedFiles` keys are ignored when
   loading older vault data.
+- Content-note templates no longer write legacy `para-zk-props`/`para-zk-managed`
+  scaffolding fences into note bodies. Props (top) and managed
+  UI (bottom) now render automatically in both Reading view and Live Preview from
+  frontmatter `type`, so raw file bodies and `read-*` bodies no longer disagree
+  and LLMs do not recreate duplicate blocks. Existing notes can be migrated with
+  the new `managed_block_in_body` audit check and `para-zk:audit fix=true`, which
+  strips the residual fences while leaving frontmatter and user-authored body text
+  intact. The project `latest-retro-summary` block remains in place.
 - `para-zk:setup` now treats managed scaffolding (templates, dashboards, READMEs) as
   fully plugin-owned: it overwrites those files whenever generated content differs,
   leaves matching files alone, and no longer exposes a managed-file `force` option.

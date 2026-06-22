@@ -2,7 +2,6 @@ import type { TFile } from "obsidian";
 import type { ParaZkSettings } from "./types";
 import { localePack } from "./i18n";
 import { PARA_ZK_PATHS } from "./layout";
-import type { PropsViewType } from "./props/schema";
 import { escapeRegExp } from "./text";
 import { ensureFolder } from "./vault/files";
 import type { WorkflowHost } from "./vault/host";
@@ -182,7 +181,6 @@ function renderProjectTemplate({ t, tags, slugPlaceholder }: TemplateRenderConte
       "priority: \"{{priority}}\"",
       "done_date:"
     ]),
-    paraZkPropsBlock("project"),
     `# ${t.labels.summary}`,
     ...latestRetroSummaryBlock(),
     "{{cursor}}",
@@ -192,8 +190,6 @@ function renderProjectTemplate({ t, tags, slugPlaceholder }: TemplateRenderConte
     `| ${t.labels.content} | ${t.labels.successCriteria} |`,
     "| --- | --- |",
     "| | |",
-    "",
-    paraZkManagedBlock(),
     ""
   ].join("\n");
 }
@@ -208,12 +204,9 @@ function renderAreaTemplate({ t, tags, slugPlaceholder }: TemplateRenderContext)
       "updated:",
       "parent:"
     ]),
-    paraZkPropsBlock("area"),
     `# ${t.labels.overview}`,
     "",
     "{{cursor}}",
-    "",
-    paraZkManagedBlock(),
     ""
   ].join("\n");
 }
@@ -232,10 +225,7 @@ function renderResourceTemplate({ tags }: TemplateRenderContext): string {
       "license:",
       "kind:"
     ]),
-    paraZkPropsBlock("resource"),
     "{{cursor}}",
-    "",
-    paraZkManagedBlock(),
     ""
   ].join("\n");
 }
@@ -252,10 +242,7 @@ function renderLlmWikiTemplate({ tags }: TemplateRenderContext): string {
       "updated_by:",
       "aliases:"
     ]),
-    paraZkPropsBlock("llm-wiki"),
     "{{cursor}}",
-    "",
-    paraZkManagedBlock(),
     ""
   ].join("\n");
 }
@@ -271,7 +258,6 @@ function renderJournalTemplate({ t, tags }: TemplateRenderContext): string {
       "date: \"{{date}}\"",
       "energy: \"{{energy}}\""
     ]),
-    paraZkPropsBlock("journal"),
     `# ${t.labels.focus}`,
     "- [ ] {{cursor}}",
     "",
@@ -284,8 +270,6 @@ function renderJournalTemplate({ t, tags }: TemplateRenderContext): string {
     `# ${t.labels.shortReview}`,
     `- ${t.labels.whatWentWell}:`,
     `- ${t.labels.improvements}:`,
-    "",
-    paraZkManagedBlock(),
     ""
   ].join("\n");
 }
@@ -305,8 +289,6 @@ function renderRetroTemplate({ t, tags }: TemplateRenderContext): string {
       "week_end: \"{{week_end}}\"",
       "areas: \"{{areas_frontmatter}}\""
     ]),
-    paraZkPropsBlock("retro"),
-    "---",
     `# ${t.labels.weekProgress}`,
     "- {{cursor}}",
     "",
@@ -333,10 +315,7 @@ function renderSubnoteTemplate(): string {
       "subnote_type: \"{{subnote_type}}\"",
       "parent:"
     ]),
-    paraZkPropsBlock("subnote"),
     "{{cursor}}",
-    "",
-    paraZkManagedBlock(),
     ""
   ].join("\n");
 }
@@ -350,10 +329,7 @@ function renderSparkTemplate(): string {
       "updated:",
       "processed: false"
     ]),
-    paraZkPropsBlock("spark"),
     "{{cursor}}",
-    "",
-    paraZkManagedBlock(),
     ""
   ].join("\n");
 }
@@ -370,10 +346,7 @@ function renderDigestTemplate(): string {
       "first_author:",
       "published:"
     ]),
-    paraZkPropsBlock("digest"),
     "{{cursor}}",
-    "",
-    paraZkManagedBlock(),
     ""
   ].join("\n");
 }
@@ -388,10 +361,7 @@ function renderPermanentTemplate(): string {
       "maturity: \"{{maturity}}\"",
       "aliases:"
     ]),
-    paraZkPropsBlock("permanent"),
     "{{cursor}}",
-    "",
-    paraZkManagedBlock(),
     ""
   ].join("\n");
 }
@@ -402,18 +372,6 @@ function frontmatter(lines: string[]): string {
     ...lines,
     "---"
   ].join("\n");
-}
-
-function paraZkPropsBlock(type: PropsViewType): string {
-  return [
-    "```para-zk-props",
-    `type: ${type}`,
-    "```"
-  ].join("\n");
-}
-
-function paraZkManagedBlock(): string {
-  return fenced("para-zk-managed", []).join("\n");
 }
 
 function paraZkViewBlock(key: DataviewViewKey, title?: string): string {

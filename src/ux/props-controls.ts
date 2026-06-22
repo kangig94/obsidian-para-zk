@@ -1,7 +1,6 @@
 import {
   ButtonComponent,
   DropdownComponent,
-  MarkdownRenderChild,
   MarkdownView,
   Notice,
   SuggestModal,
@@ -44,7 +43,6 @@ import {
   renderBlockShell,
   renderShellAction
 } from "./blocks/shell";
-import { parseCodeBlockKeyValues } from "./code-block-args";
 
 type Frontmatter = Record<string, unknown>;
 type WorkflowFrontmatterType = Exclude<PropsViewType, "subnote" | "llm-wiki">;
@@ -128,91 +126,19 @@ const PROPS_CONTROL_RENDERERS: Record<PropsField["control"], PropsControlRendere
 const propsRerenderStates = new WeakMap<HTMLElement, PropsRerenderState>();
 
 export function registerPropsControlRenderers(plugin: ParaZkPluginContext): void {
-  plugin.registerMarkdownCodeBlockProcessor("para-zk-props", (source, el, ctx) => {
-    ctx.addChild(new PropsBlockRenderChild(plugin, source, el, ctx));
-  });
-
   plugin.registerMarkdownPostProcessor((el, ctx) => {
     renderInlinePropsInputs(plugin, el, ctx);
   });
 }
 
-const PROPS_RERENDER_DELAY_MS = 120;
-
-// The props grid renders the host note's frontmatter from the metadata cache, so a change
-// made outside this block — an update-resource from the CLI/MCP, Obsidian's own properties
-// editor, or sync — must re-render it; otherwise the panel kept the stale value until the
-// note was closed and reopened (switching source/reading reuses Obsidian's cached render).
-// metadataCache "changed" fires after the frontmatter is reparsed, so the re-read sees the
-// new value — references/retro-summary listen to vault "modify" instead because they read the
-// file fresh, whereas this block reads the cache. Inputs commit on `change` (blur), so the
-// debounced re-render never interrupts active typing, and a programmatic setValue does not
-// re-fire change (no write loop).
-class PropsBlockRenderChild extends MarkdownRenderChild {
-  private renderTimer: number | undefined;
-  private currentSourcePath: string | undefined;
-
-  constructor(
-    private readonly plugin: ParaZkPluginContext,
-    private readonly source: string,
-    containerEl: HTMLElement,
-    ctx: MarkdownPostProcessorContext
-  ) {
-    super(containerEl);
-    this.currentSourcePath = ctx.sourcePath;
-  }
-
-  onload(): void {
-    this.render();
-    this.registerEvent(
-      this.plugin.app.metadataCache.on("changed", (file) => this.onMetadataChange(file))
-    );
-    this.registerEvent(
-      this.plugin.app.vault.on("rename", (file, oldPath) => this.onRename(file, oldPath))
-    );
-  }
-
-  onunload(): void {
-    if (this.renderTimer !== undefined) window.clearTimeout(this.renderTimer);
-    this.renderTimer = undefined;
-  }
-
-  private onMetadataChange(file: TFile): void {
-    if (file.path !== this.currentSourcePath) return;
-    this.scheduleRender();
-  }
-
-  private onRename(file: unknown, oldPath?: string): void {
-    if (!(file instanceof TFile)) return;
-    const isHostRename = oldPath !== undefined && oldPath === this.currentSourcePath;
-    if (!isHostRename) return;
-    this.currentSourcePath = file.path;
-    this.scheduleRender();
-  }
-
-  private scheduleRender(): void {
-    if (this.renderTimer !== undefined) window.clearTimeout(this.renderTimer);
-    this.renderTimer = window.setTimeout(() => {
-      this.renderTimer = undefined;
-      this.render();
-    }, PROPS_RERENDER_DELAY_MS);
-  }
-
-  private render(): void {
-    renderPropsCodeBlock(this.plugin, this.source, this.containerEl, this.currentSourcePath);
-  }
-}
-
-function renderPropsCodeBlock(
+export function renderPropsPanel(
   plugin: ParaZkPluginContext,
-  source: string,
   el: HTMLElement,
   sourcePath: string | undefined
 ): void {
-  const args = parseCodeBlockKeyValues(source);
   const file = sourceFile(plugin, sourcePath);
   const frontmatter = file ? fileFrontmatter(plugin, file) : {};
-  const type = parsePropsViewType(args.type) ?? inferPropsViewType(frontmatter);
+  const type = inferPropsViewType(frontmatter);
 
   el.empty();
   if (!type) {
@@ -778,8 +704,9 @@ async function focusMarkdownMode(
 function cursorAfterPropsHeading(content: string): { line: number; ch: number } {
   const lines = content.split(/\r?\n/);
   const propsEnd = propsBlockEndLine(lines);
-  const headingLine = firstHeadingLineAfter(lines, propsEnd + 1);
-  if (headingLine === undefined) return { line: Math.min(lines.length, propsEnd + 1), ch: 0 };
+  const bodyStart = propsEnd >= 0 ? propsEnd + 1 : markdownBodyStartLine(lines);
+  const headingLine = firstHeadingLineAfter(lines, bodyStart);
+  if (headingLine === undefined) return { line: Math.min(lines.length, bodyStart), ch: 0 };
   return { line: headingBodyStartLine(lines, headingLine + 1), ch: 0 };
 }
 
@@ -790,6 +717,14 @@ function propsBlockEndLine(lines: string[]): number {
     return close ?? index;
   }
   return -1;
+}
+
+function markdownBodyStartLine(lines: string[]): number {
+  if (!/^\uFEFF?---\s*$/.test(lines[0] ?? "")) return 0;
+  for (let index = 1; index < lines.length; index += 1) {
+    if (/^\s*---\s*$/.test(lines[index])) return Math.min(index + 1, lines.length);
+  }
+  return 0;
 }
 
 function firstHeadingLineAfter(lines: string[], startLine: number): number | undefined {

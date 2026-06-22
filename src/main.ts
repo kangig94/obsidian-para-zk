@@ -14,7 +14,8 @@ import { registerEditorWidthControl } from "./ux/editor-width";
 import { registerExplorerActions } from "./ux/actions/explorer";
 import { registerLatestRetroSummaryRenderers } from "./ux/blocks/latest-retro-summary";
 import { refreshRegisteredLocaleLabels } from "./ux/locale-labels";
-import { registerManagedSectionRenderers } from "./ux/blocks/managed-sections";
+import { registerNoteChromeRenderers } from "./ux/blocks/note-chrome";
+import { createNoteChromeEditorExtension } from "./ux/note-chrome-editor";
 import { registerPropsControlRenderers } from "./ux/props-controls";
 import { registerRibbonActions } from "./ux/actions/ribbon";
 import { ParaZkSettingTab } from "./ux/settings";
@@ -47,8 +48,9 @@ export default class ParaZkPlugin extends Plugin {
     registerReferenceRenderers(this);
     registerCitationRenderers(this);
     this.registerEditorExtension(createCitationEditorExtension(this));
+    registerNoteChromeRenderers(this);
+    this.registerEditorExtension(createNoteChromeEditorExtension(this));
     this.registerEditorSuggest(new CitationSuggest(this));
-    registerManagedSectionRenderers(this);
 
     this.addSettingTab(new ParaZkSettingTab(this));
     registerNativeCliHandlers(this);

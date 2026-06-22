@@ -132,14 +132,18 @@ as `{ path, title, updated_ms }`.
 Related surface notes:
 
 - **Audit check** — the `audit` workflow includes `upward_wiki_link` (`medium`),
-  which flags a non-`llm-wiki` note linking into an `llm-wiki` note, and
+  which flags a non-`llm-wiki` note linking into an `llm-wiki` note,
   `orphan_wiki_page` (`low`), an advisory hint for an `llm-wiki` page no other wiki
-  page links to (a standalone topic is legitimate; never forced).
+  page links to (a standalone topic is legitimate; never forced), and
+  `managed_block_in_body` (`low`), which flags legacy `para-zk-props` /
+  `para-zk-managed` scaffolding fences left in note bodies; `fix=true` strips
+  those leading props and trailing managed fences.
 - **LLM-Wiki authorship** — direct CLI `create-llm-wiki` and `update-llm-wiki`
   accept `by=<model-id>`; create stamps `created_by` and `updated_by`, while
   changed updates stamp `updated_by`.
-- **LLM-Wiki managed sections** — generated wiki pages include props and a
-  managed tail rendering wiki-folder-scoped Cited-by, then References.
+- **LLM-Wiki managed sections** — wiki pages render props and a managed tail
+  automatically from `type: llm-wiki`; the tail renders wiki-folder-scoped
+  Cited-by, then References.
 
 ### `replace`
 

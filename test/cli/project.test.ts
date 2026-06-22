@@ -41,7 +41,8 @@ describe("create-project", () => {
 
     const content = cli.app.readPath("PARA/Projects/Template Shape/Template Shape.md") ?? "";
     expect(content).toContain("# Summary\n```para-zk-latest-retro-summary\n```\n\n# Goals");
-    expect(content).toContain("```para-zk-managed\n```");
+    expect(content).not.toContain("```para-zk-props");
+    expect(content).not.toContain("```para-zk-managed");
     expect(content).not.toContain("```\n\n\n# Goals");
     expect(content.endsWith("\n\n")).toBe(false);
 
@@ -54,8 +55,9 @@ describe("create-project", () => {
     });
     expect(subnote.ok).toBe(true);
     const subnoteContent = cli.app.readPath("PARA/Projects/Template Shape/Template Child.md") ?? "";
-    expect(subnoteContent).toContain("```para-zk-props\ntype: subnote\n```");
-    expect(subnoteContent).toContain("```para-zk-managed");
+    expect(subnoteContent).toContain("type: subnote");
+    expect(subnoteContent).not.toContain("```para-zk-props");
+    expect(subnoteContent).not.toContain("```para-zk-managed");
     expect(subnoteContent.endsWith("\n\n")).toBe(false);
   });
 

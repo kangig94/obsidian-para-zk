@@ -6,6 +6,8 @@ import { slugify, uniqueStrings } from "../text";
 import { frontmatterTimeMs } from "../time";
 import { fileFrontmatter, frontmatterLinks, readFileFrontmatterFresh, readType, type Frontmatter } from "../vault/frontmatter";
 import { splitObsidianSubpath } from "../vault/paths";
+import { markdownBodyRange, stripManagedScaffolding } from "../vault/sections";
+import { serializeFileWrite } from "../vault/write-serializer";
 import type {
   AuditCheckCode,
   AuditFinding,
@@ -44,6 +46,7 @@ const AUDIT_CHECKS: AuditCheckCode[] = [
   "upward_wiki_link",
   "orphan_wiki_page",
   "wiki_tag_domain_mismatch",
+  "managed_block_in_body",
   "unprocessed_spark",
   "stale_draft_permanent"
 ];
@@ -58,6 +61,7 @@ const CHECK_SEVERITY: Record<AuditCheckCode, AuditSeverity> = {
   upward_wiki_link: "medium",
   orphan_wiki_page: "low",
   wiki_tag_domain_mismatch: "low",
+  managed_block_in_body: "low",
   unprocessed_spark: "low",
   stale_draft_permanent: "low"
 };
@@ -84,10 +88,14 @@ export async function auditVault(ctx: WorkflowContext, options: AuditOptions = {
     const bareFindings = enabledChecks.has("bare_reference")
       ? findings.filter((finding) => finding.code === "bare_reference")
       : await referenceFindings(ctx, notes, new Set<AuditCheckCode>(["bare_reference"]));
+    const managedBlockFindings = enabledChecks.has("managed_block_in_body")
+      ? findings.filter((finding) => finding.code === "managed_block_in_body")
+      : await managedBlockInBodyFindings(ctx, notes);
     fixed = [
       ...await backfillIdlessReferences(ctx, notes, idlessFindings),
       ...await fixWikiTagDomains(ctx, notes, wikiTagFindings),
-      ...await fixBareReferences(ctx, notes, bareFindings)
+      ...await fixBareReferences(ctx, notes, bareFindings),
+      ...await fixManagedBlocksInBody(ctx, notes, managedBlockFindings)
     ];
     if (fixed.length > 0) {
       // Fixes mutate frontmatter, so pre-fix findings are stale.
@@ -178,6 +186,7 @@ async function collectAuditFindings(
   if (enabledChecks.has("upward_wiki_link")) findings.push(...upwardWikiLinkFindings(ctx, notes));
   if (enabledChecks.has("orphan_wiki_page")) findings.push(...orphanWikiPageFindings(ctx, notes));
   if (enabledChecks.has("wiki_tag_domain_mismatch")) findings.push(...await wikiTagDomainMismatchFindings(ctx, notes));
+  if (enabledChecks.has("managed_block_in_body")) findings.push(...await managedBlockInBodyFindings(ctx, notes));
   if (enabledChecks.has("unprocessed_spark")) findings.push(...unprocessedSparkFindings(notes));
   if (enabledChecks.has("stale_draft_permanent")) findings.push(...staleDraftPermanentFindings(notes));
   return findings;
@@ -292,6 +301,57 @@ function sourceAnchors(content: string): SourceAnchors {
 
 function normalizeAnchor(text: string): string {
   return text.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+async function managedBlockInBodyFindings(ctx: WorkflowContext, notes: AuditableNote[]): Promise<AuditFinding[]> {
+  const findings: AuditFinding[] = [];
+  for (const note of notes) {
+    const content = await ctx.host.read(note.file);
+    const body = content.slice(markdownBodyRange(content).start);
+    const props = managedFenceCount(body, "para-zk-props");
+    const managed = managedFenceCount(body, "para-zk-managed");
+    const total = props + managed;
+    if (total === 0) continue;
+    findings.push({
+      code: "managed_block_in_body",
+      severity: CHECK_SEVERITY.managed_block_in_body,
+      path: note.file.path,
+      type: note.type,
+      detail: { props, managed, total },
+      fix: "Run para-zk:audit fix=true to remove the legacy managed-block scaffolding from the note body."
+    });
+  }
+  return findings;
+}
+
+function managedFenceCount(content: string, language: "para-zk-props" | "para-zk-managed"): number {
+  const pattern = language === "para-zk-props"
+    ? /(?:^|\r?\n)[ \t]*```para-zk-props(?:[^\r\n]*)?(?=\r?\n|$)/g
+    : /(?:^|\r?\n)[ \t]*```para-zk-managed(?:[^\r\n]*)?(?=\r?\n|$)/g;
+  return content.match(pattern)?.length ?? 0;
+}
+
+async function fixManagedBlocksInBody(
+  ctx: WorkflowContext,
+  notes: AuditableNote[],
+  findings: AuditFinding[]
+): Promise<AuditFixedItem[]> {
+  const filesByPath = new Map(notes.map((note) => [note.file.path, note.file]));
+  const paths = Array.from(new Set(findings.map((finding) => finding.path))).sort((left, right) => left.localeCompare(right));
+  const fixed: AuditFixedItem[] = [];
+  for (const path of paths) {
+    const file = filesByPath.get(path);
+    if (!file) continue;
+    const changed = await serializeFileWrite(file.path, async () => {
+      const before = await ctx.host.read(file);
+      const after = stripManagedScaffolding(before);
+      if (before === after) return false;
+      await ctx.host.modify(file, after);
+      return true;
+    });
+    if (changed) fixed.push({ code: "managed_block_in_body", path, action: "stripManagedBlocks" });
+  }
+  return fixed;
 }
 
 async function referenceFindings(

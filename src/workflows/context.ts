@@ -282,6 +282,7 @@ export type AuditCheckCode =
   | "upward_wiki_link"
   | "orphan_wiki_page"
   | "wiki_tag_domain_mismatch"
+  | "managed_block_in_body"
   | "unprocessed_spark"
   | "stale_draft_permanent";
 
@@ -304,7 +305,7 @@ export type AuditFinding = {
 };
 
 export type AuditFixedItem = {
-  code: "idless_reference" | "wiki_tag_domain_mismatch" | "bare_reference";
+  code: "idless_reference" | "wiki_tag_domain_mismatch" | "bare_reference" | "managed_block_in_body";
   path: string;
   action: string;
 };

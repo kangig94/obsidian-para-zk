@@ -127,11 +127,14 @@ duplicating business logic.
 - `src/templates.ts` — managed templates, vault guide, dashboard artifacts.
 - `src/cli/handlers.ts` — LLM-friendly native CLI adapter over workflows.
 - `src/ux/workflow-commands.ts` — human-friendly Obsidian command adapter.
-- `src/ux/managed-sections.ts` — `para-zk-managed` wrapper for template UI tails.
+- `src/ux/blocks/note-chrome.ts` / `src/ux/note-chrome-editor.ts` — frontmatter
+  `type` based props/managed chrome in Reading view and Live Preview; legacy
+  scaffolding fences are swallowed.
+- `src/ux/blocks/managed-sections.ts` — managed UI panel renderer used by note chrome.
 - `src/ux/dataview-views.ts` — native `para-zk-view` wrappers + toolbar actions.
 - `src/ux/latest-retro-summary.ts` — project latest-retro summary widget.
 - `src/ux/workflow-buttons.ts` — shared GUI workflow button creation.
-- `src/ux/props-controls.ts` — native `para-zk-props` frontmatter controls.
+- `src/ux/props-controls.ts` — props panel and `PZ_INPUT[...]` frontmatter controls.
 - `src/ux/dashboard-actions.ts` / `dashboard-summary.ts` — Home dashboard blocks.
 - `src/runtime/setup.ts` — idempotent vault setup and managed file writes.
 - `src/runtime/dependencies/index.ts` — community-plugin dependency handling.
@@ -151,12 +154,14 @@ overwritten when generated content differs; matching files are left alone. User
 content notes are never touched by setup.
 
 Generated templates do not depend on Meta Bind, QuickAdd, or Templater. Native
-plugin blocks replace those mechanisms:
+plugin blocks and frontmatter-driven note chrome replace those mechanisms:
 
-- `para-zk-managed` — generated template UI tails in one compact block.
+- Frontmatter `type` note chrome — auto-renders the props panel at the top and
+  managed UI at the bottom; content templates no longer include
+  `para-zk-props`/`para-zk-managed` fences.
 - `para-zk-view` — relationship Dataview queries with matching workflow buttons.
 - `para-zk-latest-retro-summary` — project-summary widget (replaces a DataviewJS callout).
-- `para-zk-props` / `PZ_INPUT[...]` — frontmatter input controls (replace Meta Bind).
+- `PZ_INPUT[...]` — frontmatter input controls inside the props panel (replace Meta Bind).
 - `para-zk-dashboard-actions` / `para-zk-dashboard-summary` — Home dashboard blocks.
 - `para-zk-tasks` / `para-zk-references` — render the managed task registry and
   frontmatter-backed references inside root notes.

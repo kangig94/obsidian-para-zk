@@ -33,6 +33,29 @@ export function yamlFrontmatterRange(content: string): TextRange | undefined {
   };
 }
 
+export function readFrontmatterTypeFromContent(content: string): string | undefined {
+  const range = yamlFrontmatterRange(content);
+  if (!range) return undefined;
+
+  const raw = content.slice(range.start, range.end);
+  const body = raw.replace(/^\uFEFF?---\r?\n/, "");
+  const close = body.match(/\r?\n---(?:\r?\n)?$/);
+  if (!close) return undefined;
+
+  for (const line of body.slice(0, close.index).split(/\r?\n/)) {
+    const typed = line.trim().match(/^type\s*:\s*(.+)$/i)?.[1];
+    const type = normalizeFrontmatterType(typed);
+    if (type) return type;
+  }
+  return undefined;
+}
+
+export function normalizeFrontmatterType(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const type = value.trim().replace(/^["']|["']$/g, "");
+  return /^[A-Za-z0-9_-]+$/.test(type) ? type : undefined;
+}
+
 export function spliceTextRange(content: string, range: TextRange, value: string): string {
   const before = content.slice(0, range.start);
   const after = content.slice(range.end);
@@ -202,8 +225,16 @@ export function stripProjectSummaryManagedBlock(content: string): string {
 
 export function stripManagedPrelude(content: string): string {
   return trimMarkdownBlock(
-    stripTrailingManagedBlock(stripYamlFrontmatter(content).replace(/^\uFEFF?\s*```para-zk-props\r?\n[\s\S]*?\r?\n```[ \t]*(?:\r?\n[ \t]*)*/, ""))
+    stripTrailingManagedBlock(stripYamlFrontmatter(content).replace(LEADING_PROPS_BLOCK_RE, ""))
   );
+}
+
+export function stripManagedScaffolding(content: string): string {
+  const frontmatter = yamlFrontmatterRange(content);
+  const frontmatterText = frontmatter ? content.slice(0, frontmatter.end) : "";
+  const body = frontmatter ? content.slice(frontmatter.end) : content;
+  const strippedBody = stripTrailingManagedBlock(body.replace(LEADING_PROPS_BLOCK_RE, ""));
+  return `${frontmatterText}${strippedBody}`;
 }
 
 function stripYamlFrontmatter(content: string): string {
@@ -463,8 +494,11 @@ function stripLeadingFencedBlock(content: string, language: string): string {
   return trimMarkdownBlock(lines.slice(index).join("\n"));
 }
 
+const LEADING_PROPS_BLOCK_RE = /^\uFEFF?\s*```para-zk-props\r?\n[\s\S]*?\r?\n```[ \t]*(?:\r?\n[ \t]*)*/;
+const TRAILING_MANAGED_BLOCK_RE = /(?:\r?\n[ \t]*)*```para-zk-managed[^\r\n]*\r?\n```[ \t]*(?:\r?\n[ \t]*)*$/;
+
 function stripTrailingManagedBlock(content: string): string {
-  return content.replace(/(?:\r?\n[ \t]*)*```para-zk-managed[^\r\n]*\r?\n```[ \t]*(?:\r?\n[ \t]*)*$/, "");
+  return content.replace(TRAILING_MANAGED_BLOCK_RE, "");
 }
 
 function isEmptyMarkdownTable(value: string): boolean {

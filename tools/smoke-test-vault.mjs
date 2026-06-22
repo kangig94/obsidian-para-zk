@@ -234,18 +234,13 @@ function assertManagedTemplateFiles() {
     const path = `Templates/para-zk/template_${name}.md`;
     const text = readVaultText(path);
     assertNoTemplateDrift(path, text);
-
-    if (name === "retro") {
-      assert(!text.includes("```para-zk-managed"), `${path} should not include managed UI`);
-    } else {
-      assert(countOccurrences(text, "```para-zk-managed") === 1, `${path} must include exactly one managed block`);
-      assert(text.includes("```para-zk-managed\n```"), `${path} managed block must stay compact`);
-    }
+    assert(!text.includes("```para-zk-props"), `${path} should not include para-zk props fence`);
+    assert(!text.includes("```para-zk-managed"), `${path} should not include para-zk managed fence`);
   }
 
   const llmWiki = readVaultText("Templates/para-zk/template_llm-wiki.md");
   assertLlmWikiManagedShape("Templates/para-zk/template_llm-wiki.md", llmWiki);
-  assert(llmWiki.includes("  - llm-wiki/{{slug}}"), "template_llm-wiki.md must include the llm-wiki identity tag placeholder");
+  assert(llmWiki.includes("  - llm-wiki\n"), "template_llm-wiki.md must include the llm-wiki identity tag");
 
   const project = readVaultText("Templates/para-zk/template_project.md");
   assert(
@@ -254,7 +249,7 @@ function assertManagedTemplateFiles() {
   );
 
   const retro = readVaultText("Templates/para-zk/template_retro.md");
-  assert(retro.includes("areas: {{areas_frontmatter}}"), "template_retro.md must keep YAML-safe areas placeholder spacing");
+  assert(retro.includes("areas: \"{{areas_frontmatter}}\""), "template_retro.md must keep YAML-safe quoted areas placeholder");
   assert(retro.includes(`# ${L.retroSummary}\n`), "template_retro.md must keep required Retro summary heading");
   assert(!retro.includes("```para-zk-managed"), "template_retro.md must not include managed UI");
   assertFileNotContains("Templates/para-zk/template_retro.md", [
@@ -267,14 +262,8 @@ function assertManagedTemplateFiles() {
 function assertGeneratedNoteTemplateShape(path, type, options = {}) {
   assertVaultTextEventually(path, (text) => {
     assertNoTemplateDrift(path, text);
-    assert(text.includes("```para-zk-props"), `${path} is missing para-zk props block`);
-
-    if (type === "retro") {
-      assert(!text.includes("```para-zk-managed"), `${path} should not include managed UI`);
-    } else {
-      assert(countOccurrences(text, "```para-zk-managed") === 1, `${path} must include exactly one managed block`);
-      assert(text.includes("```para-zk-managed\n```"), `${path} managed block must stay compact`);
-    }
+    assert(!text.includes("```para-zk-props"), `${path} should not include para-zk props fence`);
+    assert(!text.includes("```para-zk-managed"), `${path} should not include para-zk managed fence`);
 
     if (type === "project") {
       assertProjectSummaryText(path, text);
@@ -296,24 +285,23 @@ function assertGeneratedNoteTemplateShape(path, type, options = {}) {
 
 function assertLlmWikiManagedShape(path, text) {
   assert(text.includes("type: llm-wiki"), `${path} is missing llm-wiki type frontmatter`);
-  assert(text.includes("```para-zk-props\ntype: llm-wiki\n```"), `${path} is missing llm-wiki props block`);
-  assert(countOccurrences(text, "```para-zk-managed") === 1, `${path} must include exactly one managed block`);
-  assert(text.match(/\s*```para-zk-managed\r?\n```\s*$/), `${path} managed block must be the compact tail`);
+  assert(!text.includes("```para-zk-props"), `${path} should not include para-zk props fence`);
+  assert(!text.includes("```para-zk-managed"), `${path} should not include para-zk managed fence`);
   for (const key of ["url:", "first_author:", "license:", "kind:"]) {
     assert(!text.includes(key), `${path} should not include resource provenance key ${key}`);
   }
 }
 
 function assertResourceFreeFormTemplateShape(path, text) {
-  const body = editableBodyBeforeManagedTail(path, text);
-  assert(body.trim() === "", `${path} resource template body must be blank before the managed tail`);
+  const body = bodyAfterFrontmatter(path, text);
+  assert(body.trim() === "", `${path} resource template body must be blank`);
   assert(!text.includes("# Overview\n"), `${path} resource template must not include old Overview heading`);
   assert(!text.includes("# Body\n"), `${path} resource template must not include old Body heading`);
 }
 
 function assertZkStarterTemplateShape(path, type, text) {
-  const body = editableBodyBeforeManagedTail(path, text);
-  assert(body.trim() === "", `${path} ${type} template body must be blank before the managed tail`);
+  const body = bodyAfterFrontmatter(path, text);
+  assert(body.trim() === "", `${path} ${type} template body must be blank`);
   for (const heading of oldZkStarterHeadings(type)) {
     assert(!text.includes(`${heading}\n`), `${path} ZK template must not include old starter heading: ${heading}`);
   }
@@ -332,12 +320,10 @@ function oldZkStarterHeadings(type) {
   }
 }
 
-function editableBodyBeforeManagedTail(path, text) {
-  const props = text.match(/```para-zk-props\r?\n[\s\S]*?\r?\n```\s*/);
-  assert(props?.index !== undefined, `${path} is missing para-zk props block`);
-  const tail = text.match(/\s*```para-zk-managed\r?\n```\s*$/);
-  assert(tail?.index !== undefined, `${path} is missing trailing para-zk managed block`);
-  return text.slice(props.index + props[0].length, tail.index);
+function bodyAfterFrontmatter(path, text) {
+  const frontmatter = text.match(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/);
+  assert(frontmatter?.index === 0, `${path} is missing frontmatter`);
+  return text.slice(frontmatter[0].length);
 }
 
 
@@ -612,7 +598,10 @@ function assertBacklinkReadKeyScenario() {
 }
 
 function assertLlmWikiRoundTrip() {
-  const title = `Smoke LLM Wiki ${stamp}`;
+  const domain = "SmokeWiki";
+  const concept = `Smoke LLM Wiki ${stamp}`;
+  const title = `${domain}/${concept}`;
+  const path = `LLM-Wiki/${domain}/${concept}.md`;
   const body = `LLM-owned synthesis for ${stamp}.`;
   const wiki = cliJson("para-zk:create-llm-wiki", [
     `title=${title}`,
@@ -622,11 +611,11 @@ function assertLlmWikiRoundTrip() {
     "format=json"
   ]);
   assertCreated(wiki, "llm-wiki create");
-  assert(wiki.path === `LLM-Wiki/${title}.md`, `llm-wiki path mismatch: ${wiki.path}`);
+  assert(wiki.path === path, `llm-wiki path mismatch: ${wiki.path}`);
   assertGeneratedNoteTemplateShape(wiki.path, "llm-wiki");
   assertFileContains(wiki.path, [
     "type: llm-wiki",
-    `  - llm-wiki/${slugForTitle(title)}`,
+    `  - llm-wiki/${slugForTitle(domain)}`,
     body
   ]);
 
@@ -640,8 +629,11 @@ function assertLlmWikiRoundTrip() {
 }
 
 function assertLlmWikiCitedByRenderer() {
-  const targetTitle = `Smoke Wiki Concept A ${stamp}`;
-  const citingTitle = `Smoke Wiki Concept B ${stamp}`;
+  const domain = "SmokeWiki";
+  const targetConcept = `Smoke Wiki Concept A ${stamp}`;
+  const citingConcept = `Smoke Wiki Concept B ${stamp}`;
+  const targetTitle = `${domain}/${targetConcept}`;
+  const citingTitle = `${domain}/${citingConcept}`;
   const target = cliJson("para-zk:create-llm-wiki", [
     `title=${targetTitle}`,
     `body=Target wiki concept for ${stamp}.`,
@@ -704,7 +696,9 @@ function assertLlmWikiCitedByRenderer() {
 
 function assertWikiIngestCandidatesScenario() {
   const sourceTitle = `Smoke Wiki Ingest Source ${stamp}`;
-  const wikiTitle = `Smoke Wiki Ingest ${stamp}`;
+  const wikiDomain = "SmokeWiki";
+  const wikiConcept = `Smoke Wiki Ingest ${stamp}`;
+  const wikiTitle = `${wikiDomain}/${wikiConcept}`;
   const source = cliJson("para-zk:create-resource", [
     `title=${sourceTitle}`,
     "link=false",
@@ -2051,10 +2045,9 @@ function countOccurrences(text, needle) {
 function slugForTitle(value) {
   const slug = value
     .toLowerCase()
-    .replace(/[^a-z0-9가-힣_\/]+/g, "_")
-    .replace(/-/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "");
+    .replace(/[^a-z0-9가-힣\/]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
   return slug || "untitled";
 }
 
