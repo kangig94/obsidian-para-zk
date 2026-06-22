@@ -19,7 +19,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 26
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -29,3 +29,7 @@ jobs:
         run: pnpm run test
       - name: Build
         run: pnpm run build
+      - name: Check MCP bundle hash
+        run: pnpm run check:mcp-hash
+      - name: Check generated build artifacts
+        run: pnpm run check:build-drift

@@ -37,6 +37,16 @@ describe("llm-wiki domain index hub", () => {
     expect(res.created).toBe(false);
   });
 
+  it("rejects case variants of the reserved domain index hub name", async () => {
+    const { ctx, app } = createTestContext();
+
+    await expect(createLlmWiki(ctx, { title: "AI/Index", open: false })).rejects.toThrow(
+      'domain hub must be named "index" exactly'
+    );
+    expect(app.readPath("LLM-Wiki/AI/Index.md")).toBeUndefined();
+    expect(app.readPath("LLM-Wiki/AI/index.md")).toBeUndefined();
+  });
+
   it("flags a real orphan concept but never the <domain>/index hub", async () => {
     const { ctx } = createTestContext();
     await createLlmWiki(ctx, { title: "AI/Diffusion Policy", open: false }); // orphan concept + auto AI/index

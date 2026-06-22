@@ -45,6 +45,14 @@ describe("wiki domains", () => {
     expect(result.count).toBe(0);
   });
 
+  it("only treats lowercase index.md as the domain hub", async () => {
+    const { ctx, app } = createTestContext();
+    await createRawWikiPage(app, "LLM-Wiki/Case/Index.md");
+
+    const result = await wikiDomains(ctx, { limit: "all" });
+    expect(result.domains).toEqual([{ domain: "Case", pages: 1, has_index: false }]);
+  });
+
   it("paginates the domain roster", async () => {
     const { ctx } = createTestContext();
     await createLlmWiki(ctx, { title: "AI/X", open: false });

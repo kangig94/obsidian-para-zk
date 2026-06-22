@@ -276,6 +276,10 @@ export async function createLlmWiki(ctx: WorkflowContext, options: CreateLlmWiki
   }
   const [domain, concept] = segments;
 
+  if (concept.toLowerCase() === DOMAIN_INDEX_CONCEPT && concept !== DOMAIN_INDEX_CONCEPT) {
+    throw new Error('llm-wiki domain hub must be named "index" exactly; use "<domain>/index"');
+  }
+
   if (concept === DOMAIN_INDEX_CONCEPT) {
     // Domain hub: get-or-create by exact path so every domain keeps its own `index` page.
     const existingIndex = ctx.host.getFile(domainIndexPath(ctx, domain));

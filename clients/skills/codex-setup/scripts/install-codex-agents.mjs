@@ -49,7 +49,9 @@ for (const file of files) {
   if (!options.dryRun) {
     await writeFile(target, agent.toml, "utf8");
   }
-  results.push({ status: current === undefined ? "installed" : "updated", target });
+  const status = current === undefined ? "installed" : "updated";
+  const dryRunStatus = current === undefined ? "would install" : "would update";
+  results.push({ status: options.dryRun ? dryRunStatus : status, target });
 }
 
 for (const result of results) {

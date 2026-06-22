@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@10.20.0",
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "scripts": {
     "build": "NODE_ENV=production node tools/build.mjs production",
@@ -19,6 +19,8 @@
     "typecheck": "tsc --noEmit",
     "lint:architecture": "node tools/check-architecture.mjs",
     "lint:deadcode": "knip",
+    "check:mcp-hash": "node tools/check-mcp-build-hash.mjs",
+    "check:build-drift": "node tools/check-generated-drift.mjs",
     "lint": "pnpm run lint:architecture && pnpm run lint:deadcode && pnpm run typecheck"
   },
   "keywords": [

@@ -68,8 +68,8 @@ plugin renders localized labels in the note. Default locale is English — pass
 ## Development
 
 Start with [docs/FIRST_READ.md](docs/FIRST_READ.md) for project intent, test-vault
-rules, and the GUI/CLI contract. See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the
-development changelog.
+rules, and the GUI/CLI contract. [docs/CHANGELOG.md](docs/CHANGELOG.md) is only the
+pending GitHub release-note draft; published history lives in GitHub Releases.
 
 ```bash
 pnpm install

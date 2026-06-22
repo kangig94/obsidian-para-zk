@@ -24,12 +24,16 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 26
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Build
         run: pnpm run build
+      - name: Check MCP bundle hash
+        run: pnpm run check:mcp-hash
+      - name: Check generated build artifacts
+        run: pnpm run check:build-drift
       - name: Create or refresh release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -40,12 +44,19 @@ jobs:
             echo "::error::Tag '$tag' does not match manifest.json version '$manifest_version' (Obsidian requires an exact match, no 'v' prefix)."
             exit 1
           fi
+          notes_args=(--notes "Beta release $tag — install via BRAT (see README).")
+          if [ -s docs/CHANGELOG.md ] && ! grep -q '^_No pending release notes\._$' docs/CHANGELOG.md; then
+            notes_args=(--notes-file docs/CHANGELOG.md)
+          fi
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" build/main.js build/manifest.json build/styles.css --clobber
+            if [ "${notes_args[0]}" = "--notes-file" ]; then
+              gh release edit "$tag" --notes-file docs/CHANGELOG.md
+            fi
           else
             gh release create "$tag" \
               --title "$tag" \
               --draft \
-              --notes "Beta release $tag — install via BRAT (see README)." \
+              "${notes_args[@]}" \
               build/main.js build/manifest.json build/styles.css
           fi

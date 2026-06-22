@@ -14,12 +14,13 @@ No runtime dependencies — the plugin bundles everything; `obsidian`, `electron
 
 ## Build Targets
 
-`pnpm run build` produces **two** esbuild bundles plus the stylesheet:
+`pnpm run build` produces **two** esbuild bundles plus the stylesheet. CI and release
+workflows build on Node 26:
 
 1. `src/main.ts` → `build/main.js` (cjs, browser, es2022, minified; externals: `obsidian`,
    `electron`, `@codemirror/*`, node builtins) — the Obsidian plugin.
-2. `src/mcp/server.ts` → `clients/para-zk-mcp.mjs` (esm, node18, `#!/usr/bin/env node`
-   banner) — the MCP server.
+2. `src/mcp/server.ts` → `clients/para-zk-mcp.mjs` (esm, node18 target, `#!/usr/bin/env node`
+   banner) — the MCP server, plus `clients/para-zk-mcp.mjs.sha256`.
 3. `assets/styles.css` → `build/styles.css`.
 
 `build/` is the Obsidian deployment shape (`main.js`, `manifest.json` — staged from the
@@ -122,9 +123,11 @@ hand-edited:
 - `clients/.codex-plugin/plugin.json` version
 - the MCP server bundle, via the esbuild `__VERSION__` define — `src/mcp/server.ts`
   reads that injected global, never a hardcoded literal
+- `clients/para-zk-mcp.mjs.sha256` — SHA-256 for the committed MCP bundle
 
-A same-version rebuild is a no-op, and CI's post-build `git diff --exit-code` fails if any
-manifest drifts from `package.json`. To release, bump the single source and let the build
+A same-version rebuild is a no-op, and CI's post-build generated-artifact check fails if
+any artifact drifts from `package.json` or the source bundle. CI also compares the MCP
+bundle against its committed SHA-256. To release, bump the single source and let the build
 sync the rest:
 
 ```bash
@@ -140,4 +143,5 @@ See "Cutting a release (maintainers)" in the README for the push + publish steps
 3. `pnpm run lint && pnpm run test` (and `pnpm run build`) before considering a change done.
 4. Run `pnpm run smoke:vault` when the change touches engine behavior (links, backlinks,
    renderers, dependency config).
-5. Update `docs/CHANGELOG.md` for notable changes.
+5. Put notable pending release notes in `docs/CHANGELOG.md`; after publishing the GitHub
+   release, clear it back to the placeholder.

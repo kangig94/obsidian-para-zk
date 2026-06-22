@@ -1,4 +1,5 @@
 import { build, context } from "esbuild";
+import { createHash } from "node:crypto";
 import { readFileSync, watch, writeFileSync } from "node:fs";
 import { access, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { builtinModules } from "node:module";
@@ -19,9 +20,12 @@ const filesToDeploy = ["main.js", "manifest.json", "styles.css"];
 
 // package.json is the single source of truth for the version. The build injects it
 // (__VERSION__) and propagates it into every distribution manifest, so a release only
-// edits package.json — no hand-syncing the seven places the version used to live.
+// edits package.json without hand-syncing generated distribution files.
 const { version } = JSON.parse(readFileSync("package.json", "utf8"));
 syncManifestVersions(version);
+
+const mcpBundlePath = "clients/para-zk-mcp.mjs";
+const mcpHashPath = `${mcpBundlePath}.sha256`;
 
 const pluginBuildOptions = {
   banner: {
@@ -63,7 +67,7 @@ const mcpBuildOptions = {
   minify: production,
   // The MCP bundle stays committed under clients/ — the Claude Code / Codex marketplace
   // ships that folder via git clone and runs no build step at install time.
-  outfile: "clients/para-zk-mcp.mjs",
+  outfile: mcpBundlePath,
   platform: "node",
   sourcemap: production ? false : "inline",
   target: "node18",
@@ -96,6 +100,12 @@ async function afterBuild() {
   await syncToPlugin();
 }
 
+async function writeMcpBundleHash() {
+  const bundle = await readFile(mcpBundlePath);
+  const hash = createHash("sha256").update(bundle).digest("hex");
+  await writeFile(mcpHashPath, `${hash}  ${mcpBundlePath}\n`, "utf8");
+}
+
 if (watchMode) {
   const pluginCtx = await context({
     ...pluginBuildOptions,
@@ -125,13 +135,14 @@ if (watchMode) {
 } else {
   await build(pluginBuildOptions);
   await build(mcpBuildOptions);
+  await writeMcpBundleHash();
   await afterBuild();
 }
 
 // Propagate package.json's version into the static manifests that external installers
 // read directly (Obsidian, the BRAT versions map, and the Claude Code / Codex plugin
 // manifests). Each entry is rewritten only when it drifts, so a same-version rebuild is
-// a no-op and CI's post-build `git diff --exit-code` catches any un-synced manifest.
+// a no-op and CI's post-build generated-artifact check catches any un-synced manifest.
 function syncManifestVersions(targetVersion) {
   const manifest = JSON.parse(readFileSync("manifest.json", "utf8"));
   if (manifest.version !== targetVersion) {
