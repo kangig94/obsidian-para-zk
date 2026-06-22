@@ -9,6 +9,11 @@ import { normalizeFrontmatterType, readFrontmatterTypeFromContent } from "../../
 import { applyBlockKind, renderBlockNotice } from "./shell";
 
 const MANAGED_PANEL_BUFFER_SETTLE_TIMEOUT_MS = 1000;
+const INLINE_ACTION_BLOCK_SELECTOR = ":scope > .para-zk-block--action";
+const INLINE_ACTION_TARGET_SELECTOR = ".para-zk-block:not(.para-zk-block--action)";
+const BLOCK_ACTIONS_CLASS = "para-zk-block__actions";
+const BLOCK_ACTIONS_SELECTOR = `.${BLOCK_ACTIONS_CLASS}`;
+const BLOCK_TOOLBAR_SELECTOR = ":scope > .para-zk-block__toolbar";
 
 export async function renderManagedPanel(
   plugin: ParaZkPluginContext,
@@ -32,6 +37,7 @@ export async function renderManagedPanel(
     if (block) {
       await MarkdownRenderer.render(plugin.app, block, buffer, sourcePath ?? "", child);
       await waitForManagedPanelSettled(buffer, expectedViewCount);
+      inlineManagedActionBlocks(buffer);
     }
 
     replaceManagedPanel(el, buffer);
@@ -85,6 +91,53 @@ function replaceManagedPanel(el: HTMLElement, rendered: HTMLElement): void {
     }
   }
   el.replaceChildren(...Array.from(rendered.childNodes));
+}
+
+function inlineManagedActionBlocks(el: HTMLElement): void {
+  for (const actionBlock of Array.from(el.querySelectorAll<HTMLElement>(INLINE_ACTION_BLOCK_SELECTOR))) {
+    const targetBlock = nextInlineActionTarget(actionBlock);
+    if (!targetBlock || !moveActionButtonsIntoToolbar(actionBlock, targetBlock)) continue;
+    removeInlineActionGap(actionBlock, targetBlock);
+    actionBlock.remove();
+  }
+}
+
+function nextInlineActionTarget(actionBlock: HTMLElement): HTMLElement | undefined {
+  for (let node = actionBlock.nextSibling; node; node = node.nextSibling) {
+    if (isManagedBlockSeparatorNode(node)) continue;
+    if (node instanceof HTMLElement && node.matches(INLINE_ACTION_TARGET_SELECTOR)) return node;
+    return undefined;
+  }
+  return undefined;
+}
+
+function moveActionButtonsIntoToolbar(actionBlock: HTMLElement, targetBlock: HTMLElement): boolean {
+  const sourceActions = actionBlock.querySelector<HTMLElement>(BLOCK_ACTIONS_SELECTOR);
+  const targetToolbar = targetBlock.querySelector<HTMLElement>(BLOCK_TOOLBAR_SELECTOR);
+  if (!sourceActions || !targetToolbar || !sourceActions.hasChildNodes()) return false;
+
+  let targetActions = targetToolbar.querySelector<HTMLElement>(`:scope > ${BLOCK_ACTIONS_SELECTOR}`);
+  if (!targetActions) {
+    targetActions = targetToolbar.ownerDocument.createElement("div");
+    targetActions.addClass(BLOCK_ACTIONS_CLASS);
+    targetToolbar.appendChild(targetActions);
+  }
+
+  while (sourceActions.firstChild) targetActions.appendChild(sourceActions.firstChild);
+  return true;
+}
+
+function removeInlineActionGap(left: HTMLElement, right: HTMLElement): void {
+  for (let node = left.nextSibling; node && node !== right;) {
+    const next = node.nextSibling;
+    if (isManagedBlockSeparatorNode(node)) node.remove();
+    node = next;
+  }
+}
+
+function isManagedBlockSeparatorNode(node: ChildNode): boolean {
+  return (node.nodeType === Node.TEXT_NODE && !node.textContent?.trim())
+    || (node instanceof HTMLElement && node.tagName === "HR");
 }
 
 function countManagedDataviewViews(block: string | undefined): number {

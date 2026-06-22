@@ -98,6 +98,7 @@ class NoteChromeController {
   private managedChild: NoteChromeManagedRenderChild | undefined;
   private renderTimer: number | undefined;
   private layoutTimer: number | undefined;
+  private refreshFrame: number | undefined;
   private renderGeneration = 0;
   private renderedSignature: string | undefined;
   private pendingSignature: string | undefined;
@@ -133,6 +134,8 @@ class NoteChromeController {
     this.renderTimer = undefined;
     if (this.layoutTimer !== undefined) window.clearTimeout(this.layoutTimer);
     this.layoutTimer = undefined;
+    if (this.refreshFrame !== undefined) window.cancelAnimationFrame(this.refreshFrame);
+    this.refreshFrame = undefined;
     this.observer.disconnect();
     this.removeInjectedPanels();
     if (noteChromeControllers.get(this.container) === this) noteChromeControllers.delete(this.container);
@@ -156,6 +159,7 @@ class NoteChromeController {
     const signature = noteChromeSignature(this.plugin, this.sourcePath, this.typeHint);
     if (signature === this.renderedSignature && this.hasRenderedPanels()) {
       this.ensureLayout();
+      this.schedulePreviewChromeRefresh();
       return;
     }
     if (signature === this.pendingSignature) return;
@@ -177,6 +181,7 @@ class NoteChromeController {
     }
     if (!isParaZkNote(this.plugin, this.sourcePath, this.typeHint)) {
       this.removeInjectedPanels();
+      this.schedulePreviewChromeRefresh();
       this.renderedSignature = undefined;
       return;
     }
@@ -192,16 +197,16 @@ class NoteChromeController {
     const generation = ++this.renderGeneration;
     const child = this.ensureManagedChild(managedEl);
     renderPropsPanel(this.plugin, propsEl, this.sourcePath);
-    refreshPreviewChromeSections(this.plugin, this.container);
+    this.schedulePreviewChromeRefresh();
     void renderManagedPanel(this.plugin, managedEl, this.sourcePath, child)
       .then(() => {
-        if (this.isCurrentRender(generation)) refreshPreviewChromeSections(this.plugin, this.container);
+        if (this.isCurrentRender(generation)) this.schedulePreviewChromeRefresh();
       })
       .catch((error: unknown) => {
         if (this.isCurrentRender(generation)) {
           managedEl.style.removeProperty("display");
           renderBlockNotice(managedEl, "managed", error instanceof Error ? error.message : String(error));
-          refreshPreviewChromeSections(this.plugin, this.container);
+          this.schedulePreviewChromeRefresh();
         }
       });
     this.renderedSignature = signature;
@@ -254,7 +259,18 @@ class NoteChromeController {
         return;
       }
       this.ensureLayout();
+      this.schedulePreviewChromeRefresh();
     }, 0);
+  }
+
+  private schedulePreviewChromeRefresh(): void {
+    if (this.refreshFrame !== undefined) return;
+    this.refreshFrame = window.requestAnimationFrame(() => {
+      this.refreshFrame = undefined;
+      if (this.disposed || !this.container.isConnected) return;
+      this.ensureLayout();
+      refreshPreviewChromeSections(this.plugin, this.container);
+    });
   }
 
   private ensureManagedChild(managedEl: HTMLElement): NoteChromeManagedRenderChild {
@@ -490,32 +506,61 @@ function insertManagedFooter(container: HTMLElement, managedEl: HTMLElement): vo
   if (container.lastElementChild !== managedEl) container.appendChild(managedEl);
 }
 
+interface PreviewRendererSection {
+  el?: HTMLElement;
+  height?: number;
+  computed?: boolean;
+}
+
+interface PreviewRenderer {
+  sections?: PreviewRendererSection[];
+  getSectionForElement?: (el: HTMLElement) => PreviewRendererSection | undefined;
+  updateVirtualDisplay?: () => void;
+}
+
 function refreshPreviewChromeSections(plugin: ParaZkPluginContext, container: HTMLElement): void {
   const renderer = previewRendererForContainer(plugin, container);
   try {
-    renderer?.updateHeader?.();
-    renderer?.updateFooter?.();
-    renderer?.updateVirtualDisplay?.();
+    const headerChanged = syncPreviewSectionHeight(
+      renderer,
+      container.querySelector<HTMLElement>(":scope > .mod-header")
+    );
+    const footerChanged = syncPreviewSectionHeight(
+      renderer,
+      container.querySelector<HTMLElement>(":scope > .mod-footer")
+    );
+    if (headerChanged || footerChanged) renderer?.updateVirtualDisplay?.();
   } catch {
     // Obsidian's preview renderer hooks are private; failing to refresh height
     // is better than breaking note rendering on a version mismatch.
   }
 }
 
+function syncPreviewSectionHeight(renderer: PreviewRenderer | undefined, el: HTMLElement | null): boolean {
+  if (!renderer || !el) return false;
+  const section = renderer.getSectionForElement?.(el)
+    ?? renderer.sections?.find((candidate) => candidate.el === el);
+  if (!section) return false;
+
+  const height = Math.ceil(Math.max(el.offsetHeight, el.getBoundingClientRect().height));
+  if (!Number.isFinite(height)) return false;
+
+  const changed = section.height !== height || section.computed !== true;
+  section.height = height;
+  section.computed = true;
+  return changed;
+}
+
 function previewRendererForContainer(
   plugin: ParaZkPluginContext,
   container: HTMLElement
-): { updateHeader?: () => void; updateFooter?: () => void; updateVirtualDisplay?: () => void } | undefined {
+): PreviewRenderer | undefined {
   for (const leaf of plugin.app.workspace.getLeavesOfType("markdown")) {
     if (!(leaf.view instanceof MarkdownView)) continue;
     if (leaf.view.containerEl.querySelector(".markdown-preview-sizer") !== container) continue;
     const viewWithPreview = leaf.view as MarkdownView & {
       previewMode?: {
-        renderer?: {
-          updateHeader?: () => void;
-          updateFooter?: () => void;
-          updateVirtualDisplay?: () => void;
-        };
+        renderer?: PreviewRenderer;
       };
     };
     return viewWithPreview.previewMode?.renderer;

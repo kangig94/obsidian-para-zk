@@ -390,13 +390,13 @@ function assertDataviewToolbarLayout(path) {
       const root = leaf.view.containerEl;
       taskToolbar = root.querySelector(".para-zk-block--tasks .para-zk-block__toolbar");
       referenceToolbar = root.querySelector(".para-zk-block--references .para-zk-block__toolbar");
-      viewToolbar = root.querySelector(".para-zk-block--action .para-zk-block__toolbar");
       viewRoot = root.querySelector(".para-zk-block--view-project-subnotes");
-      viewButton = root.querySelector(".para-zk-block--action .para-zk-block__action");
+      viewToolbar = viewRoot?.querySelector(".para-zk-block__toolbar") ?? null;
+      viewButton = viewRoot?.querySelector(".para-zk-block__action") ?? null;
       taskTitle = taskToolbar?.querySelector(".para-zk-block__title")?.textContent?.trim() ?? "";
       referenceTitle = referenceToolbar?.querySelector(".para-zk-block__title")?.textContent?.trim() ?? "";
       viewTitle = viewRoot?.querySelector(".para-zk-block__title")?.textContent?.trim() ?? "";
-      if (taskToolbar && referenceToolbar && viewToolbar && viewRoot) break;
+      if (taskToolbar && referenceToolbar && viewToolbar && viewRoot && viewButton) break;
       await sleep(100);
     }
 
@@ -404,6 +404,8 @@ function assertDataviewToolbarLayout(path) {
       if (!el) return null;
       const box = el.getBoundingClientRect();
       return {
+        top: Math.round(box.top * 100) / 100,
+        bottom: Math.round(box.bottom * 100) / 100,
         left: Math.round(box.left * 100) / 100,
         right: Math.round(box.right * 100) / 100,
         width: Math.round(box.width * 100) / 100
@@ -432,6 +434,7 @@ function assertDataviewToolbarLayout(path) {
   assertNearlyEqual(snapshot.viewButton.right, snapshot.viewRoot.right, 1, `Dataview button right edge differs from view root: ${JSON.stringify(snapshot)}`);
   assertNearlyEqual(snapshot.viewToolbar.right, snapshot.taskToolbar.right, 1, `Dataview toolbar right edge differs from task toolbar: ${JSON.stringify(snapshot)}`);
   assertNearlyEqual(snapshot.viewToolbar.right, snapshot.referenceToolbar.right, 1, `Dataview toolbar right edge differs from reference toolbar: ${JSON.stringify(snapshot)}`);
+  assert(snapshot.viewButton.top >= snapshot.viewToolbar.top && snapshot.viewButton.bottom <= snapshot.viewToolbar.bottom, `Dataview button is not inside the view toolbar row: ${JSON.stringify(snapshot)}`);
 }
 
 function assertCitationRendering(stamp) {
@@ -699,6 +702,16 @@ function assertWikiIngestCandidatesScenario() {
   const wikiDomain = "SmokeWiki";
   const wikiConcept = `Smoke Wiki Ingest ${stamp}`;
   const wikiTitle = `${wikiDomain}/${wikiConcept}`;
+  const wiki = cliJson("para-zk:create-llm-wiki", [
+    `title=${wikiTitle}`,
+    `body=Wiki ingest smoke for ${stamp}.`,
+    `by=${smokeModelId}`,
+    "open=false",
+    "format=json"
+  ]);
+  assertCreated(wiki, "wiki ingest wiki");
+  waitForNextMinuteBoundary();
+
   const source = cliJson("para-zk:create-resource", [
     `title=${sourceTitle}`,
     "link=false",
@@ -714,15 +727,6 @@ function assertWikiIngestCandidatesScenario() {
     `uncited source should be an init candidate: ${JSON.stringify(initCandidate)}`
   );
 
-  const wiki = cliJson("para-zk:create-llm-wiki", [
-    `title=${wikiTitle}`,
-    `body=Wiki ingest smoke for ${stamp}.`,
-    `by=${smokeModelId}`,
-    "open=false",
-    "format=json"
-  ]);
-  assertCreated(wiki, "wiki ingest wiki");
-
   const insert = cliJson("para-zk:update-llm-wiki", [
     `title=${wikiTitle}`,
     "key=references",
@@ -736,31 +740,10 @@ function assertWikiIngestCandidatesScenario() {
   assert(waitForBacklink(source.path, wiki.path), "wiki ingest source did not resolve as cited by llm-wiki");
 
   waitForWikiIngestCandidate(source.path, false);
-  waitForNextMinuteBoundary();
-
-  const wikiTouch = cliJson("para-zk:update-llm-wiki", [
-    `title=${wikiTitle}`,
-    "key=body",
-    "op=append",
-    `value=Wiki freshness baseline for ${stamp}.`,
-    `by=${smokeModelId}`,
-    "format=json"
-  ]);
-  assert(wikiTouch.ok === true && wikiTouch.changed === true, `wiki ingest citing page freshness baseline failed: ${JSON.stringify(wikiTouch)}`);
-  waitForNextMinuteBoundary();
-
-  const sourceBump = cliJson("para-zk:update-resource", [
-    `title=${sourceTitle}`,
-    "key=body",
-    "op=append",
-    `value=Source freshness bump for ${stamp}.`,
-    "format=json"
-  ]);
-  assert(sourceBump.ok === true && sourceBump.changed === true, `wiki ingest source freshness bump failed: ${JSON.stringify(sourceBump)}`);
   const stale = waitForWikiIngestStaleCandidate(source.path, wiki.path);
   assert(stale.reason === "source_newer_than_wiki", `wiki ingest stale source reason mismatch: ${JSON.stringify(stale)}`);
   assert(
-    Array.isArray(stale.stale_pages) && stale.stale_pages.some((page) => page.path === wiki.path),
+    Array.isArray(stale.stale_llm_wikis) && stale.stale_llm_wikis.some((page) => page.path === wiki.path),
     `wiki ingest stale source did not include citing wiki page: ${JSON.stringify(stale)}`
   );
 }
@@ -795,8 +778,8 @@ function waitForWikiIngestStaleCandidate(sourcePath, wikiPath) {
       lastCandidate = candidate;
       if (
         candidate.reason === "source_newer_than_wiki"
-        && Array.isArray(candidate.stale_pages)
-        && candidate.stale_pages.some((page) => page.path === wikiPath)
+        && Array.isArray(candidate.stale_llm_wikis)
+        && candidate.stale_llm_wikis.some((page) => page.path === wikiPath)
       ) {
         return candidate;
       }
@@ -1352,7 +1335,7 @@ function assertCreateRetroButtonProjectLink() {
     let button = null;
     const retroLabel = ${JSON.stringify(L.createRetro)};
     for (let index = 0; index < 30; index += 1) {
-      button = Array.from(leaf.view.containerEl.querySelectorAll(".para-zk-block--action .para-zk-block__action"))
+      button = Array.from(leaf.view.containerEl.querySelectorAll(".para-zk-block__action"))
         .find((candidate) => (candidate.textContent ?? "").includes(retroLabel)) ?? null;
       if (button) break;
       await sleep(100);
