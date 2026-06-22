@@ -22,6 +22,10 @@ type DataviewRenderOptions = {
   preserveCurrent?: boolean;
 };
 
+type DataviewRenderExpectation = {
+  headers: string[];
+};
+
 const DATAVIEW_CHANGE_RERENDER_DELAY_MS = 300;
 const DATAVIEW_BUFFER_SETTLE_TIMEOUT_MS = 2500;
 const DATAVIEW_INITIAL_BUFFER_SETTLE_TIMEOUT_MS = 700;
@@ -155,10 +159,10 @@ async function renderDataviewViewBuffered(
   el.after(buffer);
 
   try {
-    await renderDataviewViewInto(plugin, args, buffer, sourcePath, child);
-    await waitForSettledDataviewRender(buffer, isCurrent, options.timeoutMs);
+    const expectation = await renderDataviewViewInto(plugin, args, buffer, sourcePath, child);
+    await waitForSettledDataviewRender(buffer, isCurrent, options.timeoutMs, expectation);
     if (!isCurrent()) return;
-    if (!hasSettledDataviewRender(buffer) && !options.replaceUnsettled) return;
+    if (!hasSettledDataviewRender(buffer, expectation) && !options.replaceUnsettled) return;
     replaceDataviewView(el, buffer);
   } finally {
     buffer.remove();
@@ -171,23 +175,24 @@ async function renderDataviewViewInto(
   el: HTMLElement,
   sourcePath: string | undefined,
   child: MarkdownRenderChild
-): Promise<void> {
+): Promise<DataviewRenderExpectation | undefined> {
   const key = args.key;
 
   el.empty();
   if (!isDataviewViewKey(key)) {
     renderBlockNotice(el, viewBlockKind(key), `Unknown PARA-ZK view: ${key || "(empty)"}`);
-    return Promise.resolve();
+    return undefined;
   }
 
   const block = dataviewViewBlock(key, plugin.settings, sourcePath);
   if (!block) {
     renderBlockNotice(el, viewBlockKind(key), `Unknown PARA-ZK view: ${key || "(empty)"}`);
-    return Promise.resolve();
+    return undefined;
   }
 
   const body = renderDataviewViewShell(el, key, args.title);
   await MarkdownRenderer.render(plugin.app, block, body, sourcePath ?? "", child);
+  return dataviewRenderExpectation(block);
 }
 
 function readViewArgs(source: string): DataviewViewArgs {
@@ -231,9 +236,10 @@ function replaceDataviewView(el: HTMLElement, rendered: HTMLElement): void {
 function waitForSettledDataviewRender(
   el: HTMLElement,
   isCurrent: () => boolean,
-  timeoutMs: number
+  timeoutMs: number,
+  expectation?: DataviewRenderExpectation
 ): Promise<void> {
-  if (hasSettledDataviewRender(el) || !isCurrent()) return Promise.resolve();
+  if (hasSettledDataviewRender(el, expectation) || !isCurrent()) return Promise.resolve();
 
   return new Promise((resolve) => {
     const timer = window.setTimeout(() => {
@@ -241,7 +247,7 @@ function waitForSettledDataviewRender(
       resolve();
     }, timeoutMs);
     const observer = new MutationObserver(() => {
-      if (!isCurrent() || hasSettledDataviewRender(el)) {
+      if (!isCurrent() || hasSettledDataviewRender(el, expectation)) {
         window.clearTimeout(timer);
         observer.disconnect();
         resolve();
@@ -251,7 +257,7 @@ function waitForSettledDataviewRender(
   });
 }
 
-function hasSettledDataviewRender(el: HTMLElement): boolean {
+function hasSettledDataviewRender(el: HTMLElement, expectation?: DataviewRenderExpectation): boolean {
   const dataview = el.querySelector<HTMLElement>(".block-language-dataview");
   if (!dataview) return false;
 
@@ -261,7 +267,45 @@ function hasSettledDataviewRender(el: HTMLElement): boolean {
   const loadingError = dataview.querySelector<HTMLElement>(".dataview-error")
     ?.textContent
     ?.trim();
-  return loadingError !== "Loading...";
+  if (loadingError) return loadingError !== "Loading...";
+
+  return hasExpectedDataviewHeaders(dataview, expectation);
+}
+
+function dataviewRenderExpectation(block: string): DataviewRenderExpectation {
+  return {
+    headers: extractDataviewHeaders(block)
+  };
+}
+
+function extractDataviewHeaders(block: string): string[] {
+  const tableLine = block
+    .split("\n")
+    .find((line) => /^\s*TABLE\b/i.test(line));
+  if (!tableLine) return [];
+  return Array.from(
+    tableLine.matchAll(/\bAS\s+"((?:\\"|[^"])*)"/g),
+    (match) => normalizeDataviewHeader(match[1].replace(/\\"/g, "\""))
+  );
+}
+
+function hasExpectedDataviewHeaders(dataview: HTMLElement, expectation?: DataviewRenderExpectation): boolean {
+  if (!expectation?.headers.length) return true;
+
+  const actualHeaders = Array.from(dataview.querySelectorAll<HTMLElement>("th"))
+    .map((header) => normalizeDataviewHeaderText(header))
+    .filter((header) => header.length > 0);
+  return expectation.headers.every((header) => actualHeaders.includes(header));
+}
+
+function normalizeDataviewHeaderText(header: HTMLElement): string {
+  const clone = header.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll(".dataview.small-text").forEach((count) => count.remove());
+  return normalizeDataviewHeader(clone.textContent ?? "");
+}
+
+function normalizeDataviewHeader(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
 }
 
 function isDataviewViewKey(key: string): key is DataviewViewKey {
