@@ -51,24 +51,14 @@ export function registerNoteChromeRenderers(plugin: ParaZkPluginContext): void {
   plugin.registerEvent(
     plugin.app.workspace.on("layout-change", () => {
       cleanupDisconnectedNoteChromeControllers();
-      cleanupHiddenNoteChromeForOpenViews(plugin);
-      cleanupStaleNoteChromeForOpenViews(plugin);
       scheduleOpenReadingViewScan(plugin);
     })
   );
   plugin.registerEvent(
-    plugin.app.workspace.on("file-open", () => {
-      cleanupHiddenNoteChromeForOpenViews(plugin);
-      cleanupStaleNoteChromeForOpenViews(plugin);
-      scheduleOpenReadingViewScan(plugin);
-    })
+    plugin.app.workspace.on("file-open", () => scheduleOpenReadingViewScan(plugin))
   );
   plugin.registerEvent(
-    plugin.app.workspace.on("active-leaf-change", () => {
-      cleanupHiddenNoteChromeForOpenViews(plugin);
-      cleanupStaleNoteChromeForOpenViews(plugin);
-      scheduleOpenReadingViewScan(plugin);
-    })
+    plugin.app.workspace.on("active-leaf-change", () => scheduleOpenReadingViewScan(plugin))
   );
   plugin.app.workspace.onLayoutReady(() => scheduleOpenReadingViewScan(plugin));
   plugin.register(() => disposeAllNoteChromeControllers());
@@ -336,16 +326,14 @@ function refreshNoteChromeForPath(path: string): void {
 }
 
 function scheduleOpenReadingViewScan(plugin: ParaZkPluginContext): void {
-  cleanupHiddenNoteChromeForOpenViews(plugin);
-  cleanupStaleNoteChromeForOpenViews(plugin);
+  cleanupNoteChromeForOpenViews(plugin);
   window.setTimeout(() => scanOpenReadingViews(plugin), NOTE_CHROME_INITIAL_ATTACH_DELAY_MS);
   window.setTimeout(() => scanOpenReadingViews(plugin), NOTE_CHROME_INITIAL_ATTACH_DELAY_MS + NOTE_CHROME_ATTACH_RETRY_DELAY_MS);
 }
 
 function scanOpenReadingViews(plugin: ParaZkPluginContext): void {
   cleanupDisconnectedNoteChromeControllers();
-  cleanupHiddenNoteChromeForOpenViews(plugin);
-  cleanupStaleNoteChromeForOpenViews(plugin);
+  cleanupNoteChromeForOpenViews(plugin);
   for (const leaf of plugin.app.workspace.getLeavesOfType("markdown")) {
     if (!(leaf.view instanceof MarkdownView)) continue;
     if (leaf.view.getMode() !== "preview") continue;
@@ -365,23 +353,18 @@ function scanOpenReadingViews(plugin: ParaZkPluginContext): void {
   }
 }
 
-function cleanupHiddenNoteChromeForOpenViews(plugin: ParaZkPluginContext): void {
+function cleanupNoteChromeForOpenViews(plugin: ParaZkPluginContext): void {
   for (const leaf of plugin.app.workspace.getLeavesOfType("markdown")) {
     if (!(leaf.view instanceof MarkdownView)) continue;
     const preview = leaf.view.containerEl.querySelector<HTMLElement>(".markdown-preview-view");
     const container = leaf.view.containerEl.querySelector<HTMLElement>(".markdown-preview-sizer");
-    if (!container || (preview && isVisibleElement(preview))) continue;
-
-    noteChromeControllers.get(container)?.dispose();
-    removeInjectedPanels(container);
-  }
-}
-
-function cleanupStaleNoteChromeForOpenViews(plugin: ParaZkPluginContext): void {
-  for (const leaf of plugin.app.workspace.getLeavesOfType("markdown")) {
-    if (!(leaf.view instanceof MarkdownView)) continue;
-    const container = leaf.view.containerEl.querySelector<HTMLElement>(".markdown-preview-sizer");
     if (!container) continue;
+
+    if (!preview || !isVisibleElement(preview)) {
+      noteChromeControllers.get(container)?.dispose();
+      removeInjectedPanels(container);
+      continue;
+    }
 
     const file = leaf.view.file;
     const sourcePath = file instanceof TFile ? file.path : undefined;
