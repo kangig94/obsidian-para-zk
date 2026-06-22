@@ -47,15 +47,17 @@ describe("wiki-domains SessionStart hook", () => {
     const hooksPath = path.resolve("clients/hooks/hooks.json");
     const config = JSON.parse(readFileSync(hooksPath, "utf8")) as {
       hooks?: {
-        SessionStart?: Array<{ hooks?: Array<{ command?: string }> }>;
+        SessionStart?: Array<{ hooks?: Array<{ command?: string }>; matcher?: string }>;
       };
     };
-    const commands = (config.hooks?.SessionStart ?? [])
+    const entries = config.hooks?.SessionStart ?? [];
+    const commands = entries
       .flatMap((entry) => entry.hooks ?? [])
       .map((hook) => hook.command)
       .filter((command): command is string => typeof command === "string");
 
     expect(commands.filter((command) => command.includes("wiki-domains-hook.mjs"))).toHaveLength(1);
+    expect(entries.map((entry) => entry.matcher)).toEqual(["startup|resume|clear|compact"]);
   });
 
   it("enumerates the same domain set as the wiki-domains workflow (drift guard)", async () => {
