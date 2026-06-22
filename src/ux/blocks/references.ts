@@ -44,10 +44,9 @@ import {
   renderBlockShell,
   renderShellAction
 } from "./shell";
-import { parseCodeBlockKeyValues } from "../code-block-args";
 import { referenceTargetHint, referenceTitle, renderReferenceAnchor } from "../citations/reference-link";
 
-type ReferenceBlockArgs = {
+export type ReferenceBlockArgs = {
   root: "current" | string;
   title?: string;
 };
@@ -55,6 +54,7 @@ type ReferenceBlockArgs = {
 type ReferenceToolbarState = Record<string, never>;
 
 type ReferenceBlockState = RegistryBlockState<ReferenceToolbarState, RenderableReference>;
+type ReferenceBlockContext = Pick<MarkdownPostProcessorContext, "sourcePath">;
 
 type RenderableReference = {
   rootFile: TFile;
@@ -82,27 +82,25 @@ const REFERENCE_GONE_MESSAGE = "reference no longer present — re-render";
 const REFERENCE_RERENDER_DELAY_MS = 120;
 const referenceBlockStates = new WeakMap<HTMLElement, ReferenceBlockState>();
 
-export function registerReferenceRenderers(plugin: ParaZkPluginContext): void {
-  plugin.registerMarkdownCodeBlockProcessor("para-zk-references", (source, el, ctx) => {
-    ctx.addChild(new ReferenceBlockRenderChild(plugin, source, el, ctx));
-  });
-}
-
 // References render from the host note's frontmatter, so a change made outside this
 // block — reference updates / create-resource from the CLI, MCP, or another view — must
 // re-render it; otherwise the list only refreshed when the note was reopened. Mirrors
 // the vault-event subscription the retro-summary and dataview renderers already use.
-class ReferenceBlockRenderChild extends MarkdownRenderChild {
+export class ReferenceBlockRenderChild extends MarkdownRenderChild {
+  private readonly plugin: ParaZkPluginContext;
+  private readonly args: ReferenceBlockArgs;
   private renderTimer: number | undefined;
   private currentSourcePath: string | undefined;
 
   constructor(
-    private readonly plugin: ParaZkPluginContext,
-    private readonly source: string,
+    plugin: ParaZkPluginContext,
+    args: ReferenceBlockArgs,
     containerEl: HTMLElement,
-    ctx: MarkdownPostProcessorContext
+    ctx: ReferenceBlockContext
   ) {
     super(containerEl);
+    this.plugin = plugin;
+    this.args = args;
     this.currentSourcePath = ctx.sourcePath;
   }
 
@@ -138,18 +136,17 @@ class ReferenceBlockRenderChild extends MarkdownRenderChild {
   }
 
   private render(): Promise<void> {
-    return renderReferenceBlock(this.plugin, this.source, this.containerEl, this.currentSourcePath)
+    return renderReferenceBlock(this.plugin, this.args, this.containerEl, this.currentSourcePath)
       .catch((error: unknown) => renderReferenceError(this.containerEl, error));
   }
 }
 
 async function renderReferenceBlock(
   plugin: ParaZkPluginContext,
-  source: string,
+  args: ReferenceBlockArgs,
   el: HTMLElement,
   sourcePath: string | undefined
 ): Promise<void> {
-  const args = parseReferenceBlockArgs(source);
   const blockState = beginReferenceBlockRender(el, args);
   const generation = blockState.generation;
   el.empty();
@@ -183,7 +180,7 @@ async function renderReferenceBlock(
           rootFile,
           () => persistReferenceOrder(plugin, rootFile, renderedLinks, nextLinks)
         ),
-        rerender: () => renderReferenceBlock(plugin, source, el, sourcePath)
+        rerender: () => renderReferenceBlock(plugin, args, el, sourcePath)
       })
       : undefined;
 
@@ -191,7 +188,7 @@ async function renderReferenceBlock(
       rootFile,
       title: args.title,
       items,
-      rerender: () => renderReferenceBlock(plugin, source, el, sourcePath)
+      rerender: () => renderReferenceBlock(plugin, args, el, sourcePath)
     });
 
     if (items.length === 0) {
@@ -205,7 +202,7 @@ async function renderReferenceBlock(
         blockState,
         sourcePath,
         drag,
-        rerender: () => renderReferenceBlock(plugin, source, el, sourcePath)
+        rerender: () => renderReferenceBlock(plugin, args, el, sourcePath)
       });
     }
   } catch (error) {
@@ -509,6 +506,10 @@ function referenceEditValue(reference: ReferenceRead): ReferenceEditValue {
 }
 
 class ReferenceEditModal extends Modal {
+  private readonly plugin: ParaZkPluginContext;
+  private readonly heading: string;
+  private readonly sourcePath: string;
+  private readonly save: (value: ReferenceEditValue) => Promise<void>;
   private value: ReferenceEditValue;
   private saving = false;
   private targetSuggest?: ReferenceTargetSuggest;
@@ -516,14 +517,18 @@ class ReferenceEditModal extends Modal {
   private readonly suppressInitialTargetFocus: boolean;
 
   constructor(
-    private readonly plugin: ParaZkPluginContext,
-    private readonly heading: string,
-    private readonly sourcePath: string,
+    plugin: ParaZkPluginContext,
+    heading: string,
+    sourcePath: string,
     value: ReferenceEditValue,
-    private readonly save: (value: ReferenceEditValue) => Promise<void>,
+    save: (value: ReferenceEditValue) => Promise<void>,
     options: ReferenceEditModalOptions = {}
   ) {
     super(plugin.app);
+    this.plugin = plugin;
+    this.heading = heading;
+    this.sourcePath = sourcePath;
+    this.save = save;
     this.value = {
       ...value,
       prefilledTarget: value.prefilledTarget ?? value.target
@@ -636,12 +641,17 @@ class ReferenceEditModal extends Modal {
 }
 
 class ReferenceTargetSuggest extends AbstractInputSuggest<ReferenceTargetSuggestion> {
+  private readonly plugin: ParaZkPluginContext;
+  private readonly onSelectFile: (file: TFile) => void;
+
   constructor(
-    private readonly plugin: ParaZkPluginContext,
+    plugin: ParaZkPluginContext,
     inputEl: HTMLInputElement,
-    private readonly onSelectFile: (file: TFile) => void
+    onSelectFile: (file: TFile) => void
   ) {
     super(plugin.app, inputEl);
+    this.plugin = plugin;
+    this.onSelectFile = onSelectFile;
     this.limit = 20;
   }
 
@@ -726,12 +736,4 @@ function beginReferenceBlockRender(el: HTMLElement, args: ReferenceBlockArgs): R
 
 function isCurrentReferenceBlockGeneration(el: HTMLElement, generation: number): boolean {
   return isCurrentRegistryBlockGeneration(referenceBlockStates, el, generation);
-}
-
-function parseReferenceBlockArgs(source: string): ReferenceBlockArgs {
-  const raw = parseCodeBlockKeyValues(source);
-  return {
-    root: raw.root?.trim() || "current",
-    title: raw.title?.trim() || undefined
-  };
 }

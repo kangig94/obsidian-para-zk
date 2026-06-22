@@ -8,8 +8,11 @@ import { refreshRegisteredLocaleLabels } from "./locale-labels";
 import { refreshRibbonActions } from "./actions/ribbon";
 
 export class ParaZkSettingTab extends PluginSettingTab {
-  constructor(private readonly plugin: ParaZkPluginContext) {
+  private readonly plugin: ParaZkPluginContext;
+
+  constructor(plugin: ParaZkPluginContext) {
     super(plugin.app, plugin);
+    this.plugin = plugin;
   }
 
   display(): void {

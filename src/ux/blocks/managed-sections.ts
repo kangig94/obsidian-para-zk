@@ -1,19 +1,21 @@
 import {
   MarkdownRenderChild,
-  MarkdownRenderer,
   TFile
 } from "obsidian";
 import type { ParaZkPluginContext } from "../../plugin-interface";
-import { managedUiBlockForType } from "../../templates";
+import {
+  managedUiBlocksForType,
+  type ManagedUiRenderAction,
+  type ManagedUiRenderBlock
+} from "../../templates";
 import { normalizeFrontmatterType, readFrontmatterTypeFromContent } from "../../vault/sections";
+import { renderActionButtons } from "./action";
+import { DataviewViewRenderChild } from "./dataview";
+import { ReferenceBlockRenderChild } from "./references";
 import { applyBlockKind, renderBlockNotice } from "./shell";
+import { TaskBlockRenderChild } from "./tasks";
 
 const MANAGED_PANEL_BUFFER_SETTLE_TIMEOUT_MS = 1000;
-const INLINE_ACTION_BLOCK_SELECTOR = ":scope > .para-zk-block--action";
-const INLINE_ACTION_TARGET_SELECTOR = ".para-zk-block:not(.para-zk-block--action)";
-const BLOCK_ACTIONS_CLASS = "para-zk-block__actions";
-const BLOCK_ACTIONS_SELECTOR = `.${BLOCK_ACTIONS_CLASS}`;
-const BLOCK_TOOLBAR_SELECTOR = ":scope > .para-zk-block__toolbar";
 
 export async function renderManagedPanel(
   plugin: ParaZkPluginContext,
@@ -22,9 +24,11 @@ export async function renderManagedPanel(
   child: MarkdownRenderChild
 ): Promise<void> {
   const type = await resolveManagedType(plugin, sourcePath);
-  const block = type ? managedUiBlockForType(type, plugin.settings) : undefined;
-  const expectedViewCount = countManagedDataviewViews(block);
+  const blocks = type ? managedUiBlocksForType(type, plugin.settings) : undefined;
+  const expectedViewCount = countManagedDataviewViews(blocks);
   const buffer = createManagedPanelBuffer(el);
+
+  resetManagedRenderChild(child);
 
   try {
     if (!type) {
@@ -34,10 +38,9 @@ export async function renderManagedPanel(
     }
 
     applyBlockKind(buffer, `managed-${type}`);
-    if (block) {
-      await MarkdownRenderer.render(plugin.app, block, buffer, sourcePath ?? "", child);
+    if (blocks) {
+      renderManagedBlocks(plugin, buffer, blocks, sourcePath, child);
       await waitForManagedPanelSettled(buffer, expectedViewCount);
-      inlineManagedActionBlocks(buffer);
     }
 
     replaceManagedPanel(el, buffer);
@@ -62,6 +65,83 @@ async function resolveManagedType(
   }
 
   return normalizeFrontmatterType(plugin.app.metadataCache.getFileCache(file)?.frontmatter?.type);
+}
+
+function resetManagedRenderChild(child: MarkdownRenderChild): void {
+  child.unload();
+  child.load();
+}
+
+function renderManagedBlocks(
+  plugin: ParaZkPluginContext,
+  el: HTMLElement,
+  blocks: readonly ManagedUiRenderBlock[],
+  sourcePath: string | undefined,
+  child: MarkdownRenderChild
+): void {
+  let pendingActions: ManagedUiRenderAction[] = [];
+  for (const block of blocks) {
+    if (block.kind === "action") {
+      pendingActions = [...pendingActions, ...block.actions];
+      continue;
+    }
+
+    appendManagedBlockSeparator(el);
+    const blockEl = appendManagedBlockContainer(el, block);
+    renderManagedBlock(plugin, blockEl, block, sourcePath, child, pendingActions);
+    pendingActions = [];
+  }
+}
+
+function renderManagedBlock(
+  plugin: ParaZkPluginContext,
+  el: HTMLElement,
+  block: Exclude<ManagedUiRenderBlock, { kind: "action" }>,
+  sourcePath: string | undefined,
+  child: MarkdownRenderChild,
+  actions: readonly ManagedUiRenderAction[]
+): void {
+  switch (block.kind) {
+    case "tasks":
+      child.addChild(new TaskBlockRenderChild(
+        plugin,
+        { root: "current", title: block.title },
+        el,
+        { sourcePath: sourcePath ?? "" }
+      ));
+      return;
+    case "view":
+      child.addChild(new DataviewViewRenderChild(
+        plugin,
+        el,
+        { key: block.key, title: block.title },
+        sourcePath,
+        actions.length > 0 ? (actionsEl) => renderActionButtons(plugin, actionsEl, actions, sourcePath) : undefined
+      ));
+      return;
+    case "references":
+      child.addChild(new ReferenceBlockRenderChild(
+        plugin,
+        { root: "current", title: block.title },
+        el,
+        { sourcePath: sourcePath ?? "" }
+      ));
+      return;
+  }
+}
+
+function appendManagedBlockSeparator(el: HTMLElement): void {
+  el.appendChild(el.ownerDocument.createElement("hr"));
+}
+
+function appendManagedBlockContainer(
+  el: HTMLElement,
+  block: Exclude<ManagedUiRenderBlock, { kind: "action" }>
+): HTMLElement {
+  const blockEl = el.ownerDocument.createElement("div");
+  blockEl.addClass(`block-language-para-zk-${block.kind}`);
+  el.appendChild(blockEl);
+  return blockEl;
 }
 
 function createManagedPanelBuffer(el: HTMLElement): HTMLElement {
@@ -93,56 +173,8 @@ function replaceManagedPanel(el: HTMLElement, rendered: HTMLElement): void {
   el.replaceChildren(...Array.from(rendered.childNodes));
 }
 
-function inlineManagedActionBlocks(el: HTMLElement): void {
-  for (const actionBlock of Array.from(el.querySelectorAll<HTMLElement>(INLINE_ACTION_BLOCK_SELECTOR))) {
-    const targetBlock = nextInlineActionTarget(actionBlock);
-    if (!targetBlock || !moveActionButtonsIntoToolbar(actionBlock, targetBlock)) continue;
-    removeInlineActionGap(actionBlock, targetBlock);
-    actionBlock.remove();
-  }
-}
-
-function nextInlineActionTarget(actionBlock: HTMLElement): HTMLElement | undefined {
-  for (let node = actionBlock.nextSibling; node; node = node.nextSibling) {
-    if (isManagedBlockSeparatorNode(node)) continue;
-    if (node instanceof HTMLElement && node.matches(INLINE_ACTION_TARGET_SELECTOR)) return node;
-    return undefined;
-  }
-  return undefined;
-}
-
-function moveActionButtonsIntoToolbar(actionBlock: HTMLElement, targetBlock: HTMLElement): boolean {
-  const sourceActions = actionBlock.querySelector<HTMLElement>(BLOCK_ACTIONS_SELECTOR);
-  const targetToolbar = targetBlock.querySelector<HTMLElement>(BLOCK_TOOLBAR_SELECTOR);
-  if (!sourceActions || !targetToolbar || !sourceActions.hasChildNodes()) return false;
-
-  let targetActions = targetToolbar.querySelector<HTMLElement>(`:scope > ${BLOCK_ACTIONS_SELECTOR}`);
-  if (!targetActions) {
-    targetActions = targetToolbar.ownerDocument.createElement("div");
-    targetActions.addClass(BLOCK_ACTIONS_CLASS);
-    targetToolbar.appendChild(targetActions);
-  }
-
-  while (sourceActions.firstChild) targetActions.appendChild(sourceActions.firstChild);
-  return true;
-}
-
-function removeInlineActionGap(left: HTMLElement, right: HTMLElement): void {
-  for (let node = left.nextSibling; node && node !== right;) {
-    const next = node.nextSibling;
-    if (isManagedBlockSeparatorNode(node)) node.remove();
-    node = next;
-  }
-}
-
-function isManagedBlockSeparatorNode(node: ChildNode): boolean {
-  return (node.nodeType === Node.TEXT_NODE && !node.textContent?.trim())
-    || (node instanceof HTMLElement && node.tagName === "HR");
-}
-
-function countManagedDataviewViews(block: string | undefined): number {
-  if (!block) return 0;
-  return Array.from(block.matchAll(/```para-zk-view\b/g)).length;
+function countManagedDataviewViews(blocks: readonly ManagedUiRenderBlock[] | undefined): number {
+  return blocks?.filter((block) => block.kind === "view").length ?? 0;
 }
 
 function waitForManagedPanelSettled(el: HTMLElement, expectedViewCount: number): Promise<void> {

@@ -72,14 +72,18 @@ type RenderedCitation = {
 };
 
 class CitationRenderChild extends MarkdownRenderChild {
+  private readonly plugin: ParaZkPluginContext;
+  private readonly sourcePath: string;
   private readonly citations: RenderedCitation[] = [];
 
   constructor(
-    private readonly plugin: ParaZkPluginContext,
+    plugin: ParaZkPluginContext,
     containerEl: HTMLElement,
-    private readonly sourcePath: string
+    sourcePath: string
   ) {
     super(containerEl);
+    this.plugin = plugin;
+    this.sourcePath = sourcePath;
   }
 
   onload(): void {

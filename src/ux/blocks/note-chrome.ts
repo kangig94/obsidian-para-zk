@@ -6,7 +6,7 @@ import {
 } from "obsidian";
 import type { ParaZkPluginContext } from "../../plugin-interface";
 import { inferPropsViewType } from "../../props/schema";
-import { managedUiBlockForType } from "../../templates";
+import { managedUiBlocksForType } from "../../templates";
 import { normalizeFrontmatterType } from "../../vault/sections";
 import { renderPropsPanel } from "../props-controls";
 import { renderManagedPanel } from "./managed-sections";
@@ -33,13 +33,6 @@ const activeNoteChromeControllers = new Set<NoteChromeController>();
 let openReadingViewScanTimers: number[] = [];
 
 export function registerNoteChromeRenderers(plugin: ParaZkPluginContext): void {
-  plugin.registerMarkdownCodeBlockProcessor("para-zk-props", (_source, el) => {
-    swallowLegacyChromeBlock(el);
-  });
-  plugin.registerMarkdownCodeBlockProcessor("para-zk-managed", (_source, el) => {
-    swallowLegacyChromeBlock(el);
-  });
-
   plugin.registerMarkdownPostProcessor((el, ctx) => renderNoteChrome(plugin, el, ctx));
   plugin.registerEvent(
     plugin.app.metadataCache.on("changed", (file) => {
@@ -70,18 +63,12 @@ export function registerNoteChromeRenderers(plugin: ParaZkPluginContext): void {
   });
 }
 
-function swallowLegacyChromeBlock(el: HTMLElement): void {
-  el.empty();
-  el.remove();
-}
-
 function renderNoteChrome(
   plugin: ParaZkPluginContext,
   el: HTMLElement,
   ctx: MarkdownPostProcessorContext
 ): void {
-  // Skip embedded previews and re-entrant calls from the managed panel's own
-  // MarkdownRenderer.render (its rendered blocks live inside a .para-zk-note-chrome host).
+  // Skip embedded previews and nested renders from managed note chrome.
   if (el.closest(".markdown-embed") || el.closest(".para-zk-note-chrome")) return;
 
   const typeHint = normalizeFrontmatterType(ctx.frontmatter?.type);
@@ -110,13 +97,21 @@ class NoteChromeController {
   private pendingSignature: string | undefined;
   private disposed = false;
   private readonly observer: MutationObserver;
+  private readonly plugin: ParaZkPluginContext;
+  private readonly container: HTMLElement;
+  sourcePath: string;
+  private typeHint: string | undefined;
 
   constructor(
-    private readonly plugin: ParaZkPluginContext,
-    private readonly container: HTMLElement,
-    public sourcePath: string,
-    private typeHint: string | undefined
+    plugin: ParaZkPluginContext,
+    container: HTMLElement,
+    sourcePath: string,
+    typeHint: string | undefined
   ) {
+    this.plugin = plugin;
+    this.container = container;
+    this.sourcePath = sourcePath;
+    this.typeHint = typeHint;
     this.observer = new MutationObserver(() => this.scheduleLayout());
     this.observer.observe(container, { childList: true });
   }
@@ -611,7 +606,7 @@ function isParaZkNote(
   const type = typeHint ?? cachedFrontmatterType(plugin, sourcePath);
   if (!type) return false;
   return inferPropsViewType({ type }) !== undefined
-    || managedUiBlockForType(type, plugin.settings) !== undefined;
+    || managedUiBlocksForType(type, plugin.settings) !== undefined;
 }
 
 function noteChromeSignature(

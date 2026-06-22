@@ -1,6 +1,6 @@
 {
   "name": "obsidian-para-zk",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "description": "Native Obsidian plugin for PARA and Zettelkasten workflows.",
   "type": "module",
   "packageManager": "pnpm@10.20.0",

@@ -374,29 +374,11 @@ function frontmatter(lines: string[]): string {
   ].join("\n");
 }
 
-function paraZkViewBlock(key: DataviewViewKey, title?: string): string {
-  return fenced("para-zk-view", [
-    `key: ${key}`,
-    ...(title ? [`title: ${title}`] : [])
-  ]).join("\n");
-}
-
-function paraZkActionBlock(actions: ReadonlyArray<{ command: string; icon: string; label: string }>): string[] {
-  return fenced("para-zk-action", actions.map((a) => `${a.command}|${a.icon}|${a.label}`));
-}
-
 function paraZkTasksBlock(root: "current" | "all", extra: string[] = [], title?: string): string[] {
   return fenced("para-zk-tasks", [
     `root: ${root}`,
     ...(title ? [`title: ${title}`] : []),
     ...extra
-  ]);
-}
-
-function paraZkReferencesBlock(root: "current", title?: string): string[] {
-  return fenced("para-zk-references", [
-    `root: ${root}`,
-    ...(title ? [`title: ${title}`] : [])
   ]);
 }
 
@@ -420,6 +402,18 @@ type ManagedUiBlockRecipeItem =
   | { kind: "view"; key: DataviewViewKey; label: TemplateLabelKey }
   | { kind: "references"; label: TemplateLabelKey }
   | { kind: "action"; actions: readonly ManagedUiAction[] };
+
+export type ManagedUiRenderAction = {
+  command: string;
+  icon: string;
+  label: string;
+};
+
+export type ManagedUiRenderBlock =
+  | { kind: "tasks"; title: string }
+  | { kind: "view"; key: DataviewViewKey; title: string }
+  | { kind: "references"; title: string }
+  | { kind: "action"; actions: readonly ManagedUiRenderAction[] };
 
 const MANAGED_UI_BLOCK_RECIPES: Record<ManagedUiType, readonly ManagedUiBlockRecipeItem[]> = {
   project: [
@@ -483,11 +477,11 @@ const MANAGED_UI_BLOCK_RECIPES: Record<ManagedUiType, readonly ManagedUiBlockRec
   ]
 };
 
-export function managedUiBlockForType(type: string, settings: ParaZkSettings): string | undefined {
+export function managedUiBlocksForType(type: string, settings: ParaZkSettings): readonly ManagedUiRenderBlock[] | undefined {
   const recipe = managedUiBlockRecipe(type);
   if (!recipe) return undefined;
   const t = localePack(settings.locale);
-  return joinManagedUiBlocks(recipe.map((item) => renderManagedUiBlockRecipeItem(item, t)));
+  return recipe.map((item) => localizeManagedUiBlockRecipeItem(item, t));
 }
 
 function managedUiBlockRecipe(type: string): readonly ManagedUiBlockRecipeItem[] | undefined {
@@ -497,33 +491,23 @@ function managedUiBlockRecipe(type: string): readonly ManagedUiBlockRecipeItem[]
     : undefined;
 }
 
-function renderManagedUiBlockRecipeItem(
+function localizeManagedUiBlockRecipeItem(
   item: ManagedUiBlockRecipeItem,
   t: TemplateLocalePack
-): string | string[] {
+): ManagedUiRenderBlock {
   switch (item.kind) {
     case "tasks":
-      return paraZkTasksBlock("current", [], t.labels[item.label]);
+      return { kind: "tasks", title: t.labels[item.label] };
     case "view":
-      return paraZkViewBlock(item.key, t.labels[item.label]);
+      return { kind: "view", key: item.key, title: t.labels[item.label] };
     case "references":
-      return paraZkReferencesBlock("current", t.labels[item.label]);
+      return { kind: "references", title: t.labels[item.label] };
     case "action":
-      return paraZkActionBlock(item.actions.map((a) => ({ command: a.command, icon: a.icon, label: t.labels[a.label] })));
+      return {
+        kind: "action",
+        actions: item.actions.map((a) => ({ command: a.command, icon: a.icon, label: t.labels[a.label] }))
+      };
   }
-}
-
-function managedUiLines(body: string | string[]): string[] {
-  return Array.isArray(body) ? body : body.split(/\r?\n/);
-}
-
-function joinManagedUiBlocks(blocks: Array<string | string[]>): string {
-  const lines: string[] = ["", "---"];
-  for (const [index, block] of blocks.entries()) {
-    if (index > 0) lines.push("", "---");
-    lines.push(...managedUiLines(block));
-  }
-  return [...lines, ""].join("\n");
 }
 
 function dataviewProjectRetros(t: ReturnType<typeof localePack>, sourcePath?: string): string[] {
@@ -665,9 +649,8 @@ const DATAVIEW_VIEW_RENDERERS: Record<DataviewViewKey, DataviewViewRenderer> = {
 };
 
 /**
- * Returns the fenced Dataview block for a named view, so notes can embed a
- * compact `para-zk-view` token instead of the full query. The query (and its
- * localized column labels) stays in code; the renderer expands it at view time.
+ * Returns the native Dataview block for a named managed view. The query and
+ * localized column labels stay in code while managed UI renders the view by key.
  */
 export function dataviewViewBlock(key: string, settings: ParaZkSettings, sourcePath?: string): string | undefined {
   const renderer = dataviewViewRenderer(key);

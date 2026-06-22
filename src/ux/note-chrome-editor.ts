@@ -21,7 +21,7 @@ import {
 } from "obsidian";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { inferPropsViewType } from "../props/schema";
-import { managedUiBlockForType } from "../templates";
+import { managedUiBlocksForType } from "../templates";
 import {
   normalizeFrontmatterType,
   readFrontmatterTypeFromContent,
@@ -43,14 +43,20 @@ const refreshNoteChrome = StateEffect.define<null>();
 
 export function createNoteChromeEditorExtension(plugin: ParaZkPluginContext): Extension {
   class NoteChromeWidget extends WidgetType {
+    private readonly kind: NoteChromeWidgetKind;
+    private readonly sourcePath: string;
+    private readonly signature: string;
     private child: NoteChromeWidgetRenderChild | undefined;
 
     constructor(
-      private readonly kind: NoteChromeWidgetKind,
-      private readonly sourcePath: string,
-      private readonly signature: string
+      kind: NoteChromeWidgetKind,
+      sourcePath: string,
+      signature: string
     ) {
       super();
+      this.kind = kind;
+      this.sourcePath = sourcePath;
+      this.signature = signature;
     }
 
     eq(widget: WidgetType): boolean {
@@ -149,10 +155,12 @@ export function createNoteChromeEditorExtension(plugin: ParaZkPluginContext): Ex
   // editor recreations.
   const externalRefresh = ViewPlugin.fromClass(
     class {
+      private readonly view: EditorView;
       private readonly metadataChangeRef: EventRef;
       private readonly renameRef: EventRef;
 
-      constructor(private readonly view: EditorView) {
+      constructor(view: EditorView) {
+        this.view = view;
         this.metadataChangeRef = plugin.app.metadataCache.on("changed", (file) => this.onExternalChange(file.path));
         this.renameRef = plugin.app.vault.on("rename", (file, oldPath) => {
           if (file instanceof TFile) this.onRename(file, oldPath);
@@ -208,7 +216,7 @@ function cachedFrontmatterType(plugin: ParaZkPluginContext, file: TFile): string
 function isParaZkType(plugin: ParaZkPluginContext, type: string | undefined): boolean {
   if (!type) return false;
   return inferPropsViewType({ type }) !== undefined
-    || managedUiBlockForType(type, plugin.settings) !== undefined;
+    || managedUiBlocksForType(type, plugin.settings) !== undefined;
 }
 
 function noteChromeSignature(plugin: ParaZkPluginContext, file: TFile, type: string | undefined): string {

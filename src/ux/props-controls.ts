@@ -878,12 +878,17 @@ function areaSuggestions(plugin: ParaZkPluginContext): AreaSuggestion[] {
 }
 
 class AreaSuggestModal extends SuggestModal<AreaSuggestion> {
+  private readonly areas: AreaSuggestion[];
+  private readonly choose: (area: AreaSuggestion) => Promise<void>;
+
   constructor(
     app: App,
-    private readonly areas: AreaSuggestion[],
-    private readonly choose: (area: AreaSuggestion) => Promise<void>
+    areas: AreaSuggestion[],
+    choose: (area: AreaSuggestion) => Promise<void>
   ) {
     super(app);
+    this.areas = areas;
+    this.choose = choose;
     this.setPlaceholder("Area");
   }
 

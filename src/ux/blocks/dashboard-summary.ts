@@ -39,14 +39,18 @@ export function registerDashboardSummaryRenderers(plugin: ParaZkPluginContext): 
 // counts, and `renderDashboardSummary` is synchronous so no generation guard is needed.
 // Mirrors the reference / retro-summary renderers' subscription.
 class DashboardSummaryRenderChild extends MarkdownRenderChild {
+  private readonly plugin: ParaZkPluginContext;
+  private readonly source: string;
   private renderTimer: number | undefined;
 
   constructor(
-    private readonly plugin: ParaZkPluginContext,
-    private readonly source: string,
+    plugin: ParaZkPluginContext,
+    source: string,
     containerEl: HTMLElement
   ) {
     super(containerEl);
+    this.plugin = plugin;
+    this.source = source;
   }
 
   onload(): void {

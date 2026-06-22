@@ -24,17 +24,19 @@ export function registerLatestRetroSummaryRenderers(plugin: ParaZkPluginContext)
 }
 
 class LatestRetroSummaryRenderChild extends MarkdownRenderChild {
+  private readonly plugin: ParaZkPluginContext;
   private renderTimer: number | undefined;
   private renderGeneration = 0;
   private unloaded = true;
   private currentSourcePath: string | undefined;
 
   constructor(
-    private readonly plugin: ParaZkPluginContext,
+    plugin: ParaZkPluginContext,
     containerEl: HTMLElement,
     sourcePath: string | undefined
   ) {
     super(containerEl);
+    this.plugin = plugin;
     this.currentSourcePath = sourcePath;
   }
 

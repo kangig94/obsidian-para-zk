@@ -34,13 +34,15 @@ type CitationSuggestion =
 // in normal prose). Picking a reference inserts `` `PZ[<id>]` `` and leaves the cursor just
 // before the `]`; typing `#` there switches to suggesting the reference's headings/blocks.
 export class CitationSuggest extends EditorSuggest<CitationSuggestion> {
+  private readonly plugin: ParaZkPluginContext;
   private readonly suggestionIndexes = new Map<ReferenceRead, number>();
   // NOTE: not `trigger` — EditorSuggest's base class owns a `trigger()` method; shadowing
   // it with a field breaks the whole suggester (Obsidian calls `.trigger()` internally).
   private activeTrigger: CitationTrigger | null = null;
 
-  constructor(private readonly plugin: ParaZkPluginContext) {
+  constructor(plugin: ParaZkPluginContext) {
     super(plugin.app);
+    this.plugin = plugin;
   }
 
   onTrigger(cursor: EditorPosition, editor: Editor, file: TFile | null): EditorSuggestTriggerInfo | null {

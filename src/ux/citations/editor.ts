@@ -21,14 +21,20 @@ import { buildCitationElement, resolveReferences } from "./renderer";
 // (Mirrors the removed inline-actions.ts pattern: ViewPlugin + replace widget.)
 export function createCitationEditorExtension(plugin: ParaZkPluginContext): Extension {
   class CitationWidget extends WidgetType {
+    private readonly keys: CitationKey[];
+    private readonly references: ReferenceRead[];
+    private readonly sourcePath: string;
     private readonly referenceSignature: string;
 
     constructor(
-      private readonly keys: CitationKey[],
-      private readonly references: ReferenceRead[],
-      private readonly sourcePath: string
+      keys: CitationKey[],
+      references: ReferenceRead[],
+      sourcePath: string
     ) {
       super();
+      this.keys = keys;
+      this.references = references;
+      this.sourcePath = sourcePath;
       this.referenceSignature = citationReferenceSignature(references);
     }
 

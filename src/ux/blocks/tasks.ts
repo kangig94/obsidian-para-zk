@@ -49,7 +49,7 @@ import {
   renderShellSelect
 } from "./shell";
 
-type TaskBlockArgs = {
+export type TaskBlockArgs = {
   root: "current" | "all";
   title?: string;
   checkbox?: "open" | "done" | string;
@@ -87,11 +87,12 @@ type TaskMetaChip = {
   label: string;
 };
 
+type TaskBlockContext = Pick<MarkdownPostProcessorContext, "sourcePath">;
 type TaskEditValue = Pick<TaskRead, "name" | "priority" | "due" | "scheduled" | "start">;
 type RenderTaskRowOptions = {
   blockState: TaskBlockState;
-  source: string;
-  ctx: MarkdownPostProcessorContext;
+  args: TaskBlockArgs;
+  ctx: TaskBlockContext;
   el: HTMLElement;
   showRoot: boolean;
   drag?: RegistryDragOptions;
@@ -109,23 +110,29 @@ const taskBlockStates = new WeakMap<HTMLElement, TaskBlockState>();
 
 export function registerTaskRenderers(plugin: ParaZkPluginContext): void {
   plugin.registerMarkdownCodeBlockProcessor("para-zk-tasks", (source, el, ctx) => {
-    ctx.addChild(new TaskBlockRenderChild(plugin, source, el, ctx));
+    ctx.addChild(new TaskBlockRenderChild(plugin, parseTaskBlockArgs(source), el, ctx));
   });
 }
 
 // A task block open in another tab went stale until reopened. Task data lives in the
 // tasks-folder shards (and a "current" block also depends on its own note), so refresh on
 // vault changes there, debounced. Mirrors the reference/retro-summary renderers' subscription.
-class TaskBlockRenderChild extends MarkdownRenderChild {
+export class TaskBlockRenderChild extends MarkdownRenderChild {
+  private readonly plugin: ParaZkPluginContext;
+  private readonly args: TaskBlockArgs;
+  private readonly ctx: TaskBlockContext;
   private renderTimer: number | undefined;
 
   constructor(
-    private readonly plugin: ParaZkPluginContext,
-    private readonly source: string,
+    plugin: ParaZkPluginContext,
+    args: TaskBlockArgs,
     containerEl: HTMLElement,
-    private readonly ctx: MarkdownPostProcessorContext
+    ctx: TaskBlockContext
   ) {
     super(containerEl);
+    this.plugin = plugin;
+    this.args = args;
+    this.ctx = ctx;
   }
 
   onload(): void {
@@ -171,18 +178,17 @@ class TaskBlockRenderChild extends MarkdownRenderChild {
     // A checkbox toggle holds an optimistic UI until its own reconcile re-render fires; skip the
     // vault-driven refresh while that is pending so it does not clobber the optimistic state.
     if (taskBlockStates.get(this.containerEl)?.pendingCheckboxTimer !== undefined) return Promise.resolve();
-    return renderTaskBlock(this.plugin, this.source, this.containerEl, this.ctx)
+    return renderTaskBlock(this.plugin, this.args, this.containerEl, this.ctx)
       .catch((error: unknown) => renderTaskError(this.containerEl, error));
   }
 }
 
 async function renderTaskBlock(
   plugin: ParaZkPluginContext,
-  source: string,
+  args: TaskBlockArgs,
   el: HTMLElement,
-  ctx: MarkdownPostProcessorContext
+  ctx: TaskBlockContext
 ): Promise<void> {
-  const args = parseTaskBlockArgs(source);
   const blockState = beginTaskBlockRender(el, args);
   if (args.root === "all" && blockState.toolbar.order === "manual") blockState.toolbar.order = "smart";
   const generation = blockState.generation;
@@ -219,10 +225,10 @@ async function renderTaskBlock(
         rootFile,
         () => reorderRootTasks(workflowContext(plugin), rootFile, nextIds)
       ),
-      rerender: () => renderTaskBlock(plugin, source, el, ctx)
+      rerender: () => renderTaskBlock(plugin, args, el, ctx)
     }) : undefined;
 
-    const body = renderTaskShell(plugin, el, source, ctx, {
+    const body = renderTaskShell(plugin, el, args, ctx, {
       args,
       rootFile,
       items,
@@ -239,12 +245,12 @@ async function renderTaskBlock(
     for (const item of visible) {
       renderTaskRow(plugin, list, item, {
         blockState,
-        source,
+        args,
         ctx,
         el,
         showRoot: args.root === "all",
         drag,
-        rerender: () => renderTaskBlock(plugin, source, el, ctx)
+        rerender: () => renderTaskBlock(plugin, args, el, ctx)
       });
     }
   } catch (error) {
@@ -255,8 +261,8 @@ async function renderTaskBlock(
 function renderTaskShell(
   plugin: ParaZkPluginContext,
   el: HTMLElement,
-  source: string,
-  ctx: MarkdownPostProcessorContext,
+  args: TaskBlockArgs,
+  ctx: TaskBlockContext,
   options: {
     args: TaskBlockArgs;
     rootFile?: TFile;
@@ -278,7 +284,7 @@ function renderTaskShell(
         options: taskOrderOptions(labels, options.args.root === "current"),
         onChange: (value) => {
           options.blockState.toolbar.order = value;
-          void renderTaskBlock(plugin, source, el, ctx);
+          void renderTaskBlock(plugin, args, el, ctx);
         }
       });
       renderShellSelect(actions, {
@@ -287,7 +293,7 @@ function renderTaskShell(
         options: taskStatusOptions(labels),
         onChange: (value) => {
           options.blockState.toolbar.status = value;
-          void renderTaskBlock(plugin, source, el, ctx);
+          void renderTaskBlock(plugin, args, el, ctx);
         }
       });
       renderShellSelect(actions, {
@@ -296,7 +302,7 @@ function renderTaskShell(
         options: taskPriorityOptions(labels),
         onChange: (value) => {
           options.blockState.toolbar.priority = value;
-          void renderTaskBlock(plugin, source, el, ctx);
+          void renderTaskBlock(plugin, args, el, ctx);
         }
       });
 
@@ -318,7 +324,7 @@ function renderTaskShell(
               );
               if (!name) return;
               await queueRootTaskWrite(rootFile, () => insertRootTask(workflowContext(plugin), rootFile, { name }));
-              await renderTaskBlock(plugin, source, el, ctx);
+              await renderTaskBlock(plugin, args, el, ctx);
             });
           }
         });
@@ -446,7 +452,7 @@ function renderTaskCheckbox(row: HTMLElement, context: TaskRowRenderContext): vo
           ) {
             scheduleCheckboxReconcile(
               plugin,
-              options.source,
+              options.args,
               options.el,
               options.ctx,
               options.blockState,
@@ -458,13 +464,13 @@ function renderTaskCheckbox(row: HTMLElement, context: TaskRowRenderContext): vo
 
         if (!options.el.isConnected) return;
         if (!isCurrentTaskBlockGeneration(options.el, clickGeneration)) {
-          await renderTaskBlock(plugin, options.source, options.el, options.ctx);
+          await renderTaskBlock(plugin, options.args, options.el, options.ctx);
           return;
         }
         if (options.blockState.checkboxMutationSerial !== mutationSerial) return;
         scheduleCheckboxReconcile(
           plugin,
-          options.source,
+          options.args,
           options.el,
           options.ctx,
           options.blockState,
@@ -548,15 +554,19 @@ function renderTaskError(el: HTMLElement, error: unknown): void {
 }
 
 class TaskEditModal extends Modal {
+  private readonly plugin: ParaZkPluginContext;
+  private readonly save: (value: TaskEditValue) => Promise<void>;
   private value: TaskEditValue;
   private saving = false;
 
   constructor(
-    private readonly plugin: ParaZkPluginContext,
+    plugin: ParaZkPluginContext,
     task: TaskRead,
-    private readonly save: (value: TaskEditValue) => Promise<void>
+    save: (value: TaskEditValue) => Promise<void>
   ) {
     super(plugin.app);
+    this.plugin = plugin;
+    this.save = save;
     this.value = {
       name: task.name,
       priority: task.priority,
@@ -686,9 +696,9 @@ function isCurrentTaskBlockGeneration(el: HTMLElement, generation: number): bool
 
 function scheduleCheckboxReconcile(
   plugin: ParaZkPluginContext,
-  source: string,
+  args: TaskBlockArgs,
   el: HTMLElement,
-  ctx: MarkdownPostProcessorContext,
+  ctx: TaskBlockContext,
   state: TaskBlockState,
   generation: number
 ): void {
@@ -697,7 +707,7 @@ function scheduleCheckboxReconcile(
     state.pendingCheckboxTimer = undefined;
     if (!el.isConnected) return;
     if (!isCurrentTaskBlockGeneration(el, generation)) return;
-    void renderTaskBlock(plugin, source, el, ctx);
+    void renderTaskBlock(plugin, args, el, ctx);
   }, CHECKBOX_RECONCILE_DELAY_MS);
 }
 

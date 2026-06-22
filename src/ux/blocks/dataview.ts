@@ -1,8 +1,7 @@
 import {
   MarkdownRenderChild,
   MarkdownRenderer,
-  TFile,
-  type MarkdownPostProcessorContext
+  TFile
 } from "obsidian";
 import type { ParaZkPluginContext } from "../../plugin-interface";
 import { DATAVIEW_VIEW_KEYS, dataviewViewBlock, type DataviewViewKey } from "../../templates";
@@ -10,12 +9,13 @@ import {
   renderBlockNotice,
   renderBlockShell
 } from "./shell";
-import { parseCodeBlockKeyValues } from "../code-block-args";
 
-type DataviewViewArgs = {
+export type DataviewViewArgs = {
   key: string;
   title?: string;
 };
+
+type DataviewViewActionRenderer = (actions: HTMLElement) => void;
 
 type DataviewRenderOptions = {
   bufferInitial?: boolean;
@@ -30,29 +30,27 @@ const DATAVIEW_CHANGE_RERENDER_DELAY_MS = 300;
 const DATAVIEW_BUFFER_SETTLE_TIMEOUT_MS = 2500;
 const DATAVIEW_INITIAL_BUFFER_SETTLE_TIMEOUT_MS = 700;
 
-// Renders a compact `para-zk-view` block by expanding its view key into a
-// managed Dataview query. The source path is passed so the query's `this.file`
-// resolves to the host note.
-export function registerDataviewViewRenderers(plugin: ParaZkPluginContext): void {
-  plugin.registerMarkdownCodeBlockProcessor("para-zk-view", (source, el, ctx) => {
-    ctx.addChild(new DataviewViewRenderChild(plugin, el, readViewArgs(source), ctx.sourcePath));
-  });
-}
-
-class DataviewViewRenderChild extends MarkdownRenderChild {
+export class DataviewViewRenderChild extends MarkdownRenderChild {
+  private readonly plugin: ParaZkPluginContext;
+  private readonly args: DataviewViewArgs;
+  private readonly renderActions?: DataviewViewActionRenderer;
   private renderTimer: number | undefined;
   private renderGeneration = 0;
   private unloaded = true;
   private currentSourcePath: string | undefined;
 
   constructor(
-    private readonly plugin: ParaZkPluginContext,
+    plugin: ParaZkPluginContext,
     containerEl: HTMLElement,
-    private readonly args: DataviewViewArgs,
-    sourcePath: MarkdownPostProcessorContext["sourcePath"]
+    args: DataviewViewArgs,
+    sourcePath: string | undefined,
+    renderActions?: DataviewViewActionRenderer
   ) {
     super(containerEl);
+    this.plugin = plugin;
+    this.args = args;
     this.currentSourcePath = sourcePath;
+    this.renderActions = renderActions;
   }
 
   onload(): void {
@@ -97,6 +95,7 @@ class DataviewViewRenderChild extends MarkdownRenderChild {
       this.currentSourcePath,
       this,
       () => this.isCurrentRender(generation),
+      this.renderActions,
       options
     )
       .catch((error: unknown) => {
@@ -116,25 +115,26 @@ async function renderDataviewView(
   sourcePath: string | undefined,
   child: MarkdownRenderChild,
   isCurrent: () => boolean,
+  renderActions?: DataviewViewActionRenderer,
   options: DataviewRenderOptions = {}
 ): Promise<void> {
   if (!isCurrent()) return;
   if (options.preserveCurrent && hasSettledDataviewRender(el)) {
-    await renderDataviewViewBuffered(plugin, args, el, sourcePath, child, isCurrent, {
+    await renderDataviewViewBuffered(plugin, args, el, sourcePath, child, isCurrent, renderActions, {
       replaceUnsettled: false,
       timeoutMs: DATAVIEW_BUFFER_SETTLE_TIMEOUT_MS
     });
     return;
   }
   if (options.bufferInitial) {
-    await renderDataviewViewBuffered(plugin, args, el, sourcePath, child, isCurrent, {
+    await renderDataviewViewBuffered(plugin, args, el, sourcePath, child, isCurrent, renderActions, {
       replaceUnsettled: true,
       timeoutMs: DATAVIEW_INITIAL_BUFFER_SETTLE_TIMEOUT_MS
     });
     return;
   }
 
-  await renderDataviewViewInto(plugin, args, el, sourcePath, child);
+  await renderDataviewViewInto(plugin, args, el, sourcePath, child, renderActions);
   if (!isCurrent()) return;
 }
 
@@ -145,6 +145,7 @@ async function renderDataviewViewBuffered(
   sourcePath: string | undefined,
   child: MarkdownRenderChild,
   isCurrent: () => boolean,
+  renderActions: DataviewViewActionRenderer | undefined,
   options: { replaceUnsettled: boolean; timeoutMs: number }
 ): Promise<void> {
   const buffer = el.ownerDocument.createElement("div");
@@ -159,7 +160,7 @@ async function renderDataviewViewBuffered(
   el.after(buffer);
 
   try {
-    const expectation = await renderDataviewViewInto(plugin, args, buffer, sourcePath, child);
+    const expectation = await renderDataviewViewInto(plugin, args, buffer, sourcePath, child, renderActions);
     await waitForSettledDataviewRender(buffer, isCurrent, options.timeoutMs, expectation);
     if (!isCurrent()) return;
     if (!hasSettledDataviewRender(buffer, expectation) && !options.replaceUnsettled) return;
@@ -174,7 +175,8 @@ async function renderDataviewViewInto(
   args: DataviewViewArgs,
   el: HTMLElement,
   sourcePath: string | undefined,
-  child: MarkdownRenderChild
+  child: MarkdownRenderChild,
+  renderActions?: DataviewViewActionRenderer
 ): Promise<DataviewRenderExpectation | undefined> {
   const key = args.key;
 
@@ -190,17 +192,9 @@ async function renderDataviewViewInto(
     return undefined;
   }
 
-  const body = renderDataviewViewShell(el, key, args.title);
+  const body = renderDataviewViewShell(el, key, args.title, renderActions);
   await MarkdownRenderer.render(plugin.app, block, body, sourcePath ?? "", child);
   return dataviewRenderExpectation(block);
-}
-
-function readViewArgs(source: string): DataviewViewArgs {
-  const raw = parseCodeBlockKeyValues(source);
-  return {
-    key: raw.key?.trim() ?? "",
-    title: raw.title?.trim() || undefined
-  };
 }
 
 function renderDataviewViewError(el: HTMLElement, error: unknown): void {
@@ -210,12 +204,14 @@ function renderDataviewViewError(el: HTMLElement, error: unknown): void {
 function renderDataviewViewShell(
   el: HTMLElement,
   rawKey: string,
-  title?: string
+  title?: string,
+  renderActions?: DataviewViewActionRenderer
 ): HTMLElement {
   const titleText = title?.trim();
   return renderBlockShell(el, {
     kind: viewBlockKind(rawKey),
-    title: titleText
+    title: titleText,
+    renderActions
   }).body;
 }
 

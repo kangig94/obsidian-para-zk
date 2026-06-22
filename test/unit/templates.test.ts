@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dataviewViewBlock, managedUiBlockForType, renderTemplate, TEMPLATE_NAMES } from "../../src/templates";
+import { dataviewViewBlock, managedUiBlocksForType, renderTemplate, TEMPLATE_NAMES } from "../../src/templates";
 import { DEFAULT_SETTINGS } from "../../src/types";
 
 describe("managed templates", () => {
@@ -87,62 +87,69 @@ describe("managed templates", () => {
   });
 
   it("expands managed UI blocks for each note type", () => {
-    const project = managedUiBlockForType("project", DEFAULT_SETTINGS) ?? "";
-    const area = managedUiBlockForType("area", DEFAULT_SETTINGS) ?? "";
-    const resource = managedUiBlockForType("resource", DEFAULT_SETTINGS) ?? "";
-    const llmWiki = managedUiBlockForType("llm-wiki", DEFAULT_SETTINGS) ?? "";
-    const journal = managedUiBlockForType("journal", DEFAULT_SETTINGS) ?? "";
-    const spark = managedUiBlockForType("spark", DEFAULT_SETTINGS) ?? "";
-    const source = managedUiBlockForType("digest", DEFAULT_SETTINGS) ?? "";
-    const permanent = managedUiBlockForType("permanent", DEFAULT_SETTINGS) ?? "";
+    const project = managedUiBlocksForType("project", DEFAULT_SETTINGS) ?? [];
+    const area = managedUiBlocksForType("area", DEFAULT_SETTINGS) ?? [];
+    const resource = managedUiBlocksForType("resource", DEFAULT_SETTINGS) ?? [];
+    const llmWiki = managedUiBlocksForType("llm-wiki", DEFAULT_SETTINGS) ?? [];
+    const journal = managedUiBlocksForType("journal", DEFAULT_SETTINGS) ?? [];
+    const spark = managedUiBlocksForType("spark", DEFAULT_SETTINGS) ?? [];
+    const source = managedUiBlocksForType("digest", DEFAULT_SETTINGS) ?? [];
+    const permanent = managedUiBlocksForType("permanent", DEFAULT_SETTINGS) ?? [];
 
-    expect(project).not.toContain("para-zk-latest-retro-summary");
-    expect(project).toMatch(/^\n---\n```para-zk-tasks/);
-    expect(project).not.toContain("# Tasks");
-    expect(project).toContain("title: Tasks");
-    expect(project).toContain("create-subnote|file-plus|Create subnote");
-    expect(project).toContain("project-subnotes");
-    expect(project).toContain("title: Subnotes");
-    expect(project).toContain("create-retro|calendar-plus|Create retro");
-    expect(project).toContain("project-retros");
-    expect(project).toContain("key: cited-by");
-    expect(project).toContain("```para-zk-action");
-    expect(area).toContain("area-projects");
-    expect(area).toContain("title: Projects dashboard");
-    expect(area).toContain("create-subarea|folder-plus|Create subarea");
-    expect(area).toContain("area-subareas");
-    expect(area).toContain("create-subnote|file-plus|Create subnote");
-    expect(area).toContain("area-subnotes");
-    expect(area).toContain("create-retro|calendar-plus|Create retro");
-    expect(area).toContain("area-retros");
-    expect(area).toContain("key: cited-by");
-    expect(resource).toContain("create-from-resource|arrow-up-right|Create ZK");
-    expect(resource).toContain("key: cited-by");
-    expect(resource).toContain("title: Cited by");
-    expect(llmWiki).toContain("key: cited-by");
-    expect(llmWiki).toContain("title: Cited by");
-    expect(llmWiki).toContain("para-zk-references");
-    expect(llmWiki).toContain("title: References");
-    expect(journal).toContain("para-zk-tasks");
-    expect(journal).toContain("key: cited-by");
-    expect(managedUiBlockForType("retro", DEFAULT_SETTINGS)).toBeUndefined();
-    expect(spark).toContain("discard-spark|trash-2|Discard");
-    expect(spark).toContain("distill-spark|arrow-up-right|Distill to Permanent");
-    expect(spark).toContain("spark-distill");
-    expect(spark).toContain("```para-zk-action");
-    expect(spark).not.toContain("key: cited-by");
-    expect(source).toContain("create-from-digest|arrow-up-right|Create permanent");
-    expect(source).toContain("key: cited-by");
-    expect(source).toContain("para-zk-references");
-    expect(permanent).toContain("key: cited-by");
-    expect(permanent).toContain("title: Cited by");
-    const subnote = managedUiBlockForType("subnote", DEFAULT_SETTINGS) ?? "";
-    expect(subnote).toContain("key: cited-by");
-    expect(subnote).toContain("para-zk-references");
-    expect(subnote).toContain("title: References");
-    expect(subnote).not.toContain("para-zk-tasks");
+    expect(project).toEqual([
+      { kind: "tasks", title: "Tasks" },
+      { kind: "action", actions: [{ command: "create-subnote", icon: "file-plus", label: "Create subnote" }] },
+      { kind: "view", key: "project-subnotes", title: "Subnotes" },
+      { kind: "action", actions: [{ command: "create-retro", icon: "calendar-plus", label: "Create retro" }] },
+      { kind: "view", key: "project-retros", title: "Retros" },
+      { kind: "view", key: "cited-by", title: "Cited by" },
+      { kind: "references", title: "References" }
+    ]);
+    expect(area).toContainEqual({ kind: "view", key: "area-projects", title: "Projects dashboard" });
+    expect(area).toContainEqual({ kind: "action", actions: [{ command: "create-subarea", icon: "folder-plus", label: "Create subarea" }] });
+    expect(area).toContainEqual({ kind: "view", key: "area-subareas", title: "Subareas" });
+    expect(area).toContainEqual({ kind: "action", actions: [{ command: "create-subnote", icon: "file-plus", label: "Create subnote" }] });
+    expect(area).toContainEqual({ kind: "view", key: "area-subnotes", title: "Subnotes" });
+    expect(area).toContainEqual({ kind: "action", actions: [{ command: "create-retro", icon: "calendar-plus", label: "Create retro" }] });
+    expect(area).toContainEqual({ kind: "view", key: "area-retros", title: "Retros" });
+    expect(area).toContainEqual({ kind: "view", key: "cited-by", title: "Cited by" });
+    expect(resource).toEqual([
+      { kind: "action", actions: [{ command: "create-from-resource", icon: "arrow-up-right", label: "Create ZK" }] },
+      { kind: "view", key: "cited-by", title: "Cited by" },
+      { kind: "references", title: "References" }
+    ]);
+    expect(llmWiki).toEqual([
+      { kind: "view", key: "cited-by", title: "Cited by" },
+      { kind: "references", title: "References" }
+    ]);
+    expect(journal).toContainEqual({ kind: "tasks", title: "Tasks" });
+    expect(journal).toContainEqual({ kind: "view", key: "cited-by", title: "Cited by" });
+    expect(managedUiBlocksForType("retro", DEFAULT_SETTINGS)).toBeUndefined();
+    expect(spark).toEqual([
+      {
+        kind: "action",
+        actions: [
+          { command: "discard-spark", icon: "trash-2", label: "Discard" },
+          { command: "distill-spark", icon: "arrow-up-right", label: "Distill to Permanent" }
+        ]
+      },
+      { kind: "view", key: "spark-distill", title: "Created from this" },
+      { kind: "references", title: "References" }
+    ]);
+    expect(source).toContainEqual({ kind: "action", actions: [{ command: "create-from-digest", icon: "arrow-up-right", label: "Create permanent" }] });
+    expect(source).toContainEqual({ kind: "view", key: "cited-by", title: "Cited by" });
+    expect(source).toContainEqual({ kind: "references", title: "References" });
+    expect(permanent).toEqual([
+      { kind: "view", key: "cited-by", title: "Cited by" },
+      { kind: "references", title: "References" }
+    ]);
+    const subnote = managedUiBlocksForType("subnote", DEFAULT_SETTINGS) ?? [];
+    expect(subnote).toEqual([
+      { kind: "view", key: "cited-by", title: "Cited by" },
+      { kind: "references", title: "References" }
+    ]);
 
-    for (const content of [project, area, resource, llmWiki, journal, spark, source, permanent, subnote]) {
+    for (const content of [project, area, resource, llmWiki, journal, spark, source, permanent, subnote].map(JSON.stringify)) {
       expect(content).not.toContain("resource-cited-by");
       expect(content).not.toContain("llm-wiki-cited-by");
       expect(content).not.toContain("permanent-cited-by");

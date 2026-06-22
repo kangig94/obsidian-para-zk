@@ -7,9 +7,7 @@ import { registerCitationRenderers } from "./ux/citations/renderer";
 import { CitationSuggest } from "./ux/citations/suggest";
 import { registerAutoTemplate } from "./ux/actions/auto-template";
 import { registerDashboardActionRenderers } from "./ux/actions/dashboard";
-import { registerActionBlockRenderers } from "./ux/blocks/action";
 import { registerDashboardSummaryRenderers } from "./ux/blocks/dashboard-summary";
-import { registerDataviewViewRenderers } from "./ux/blocks/dataview";
 import { registerEditorWidthControl } from "./ux/editor-width";
 import { registerExplorerActions } from "./ux/actions/explorer";
 import { registerLatestRetroSummaryRenderers } from "./ux/blocks/latest-retro-summary";
@@ -19,7 +17,6 @@ import { createNoteChromeEditorExtension } from "./ux/note-chrome-editor";
 import { registerPropsControlRenderers } from "./ux/props-controls";
 import { registerRibbonActions } from "./ux/actions/ribbon";
 import { ParaZkSettingTab } from "./ux/settings";
-import { registerReferenceRenderers } from "./ux/blocks/references";
 import { registerTaskRenderers } from "./ux/blocks/tasks";
 import {
   registerStatusAndInitCommands,
@@ -39,13 +36,10 @@ export default class ParaZkPlugin extends Plugin {
     registerAutoTemplate(this);
     registerExplorerActions(this);
     registerDashboardActionRenderers(this);
-    registerActionBlockRenderers(this);
     registerDashboardSummaryRenderers(this);
-    registerDataviewViewRenderers(this);
     registerLatestRetroSummaryRenderers(this);
     registerPropsControlRenderers(this);
     registerTaskRenderers(this);
-    registerReferenceRenderers(this);
     registerCitationRenderers(this);
     this.registerEditorExtension(createCitationEditorExtension(this));
     registerNoteChromeRenderers(this);

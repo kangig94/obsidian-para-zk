@@ -64,13 +64,15 @@ export function promptSetupOptions(
 }
 
 class ResolvingModal<T> extends Modal {
+  private readonly resolve: (value: T | null) => void;
   private done = false;
 
   constructor(
     app: App,
-    private readonly resolve: (value: T | null) => void
+    resolve: (value: T | null) => void
   ) {
     super(app);
+    this.resolve = resolve;
   }
 
   onClose(): void {
@@ -92,16 +94,27 @@ class ResolvingModal<T> extends Modal {
 }
 
 class TextPromptModal extends ResolvingModal<string> {
+  private readonly titleText: string;
+  private readonly placeholder: string;
+  private readonly initialValue: string;
+  private readonly confirmLabel: string;
+  private readonly cancelLabel: string;
+
   constructor(
     app: App,
-    private readonly titleText: string,
-    private readonly placeholder: string,
-    private readonly initialValue: string,
-    private readonly confirmLabel: string,
-    private readonly cancelLabel: string,
+    titleText: string,
+    placeholder: string,
+    initialValue: string,
+    confirmLabel: string,
+    cancelLabel: string,
     resolve: (value: string | null) => void
   ) {
     super(app, resolve);
+    this.titleText = titleText;
+    this.placeholder = placeholder;
+    this.initialValue = initialValue;
+    this.confirmLabel = confirmLabel;
+    this.cancelLabel = cancelLabel;
   }
 
   onOpen(): void {
@@ -219,19 +232,31 @@ class SetupOptionsModal extends ResolvingModal<SetupPromptOptions> {
 }
 
 class DistillPromptModal extends ResolvingModal<DistillPromptResult> {
+  private readonly titleText: string;
+  private readonly placeholder: string;
+  private readonly initialValue: string;
+  private readonly discardToggleLabel: string;
+  private readonly confirmLabel: string;
+  private readonly cancelLabel: string;
   private discard = false;
 
   constructor(
     app: App,
-    private readonly titleText: string,
-    private readonly placeholder: string,
-    private readonly initialValue: string,
-    private readonly discardToggleLabel: string,
-    private readonly confirmLabel: string,
-    private readonly cancelLabel: string,
+    titleText: string,
+    placeholder: string,
+    initialValue: string,
+    discardToggleLabel: string,
+    confirmLabel: string,
+    cancelLabel: string,
     resolve: (value: DistillPromptResult | null) => void
   ) {
     super(app, resolve);
+    this.titleText = titleText;
+    this.placeholder = placeholder;
+    this.initialValue = initialValue;
+    this.discardToggleLabel = discardToggleLabel;
+    this.confirmLabel = confirmLabel;
+    this.cancelLabel = cancelLabel;
   }
 
   onOpen(): void {
@@ -276,15 +301,24 @@ class DistillPromptModal extends ResolvingModal<DistillPromptResult> {
 }
 
 class ConfirmModal extends ResolvingModal<boolean> {
+  private readonly titleText: string;
+  private readonly message: string;
+  private readonly confirmLabel: string;
+  private readonly cancelLabel: string;
+
   constructor(
     app: App,
-    private readonly titleText: string,
-    private readonly message: string,
-    private readonly confirmLabel: string,
-    private readonly cancelLabel: string,
+    titleText: string,
+    message: string,
+    confirmLabel: string,
+    cancelLabel: string,
     resolve: (value: boolean | null) => void
   ) {
     super(app, resolve);
+    this.titleText = titleText;
+    this.message = message;
+    this.confirmLabel = confirmLabel;
+    this.cancelLabel = cancelLabel;
   }
 
   onOpen(): void {
@@ -304,13 +338,18 @@ class ConfirmModal extends ResolvingModal<boolean> {
 }
 
 class ChoiceModal extends ResolvingModal<string> {
+  private readonly titleText: string;
+  private readonly choices: Array<{ label: string; value: string }>;
+
   constructor(
     app: App,
-    private readonly titleText: string,
-    private readonly choices: Array<{ label: string; value: string }>,
+    titleText: string,
+    choices: Array<{ label: string; value: string }>,
     resolve: (value: string | null) => void
   ) {
     super(app, resolve);
+    this.titleText = titleText;
+    this.choices = choices;
   }
 
   onOpen(): void {
