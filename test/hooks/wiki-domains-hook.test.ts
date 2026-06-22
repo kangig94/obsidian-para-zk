@@ -44,6 +44,10 @@ function writeRegistry(root: string, vaultPaths: string[]): string {
 
 describe("wiki-domains SessionStart hook", () => {
   it("registers the SessionStart context hook once", () => {
+    const claudeManifestPath = path.resolve("clients/.claude-plugin/plugin.json");
+    const claudeManifest = JSON.parse(readFileSync(claudeManifestPath, "utf8")) as { hooks?: unknown };
+    expect(claudeManifest.hooks).toBeUndefined();
+
     const hooksPath = path.resolve("clients/hooks/hooks.json");
     const config = JSON.parse(readFileSync(hooksPath, "utf8")) as {
       hooks?: {
