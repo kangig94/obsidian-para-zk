@@ -98,6 +98,30 @@ describe("MCP update arg builder", () => {
     ]);
   });
 
+  it("passes archived selectors through for child updates under project/area roots", () => {
+    expect(buildUpdateArgs({
+      tool: "set",
+      params: {
+        type: "project",
+        title: "Alpha",
+        archived: true,
+        child: ["Plan"],
+        key: "body",
+        content: "Archived plan"
+      }
+    })).toEqual([
+      "para-zk:update-child",
+      "root_type=project",
+      "root_title=Alpha",
+      "archived=true",
+      "title=Plan",
+      "key=body",
+      "op=set",
+      "value=Archived plan",
+      "format=json"
+    ]);
+  });
+
   it("passes a qualified subfolder child title through to update-child", () => {
     expect(buildUpdateArgs({
       tool: "set",

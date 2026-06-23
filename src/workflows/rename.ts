@@ -51,10 +51,14 @@ export async function renameLlmWiki(ctx: WorkflowContext, options: RenameLlmWiki
   if (newTitleSegments.length > 1) {
     throw new Error("new_title for rename-llm-wiki must be a bare basename (use optsidian rename/move to change the folder).");
   }
+  const newTitle = newTitleSegments[0];
+  if (newTitle.toLowerCase() === "index" && newTitle !== "index") {
+    throw new Error('llm-wiki domain hub must be named "index" exactly; use new_title=index');
+  }
   return renameFlatNote(
     ctx,
     await resolveRequiredLlmWiki(ctx, options),
-    newTitleSegments[0],
+    newTitle,
     "llm-wiki"
   );
 }

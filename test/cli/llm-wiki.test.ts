@@ -170,6 +170,24 @@ describe("llm-wiki CLI adapters", () => {
     expect(cli.app.readPath("LLM-Wiki/AI/Policy Wiki.md")).toBeUndefined();
   });
 
+  it("rejects case variants of the reserved index hub name on rename", async () => {
+    await cli.run("para-zk:create-llm-wiki", {
+      title: "AI/Case Rename",
+      body: "Concept.",
+      open: "false"
+    });
+
+    const renamed = await cli.run("para-zk:rename-llm-wiki", {
+      title: "AI/Case Rename",
+      new_title: "Index"
+    });
+
+    expect(renamed.ok).toBe(false);
+    expect(String(renamed.error)).toContain('domain hub must be named "index" exactly');
+    expect(cli.app.readPath("LLM-Wiki/AI/Case Rename.md")).toBeDefined();
+    expect(cli.app.readPath("LLM-Wiki/AI/Index.md")).toBeUndefined();
+  });
+
   it("updates aliases and references, then reads references and backlinks collections", async () => {
     await cli.run("para-zk:create-resource", { title: "Canonical Source", open: "false" });
     await cli.run("para-zk:create-llm-wiki", {

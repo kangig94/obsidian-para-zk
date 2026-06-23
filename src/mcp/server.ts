@@ -224,9 +224,7 @@ function childUpdateSelectorArgs(type: UpdateType, params: UpdateParams, child: 
   if (type !== "project" && type !== "area") {
     throw new Error("child updates require type=project or type=area");
   }
-  if (readOptionalBoolean(params, "archived") !== undefined) {
-    throw new Error("child updates do not support archived selector; address an active project or root area");
-  }
+  const archived = readOptionalBoolean(params, "archived");
   const title = readOptionalString(params, "title");
   if (!title) throw new Error(`${type} requires a title selector`);
   const target = child.at(-1);
@@ -237,6 +235,7 @@ function childUpdateSelectorArgs(type: UpdateType, params: UpdateParams, child: 
     `root_type=${type}`,
     `root_title=${title}`
   ];
+  if (archived !== undefined) args.push(`archived=${archived ? "true" : "false"}`);
   if (relpath.length > 0) args.push(`relpath=${JSON.stringify(relpath)}`);
   args.push(`title=${target}`);
   return args;
