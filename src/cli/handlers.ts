@@ -1412,22 +1412,21 @@ function withCreateInputs(surface: SurfaceDescription): SurfaceDescription {
 // The CLI adapter is desktop-only — handlers are never registered on mobile (the host
 // injects registerCliHandler only on desktop) — so it may use Node. It is loaded lazily,
 // never at the top level, so the plugin bundle carries no eager Node require and still
-// loads on Obsidian mobile (iPad/Android). Obsidian desktop (Electron) resolves Node
-// modules via window.require; a plain import() does NOT work there (the renderer tries to
-// fetch the specifier as a URL), so prefer window.require and fall back to a dynamic
-// import only off-Electron (e.g. the Node test runner).
-function loadNodeModule<T>(id: string): Promise<T> {
-  const electronRequire = (globalThis as { window?: { require?: (id: string) => unknown } }).window?.require;
-  if (typeof electronRequire === "function") return Promise.resolve(electronRequire(id) as T);
-  return import(id) as Promise<T>;
+// loads on Obsidian mobile (iPad/Android).
+function electronRequire(id: string): unknown | undefined {
+  if (typeof window === "undefined") return undefined;
+  const requireFn = window.require;
+  return typeof requireFn === "function" ? requireFn(id) : undefined;
 }
 
 function nodeFs(): Promise<typeof import("node:fs/promises")> {
-  return loadNodeModule("node:fs/promises");
+  return Promise.resolve(electronRequire("node:fs/promises") as typeof import("node:fs/promises") | undefined)
+    .then((module) => module ?? import("node:fs/promises"));
 }
 
 function nodePath(): Promise<typeof import("node:path")> {
-  return loadNodeModule("node:path");
+  return Promise.resolve(electronRequire("node:path") as typeof import("node:path") | undefined)
+    .then((module) => module ?? import("node:path"));
 }
 
 // Create body and update value may carry large markdown; an @file value is read from

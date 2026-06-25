@@ -147,12 +147,9 @@ function appendManagedBlockContainer(
 function createManagedPanelBuffer(el: HTMLElement): HTMLElement {
   const buffer = el.ownerDocument.createElement("div");
   buffer.addClass("para-zk-managed-buffer");
-  buffer.style.position = "absolute";
-  buffer.style.left = "-100000px";
-  buffer.style.top = "0";
-  buffer.style.width = `${Math.max(1, Math.round(el.getBoundingClientRect().width))}px`;
-  buffer.style.pointerEvents = "none";
-  buffer.style.opacity = "0";
+  buffer.setCssProps({
+    "--para-zk-buffer-width": `${Math.max(1, Math.round(el.getBoundingClientRect().width))}px`
+  });
   buffer.contentEditable = "false";
   buffer.setAttribute("contenteditable", "false");
   buffer.setAttribute("aria-hidden", "true");
@@ -163,7 +160,7 @@ function createManagedPanelBuffer(el: HTMLElement): HTMLElement {
 }
 
 function replaceManagedPanel(el: HTMLElement, rendered: HTMLElement): void {
-  el.style.removeProperty("display");
+  el.removeClass("para-zk-hidden");
   for (const className of Array.from(el.classList)) {
     if (className === "para-zk-block" || className.startsWith("para-zk-block--")) {
       el.removeClass(className);

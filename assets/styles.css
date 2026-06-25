@@ -13,6 +13,20 @@
   cursor: pointer;
 }
 
+.para-zk-hidden {
+  display: none;
+}
+
+.para-zk-view-buffer,
+.para-zk-managed-buffer {
+  left: -100000px;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  width: var(--para-zk-buffer-width, 1px);
+}
+
 .para-zk-width-slider {
   align-items: center;
   display: flex;

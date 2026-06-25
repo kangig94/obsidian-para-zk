@@ -20,7 +20,9 @@ export class ParaZkSettingTab extends PluginSettingTab {
     const labels = localePack(this.plugin.settings.locale).labels;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "PARA-ZK" });
+    new Setting(containerEl)
+      .setName("PARA-ZK")
+      .setHeading();
     containerEl.createEl("p", {
       cls: "para-zk-setting-note",
       text: labels.settingsNote

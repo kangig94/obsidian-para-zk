@@ -192,7 +192,7 @@ class NoteChromeController {
     const managedEl = this.ensureManagedEl();
     propsEl.dataset.paraZkSourcePath = this.sourcePath;
     managedEl.dataset.paraZkSourcePath = this.sourcePath;
-    if (!managedEl.hasChildNodes()) managedEl.style.display = "none";
+    if (!managedEl.hasChildNodes()) managedEl.addClass("para-zk-hidden");
     this.ensureLayout();
 
     const generation = ++this.renderGeneration;
@@ -205,7 +205,7 @@ class NoteChromeController {
       })
       .catch((error: unknown) => {
         if (this.isCurrentRender(generation)) {
-          managedEl.style.removeProperty("display");
+          managedEl.removeClass("para-zk-hidden");
           renderBlockNotice(managedEl, "managed", error instanceof Error ? error.message : String(error));
           this.schedulePreviewChromeRefresh();
         }

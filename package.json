@@ -1,7 +1,7 @@
 {
   "name": "obsidian-para-zk",
   "version": "0.1.2",
-  "description": "PARA, Zettelkasten, and LLM-Wiki workflows for Obsidian, with MCP/CLI access for Claude Code, Codex, and other clients.",
+  "description": "PARA, Zettelkasten, and LLM-Wiki workflows with MCP/CLI access for Claude Code, Codex, and other clients.",
   "type": "module",
   "packageManager": "pnpm@10.20.0",
   "engines": {
@@ -37,7 +37,7 @@
     "@types/node": "^25.9.1",
     "esbuild": "^0.28.0",
     "knip": "^6.15.0",
-    "obsidian": "^1.12.3",
+    "obsidian": "1.12.3",
     "typescript": "^6.0.3",
     "vitest": "^4.1.8",
     "yaml": "^2.9.0"

@@ -150,12 +150,9 @@ async function renderDataviewViewBuffered(
 ): Promise<void> {
   const buffer = el.ownerDocument.createElement("div");
   buffer.addClass("para-zk-view-buffer");
-  buffer.style.position = "absolute";
-  buffer.style.left = "-100000px";
-  buffer.style.top = "0";
-  buffer.style.width = `${Math.max(1, Math.round(el.getBoundingClientRect().width))}px`;
-  buffer.style.pointerEvents = "none";
-  buffer.style.opacity = "0";
+  buffer.setCssProps({
+    "--para-zk-buffer-width": `${Math.max(1, Math.round(el.getBoundingClientRect().width))}px`
+  });
   buffer.setAttribute("aria-hidden", "true");
   el.after(buffer);
 
