@@ -2,5 +2,5 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": ["src/main.ts", "src/mcp/server.ts", "tools/*.mjs"],
   "project": ["src/**/*.ts"],
-  "ignoreBinaries": ["quartz"]
+  "ignoreBinaries": ["quartz", "python3"]
 }
