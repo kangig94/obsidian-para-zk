@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { buildRoster, renderContext } from "../../clients/hooks/wiki-domains-hook.mjs";
+import { buildRoster, renderContext, resolveCliCommand } from "../../clients/hooks/para-zk-context-hook.mjs";
 import { wikiDomains } from "../../src/workflows";
 import { createTestContext } from "../harness/vault";
 
@@ -42,7 +42,7 @@ function writeRegistry(root: string, vaultPaths: string[]): string {
   return registry;
 }
 
-describe("wiki-domains SessionStart hook", () => {
+describe("para-zk context SessionStart hook", () => {
   it("registers the SessionStart context hook once", () => {
     const claudeManifestPath = path.resolve("clients/.claude-plugin/plugin.json");
     const claudeManifest = JSON.parse(readFileSync(claudeManifestPath, "utf8")) as { hooks?: unknown };
@@ -60,7 +60,7 @@ describe("wiki-domains SessionStart hook", () => {
       .map((hook) => hook.command)
       .filter((command): command is string => typeof command === "string");
 
-    expect(commands.filter((command) => command.includes("wiki-domains-hook.mjs"))).toHaveLength(1);
+    expect(commands.filter((command) => command.includes("para-zk-context-hook.mjs"))).toHaveLength(1);
     expect(entries.map((entry) => entry.matcher)).toEqual(["startup|resume|clear|compact"]);
   });
 
@@ -129,12 +129,19 @@ describe("wiki-domains SessionStart hook", () => {
     expect(roster.map((vault) => vault.name)).toEqual(["VaultA"]);
   });
 
-  it("skips a para-zk vault whose wiki has no domain folders", () => {
+  it("keeps a para-zk vault even when its wiki has no domain folders", () => {
     const root = tempRoot();
     const flat = makeVault(root, "Flat", { pages: ["floating"] }); // only a flat page
     const empty = makeVault(root, "Empty", { pages: [] }); // no LLM-Wiki content
 
-    expect(buildRoster(writeRegistry(root, [flat, empty]))).toEqual([]);
+    const roster = buildRoster(writeRegistry(root, [flat, empty])).map((vault) => ({
+      name: vault.name,
+      domains: vault.domains
+    }));
+    expect(roster).toEqual([
+      { name: "Flat", domains: [] },
+      { name: "Empty", domains: [] }
+    ]);
   });
 
   it("does not treat a markdown-less subfolder as a domain", () => {
@@ -185,14 +192,65 @@ describe("wiki-domains SessionStart hook", () => {
     }
   });
 
+  it("uses optsidian only when it is installed on PATH", () => {
+    const root = tempRoot();
+    const bin = path.join(root, "bin");
+    mkdirSync(bin, { recursive: true });
+
+    expect(resolveCliCommand({ PATH: bin })).toBe("obsidian");
+
+    const optsidian = path.join(bin, "optsidian");
+    writeFileSync(optsidian, "#!/bin/sh\n");
+    chmodSync(optsidian, 0o755);
+
+    expect(resolveCliCommand({ PATH: bin })).toBe("optsidian");
+  });
+
   it("renders a context block with domains, vault-path, the CLI recipe, and guardrails", () => {
-    const block = renderContext([{ name: "VaultA", vaultPath: "/v/VaultA", domains: ["ai", "robotics"] }]);
-    expect(block).toContain("<para-zk-wiki>");
+    const block = renderContext([{ name: "VaultA", vaultPath: "/v/VaultA", domains: ["ai", "robotics"] }], "optsidian");
+    expect(block).toContain("<para-zk>");
     expect(block).toContain('Vault "VaultA" (vault-path=/v/VaultA)');
     expect(block).toContain("ai, robotics");
     expect(block).toContain("never read vault files by raw path");
     expect(block).toContain('para-zk:read-llm-wiki title="<domain>/index"');
     expect(block).toContain("optsidian open-gui vault-path=<vault-path>");
-    expect(renderContext([])).toContain("<para-zk-wiki>"); // safe to call with an empty roster
+    expect(block).toContain("optsidian para-zk:conventions");
+    expect(block).toContain("optsidian para-zk:describe");
+    expect(block).toContain("Prefer PARA-ZK `para-zk:*` commands");
+    expect(block).toContain("over generic `optsidian` commands");
+    expect(block).toContain("Sandbox note:");
+    expect(block).toContain("optsidian CLI still runs inside the current sandbox");
+    expect(block).toContain("mcp__optsidian__command_run");
+    expect(block).toContain("command_run");
+    expect(block).not.toContain("Search note:");
+    expect(renderContext([], "optsidian")).toContain("<para-zk>"); // safe to call with an empty roster
+  });
+
+  it("renders para-zk convention and describe guidance for a vault without wiki domains", () => {
+    const block = renderContext([{ name: "Empty", vaultPath: "/v/Empty", domains: [] }], "optsidian");
+    expect(block).toContain('Vault "Empty" (vault-path=/v/Empty) — no LLM-Wiki domains detected.');
+    expect(block).toContain("when the user asks you to work in a PARA-ZK vault above");
+    expect(block).toContain("optsidian para-zk:conventions");
+    expect(block).toContain("optsidian para-zk:describe");
+  });
+
+  it("renders obsidian commands when optsidian is not selected", () => {
+    const block = renderContext([{ name: "VaultA", vaultPath: "/v/VaultA", domains: ["ai"] }], "obsidian");
+    expect(block).toContain("Search note: optsidian is not installed.");
+    expect(block).toContain("https://github.com/kangig94/optsidian");
+    expect(block).toContain("obsidian open-gui vault-path=<vault-path>");
+    expect(block).toContain("obsidian para-zk:conventions");
+    expect(block).toContain("obsidian para-zk:describe");
+    expect(block).toContain('obsidian para-zk:read-llm-wiki title="<domain>/index"');
+    expect(block).not.toContain("optsidian open-gui");
+  });
+
+  it("renders sandbox recovery guidance", () => {
+    const block = renderContext([{ name: "VaultA", vaultPath: "/v/VaultA", domains: ["ai"] }], "obsidian");
+    expect(block).toContain("Sandbox note:");
+    expect(block).toContain("outside the current sandbox");
+    expect(block).toContain("available optsidian MCP command runner");
+    expect(block).toContain("mcp__optsidian__command_run");
+    expect(block).toContain("command_run");
   });
 });

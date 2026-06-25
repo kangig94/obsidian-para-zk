@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "test -f \"${CLAUDE_PLUGIN_ROOT}/hooks/wiki-domains-hook.mjs\" || exit 0; node \"${CLAUDE_PLUGIN_ROOT}/hooks/wiki-domains-hook.mjs\"",
+            "command": "test -f \"${CLAUDE_PLUGIN_ROOT}/hooks/para-zk-context-hook.mjs\" || exit 0; node \"${CLAUDE_PLUGIN_ROOT}/hooks/para-zk-context-hook.mjs\"",
             "timeout": 10
           }
         ]
