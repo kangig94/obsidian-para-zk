@@ -796,7 +796,8 @@ export async function writeFrontmatterValue(
       // a rendered subnote only has its own file path. Keep this direct write isolated here
       // until the core grows a path selector for child-note updates.
       await plugin.app.fileManager.processFrontMatter(file, (frontmatter) => {
-        frontmatter[key] = value;
+        const target = frontmatter as Record<string, unknown>;
+        target[key] = value;
       });
       return;
     }

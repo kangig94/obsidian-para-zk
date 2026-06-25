@@ -311,7 +311,7 @@ function dateDay(value: unknown): number {
     if (!Number.isNaN(date.getTime())) return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
   }
 
-  if (typeof value === "object" && value !== null && "toMillis" in value && typeof value.toMillis === "function") {
+  if (hasToMillis(value)) {
     return dateDay(value.toMillis());
   }
 
@@ -322,6 +322,11 @@ function dateDay(value: unknown): number {
   const parsed = new Date(text);
   if (Number.isNaN(parsed.getTime())) return Number.NaN;
   return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()).getTime();
+}
+
+function hasToMillis(value: unknown): value is { toMillis: () => unknown } {
+  const candidate = value as { toMillis?: unknown } | null;
+  return typeof candidate?.toMillis === "function";
 }
 
 function startOfToday(): number {

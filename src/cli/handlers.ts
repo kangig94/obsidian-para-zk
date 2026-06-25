@@ -132,6 +132,26 @@ type AttachedFile = {
   embed: string;
 };
 
+type NodeDirent = {
+  name: string;
+  isFile(): boolean;
+  isDirectory(): boolean;
+};
+
+type NodeFsPromises = {
+  readFile(path: string, encoding: "utf8"): Promise<string>;
+  readFile(path: string): Promise<Uint8Array>;
+  readdir(path: string, options: { withFileTypes: true }): Promise<NodeDirent[]>;
+  stat(path: string): Promise<{
+    isFile(): boolean;
+    isDirectory(): boolean;
+  }>;
+};
+
+type NodePath = {
+  join(...paths: string[]): string;
+};
+
 type WorkflowFunctionName =
   | "auditVault"
   | "captureJournal"
@@ -1419,14 +1439,21 @@ function electronRequire(id: string): unknown {
   return typeof requireFn === "function" ? requireFn(id) : undefined;
 }
 
-function nodeFs(): Promise<typeof import("node:fs/promises")> {
-  return Promise.resolve(electronRequire("node:fs/promises") as typeof import("node:fs/promises") | undefined)
-    .then((module) => module ?? import("node:fs/promises"));
+function nodeFs(): Promise<NodeFsPromises> {
+  return Promise.resolve(nodeModule<NodeFsPromises>("node:fs/promises"));
 }
 
-function nodePath(): Promise<typeof import("node:path")> {
-  return Promise.resolve(electronRequire("node:path") as typeof import("node:path") | undefined)
-    .then((module) => module ?? import("node:path"));
+function nodePath(): Promise<NodePath> {
+  return Promise.resolve(nodeModule<NodePath>("node:path"));
+}
+
+function nodeModule<T>(id: string): T {
+  const electronModule = electronRequire(id);
+  if (electronModule !== undefined) return electronModule as T;
+  const getBuiltinModule = typeof process === "undefined" ? undefined : process.getBuiltinModule;
+  const module = typeof getBuiltinModule === "function" ? getBuiltinModule(id) : undefined;
+  if (module === undefined) throw new Error(`Node module unavailable: ${id}`);
+  return module as T;
 }
 
 // Create body and update value may carry large markdown; an @file value is read from

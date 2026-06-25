@@ -25,7 +25,7 @@ export class ParaZkSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     new Setting(containerEl)
-      .setName("PARA-ZK")
+      .setName(labels.settingsHeading)
       .setHeading();
     containerEl.createEl("p", {
       cls: "para-zk-setting-note",

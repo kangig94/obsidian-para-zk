@@ -6,6 +6,7 @@ import {
 } from "obsidian";
 import type { ParaZkPluginContext } from "../../plugin-interface";
 import { inferPropsViewType } from "../../props/schema";
+import { isRecord } from "../../records";
 import { managedUiBlocksForType } from "../../templates";
 import { normalizeFrontmatterType } from "../../vault/sections";
 import { renderPropsPanel } from "../props-controls";
@@ -71,7 +72,8 @@ function renderNoteChrome(
   // Skip embedded previews and nested renders from managed note chrome.
   if (isNestedNoteChromeRender(el)) return;
 
-  const typeHint = normalizeFrontmatterType(ctx.frontmatter?.type);
+  const frontmatter: unknown = ctx.frontmatter;
+  const typeHint = normalizeFrontmatterType(isRecord(frontmatter) ? frontmatter.type : undefined);
   if (!isParaZkNote(plugin, ctx.sourcePath, typeHint)) return;
 
   // At post-processor time Obsidian may still hold the section in a detached fragment.

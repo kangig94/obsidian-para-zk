@@ -73,12 +73,16 @@ function checkSourcePatterns() {
   const result = [];
   const sourceRules = [
     {
-      pattern: /\bimport\s+[^;]*["']node:(?:child_process|url)["']/,
+      pattern: /\bimport\s+[^;]*["']node:[^"']+["']/,
       message: "avoid static Node builtin imports that the review lint flags"
     },
     {
-      pattern: /\bimport\s+[^;]*["'](?:child_process|url)["']/,
+      pattern: /\bimport\s+[^;]*["'](?:child_process|fs\/promises|path|url)["']/,
       message: "avoid static Node builtin imports that the review lint flags"
+    },
+    {
+      pattern: /\b(?:typeof\s+)?import\(\s*["']node:[^"']+["']\s*\)/,
+      message: "avoid Node builtin import() or typeof import() references in plugin source"
     },
     {
       pattern: /\bimport\(\s*(?!["'`])/,
@@ -153,6 +157,10 @@ function checkSourcePatterns() {
 
     if (/\.vault\.(?:delete|trash)\s*\(/.test(text) || /\bVault\.(?:delete|trash)\s*\(/.test(text)) {
       result.push(`${rel}: use fileManager.trashFile() instead of Vault.delete()/Vault.trash()`);
+    }
+
+    if (rel === "src/ux/settings.ts" && /\.setName\(\s*["'][^"']*para[- ]?zk[^"']*["']\s*\)\s*[\r\n\s.]*setHeading\s*\(/i.test(text)) {
+      result.push(`${rel}: settings headings must not include the plugin name`);
     }
   }
 
