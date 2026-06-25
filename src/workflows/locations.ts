@@ -50,7 +50,7 @@ function folderStyleNoteInFolder(
 // (stopping below the managed root), so a note in any organizational subfolder of a project — or in a
 // nested sub-area — is parented to the closest enclosing folder note, at any depth. Returns undefined
 // when no folder-note ancestor exists below the root.
-function nearestSubnoteParent(ctx: WorkflowContext, folder: string, excludedPath: string): TFile | undefined {
+export function nearestSubnoteParent(ctx: WorkflowContext, folder: string, excludedPath: string): TFile | undefined {
   let current = normalizeVaultPath(folder);
   while (isManagedSubnoteFolder(current)) {
     const note = folderStyleNoteInFolder(ctx, current, excludedPath);

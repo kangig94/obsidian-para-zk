@@ -12,8 +12,8 @@ import { workflowContext } from "../../src/vault/host";
 import type { WorkflowContext } from "../../src/workflows";
 import { TAbstractFile, TFile, TFolder } from "../mocks/obsidian";
 
-type VaultEventName = "create";
-type VaultEventCallback = (file: TAbstractFile) => unknown;
+type VaultEventName = "create" | "rename";
+type VaultEventCallback = (file: TAbstractFile, oldPath?: string) => unknown;
 
 function parentPath(path: string): string {
   const index = path.lastIndexOf("/");
@@ -132,6 +132,7 @@ export class MockApp {
       const oldPath = file.path;
       this.relocate(oldPath, newPath);
       this.rewriteLinksAfterRename(oldPath, newPath);
+      this.emitVaultEvent("rename", file, oldPath);
     },
     trashFile: async (file: TAbstractFile): Promise<void> => {
       await this.vault.trash(file, false);
@@ -219,12 +220,12 @@ export class MockApp {
     return file;
   }
 
-  private emitVaultEvent(name: VaultEventName, file: TAbstractFile): void {
+  private emitVaultEvent(name: VaultEventName, file: TAbstractFile, oldPath?: string): void {
     const listeners = this.vaultEventListeners.get(name);
     if (!listeners) return;
     for (const listener of listeners) {
       try {
-        const result = listener(file);
+        const result = listener(file, oldPath);
         if (isPromiseLike(result)) {
           this.pendingVaultEvents.push(result.catch(() => {}));
         }
