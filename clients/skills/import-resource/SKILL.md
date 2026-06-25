@@ -55,20 +55,33 @@ and the bibliography.
 **When you work from a PDF, convert it with `marker` — always, for any PDF.** You cannot know
 a PDF's math, tables, or figures until you open it, and `marker` recovers LaTeX equations,
 Markdown tables, and figure images (saved as files) far better than plain-text extraction or
-OCR. Resolve the tool once: if `marker_single` is on PATH, use it; else if `uv` is present, run
-`uv tool install marker-pdf`; else with only `python3`, bootstrap `uv` (or `python -m venv` +
-`pip install marker-pdf`). The install is one-time but heavy (Torch + models, several GB, first
-run a few minutes) — say so before starting. If your runtime sandboxes shell commands, relax it
-for the install and the run: the model download (network) and marker's GPU access are blocked
+OCR. Prefer the bundled script via `uv run --with marker-pdf ...`; this guarantees marker and
+progress support for that run. If `marker_single` is already on PATH, plain
+`python3 scripts/marker_pdf_convert.py ...` can reuse that installed marker environment. Only
+install marker persistently (`uv tool install marker-pdf`, or venv + `pip install marker-pdf`)
+when repeated runs need it. The install/cache is heavy (Torch + models, several GB, first run a
+few minutes) — say so before starting. If your runtime sandboxes shell commands, relax it for
+the install/cache and the run: the model download (network) and marker's GPU access are blocked
 otherwise, and a resulting "no GPU" or blocked-network error means the sandbox, not a real
 absence. Only if there is no Python at all, fall back to
 poppler: `pdftotext -layout` for text, and `pdftoppm -png -r 200 -f<page> -l<page> -x -y -W -H`
 to crop each figure (find the box from `pdftotext -bbox` — the figure sits between the preceding
 paragraph's last line and the `Figure N:` caption).
 
-Run `marker_single <file.pdf> --output_dir <dir> --output_format markdown`; it writes the
-Markdown plus the figure images. Treat that as a **draft, not the final note**: in step 5 fix
-marker's residual glitches (an occasional garbled caption clause, an equation number left
+Run the bundled converter script first:
+`uv run --with marker-pdf python scripts/marker_pdf_convert.py <file.pdf>`
+(or `python3 scripts/marker_pdf_convert.py ...` when `marker_single` is already installed).
+Arguments: omit `--output_dir` to let the script choose a temp directory, pass
+`--output_dir <dir>` to choose one, pass `--page-range <range>` to convert selected pages, and
+use `--chunk-size <n>` only when needed. Keep marker on its local defaults; do not use marker's
+LLM mode by default because this skill reviews and cleans the Markdown after conversion. The
+script prints the save directory, marker/tqdm progress, and device/runtime guidance on stderr,
+with a short text result on stdout (`Markdown:`, `Mode:`, `Scope:`, `Pages:`, `Device:`). If
+stdout says `Device: cpu`, warn the user that PDF conversion will be very slow (10 pages can
+exceed 10 minutes) and ask whether to continue, use a GPU-visible runtime, or narrow the page
+range. If the script is unavailable, run `marker_single` directly and handle page ranges
+manually. Treat the Markdown as a **draft, not the final note**: in step 5 fix marker's
+residual glitches (an occasional garbled caption clause, an equation number left
 outside `\tag{}`, a mis-leveled heading), and embed the figures it extracted as local images
 (attach each with `para-zk:attach-file`, step 6) under edited/translated captions — dropping
 marker's duplicate/debug images.
