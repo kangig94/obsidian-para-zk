@@ -1,7 +1,7 @@
 {
   "name": "obsidian-para-zk",
   "version": "0.1.2",
-  "description": "Native Obsidian plugin for PARA and Zettelkasten workflows.",
+  "description": "PARA, Zettelkasten, and LLM-Wiki workflows for Obsidian, with MCP/CLI access for Claude Code, Codex, and other clients.",
   "type": "module",
   "packageManager": "pnpm@10.20.0",
   "engines": {

@@ -3,7 +3,7 @@
   "name": "PARA-ZK",
   "version": "0.1.2",
   "minAppVersion": "1.12.0",
-  "description": "Native Obsidian plugin for PARA and Zettelkasten workflows.",
+  "description": "PARA, Zettelkasten, and LLM-Wiki workflows for Obsidian, with MCP/CLI access for Claude Code, Codex, and other clients.",
   "author": "kangig94",
   "authorUrl": "https://github.com/kangig94",
   "isDesktopOnly": false
