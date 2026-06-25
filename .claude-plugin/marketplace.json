@@ -9,7 +9,7 @@
       "name": "para-zk",
       "source": "./clients",
       "description": "Discover and drive the PARA-ZK Obsidian vault from any LLM via its native CLI.",
-      "version": "0.1.4",
+      "version": "0.1.5",
       "author": {
         "name": "kangig94"
       }
