@@ -167,7 +167,7 @@ function renderInlinePropsInputs(plugin: ParaZkPluginContext, el: HTMLElement, c
     const field = findPropsField(schema, token.fieldId);
     if (!field) continue;
 
-    const container = document.createElement("span");
+    const container = activeDocument.createElement("span");
     container.addClass("para-zk-inline-input");
     const rerender = latestPropsRerender(container, () => {
       renderSingleField(plugin, schema, field, container, ctx.sourcePath, container);
@@ -343,6 +343,7 @@ function renderFieldControl(
   blockEl: HTMLElement,
   rerender: PropsRerender
 ): void {
+  container.removeClass("para-zk-block__control--url-link");
   PROPS_CONTROL_RENDERERS[field.control]({
     plugin,
     field,
@@ -425,6 +426,7 @@ function renderUrlField(
     return;
   }
 
+  container.addClass("para-zk-block__control--url-link");
   const link = container.createEl("a", { cls: "para-zk-block__url-link", text: url });
   link.setAttr("href", url);
   link.setAttr("rel", "noopener");

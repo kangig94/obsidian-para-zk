@@ -52,7 +52,7 @@ import {
 export type TaskBlockArgs = {
   root: "current" | "all";
   title?: string;
-  checkbox?: "open" | "done" | string;
+  checkbox?: string;
   due?: "today" | "upcoming7" | "upcoming30";
   limit?: number;
   order?: TaskOrder;

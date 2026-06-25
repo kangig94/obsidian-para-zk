@@ -33,7 +33,7 @@ function renderRibbonActions(plugin: ParaZkPluginContext): void {
 }
 
 function removeRibbonActions(): void {
-  for (const button of document.querySelectorAll(`.${RIBBON_ACTION_CLASS}`)) {
+  for (const button of activeDocument.querySelectorAll(`.${RIBBON_ACTION_CLASS}`)) {
     button.remove();
   }
 }

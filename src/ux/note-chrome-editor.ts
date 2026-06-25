@@ -72,7 +72,7 @@ export function createNoteChromeEditorExtension(plugin: ParaZkPluginContext): Ex
     }
 
     toDOM(view: EditorView): HTMLElement {
-      const host = document.createElement("div");
+      const host = activeDocument.createElement("div");
       host.addClass("para-zk-note-chrome-widget", `para-zk-note-chrome-widget--${this.kind}`);
       host.dataset.paraZkSourcePath = this.sourcePath;
       host.contentEditable = "false";

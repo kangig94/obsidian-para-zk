@@ -18,7 +18,7 @@ export function frontmatterTimeMs(value: unknown): number | undefined {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? undefined : date.getTime();
   }
-  if (typeof value === "object" && value !== null && "toMillis" in value && typeof value.toMillis === "function") {
+  if (hasToMillis(value)) {
     const millis = value.toMillis();
     return typeof millis === "number" && Number.isFinite(millis) ? millis : undefined;
   }
@@ -38,6 +38,11 @@ export function frontmatterTimeMs(value: unknown): number | undefined {
   }
   const parsed = new Date(trimmed);
   return Number.isNaN(parsed.getTime()) ? undefined : parsed.getTime();
+}
+
+function hasToMillis(value: unknown): value is { toMillis: () => unknown } {
+  const candidate = value as { toMillis?: unknown } | null;
+  return typeof candidate?.toMillis === "function";
 }
 
 export function minutesFromMs(ms: number): string {

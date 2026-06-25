@@ -329,12 +329,21 @@ class ConfirmModal extends ResolvingModal<boolean> {
 
     new Setting(contentEl)
       .addButton((button) => {
-        button.setButtonText(this.confirmLabel).setWarning().onClick(() => this.resolveAndClose(true));
+        markButtonDestructive(button.setButtonText(this.confirmLabel)).onClick(() => this.resolveAndClose(true));
       })
       .addButton((button) => {
         button.setButtonText(this.cancelLabel).onClick(() => this.resolveAndClose(false));
       });
   }
+}
+
+function markButtonDestructive(button: ButtonComponent): ButtonComponent {
+  const destructive = (button as ButtonComponent & {
+    setDestructive?: () => ButtonComponent;
+  }).setDestructive;
+  if (typeof destructive === "function") return destructive.call(button);
+  button.buttonEl.addClass("mod-warning");
+  return button;
 }
 
 class ChoiceModal extends ResolvingModal<string> {

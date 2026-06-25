@@ -46,7 +46,7 @@ export function createCitationEditorExtension(plugin: ParaZkPluginContext): Exte
     }
 
     toDOM(): HTMLElement {
-      const host = document.createElement("span");
+      const host = activeDocument.createElement("span");
       host.className = "para-zk-citation-host";
       buildCitationElement(plugin, this.references, this.keys, this.sourcePath, host);
       return host;

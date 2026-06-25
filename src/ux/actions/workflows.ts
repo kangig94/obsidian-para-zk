@@ -20,7 +20,8 @@ type InteractiveWorkflowContext = {
   sourcePath?: string;
   sourceFile: TFile | null;
 };
-type InteractiveWorkflowHandler = (context: InteractiveWorkflowContext) => Promise<unknown | undefined>;
+type InteractiveWorkflowResult = Record<string, unknown>;
+type InteractiveWorkflowHandler = (context: InteractiveWorkflowContext) => Promise<InteractiveWorkflowResult | undefined>;
 
 const INTERACTIVE_WORKFLOW_HANDLERS: Record<string, InteractiveWorkflowHandler> = {
   "create-project": createProjectWorkflow,
@@ -109,7 +110,7 @@ export async function runGuiWorkflow(plugin: ParaZkPluginContext, command: strin
   }
 }
 
-async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: string, sourcePath?: string): Promise<unknown | undefined> {
+async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: string, sourcePath?: string): Promise<InteractiveWorkflowResult | undefined> {
   const workflows = await import("../../workflows");
   const ctx = workflowContext(plugin);
   const labels = localePack(plugin.settings.locale).labels;
@@ -121,23 +122,23 @@ async function executeInteractiveWorkflow(plugin: ParaZkPluginContext, command: 
   return handler({ plugin, workflows, ctx, labels, activePath, sourcePath, sourceFile });
 }
 
-async function createProjectWorkflow({ plugin, workflows, ctx, labels }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+async function createProjectWorkflow({ plugin, workflows, ctx, labels }: InteractiveWorkflowContext): Promise<InteractiveWorkflowResult | undefined> {
   const title = await prompt(plugin, labels.createProjectCommandName, labels.promptProjectTitle);
   return title ? workflows.createProject(ctx, { title, open: true }) : undefined;
 }
 
-async function createAreaWorkflow({ plugin, workflows, ctx, labels }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+async function createAreaWorkflow({ plugin, workflows, ctx, labels }: InteractiveWorkflowContext): Promise<InteractiveWorkflowResult | undefined> {
   const title = await prompt(plugin, labels.createAreaCommandName, labels.promptAreaTitle);
   return title ? workflows.createArea(ctx, { title, open: true }) : undefined;
 }
 
-async function addReferenceWorkflow({ plugin, workflows, ctx, labels, activePath }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+async function addReferenceWorkflow({ plugin, workflows, ctx, labels, activePath }: InteractiveWorkflowContext): Promise<InteractiveWorkflowResult | undefined> {
   if (!activePath) return undefined;
   const target = await prompt(plugin, labels.addReferenceCommandName, labels.promptReferenceTarget);
   return target ? workflows.addReference(ctx, { sourcePath: activePath, target, open: false }) : undefined;
 }
 
-async function createResourceWorkflow({ plugin, workflows, ctx, labels, sourcePath }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+async function createResourceWorkflow({ plugin, workflows, ctx, labels, sourcePath }: InteractiveWorkflowContext): Promise<InteractiveWorkflowResult | undefined> {
   const title = await prompt(plugin, labels.createResourceCommandName, labels.promptResourceTitle);
   return title ? workflows.createResource(ctx, {
     title,
@@ -147,12 +148,12 @@ async function createResourceWorkflow({ plugin, workflows, ctx, labels, sourcePa
   }) : undefined;
 }
 
-async function createSubnoteWorkflow({ plugin, workflows, ctx, labels, activePath }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+async function createSubnoteWorkflow({ plugin, workflows, ctx, labels, activePath }: InteractiveWorkflowContext): Promise<InteractiveWorkflowResult | undefined> {
   const title = await prompt(plugin, labels.createSubnoteCommandName, labels.promptSubnoteTitle);
   return title ? workflows.createSubnote(ctx, { title, sourcePath: activePath, open: true }) : undefined;
 }
 
-async function createSubareaWorkflow({ plugin, workflows, ctx, labels, activePath }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+async function createSubareaWorkflow({ plugin, workflows, ctx, labels, activePath }: InteractiveWorkflowContext): Promise<InteractiveWorkflowResult | undefined> {
   if (!activePath) {
     new Notice(`PARA-ZK: ${localePack(plugin.settings.locale).messages.createSubareaNeedsActiveArea}`);
     return undefined;
@@ -161,11 +162,11 @@ async function createSubareaWorkflow({ plugin, workflows, ctx, labels, activePat
   return title ? workflows.createArea(ctx, { title, sourcePath: activePath, inheritParentTag: true, open: true }) : undefined;
 }
 
-async function createRetroWorkflow({ workflows, ctx, activePath }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+async function createRetroWorkflow({ workflows, ctx, activePath }: InteractiveWorkflowContext): Promise<InteractiveWorkflowResult | undefined> {
   return workflows.createRetro(ctx, { sourcePath: activePath, open: true });
 }
 
-async function createZkWorkflow({ plugin, workflows, ctx, labels, sourceFile }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+async function createZkWorkflow({ plugin, workflows, ctx, labels, sourceFile }: InteractiveWorkflowContext): Promise<InteractiveWorkflowResult | undefined> {
   const kind = await chooseValue(plugin.app, labels.promptCreateKind, [
     { label: "Spark", value: "spark" },
     { label: "Digest", value: "digest" },
@@ -176,16 +177,16 @@ async function createZkWorkflow({ plugin, workflows, ctx, labels, sourceFile }: 
   return title ? workflows.createZk(ctx, { title, kind, open: true }) : undefined;
 }
 
-async function openJournalWorkflow({ workflows, ctx }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+async function openJournalWorkflow({ workflows, ctx }: InteractiveWorkflowContext): Promise<InteractiveWorkflowResult | undefined> {
   return workflows.openJournal(ctx, { open: true });
 }
 
-async function captureJournalWorkflow({ plugin, workflows, ctx, labels }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+async function captureJournalWorkflow({ plugin, workflows, ctx, labels }: InteractiveWorkflowContext): Promise<InteractiveWorkflowResult | undefined> {
   const content = await prompt(plugin, labels.captureJournalCommandName, labels.promptCaptureContent);
   return content ? workflows.captureJournal(ctx, { content, open: true }) : undefined;
 }
 
-async function createFromResourceWorkflow({ plugin, workflows, ctx, labels, activePath, sourceFile }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+async function createFromResourceWorkflow({ plugin, workflows, ctx, labels, activePath, sourceFile }: InteractiveWorkflowContext): Promise<InteractiveWorkflowResult | undefined> {
   const kind = await chooseValue(plugin.app, labels.promptCreateKind, [
     { label: "Digest", value: "digest" },
     { label: "Permanent", value: "permanent" }
@@ -195,7 +196,7 @@ async function createFromResourceWorkflow({ plugin, workflows, ctx, labels, acti
   return title ? workflows.createFromResource(ctx, { sourcePath: activePath, title, kind, open: true }) : undefined;
 }
 
-async function distillSparkWorkflow({ plugin, workflows, ctx, labels, activePath, sourceFile }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+async function distillSparkWorkflow({ plugin, workflows, ctx, labels, activePath, sourceFile }: InteractiveWorkflowContext): Promise<InteractiveWorkflowResult | undefined> {
   const result = await promptDistill(
     plugin.app,
     labels.distillButton,
@@ -208,7 +209,7 @@ async function distillSparkWorkflow({ plugin, workflows, ctx, labels, activePath
   return result ? workflows.distillSpark(ctx, { sourcePath: activePath, title: result.title, discard: result.discard, open: true }) : undefined;
 }
 
-async function discardSparkWorkflow({ plugin, workflows, ctx, labels, activePath }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+async function discardSparkWorkflow({ plugin, workflows, ctx, labels, activePath }: InteractiveWorkflowContext): Promise<InteractiveWorkflowResult | undefined> {
   if (!activePath) return undefined;
   const confirmed = await confirmAction(
     plugin.app,
@@ -220,7 +221,7 @@ async function discardSparkWorkflow({ plugin, workflows, ctx, labels, activePath
   return confirmed ? workflows.deleteZk(ctx, { path: activePath }) : undefined;
 }
 
-async function createFromDigestWorkflow({ plugin, workflows, ctx, labels, activePath, sourceFile }: InteractiveWorkflowContext): Promise<unknown | undefined> {
+async function createFromDigestWorkflow({ plugin, workflows, ctx, labels, activePath, sourceFile }: InteractiveWorkflowContext): Promise<InteractiveWorkflowResult | undefined> {
   const title = await prompt(plugin, labels.createPermanentButton, labels.promptZkTitle, sourceFile?.basename ?? "");
   return title ? workflows.createFromDigest(ctx, { sourcePath: activePath, title, open: true }) : undefined;
 }

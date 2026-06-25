@@ -1,13 +1,11 @@
 import type { App } from "obsidian";
 import { PARA_ZK_PATHS } from "../../layout";
 import { isRecord } from "../../records";
-import { normalizeVaultPath } from "../../vault/paths";
+import { normalizeVaultPath, obsidianConfigPath } from "../../vault/paths";
 import type { DependencyConfiguration, DependencyConfigurationServices, PluginManager } from "./index";
 
 export const CUSTOM_SORT_PLUGIN_ID = "custom-sort";
 
-const CUSTOM_SORT_SETTINGS_PATH = ".obsidian/plugins/custom-sort/data.json";
-const BOOKMARKS_CONFIG_PATH = ".obsidian/bookmarks.json";
 const CUSTOM_SORT_BOOKMARKS_GROUP = "sortspec";
 const ATTACHMENT_FOLDER = "assets";
 
@@ -25,7 +23,7 @@ async function isCustomSortConfigured(
   app: App,
   manager: PluginManager
 ): Promise<boolean> {
-  const currentSettings = await services.readSettingsFile(app, CUSTOM_SORT_SETTINGS_PATH);
+  const currentSettings = await services.readSettingsFile(app, customSortSettingsPath(app));
   const nextSettings = mergeCustomSortSettings(currentSettings);
   if (JSON.stringify(currentSettings) !== JSON.stringify(nextSettings)) return false;
   if (!await hasCompleteCustomSortBookmarksGroup(app)) return false;
@@ -40,7 +38,7 @@ async function ensureCustomSortConfigured(
   app: App,
   manager: PluginManager
 ): Promise<boolean> {
-  const currentSettings = await services.readSettingsFile(app, CUSTOM_SORT_SETTINGS_PATH);
+  const currentSettings = await services.readSettingsFile(app, customSortSettingsPath(app));
   const nextSettings = mergeCustomSortSettings(currentSettings);
   const runtimeSettings = services.readRuntimePluginSettings(manager, CUSTOM_SORT_PLUGIN_ID);
   const runtimeChanged = runtimeSettings
@@ -50,7 +48,7 @@ async function ensureCustomSortConfigured(
   const bookmarksChanged = await ensureCustomSortBookmarksGroup(app);
 
   if (settingsChanged) {
-    await services.writeSettingsFile(app, CUSTOM_SORT_SETTINGS_PATH, nextSettings);
+    await services.writeSettingsFile(app, customSortSettingsPath(app), nextSettings);
     await services.updateRunningPluginSettings(manager, CUSTOM_SORT_PLUGIN_ID, nextSettings);
   }
 
@@ -111,7 +109,7 @@ async function ensureCustomSortBookmarksGroup(app: App): Promise<boolean> {
     return false;
   }
 
-  await app.vault.adapter.write(BOOKMARKS_CONFIG_PATH, `${JSON.stringify(bookmarks, null, 2)}\n`);
+  await app.vault.adapter.write(bookmarksConfigPath(app), `${JSON.stringify(bookmarks, null, 2)}\n`);
   return true;
 }
 
@@ -155,13 +153,22 @@ function hasNestedGroups(item: BookmarkItem): boolean {
 }
 
 async function readBookmarksConfig(app: App): Promise<{ items: BookmarkItem[] }> {
-  if (!await app.vault.adapter.exists(BOOKMARKS_CONFIG_PATH)) return { items: [] };
-  const raw = await app.vault.adapter.read(BOOKMARKS_CONFIG_PATH);
+  const path = bookmarksConfigPath(app);
+  if (!await app.vault.adapter.exists(path)) return { items: [] };
+  const raw = await app.vault.adapter.read(path);
   if (!raw.trim()) return { items: [] };
   const parsed = JSON.parse(raw) as unknown;
-  if (!isRecord(parsed)) throw new Error(`${BOOKMARKS_CONFIG_PATH} is not a JSON object`);
+  if (!isRecord(parsed)) throw new Error(`${path} is not a JSON object`);
   const items = Array.isArray(parsed.items) ? parsed.items.filter(isBookmarkItem) : [];
   return { ...parsed, items };
+}
+
+function customSortSettingsPath(app: App): string {
+  return obsidianConfigPath(app.vault, "plugins", CUSTOM_SORT_PLUGIN_ID, "data.json");
+}
+
+function bookmarksConfigPath(app: App): string {
+  return obsidianConfigPath(app.vault, "bookmarks.json");
 }
 
 function createCustomSortBookmarksGroup(): BookmarkItem {

@@ -1,6 +1,6 @@
 {
   "id": "para-zk",
-  "name": "PARA-ZK",
+  "name": "Para-ZK",
   "version": "0.1.2",
   "minAppVersion": "1.12.3",
   "description": "PARA, Zettelkasten, and LLM-Wiki workflows with MCP/CLI access for Claude Code, Codex, and other clients.",

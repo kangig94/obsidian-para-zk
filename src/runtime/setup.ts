@@ -125,7 +125,7 @@ async function migrateLegacyTaskRootsFolder(
   const refreshedLegacyFolder = app.vault.getAbstractFileByPath(legacyPath);
   if (refreshedLegacyFolder instanceof TFolder && refreshedLegacyFolder.children.length === 0) {
     addUnique(result.updated, legacyPath);
-    if (!dryRun) await app.vault.delete(refreshedLegacyFolder, true);
+    if (!dryRun) await app.fileManager.trashFile(refreshedLegacyFolder);
   }
 }
 

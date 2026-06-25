@@ -58,6 +58,7 @@ export class MockApp {
   readonly opened: string[] = [];
 
   vault = {
+    configDir: ".obsidian",
     getAbstractFileByPath: (path: string): TAbstractFile | null =>
       this.fileObjs.get(path) ?? this.folderObjs.get(path) ?? null,
     getFileByPath: (path: string): TFile | null => this.fileObjs.get(path) ?? null,
@@ -131,6 +132,9 @@ export class MockApp {
       const oldPath = file.path;
       this.relocate(oldPath, newPath);
       this.rewriteLinksAfterRename(oldPath, newPath);
+    },
+    trashFile: async (file: TAbstractFile): Promise<void> => {
+      await this.vault.trash(file, false);
     }
   };
 

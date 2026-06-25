@@ -82,12 +82,6 @@ const TASK_PRIORITY_FIELD_SYMBOLS: Record<string, string> = {
   lowest: "\u{23EC}"
 };
 
-async function ensureTaskShard(ctx: WorkflowContext, rootFile: TFile): Promise<TFile> {
-  const rootId = await ensureRootId(ctx, rootFile);
-  const path = taskShardPath(ctx, rootId, isArchivedFile(ctx, rootFile));
-  return ensureTaskShardAtPath(ctx, path);
-}
-
 async function ensureTaskShardAtPath(ctx: WorkflowContext, path: string): Promise<TFile> {
   await ensureFolder(ctx.host, parentFolder(path));
 
@@ -279,11 +273,8 @@ export async function deleteRootTask(ctx: WorkflowContext, rootFile: TFile, task
     if (!line) throw new Error(`task not found: ${taskId}`);
     const after = removeTextRanges(before, [line.range]);
     if (before === after) return false;
-    // Permanently delete (not trash) when deletion returns the shard to the empty managed scaffold:
-    // it is plugin-owned with nothing to recover, so it should not clutter the trash. User content
-    // (a remaining task, prose, or extra headings) fails the bare check and keeps the shard alive.
     if (isBareTaskShard(after)) {
-      await ctx.host.delete(shardFile);
+      await ctx.host.trashFile(shardFile);
       return true;
     }
     await ctx.host.modify(shardFile, after);
@@ -406,8 +397,9 @@ async function newTaskId(ctx: WorkflowContext): Promise<string> {
 }
 
 function newId(): string {
-  if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
-    return globalThis.crypto.randomUUID();
+  const crypto = typeof window === "undefined" ? undefined : window.crypto;
+  if (crypto && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
   }
   return fallbackUuid();
 }
@@ -453,8 +445,9 @@ function randomAlphabetId(length: number, alphabet: string): string {
 
 function randomBytes(length: number): Uint8Array {
   const bytes = new Uint8Array(length);
-  if (globalThis.crypto && typeof globalThis.crypto.getRandomValues === "function") {
-    globalThis.crypto.getRandomValues(bytes);
+  const crypto = typeof window === "undefined" ? undefined : window.crypto;
+  if (crypto && typeof crypto.getRandomValues === "function") {
+    crypto.getRandomValues(bytes);
     return bytes;
   }
   for (let index = 0; index < bytes.length; index += 1) {

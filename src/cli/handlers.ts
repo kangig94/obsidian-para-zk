@@ -1413,7 +1413,7 @@ function withCreateInputs(surface: SurfaceDescription): SurfaceDescription {
 // injects registerCliHandler only on desktop) — so it may use Node. It is loaded lazily,
 // never at the top level, so the plugin bundle carries no eager Node require and still
 // loads on Obsidian mobile (iPad/Android).
-function electronRequire(id: string): unknown | undefined {
+function electronRequire(id: string): unknown {
   if (typeof window === "undefined") return undefined;
   const requireFn = window.require;
   return typeof requireFn === "function" ? requireFn(id) : undefined;
@@ -1778,7 +1778,9 @@ function isAlreadyExistsError(error: unknown): boolean {
 }
 
 function bytesToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
 }
 
 function assertVaultPathSafe(path: string, label: string): void {

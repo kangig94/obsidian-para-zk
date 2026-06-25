@@ -1,10 +1,9 @@
 import type { App } from "obsidian";
 import { isRecord } from "../../records";
+import { obsidianConfigPath } from "../../vault/paths";
 import type { DependencyConfiguration, DependencyConfigurationServices, PluginManager } from "./index";
 
 export const DATAVIEW_PLUGIN_ID = "dataview";
-
-const DATAVIEW_SETTINGS_PATH = ".obsidian/plugins/dataview/data.json";
 
 export const dataviewDependencyConfiguration: DependencyConfiguration = {
   wouldConfigure: "would_enable_dataview_js",
@@ -18,7 +17,7 @@ async function isDataviewJsEnabled(
   app: App,
   manager: PluginManager
 ): Promise<boolean> {
-  const settings = await services.readSettingsFile(app, DATAVIEW_SETTINGS_PATH);
+  const settings = await services.readSettingsFile(app, dataviewSettingsPath(app));
   const runtime = readRuntimeDataviewSettings(manager);
   return settings.enableDataviewJs === true && (runtime === undefined || runtime.enableDataviewJs === true);
 }
@@ -28,7 +27,7 @@ async function ensureDataviewJsEnabled(
   app: App,
   manager: PluginManager
 ): Promise<boolean> {
-  const settings = await services.readSettingsFile(app, DATAVIEW_SETTINGS_PATH);
+  const settings = await services.readSettingsFile(app, dataviewSettingsPath(app));
   const runtime = readRuntimeDataviewSettings(manager);
   const changed = settings.enableDataviewJs !== true || (runtime !== undefined && runtime.enableDataviewJs !== true);
   if (!changed) return false;
@@ -38,9 +37,13 @@ async function ensureDataviewJsEnabled(
     enableDataviewJs: true
   };
 
-  await services.writeSettingsFile(app, DATAVIEW_SETTINGS_PATH, nextSettings);
+  await services.writeSettingsFile(app, dataviewSettingsPath(app), nextSettings);
   await updateRunningDataviewSettings(manager, nextSettings);
   return true;
+}
+
+function dataviewSettingsPath(app: App): string {
+  return obsidianConfigPath(app.vault, "plugins", DATAVIEW_PLUGIN_ID, "data.json");
 }
 
 function readRuntimeDataviewSettings(manager: PluginManager): Record<string, unknown> | undefined {

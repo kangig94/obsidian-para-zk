@@ -98,7 +98,7 @@ export function refreshRegisteredLocaleLabels(plugin: ParaZkPluginContext, previ
   }
 
   for (const action of RIBBON_ACTIONS) {
-    for (const button of document.querySelectorAll<HTMLElement>(`.para-zk-ribbon-action-${action.id}`)) {
+    for (const button of activeDocument.querySelectorAll<HTMLElement>(`.para-zk-ribbon-action-${action.id}`)) {
       button.setAttribute("aria-label", action.label(labels));
     }
   }

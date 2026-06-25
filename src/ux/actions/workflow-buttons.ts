@@ -14,7 +14,7 @@ export function createWorkflowButton(
   sourcePath?: string,
   options: WorkflowButtonOptions = {}
 ): HTMLButtonElement {
-  const host = document.createElement("span");
+  const host = activeDocument.createElement("span");
   const component = new ButtonComponent(host);
   const button = component.buttonEl;
   button.addClass("para-zk-command-button", "mod-cta");

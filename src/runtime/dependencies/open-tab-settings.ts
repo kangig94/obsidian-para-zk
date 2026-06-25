@@ -1,11 +1,9 @@
 import type { App } from "obsidian";
 import { isRecord } from "../../records";
+import { obsidianConfigPath } from "../../vault/paths";
 import type { DependencyConfiguration, DependencyConfigurationServices, PluginManager } from "./index";
 
 export const OPEN_TAB_SETTINGS_PLUGIN_ID = "open-tab-settings";
-
-const OPEN_TAB_SETTINGS_PATH = ".obsidian/plugins/open-tab-settings/data.json";
-const APP_CONFIG_PATH = ".obsidian/app.json";
 
 export const openTabSettingsDependencyConfiguration: DependencyConfiguration = {
   wouldConfigure: "would_configure_open_tab_settings",
@@ -19,7 +17,7 @@ async function isOpenTabSettingsConfigured(
   app: App,
   manager: PluginManager
 ): Promise<boolean> {
-  const currentSettings = await services.readSettingsFile(app, OPEN_TAB_SETTINGS_PATH);
+  const currentSettings = await services.readSettingsFile(app, openTabSettingsPath(app));
   const nextSettings = mergeOpenTabSettings(currentSettings);
   if (JSON.stringify(currentSettings) !== JSON.stringify(nextSettings)) return false;
 
@@ -34,7 +32,7 @@ async function ensureOpenTabSettingsConfigured(
   app: App,
   manager: PluginManager
 ): Promise<boolean> {
-  const currentSettings = await services.readSettingsFile(app, OPEN_TAB_SETTINGS_PATH);
+  const currentSettings = await services.readSettingsFile(app, openTabSettingsPath(app));
   const nextSettings = mergeOpenTabSettings(currentSettings);
   const runtimeSettings = services.readRuntimePluginSettings(manager, OPEN_TAB_SETTINGS_PLUGIN_ID);
   const settingsChanged = JSON.stringify(currentSettings) !== JSON.stringify(nextSettings);
@@ -44,7 +42,7 @@ async function ensureOpenTabSettingsConfigured(
   const focusChanged = await readFocusNewTab(app) !== true;
 
   if (settingsChanged) {
-    await services.writeSettingsFile(app, OPEN_TAB_SETTINGS_PATH, nextSettings);
+    await services.writeSettingsFile(app, openTabSettingsPath(app), nextSettings);
   }
   if (settingsChanged || runtimeChanged) {
     await services.updateRunningPluginSettings(manager, OPEN_TAB_SETTINGS_PLUGIN_ID, nextSettings);
@@ -103,14 +101,23 @@ async function writeFocusNewTab(app: App, value: boolean): Promise<void> {
 }
 
 async function readAppConfig(app: App): Promise<Record<string, unknown>> {
-  if (!await app.vault.adapter.exists(APP_CONFIG_PATH)) return {};
-  const raw = await app.vault.adapter.read(APP_CONFIG_PATH);
+  const path = appConfigPath(app);
+  if (!await app.vault.adapter.exists(path)) return {};
+  const raw = await app.vault.adapter.read(path);
   if (!raw.trim()) return {};
   const parsed = JSON.parse(raw) as unknown;
-  if (!isRecord(parsed)) throw new Error(`${APP_CONFIG_PATH} is not a JSON object`);
+  if (!isRecord(parsed)) throw new Error(`${path} is not a JSON object`);
   return parsed;
 }
 
 async function writeAppConfig(app: App, config: Record<string, unknown>): Promise<void> {
-  await app.vault.adapter.write(APP_CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`);
+  await app.vault.adapter.write(appConfigPath(app), `${JSON.stringify(config, null, 2)}\n`);
+}
+
+function openTabSettingsPath(app: App): string {
+  return obsidianConfigPath(app.vault, "plugins", OPEN_TAB_SETTINGS_PLUGIN_ID, "data.json");
+}
+
+function appConfigPath(app: App): string {
+  return obsidianConfigPath(app.vault, "app.json");
 }

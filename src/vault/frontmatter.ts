@@ -52,7 +52,7 @@ function parseFrontmatterResult(content: string): FrontmatterParseResult {
   const match = stripLeadingUtf8Bom(content).match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
   if (!match) return { ok: true, frontmatter: {} };
   try {
-    const parsed = parseYaml(match[1]);
+    const parsed: unknown = parseYaml(match[1]);
     return {
       ok: true,
       frontmatter: parsed && typeof parsed === "object" ? parsed as Frontmatter : {}

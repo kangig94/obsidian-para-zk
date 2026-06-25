@@ -18,10 +18,11 @@
     "smoke:vault": "node tools/smoke-test-vault.mjs",
     "typecheck": "tsc --noEmit",
     "lint:architecture": "node tools/check-architecture.mjs",
+    "lint:obsidian-review": "node tools/check-obsidian-review.mjs",
     "lint:deadcode": "knip",
     "check:mcp-hash": "node tools/check-mcp-build-hash.mjs",
     "check:build-drift": "node tools/check-generated-drift.mjs",
-    "lint": "pnpm run lint:architecture && pnpm run lint:deadcode && pnpm run typecheck"
+    "lint": "pnpm run lint:architecture && pnpm run lint:obsidian-review && pnpm run lint:deadcode && pnpm run typecheck"
   },
   "keywords": [
     "obsidian",

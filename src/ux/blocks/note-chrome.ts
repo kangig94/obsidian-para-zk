@@ -382,7 +382,7 @@ function registerReadingViewMutationScan(plugin: ParaZkPluginContext): void {
 
 function addsReadingViewPreview(mutation: MutationRecord): boolean {
   for (const node of Array.from(mutation.addedNodes)) {
-    if (node instanceof HTMLElement && hasReadingViewPreview(node)) return true;
+    if (node.instanceOf(HTMLElement) && hasReadingViewPreview(node)) return true;
   }
   return false;
 }

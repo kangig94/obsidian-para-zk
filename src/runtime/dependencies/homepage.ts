@@ -1,12 +1,11 @@
 import type { App } from "obsidian";
 import { PARA_ZK_PATHS } from "../../layout";
 import { isRecord } from "../../records";
-import { normalizeVaultPath } from "../../vault/paths";
+import { normalizeVaultPath, obsidianConfigPath } from "../../vault/paths";
 import type { DependencyConfiguration, DependencyConfigurationServices, PluginManager } from "./index";
 
 export const HOMEPAGE_PLUGIN_ID = "homepage";
 
-const HOMEPAGE_SETTINGS_PATH = ".obsidian/plugins/homepage/data.json";
 const HOMEPAGE_NAME = "Main Homepage";
 
 export const homepageDependencyConfiguration: DependencyConfiguration = {
@@ -21,7 +20,7 @@ async function isHomepageConfigured(
   app: App,
   manager: PluginManager
 ): Promise<boolean> {
-  const currentSettings = await services.readSettingsFile(app, HOMEPAGE_SETTINGS_PATH);
+  const currentSettings = await services.readSettingsFile(app, homepageSettingsPath(app));
   const nextSettings = mergeHomepageSettings(currentSettings);
   if (JSON.stringify(currentSettings) !== JSON.stringify(nextSettings)) return false;
 
@@ -36,7 +35,7 @@ async function ensureHomepageConfigured(
   app: App,
   manager: PluginManager
 ): Promise<boolean> {
-  const currentSettings = await services.readSettingsFile(app, HOMEPAGE_SETTINGS_PATH);
+  const currentSettings = await services.readSettingsFile(app, homepageSettingsPath(app));
   const nextSettings = mergeHomepageSettings(currentSettings);
   const runtimeSettings = services.readRuntimePluginSettings(manager, HOMEPAGE_PLUGIN_ID);
   const runtimeChanged = runtimeSettings
@@ -47,10 +46,14 @@ async function ensureHomepageConfigured(
   if (!changed) return false;
 
   if (diskChanged) {
-    await services.writeSettingsFile(app, HOMEPAGE_SETTINGS_PATH, nextSettings);
+    await services.writeSettingsFile(app, homepageSettingsPath(app), nextSettings);
   }
   await updateRunningHomepageSettings(manager, nextSettings);
   return true;
+}
+
+function homepageSettingsPath(app: App): string {
+  return obsidianConfigPath(app.vault, "plugins", HOMEPAGE_PLUGIN_ID, "data.json");
 }
 
 function mergeHomepageSettings(current: Record<string, unknown>): Record<string, unknown> {

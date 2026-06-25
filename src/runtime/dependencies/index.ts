@@ -1,6 +1,7 @@
 import { App, requestUrl, type PluginManifest } from "obsidian";
 import { isRecord } from "../../records";
 import type { DependencyResult } from "../../types";
+import { obsidianConfigPath } from "../../vault/paths";
 import {
   customSortDependencyConfiguration,
   CUSTOM_SORT_PLUGIN_ID
@@ -86,8 +87,6 @@ const dependencyConfigurationServices: DependencyConfigurationServices = {
   readRuntimePluginSettings,
   updateRunningPluginSettings
 };
-
-const COMMUNITY_PLUGINS_CONFIG = ".obsidian/community-plugins.json";
 
 const REQUIRED_DEPENDENCIES: DependencySpec[] = [
   {
@@ -371,14 +370,15 @@ async function readEnabledPluginConfig(app: App): Promise<Set<string> | undefine
 }
 
 async function readEnabledPluginConfigFile(app: App): Promise<EnabledPluginConfigRead> {
+  const path = communityPluginsConfigPath(app);
   try {
-    if (!await app.vault.adapter.exists(COMMUNITY_PLUGINS_CONFIG)) {
+    if (!await app.vault.adapter.exists(path)) {
       return { status: "missing", enabled: new Set<string>() };
     }
-    const raw = await app.vault.adapter.read(COMMUNITY_PLUGINS_CONFIG);
+    const raw = await app.vault.adapter.read(path);
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) {
-      return { status: "unreadable", error: `${COMMUNITY_PLUGINS_CONFIG} must be a JSON array` };
+      return { status: "unreadable", error: `${path} must be a JSON array` };
     }
     return {
       status: "ok",
@@ -386,7 +386,7 @@ async function readEnabledPluginConfigFile(app: App): Promise<EnabledPluginConfi
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return { status: "unreadable", error: `Cannot read ${COMMUNITY_PLUGINS_CONFIG}: ${message}` };
+    return { status: "unreadable", error: `Cannot read ${path}: ${message}` };
   }
 }
 
@@ -400,9 +400,13 @@ async function ensureEnabledPluginConfig(app: App, id: string): Promise<void> {
   if (enabled.has(id)) return;
   enabled.add(id);
   await app.vault.adapter.write(
-    COMMUNITY_PLUGINS_CONFIG,
+    communityPluginsConfigPath(app),
     `${JSON.stringify(Array.from(enabled), null, 2)}\n`
   );
+}
+
+function communityPluginsConfigPath(app: App): string {
+  return obsidianConfigPath(app.vault, "community-plugins.json");
 }
 
 async function readDependencySettingsFile(app: App, path: string): Promise<Record<string, unknown>> {

@@ -264,9 +264,14 @@ function updatedJsonValue(value: unknown): unknown {
   if (value === undefined) return null;
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString();
   // Luxon DateTime (the metadataCache shape for date frontmatter): toISO() returns string | null.
-  if (typeof value === "object" && value !== null && "toISO" in value && typeof value.toISO === "function") {
+  if (hasToIso(value)) {
     const iso = value.toISO();
     return typeof iso === "string" ? iso : null;
   }
   return value;
+}
+
+function hasToIso(value: unknown): value is { toISO: () => unknown } {
+  const candidate = value as { toISO?: unknown } | null;
+  return typeof candidate?.toISO === "function";
 }

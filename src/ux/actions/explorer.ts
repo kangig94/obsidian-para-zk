@@ -37,14 +37,14 @@ function renderEmptyTrashAction(plugin: ParaZkPluginContext): void {
 }
 
 function removeEmptyTrashButtons(): void {
-  for (const button of document.querySelectorAll(`.${EMPTY_TRASH_CLASS}`)) {
+  for (const button of activeDocument.querySelectorAll(`.${EMPTY_TRASH_CLASS}`)) {
     button.remove();
   }
 }
 
 export function refreshExplorerActionLabels(plugin: ParaZkPluginContext): void {
   const label = localePack(plugin.settings.locale).labels.emptyTrash;
-  for (const button of document.querySelectorAll<HTMLElement>(`.${EMPTY_TRASH_CLASS}`)) {
+  for (const button of activeDocument.querySelectorAll<HTMLElement>(`.${EMPTY_TRASH_CLASS}`)) {
     button.setAttribute("aria-label", label);
   }
 }
@@ -71,13 +71,18 @@ function readNavButtonsContainer(view: unknown): HTMLElement | undefined {
   if (!isRecord(view)) return undefined;
 
   const headerDom = view.headerDom;
-  if (isRecord(headerDom) && headerDom.navButtonsEl instanceof HTMLElement) {
+  if (isRecord(headerDom) && isHtmlElement(headerDom.navButtonsEl)) {
     return headerDom.navButtonsEl;
   }
 
   const containerEl = view.containerEl;
-  if (!(containerEl instanceof HTMLElement)) return undefined;
+  if (!isHtmlElement(containerEl)) return undefined;
   return containerEl.querySelector<HTMLElement>(".nav-buttons-container") ?? undefined;
+}
+
+function isHtmlElement(value: unknown): value is HTMLElement {
+  const candidate = value as { instanceOf?: (type: typeof HTMLElement) => boolean } | null;
+  return typeof candidate?.instanceOf === "function" && candidate.instanceOf(HTMLElement);
 }
 
 function executeCommand(plugin: ParaZkPluginContext, id: string): boolean {

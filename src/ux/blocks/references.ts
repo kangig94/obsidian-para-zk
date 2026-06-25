@@ -47,7 +47,7 @@ import {
 import { referenceTargetHint, referenceTitle, renderReferenceAnchor } from "../citations/reference-link";
 
 export type ReferenceBlockArgs = {
-  root: "current" | string;
+  root: string;
   title?: string;
 };
 

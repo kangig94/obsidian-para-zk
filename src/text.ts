@@ -4,7 +4,7 @@
 export function slugify(value: string): string {
   const slug = value
     .toLowerCase()
-    .replace(/[^a-z0-9가-힣\/]+/g, "-")
+    .replace(/[^a-z0-9가-힣/]+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-+|-+$/g, "");
   return slug || "untitled";

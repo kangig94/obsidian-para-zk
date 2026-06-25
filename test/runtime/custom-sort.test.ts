@@ -37,6 +37,7 @@ function staleBookmarks(): { items: Item[] } {
 function fakeApp(files: Map<string, string>): App {
   return {
     vault: {
+      configDir: ".obsidian",
       adapter: {
         exists: async (path: string) => files.has(path),
         read: async (path: string) => files.get(path) ?? "",

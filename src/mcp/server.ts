@@ -1,6 +1,4 @@
-import { execFile } from "node:child_process";
-import { pathToFileURL } from "node:url";
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult, type ListToolsResult } from "@modelcontextprotocol/sdk/types.js";
 import { isRecord } from "../records";
@@ -384,14 +382,14 @@ function execFileText(file: string, args: string[], timeout: number): Promise<st
 function execFileTextResult(file: string, args: string[], timeout: number): Promise<ExecFileTextResult> {
   return new Promise((resolve, reject) => {
     try {
-      execFile(file, args, { timeout, windowsHide: true }, (error, stdout) => {
+      process.getBuiltinModule("node:child_process").execFile(file, args, { timeout, windowsHide: true }, (error, stdout) => {
         resolve({
           stdout: textFromExecOutput(stdout),
           ...(error ? { error: errorMessage(error) } : {})
         });
       });
     } catch (error) {
-      reject(error);
+      reject(error instanceof Error ? error : new Error(String(error)));
     }
   });
 }
@@ -557,8 +555,8 @@ function serializeToolCall<T>(run: () => Promise<T>): Promise<T> {
   return result;
 }
 
-function createServer(): Server {
-  const server = new Server({
+function createServer(): McpServer {
+  const server = new McpServer({
     name: "para-zk",
     version: typeof __VERSION__ === "string" ? __VERSION__ : "0.0.0"
   }, {
@@ -567,11 +565,11 @@ function createServer(): Server {
     }
   });
 
-  server.setRequestHandler(ListToolsRequestSchema, async (): Promise<ListToolsResult> => ({
+  server.server.setRequestHandler(ListToolsRequestSchema, async (): Promise<ListToolsResult> => ({
     tools: buildToolDescriptors()
   }));
 
-  server.setRequestHandler(CallToolRequestSchema, (request): Promise<CallToolResult> => serializeToolCall(async (): Promise<CallToolResult> => {
+  server.server.setRequestHandler(CallToolRequestSchema, (request): Promise<CallToolResult> => serializeToolCall(async (): Promise<CallToolResult> => {
     if (isUpdateToolName(request.params.name)) {
       return callUpdateTool(request.params.name, request.params.arguments ?? {}, process.env);
     }
@@ -616,9 +614,24 @@ async function main(): Promise<void> {
   await server.connect(new StdioServerTransport());
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === fileUrlFromPath(process.argv[1])) {
   main().catch((error) => {
     console.error(`PARA-ZK MCP server failed: ${errorMessage(error)}`);
     process.exit(1);
   });
+}
+
+function fileUrlFromPath(path: string): string {
+  let pathname = path.replace(/\\/g, "/");
+  if (/^[A-Za-z]:\//.test(pathname)) {
+    pathname = `/${pathname}`;
+  } else if (!pathname.startsWith("/")) {
+    pathname = `/${pathname}`;
+  }
+
+  const encoded = pathname.split("/").map((segment, index) => {
+    if (index === 1 && /^[A-Za-z]:$/.test(segment)) return segment;
+    return encodeURIComponent(segment);
+  }).join("/");
+  return `file://${encoded}`;
 }

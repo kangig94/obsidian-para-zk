@@ -256,7 +256,7 @@ describe("structured task field updates", () => {
 });
 
 describe("structured task deletes", () => {
-  it("permanently deletes the current shard when deleting its only task", async () => {
+  it("trashes the current shard when deleting its only task", async () => {
     const taskId = await insertTask("Only task");
     const shardPath = currentShardPath();
 
@@ -265,9 +265,8 @@ describe("structured task deletes", () => {
     expect(deleted.changed).toBe(true);
     expect(cli.app.vault.getFileByPath(shardPath)).toBeNull();
     expect(cli.app.vault.getAbstractFileByPath(shardPath)).toBeNull();
-    // Permanently deleted (the empty managed scaffold has nothing to recover), not trashed.
-    expect(cli.app.deleted).toContain(shardPath);
-    expect(cli.app.trashed).not.toContainEqual({ path: shardPath, system: false });
+    expect(cli.app.trashed).toContainEqual({ path: shardPath, system: false });
+    expect(cli.app.deleted).not.toContain(shardPath);
 
     const read = await readTaskPage();
     expect(read.count).toBe(0);
@@ -345,7 +344,7 @@ describe("structured task deletes", () => {
     expect(currentShard()).toContain("Existing task");
   });
 
-  it("permanently deletes the archives shard for the last task of an archived project", async () => {
+  it("trashes the archives shard for the last task of an archived project", async () => {
     const taskId = await insertTask("Archived task");
     const currentPath = currentShardPath();
     await cli.run("para-zk:update-project", {
@@ -362,8 +361,8 @@ describe("structured task deletes", () => {
     expect(cli.app.readPath(ARCHIVED_PROJECT)).toBeDefined();
     expect(cli.app.vault.getFileByPath(archivePath)).toBeNull();
     expect(cli.app.vault.getFileByPath(currentPath)).toBeNull();
-    expect(cli.app.deleted).toContain(archivePath);
-    expect(cli.app.trashed).not.toContainEqual({ path: archivePath, system: false });
+    expect(cli.app.trashed).toContainEqual({ path: archivePath, system: false });
+    expect(cli.app.deleted).not.toContain(archivePath);
     expect(cli.app.deleted).not.toContain(currentPath);
   });
 });

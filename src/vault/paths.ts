@@ -10,6 +10,10 @@ export function joinVaultPath(...parts: Array<string | undefined>): string {
   return normalizeVaultPath(parts.filter(Boolean).join("/"));
 }
 
+export function obsidianConfigPath(vault: { configDir: string }, ...parts: string[]): string {
+  return joinVaultPath(vault.configDir, ...parts);
+}
+
 export function parentFolder(path: string): string {
   const normalized = normalizeVaultPath(path);
   const index = normalized.lastIndexOf("/");

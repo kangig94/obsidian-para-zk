@@ -23,7 +23,7 @@ export type ReadSectionSpec = {
   labels?: string[];
   skipManagedPrelude?: boolean;
   collection?: ReadCollectionKind;
-  transform?: (content: string, context: SectionTransformContext) => unknown | Promise<unknown>;
+  transform?: (content: string, context: SectionTransformContext) => unknown;
 };
 
 export type ReadSurfaceSpec = {

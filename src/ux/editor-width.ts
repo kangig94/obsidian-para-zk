@@ -34,7 +34,7 @@ function renderEditorWidthControl(plugin: ParaZkPluginContext): void {
   const item = plugin.addStatusBarItem();
   item.classList.add(WIDTH_SLIDER_CLASS);
 
-  const slider = document.createElement("input");
+  const slider = activeDocument.createElement("input");
   slider.type = "range";
   slider.min = String(EDITOR_LINE_WIDTH_MIN);
   slider.max = String(EDITOR_LINE_WIDTH_MAX);
@@ -44,7 +44,7 @@ function renderEditorWidthControl(plugin: ParaZkPluginContext): void {
   slider.setAttribute("aria-label", "Editor line width");
   slider.title = "Editor line width";
 
-  const label = document.createElement("span");
+  const label = activeDocument.createElement("span");
   label.classList.add("para-zk-width-slider__label");
   setLabel(label, plugin.settings.editorLineWidth);
 
@@ -60,17 +60,17 @@ function renderEditorWidthControl(plugin: ParaZkPluginContext): void {
 }
 
 function applyEditorWidth(px: number): void {
-  document.body.classList.add(WIDTH_ACTIVE_CLASS);
-  document.body.style.setProperty(WIDTH_VALUE_VAR, `${px}px`);
+  activeDocument.body.classList.add(WIDTH_ACTIVE_CLASS);
+  activeDocument.body.style.setProperty(WIDTH_VALUE_VAR, `${px}px`);
 }
 
 function clearEditorWidth(): void {
-  document.body.classList.remove(WIDTH_ACTIVE_CLASS);
-  document.body.style.removeProperty(WIDTH_VALUE_VAR);
+  activeDocument.body.classList.remove(WIDTH_ACTIVE_CLASS);
+  activeDocument.body.style.removeProperty(WIDTH_VALUE_VAR);
 }
 
 function removeEditorWidthControls(): void {
-  for (const item of document.querySelectorAll(`.${WIDTH_SLIDER_CLASS}`)) {
+  for (const item of activeDocument.querySelectorAll(`.${WIDTH_SLIDER_CLASS}`)) {
     item.remove();
   }
 }

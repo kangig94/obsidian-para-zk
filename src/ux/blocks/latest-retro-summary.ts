@@ -267,7 +267,7 @@ function dateTime(value: unknown): number {
   if (value instanceof Date) return value.getTime();
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim()) return new Date(value).getTime();
-  if (isRecord(value) && typeof value.toMillis === "function") return Number(value.toMillis());
+  if (hasToMillis(value)) return Number(value.toMillis());
   return Number.NaN;
 }
 
@@ -281,11 +281,16 @@ function frontmatterFromContent(content: string): Record<string, unknown> {
   if (!match) return {};
 
   try {
-    const parsed = parseYaml(match[1]);
+    const parsed: unknown = parseYaml(match[1]);
     return isRecord(parsed) ? parsed : {};
   } catch {
     return {};
   }
+}
+
+function hasToMillis(value: unknown): value is { toMillis: () => unknown } {
+  const candidate = value as { toMillis?: unknown } | null;
+  return isRecord(candidate) && typeof candidate.toMillis === "function";
 }
 
 function trimMarkdownBlock(value: string): string {

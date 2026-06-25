@@ -16,6 +16,10 @@ export class ParaZkSettingTab extends PluginSettingTab {
   }
 
   display(): void {
+    this.renderSettings();
+  }
+
+  private renderSettings(): void {
     const { containerEl } = this;
     const labels = localePack(this.plugin.settings.locale).labels;
     containerEl.empty();
@@ -45,7 +49,7 @@ export class ParaZkSettingTab extends PluginSettingTab {
             this.plugin.settings.locale = normalizeLocale(value, previousLocale);
             await this.plugin.saveSettings();
             refreshRegisteredLocaleLabels(this.plugin, previousLocale);
-            this.display();
+            this.renderSettings();
           });
       })
       .addButton((button) => {
@@ -117,7 +121,7 @@ export class ParaZkSettingTab extends PluginSettingTab {
         installDeps: options.installDeps
       });
       new Notice(this.setupNotice(result));
-      this.display();
+      this.renderSettings();
     } catch (error) {
       console.error(error);
       new Notice(`PARA-ZK error: ${errorMessage(error)}`);

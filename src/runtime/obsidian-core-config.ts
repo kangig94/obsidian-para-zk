@@ -3,10 +3,8 @@ import { PARA_ZK_PATHS } from "../layout";
 import { isRecord } from "../records";
 import { appendUniqueStrings } from "../text";
 import type { SetupResult } from "../types";
-import { joinVaultPath, normalizeVaultPath, parentFolder } from "../vault/paths";
+import { joinVaultPath, normalizeVaultPath, obsidianConfigPath, parentFolder } from "../vault/paths";
 
-const APP_CONFIG_PATH = ".obsidian/app.json";
-const TEMPLATES_CONFIG_PATH = ".obsidian/templates.json";
 const ATTACHMENT_FOLDER = "assets";
 
 type ConfigState = {
@@ -20,19 +18,27 @@ export async function configureObsidianCoreSettings(
   result: SetupResult,
   dryRun: boolean
 ): Promise<void> {
-  const appConfig = await readConfig(app, APP_CONFIG_PATH, result);
+  const appConfig = await readConfig(app, appConfigPath(app), result);
   if (appConfig) {
     const nextAppConfig = mergeAppConfig(appConfig.value);
     await writeConfig(app, appConfig, nextAppConfig, result, dryRun);
     if (!dryRun) updateRuntimeAppConfig(app, nextAppConfig);
   }
 
-  const templatesConfig = await readConfig(app, TEMPLATES_CONFIG_PATH, result);
+  const templatesConfig = await readConfig(app, templatesConfigPath(app), result);
   if (templatesConfig) {
     const nextTemplatesConfig = mergeTemplatesConfig(templatesConfig.value);
     await writeConfig(app, templatesConfig, nextTemplatesConfig, result, dryRun);
     if (!dryRun) updateRuntimeTemplatesConfig(app, nextTemplatesConfig);
   }
+}
+
+function appConfigPath(app: App): string {
+  return obsidianConfigPath(app.vault, "app.json");
+}
+
+function templatesConfigPath(app: App): string {
+  return obsidianConfigPath(app.vault, "templates.json");
 }
 
 async function readConfig(app: App, path: string, result: SetupResult): Promise<ConfigState | undefined> {

@@ -572,7 +572,7 @@ function randomBase36Id(): string {
 }
 
 function randomUint32(): number {
-  const crypto = globalThis.crypto;
+  const crypto = typeof window === "undefined" ? undefined : window.crypto;
   if (crypto && typeof crypto.getRandomValues === "function") {
     const buffer = new Uint32Array(1);
     crypto.getRandomValues(buffer);

@@ -11,9 +11,7 @@ export interface WorkflowHost {
   create(path: string, data: string): Promise<TFile>;
   createFolder(path: string): Promise<void>;
   modify(file: TFile, data: string): Promise<void>;
-  trash(file: TAbstractFile, system: boolean): Promise<void>;
-  trashFile?: (file: TAbstractFile) => Promise<void>;
-  delete(file: TFile): Promise<void>;
+  trashFile(file: TAbstractFile): Promise<void>;
   processFrontMatter(file: TFile, fn: (frontmatter: Record<string, unknown>) => void): Promise<void>;
   renameFile(file: TAbstractFile, newPath: string): Promise<void>;
   getFirstLinkpathDest(linkpath: string, sourcePath: string): TFile | null;
@@ -25,20 +23,11 @@ export interface WorkflowHost {
 }
 
 export async function trashAbstractFile(host: WorkflowHost, file: TAbstractFile): Promise<string> {
-  if (typeof host.trashFile === "function") {
-    await host.trashFile(file);
-    return "fileManager.trashFile";
-  }
-
-  await host.trash(file, false);
-  return "vault.trash.local";
+  await host.trashFile(file);
+  return "fileManager.trashFile";
 }
 
 function createObsidianHost(app: App): WorkflowHost {
-  const fileManager = app.fileManager as typeof app.fileManager & {
-    trashFile?: (file: TAbstractFile) => Promise<void>;
-  };
-
   return {
     getFile: (path) => app.vault.getFileByPath(path),
     getAbstractFile: (path) => app.vault.getAbstractFileByPath(path),
@@ -48,11 +37,7 @@ function createObsidianHost(app: App): WorkflowHost {
     create: (path, data) => app.vault.create(path, data),
     createFolder: async (path) => { await app.vault.createFolder(path); },
     modify: (file, data) => app.vault.modify(file, data),
-    trash: (file, system) => app.vault.trash(file, system),
-    trashFile: typeof fileManager.trashFile === "function"
-      ? (file) => fileManager.trashFile?.(file) ?? Promise.resolve()
-      : undefined,
-    delete: (file) => app.vault.delete(file),
+    trashFile: (file) => app.fileManager.trashFile(file),
     processFrontMatter: (file, fn) => app.fileManager.processFrontMatter(file, fn),
     renameFile: (file, newPath) => app.fileManager.renameFile(file, newPath),
     getFirstLinkpathDest: (linkpath, sourcePath) => app.metadataCache.getFirstLinkpathDest(linkpath, sourcePath),
