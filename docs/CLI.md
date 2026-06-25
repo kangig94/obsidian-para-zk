@@ -457,7 +457,7 @@ JSON output fields:
 ### `para-zk:setup`
 
 Sets up or syncs the PARA-ZK vault layout, managed templates, dashboards,
-guide file, required Obsidian core settings, and required community plugins.
+guide file, required Obsidian core settings, and selected community plugins.
 
 Options:
 
@@ -465,7 +465,7 @@ Options:
 | --- | --- | --- |
 | `locale` | `ko`, `en` | Locale for generated labels and tags. |
 | `dryRun` | boolean | Plan without writing. |
-| `installDeps` | boolean | Install and enable required plugins. |
+| `deps` | `none`, `required`, `enhancements`, `all` | Install and enable a dependency group. Default: `none`. |
 | `format` | `json`, `text` | Default `text` renders the data readably; use `json` when the output is machine-parsed. |
 
 Managed scaffolding (templates, dashboards, READMEs) is plugin-owned. Setup
@@ -475,11 +475,14 @@ alone; user content notes are never touched by setup.
 Required dependencies:
 
 - Dataview
-- Tasks
 - Folder Notes
 - Update time on edit
-- Trash Explorer
 - Custom File Explorer sorting
+
+UX enhancement dependencies:
+
+- Tasks
+- Trash Explorer
 - Homepage
 - Open Tab Settings
 - Remember cursor position
@@ -515,7 +518,7 @@ unrelated user settings:
 Example:
 
 ```bash
-optsidian para-zk:setup installDeps=true locale=ko
+optsidian para-zk:setup deps=required locale=ko
 ```
 
 When `locale` is omitted, PARA-ZK defaults to English. Pass `locale=ko` for

@@ -2,6 +2,7 @@ import { Notice, type TFile } from "obsidian";
 import { localePack, normalizeLocale } from "../../i18n";
 import type { ParaZkPluginContext } from "../../plugin-interface";
 import { isRecord } from "../../records";
+import type { DependencyInstallScope } from "../../types";
 import { workflowContext } from "../../vault/host";
 import {
   statusCommandEntries,
@@ -62,11 +63,11 @@ export function registerStatusAndInitCommands(plugin: ParaZkPluginContext): void
         ? {
           locale: normalizeLocale(readCommandString(args, "locale"), plugin.settings.locale),
           dryRun: readCommandBoolean(args, "dryRun") ?? readCommandBoolean(args, "dry-run") ?? false,
-          installDeps: readCommandBoolean(args, "installDeps") ?? readCommandBoolean(args, "install-deps") ?? false
+          deps: readCommandDependencyScope(args, "deps") ?? "none"
         }
         : await promptSetupOptions(plugin.app, {
           locale: plugin.settings.locale,
-          installDeps: false
+          deps: "none"
         });
       if (!options) {
         new Notice(localePack(plugin.settings.locale).messages.commandCancelled);
@@ -260,6 +261,21 @@ function readCommandBoolean(args: Record<string, unknown>, key: string): boolean
   const normalized = value.trim().toLowerCase();
   if (["true", "1", "yes", "on"].includes(normalized)) return true;
   if (["false", "0", "no", "off"].includes(normalized)) return false;
+  return undefined;
+}
+
+function readCommandDependencyScope(args: Record<string, unknown>, key: string): DependencyInstallScope | undefined {
+  const value = args[key];
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (
+    normalized === "none"
+    || normalized === "required"
+    || normalized === "enhancements"
+    || normalized === "all"
+  ) {
+    return normalized;
+  }
   return undefined;
 }
 

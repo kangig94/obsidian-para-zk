@@ -1,10 +1,10 @@
 import { App, ButtonComponent, Modal, Setting, TextComponent } from "obsidian";
 import { localePack } from "../i18n";
-import type { Locale } from "../types";
+import type { DependencyInstallScope, Locale } from "../types";
 
 export type SetupPromptOptions = {
   locale: Locale;
-  installDeps: boolean;
+  deps: DependencyInstallScope;
 };
 
 export function promptText(
@@ -198,13 +198,17 @@ class SetupOptionsModal extends ResolvingModal<SetupPromptOptions> {
       });
 
     new Setting(contentEl)
-      .setName(labels.setupInstallDeps)
-      .setDesc(labels.setupInstallDepsDesc)
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.value.installDeps)
+      .setName(labels.setupDeps)
+      .setDesc(labels.setupDepsDesc)
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption("none", labels.setupDepsNone)
+          .addOption("required", labels.setupDepsRequired)
+          .addOption("enhancements", labels.setupDepsEnhancements)
+          .addOption("all", labels.setupDepsAll)
+          .setValue(this.value.deps)
           .onChange((value) => {
-            this.value.installDeps = value;
+            this.value.deps = normalizeDependencyScope(value);
           });
       });
 
@@ -229,6 +233,11 @@ class SetupOptionsModal extends ResolvingModal<SetupPromptOptions> {
   private cancel(): void {
     this.resolveAndClose(null);
   }
+}
+
+function normalizeDependencyScope(value: string): DependencyInstallScope {
+  if (value === "required" || value === "enhancements" || value === "all") return value;
+  return "none";
 }
 
 class DistillPromptModal extends ResolvingModal<DistillPromptResult> {

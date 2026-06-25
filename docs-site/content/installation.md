@@ -65,19 +65,22 @@ After installing the plugin, run **PARA-ZK: Set up PARA-ZK vault** from the comm
 Automation can run the same setup as:
 
 ```bash
-optsidian para-zk:setup installDeps=true
+optsidian para-zk:setup deps=required
 ```
 
 Setup is idempotent. It creates or syncs the PARA/ZK layout, `LLM-Wiki/`, managed templates, dashboards, the vault guide, required Obsidian settings, and dependency configuration.
 
-With `installDeps=true`, setup offers to install and enable the required community plugins:
+With `deps=required`, setup offers to install and enable the required community plugins:
 
 - Dataview
-- Tasks
 - Folder Notes
 - Update time on edit
-- Trash Explorer
 - Custom File Explorer sorting
+
+Use `deps=all` to also install and enable UX enhancements:
+
+- Tasks
+- Trash Explorer
 - Homepage
 - Open Tab Settings
 - Remember cursor position
@@ -92,7 +95,7 @@ English is the default locale.
 For Korean generated labels, headings, and tags, pass:
 
 ```bash
-optsidian para-zk:setup installDeps=true locale=ko
+optsidian para-zk:setup deps=required locale=ko
 ```
 
 CLI and MCP values stay locale-neutral codes such as `status=in_progress` and `priority=high`; Obsidian renders localized labels in the vault.

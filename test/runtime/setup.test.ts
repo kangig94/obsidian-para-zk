@@ -46,12 +46,42 @@ function createSetupApp(): MockApp {
   return app;
 }
 
+function createSetupAppWithPluginManager(): MockApp {
+  const app = createSetupApp();
+  Object.assign(app, {
+    plugins: {
+      manifests: {},
+      enabledPlugins: new Set<string>()
+    }
+  });
+  return app;
+}
+
 async function runSetup(
   app: MockApp,
   settings: ParaZkSettings,
   options: SetupOptions = {}
 ): Promise<Awaited<ReturnType<typeof setupVault>>> {
   return setupVault(app as unknown as App, settings, options);
+}
+
+const REQUIRED_DEPENDENCY_IDS = [
+  "dataview",
+  "folder-notes",
+  "update-time-on-edit",
+  "custom-sort"
+] as const;
+
+const ENHANCEMENT_DEPENDENCY_IDS = [
+  "obsidian-tasks-plugin",
+  "obsidian-trash-explorer",
+  "homepage",
+  "open-tab-settings",
+  "remember-cursor-position"
+] as const;
+
+function dependencyActions(result: Awaited<ReturnType<typeof runSetup>>["result"]): Map<string, string> {
+  return new Map(result.dependencies.map((dependency) => [dependency.id, dependency.action]));
 }
 
 async function modifyTarget(app: MockApp, path: string, content: string): Promise<void> {
@@ -259,6 +289,54 @@ describe("setup managed scaffolding", () => {
       expect(actual.result.warnings).toContain(warning);
       expect(app.vault.getFileByPath(target.path)).toBeNull();
       expect(app.readPath(target.path)).toBeUndefined();
+    }
+  });
+
+  it("warns only for missing required dependencies when dependency installation is not selected", async () => {
+    const settings = baseSettings();
+    const app = createSetupAppWithPluginManager();
+
+    const actual = await runSetup(app, settings);
+    const actions = dependencyActions(actual.result);
+
+    for (const id of REQUIRED_DEPENDENCY_IDS) {
+      expect(actions.get(id)).toBe("warn");
+      expect(actual.result.dependencies.find((dependency) => dependency.id === id)?.tier).toBe("required");
+    }
+    for (const id of ENHANCEMENT_DEPENDENCY_IDS) {
+      expect(actions.get(id)).toBe("none");
+      expect(actual.result.dependencies.find((dependency) => dependency.id === id)?.tier).toBe("enhancement");
+    }
+    expect(actual.result.warnings.filter((warning) => warning.startsWith("Required plugin"))).toHaveLength(
+      REQUIRED_DEPENDENCY_IDS.length
+    );
+  });
+
+  it("dry-runs only the selected dependency group", async () => {
+    const settings = baseSettings();
+
+    const requiredRun = await runSetup(createSetupAppWithPluginManager(), settings, {
+      deps: "required",
+      dryRun: true
+    });
+    const requiredActions = dependencyActions(requiredRun.result);
+    for (const id of REQUIRED_DEPENDENCY_IDS) {
+      expect(requiredActions.get(id)).toBe("would_install_and_enable");
+    }
+    for (const id of ENHANCEMENT_DEPENDENCY_IDS) {
+      expect(requiredActions.get(id)).toBe("none");
+    }
+
+    const enhancementRun = await runSetup(createSetupAppWithPluginManager(), settings, {
+      deps: "enhancements",
+      dryRun: true
+    });
+    const enhancementActions = dependencyActions(enhancementRun.result);
+    for (const id of REQUIRED_DEPENDENCY_IDS) {
+      expect(enhancementActions.get(id)).toBe("warn");
+    }
+    for (const id of ENHANCEMENT_DEPENDENCY_IDS) {
+      expect(enhancementActions.get(id)).toBe("would_install_and_enable");
     }
   });
 });

@@ -1,6 +1,10 @@
 import { App, requestUrl, type PluginManifest } from "obsidian";
 import { isRecord } from "../../records";
-import type { DependencyResult } from "../../types";
+import type {
+  DependencyInstallScope,
+  DependencyResult,
+  DependencyTier
+} from "../../types";
 import { obsidianConfigPath } from "../../vault/paths";
 import {
   customSortDependencyConfiguration,
@@ -23,15 +27,16 @@ import {
   UPDATE_TIME_PLUGIN_ID
 } from "./update-time-on-edit";
 
-type RequiredDependency = {
+type DependencyDescriptor = {
   id: string;
   name: string;
   repo: string;
+  tier: DependencyTier;
   reason: string;
 };
 
 type DependencyResolutionOptions = {
-  installDeps: boolean;
+  deps: DependencyInstallScope;
   dryRun: boolean;
   warnings: string[];
 };
@@ -51,7 +56,7 @@ export type DependencyConfiguration = {
   ) => Promise<boolean>;
 };
 
-type DependencySpec = RequiredDependency & {
+type DependencySpec = DependencyDescriptor & {
   configuration?: DependencyConfiguration;
 };
 
@@ -88,11 +93,12 @@ const dependencyConfigurationServices: DependencyConfigurationServices = {
   updateRunningPluginSettings
 };
 
-const REQUIRED_DEPENDENCIES: DependencySpec[] = [
+const DEPENDENCIES: DependencySpec[] = [
   {
     id: DATAVIEW_PLUGIN_ID,
     name: "Dataview",
     repo: "blacksmithgu/obsidian-dataview",
+    tier: "required",
     reason: "PARA-ZK dashboards use Dataview and DataviewJS blocks",
     configuration: dataviewDependencyConfiguration
   },
@@ -100,18 +106,21 @@ const REQUIRED_DEPENDENCIES: DependencySpec[] = [
     id: "obsidian-tasks-plugin",
     name: "Tasks",
     repo: "obsidian-tasks-group/obsidian-tasks",
+    tier: "enhancement",
     reason: "PARA-ZK stores Tasks-compatible task status and metadata syntax"
   },
   {
     id: "folder-notes",
     name: "Folder notes",
     repo: "LostPaul/obsidian-folder-notes",
+    tier: "required",
     reason: "PARA-ZK uses folder-style project and area notes that should open from folder clicks"
   },
   {
     id: UPDATE_TIME_PLUGIN_ID,
     name: "Update time on edit",
     repo: "beaussan/update-time-on-edit-obsidian",
+    tier: "required",
     reason: "PARA-ZK relies on created and updated frontmatter staying current after human edits",
     configuration: updateTimeOnEditDependencyConfiguration
   },
@@ -119,12 +128,14 @@ const REQUIRED_DEPENDENCIES: DependencySpec[] = [
     id: "obsidian-trash-explorer",
     name: "Trash Explorer",
     repo: "proog/obsidian-trash-explorer",
+    tier: "enhancement",
     reason: "PARA-ZK uses Obsidian's local trash and exposes a native empty-trash explorer action"
   },
   {
     id: CUSTOM_SORT_PLUGIN_ID,
     name: "Custom File Explorer sorting",
     repo: "SebastianMC/obsidian-custom-sort",
+    tier: "required",
     reason: "PARA-ZK uses a stable PARA/ZK folder order in Obsidian's file explorer",
     configuration: customSortDependencyConfiguration
   },
@@ -132,6 +143,7 @@ const REQUIRED_DEPENDENCIES: DependencySpec[] = [
     id: HOMEPAGE_PLUGIN_ID,
     name: "Homepage",
     repo: "mirnovov/obsidian-homepage",
+    tier: "enhancement",
     reason: "PARA-ZK opens the generated Home dashboard on startup and when the workspace is empty",
     configuration: homepageDependencyConfiguration
   },
@@ -139,6 +151,7 @@ const REQUIRED_DEPENDENCIES: DependencySpec[] = [
     id: OPEN_TAB_SETTINGS_PLUGIN_ID,
     name: "Open Tab Settings",
     repo: "jesse-r-s-hines/obsidian-open-tab-settings",
+    tier: "enhancement",
     reason: "PARA-ZK navigation opens notes from ribbon, dashboard, and view toolbar actions; consistent open-in-new-tab, focused-new-tab, and no-duplicate-tab behavior keeps the PARA/ZK workflow navigable",
     configuration: openTabSettingsDependencyConfiguration
   },
@@ -146,6 +159,7 @@ const REQUIRED_DEPENDENCIES: DependencySpec[] = [
     id: "remember-cursor-position",
     name: "Remember cursor position",
     repo: "dy-sh/obsidian-remember-cursor-position",
+    tier: "enhancement",
     reason: "PARA-ZK users frequently move between generated dashboards, root notes, and child notes; restoring each note's cursor and scroll position keeps context intact"
   }
 ];
@@ -157,7 +171,7 @@ export async function resolveDependencies(
   const manager = readPluginManager(app);
   if (!manager) {
     options.warnings.push("Cannot inspect Obsidian community plugins; app.plugins API is unavailable");
-    return REQUIRED_DEPENDENCIES.map((dependency) => ({
+    return DEPENDENCIES.map((dependency) => ({
       ...baseResult(dependency),
       installed: false,
       enabled: false,
@@ -167,7 +181,7 @@ export async function resolveDependencies(
   }
 
   const results: DependencyResult[] = [];
-  for (const dependency of REQUIRED_DEPENDENCIES) {
+  for (const dependency of DEPENDENCIES) {
     results.push(await resolveDependency(app, manager, dependency, options));
   }
 
@@ -187,9 +201,11 @@ async function resolveDependency(
     ...before,
     action: "none"
   };
+  const selected = shouldInstallDependency(dependency, options.deps);
+  const shouldConfigure = dependency.tier === "required" || selected;
 
   if (before.installed && before.enabled) {
-    if (options.installDeps && !options.dryRun && !enabledConfig?.has(dependency.id)) {
+    if (selected && !options.dryRun && !enabledConfig?.has(dependency.id)) {
       try {
         await ensureEnabledPluginConfig(app, dependency.id);
         result.action = "enabled";
@@ -198,19 +214,21 @@ async function resolveDependency(
         options.warnings.push(`Failed to persist enabled plugin ${dependency.name} (${dependency.id}): ${message}`);
       }
     }
-    await configureDependency(app, manager, dependency, result, options);
+    if (shouldConfigure) await configureDependency(app, manager, dependency, result, options);
     return result;
   }
 
-  if (!options.installDeps) {
-    result.action = "warn";
-    options.warnings.push(dependencyWarning(dependency, before));
+  if (!selected) {
+    if (dependency.tier === "required") {
+      result.action = "warn";
+      options.warnings.push(dependencyWarning(dependency, before));
+    }
     return result;
   }
 
   if (options.dryRun) {
     result.action = before.installed ? "would_enable" : "would_install_and_enable";
-    options.warnings.push(`Would ${before.installed ? "enable" : "install and enable"} required plugin ${dependency.name} (${dependency.id})`);
+    options.warnings.push(`Would ${before.installed ? "enable" : "install and enable"} ${dependency.tier} plugin ${dependency.name} (${dependency.id})`);
     await configureDependency(app, manager, dependency, result, options);
     return result;
   }
@@ -251,7 +269,7 @@ async function configureDependency(
 async function installOrEnableDependency(
   app: App,
   manager: PluginManager,
-  dependency: RequiredDependency,
+  dependency: DependencyDescriptor,
   result: DependencyResult,
   warnings: string[]
 ): Promise<DependencyResult> {
@@ -285,14 +303,14 @@ async function installOrEnableDependency(
     result.action = "failed";
     result.error = message;
     Object.assign(result, readDependencyState(manager, dependency));
-    warnings.push(`Failed to install or enable required plugin ${dependency.name} (${dependency.id}): ${message}`);
+    warnings.push(`Failed to install or enable ${dependency.tier} plugin ${dependency.name} (${dependency.id}): ${message}`);
     return result;
   }
 }
 
 async function installDependency(
   manager: PluginManager,
-  dependency: RequiredDependency,
+  dependency: DependencyDescriptor,
   version: string,
   manifest: PluginManifest
 ): Promise<void> {
@@ -317,7 +335,7 @@ async function enableDependency(manager: PluginManager, id: string): Promise<boo
   throw new Error("app.plugins.enablePluginAndSave API is unavailable");
 }
 
-async function fetchLatestReleaseManifest(dependency: RequiredDependency): Promise<{
+async function fetchLatestReleaseManifest(dependency: DependencyDescriptor): Promise<{
   releaseTag: string;
   manifest: PluginManifest;
 }> {
@@ -351,7 +369,7 @@ function readPluginManager(app: App): PluginManager | undefined {
 
 function readDependencyState(
   manager: PluginManager,
-  dependency: RequiredDependency,
+  dependency: DependencyDescriptor,
   enabledConfig?: Set<string>
 ): Pick<DependencyResult, "installed" | "enabled" | "installedVersion"> {
   const manifest = manager.manifests?.[dependency.id];
@@ -502,11 +520,12 @@ function readOptionalBoolean(value: unknown, key: string): boolean | undefined {
   return isRecord(value) && typeof value[key] === "boolean" ? value[key] : undefined;
 }
 
-function baseResult(dependency: RequiredDependency): Pick<DependencyResult, "id" | "name" | "repo"> {
+function baseResult(dependency: DependencyDescriptor): Pick<DependencyResult, "id" | "name" | "repo" | "tier"> {
   return {
     id: dependency.id,
     name: dependency.name,
-    repo: dependency.repo
+    repo: dependency.repo,
+    tier: dependency.tier
   };
 }
 
@@ -515,9 +534,16 @@ function addConfigured(result: DependencyResult, value: string): void {
 }
 
 function dependencyWarning(
-  dependency: RequiredDependency,
+  dependency: DependencyDescriptor,
   state: Pick<DependencyResult, "installed" | "enabled">
 ): string {
   const status = state.installed ? "installed but disabled" : "not installed";
-  return `Required plugin ${dependency.name} (${dependency.id}) is ${status}; ${dependency.reason}. Re-run para-zk:setup installDeps=true to install/enable dependencies.`;
+  return `Required plugin ${dependency.name} (${dependency.id}) is ${status}; ${dependency.reason}. Re-run para-zk:setup deps=required to install/enable required dependencies.`;
+}
+
+function shouldInstallDependency(dependency: DependencySpec, deps: DependencyInstallScope): boolean {
+  if (deps === "all") return true;
+  if (deps === "required") return dependency.tier === "required";
+  if (deps === "enhancements") return dependency.tier === "enhancement";
+  return false;
 }

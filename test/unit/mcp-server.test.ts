@@ -112,7 +112,7 @@ describe("MCP server pure helpers", () => {
   it("install guidance covers the vault init step (setup), not just plugin install", () => {
     for (const cli of ["optsidian", "obsidian"] as const) {
       const install = buildFallback({ cli }).install as string;
-      expect(install).toContain("para-zk:setup installDeps=true");
+      expect(install).toContain("para-zk:setup deps=required");
     }
   });
 

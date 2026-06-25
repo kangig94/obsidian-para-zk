@@ -34,8 +34,11 @@ export type SetupResult = {
 export type SetupOptions = {
   locale?: Locale;
   dryRun?: boolean;
-  installDeps?: boolean;
+  deps?: DependencyInstallScope;
 };
+
+export type DependencyInstallScope = "none" | "required" | "enhancements" | "all";
+export type DependencyTier = "required" | "enhancement";
 
 type DependencyAction =
   | "none"
@@ -50,6 +53,7 @@ export type DependencyResult = {
   id: string;
   name: string;
   repo: string;
+  tier: DependencyTier;
   installed: boolean;
   enabled: boolean;
   installedVersion?: string;

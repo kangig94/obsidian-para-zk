@@ -85,6 +85,14 @@ function checkSourcePatterns() {
       message: "avoid Node builtin import() or typeof import() references in plugin source"
     },
     {
+      pattern: /const\s+\{[^}]+\}\s*=\s*await\s+node(?:Fs|Path)\s*\(/,
+      message: "avoid destructuring Node module methods; call them from the module object"
+    },
+    {
+      pattern: /const\s+\w+\s*=\s*process\.getBuiltinModule\b/,
+      message: "avoid separating process.getBuiltinModule from process"
+    },
+    {
       pattern: /\bimport\(\s*(?!["'`])/,
       message: "dynamic import() must use a string literal"
     },

@@ -44,7 +44,7 @@ export async function setupVault(
   }
 
   result.dependencies = await resolveDependencies(app, {
-    installDeps: options.installDeps ?? false,
+    deps: options.deps ?? "none",
     dryRun,
     warnings: result.warnings
   });

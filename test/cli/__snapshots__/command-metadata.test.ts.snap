@@ -1298,6 +1298,10 @@ exports[`native CLI command metadata is stable 1`] = `
     "command": "para-zk:setup",
     "description": "Set up the PARA-ZK vault layout and managed files",
     "options": {
+      "deps": {
+        "description": "Community plugin dependency group to install and enable.",
+        "value": "<none|required|enhancements|all>",
+      },
       "dryRun": {
         "description": "Plan changes without writing.",
         "value": "<true|false>",
@@ -1305,10 +1309,6 @@ exports[`native CLI command metadata is stable 1`] = `
       "format": {
         "description": "Output format (default: text)",
         "value": "<text|json>",
-      },
-      "installDeps": {
-        "description": "Install and enable required community plugins.",
-        "value": "<true|false>",
       },
       "locale": {
         "description": "Language for UI, generated files, and tags.",

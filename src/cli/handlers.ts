@@ -2,7 +2,7 @@ import type { Plugin } from "obsidian";
 import { localePack, normalizeLocale } from "../i18n";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { normalizeAliasList } from "../text";
-import type { CliArgs, CliOptionSpec } from "../types";
+import type { CliArgs, CliOptionSpec, DependencyInstallScope } from "../types";
 import {
   ENERGY_CODE_HELP,
   MATURITY_CODE_HELP,
@@ -911,7 +911,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     options: {
       locale: { value: "<ko|en>", description: "Language for UI, generated files, and tags." },
       dryRun: { value: "<true|false>", description: "Plan changes without writing." },
-      installDeps: { value: "<true|false>", description: "Install and enable required community plugins." },
+      deps: { value: "<none|required|enhancements|all>", description: "Community plugin dependency group to install and enable." },
       format: { value: "<text|json>", description: "Output format (default: text)" }
     },
     text: "vault set up",
@@ -920,7 +920,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       const result = await plugin.setupVault({
         locale,
         dryRun: readCliBoolean(args, "dryRun") ?? false,
-        installDeps: readCliBoolean(args, "installDeps") ?? false
+        deps: readCliDependencyScope(args, "deps") ?? "none"
       });
       return {
         message: localePack(locale).messages.setupReady,
@@ -1450,8 +1450,7 @@ function nodePath(): Promise<NodePath> {
 function nodeModule<T>(id: string): T {
   const electronModule = electronRequire(id);
   if (electronModule !== undefined) return electronModule as T;
-  const getBuiltinModule = typeof process === "undefined" ? undefined : process.getBuiltinModule;
-  const module = typeof getBuiltinModule === "function" ? getBuiltinModule(id) : undefined;
+  const module = typeof process === "undefined" ? undefined : process.getBuiltinModule(id);
   if (module === undefined) throw new Error(`Node module unavailable: ${id}`);
   return module as T;
 }
@@ -1473,9 +1472,9 @@ async function resolveFileBackedArgs(args: CliArgs, options: Record<string, CliO
     if (typeof value !== "string" || !value.startsWith("@")) continue;
     const filePath = value.slice(1);
     if (!filePath) throw new Error("@file value must include a path");
-    const { readFile } = await nodeFs();
+    const fs = await nodeFs();
     resolved ??= { ...args };
-    resolved[key] = await readFile(filePath, "utf8");
+    resolved[key] = await fs.readFile(filePath, "utf8");
   }
   return resolved ?? args;
 }
@@ -1603,12 +1602,12 @@ async function collectAttachmentJobs(
   requestedName: string | undefined,
   recursive: boolean
 ): Promise<{ jobs: AttachmentJob[]; collectionMode: boolean }> {
-  const { stat } = await nodeFs();
+  const fs = await nodeFs();
   const jobs: AttachmentJob[] = [];
   let collectionMode = sourcePaths.length > 1;
 
   for (const sourcePath of sourcePaths) {
-    const info = await stat(sourcePath);
+    const info = await fs.stat(sourcePath);
     if (info.isFile()) {
       jobs.push({ sourcePath, targetFolder: folder, requestedName });
       continue;
@@ -1634,14 +1633,14 @@ async function collectDirectoryAttachmentJobs(
   recursive: boolean,
   jobs: AttachmentJob[]
 ): Promise<void> {
-  const { readdir } = await nodeFs();
-  const { join } = await nodePath();
+  const fs = await nodeFs();
+  const path = await nodePath();
   async function visit(localFolder: string, vaultFolder: string): Promise<void> {
-    const entries = (await readdir(localFolder, { withFileTypes: true }))
+    const entries = (await fs.readdir(localFolder, { withFileTypes: true }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
     for (const entry of entries) {
-      const localPath = join(localFolder, entry.name);
+      const localPath = path.join(localFolder, entry.name);
       if (entry.isFile()) {
         jobs.push({ sourcePath: localPath, targetFolder: vaultFolder });
         continue;
@@ -1656,8 +1655,8 @@ async function collectDirectoryAttachmentJobs(
 }
 
 async function attachAttachmentJob(plugin: ParaZkPluginContext, job: AttachmentJob): Promise<AttachedFile> {
-  const { readFile } = await nodeFs();
-  const bytes = await readFile(job.sourcePath);
+  const fs = await nodeFs();
+  const bytes = await fs.readFile(job.sourcePath);
   const filename = attachmentFileName(job.sourcePath, job.requestedName);
   const file = await createUniqueVaultBinary(plugin, job.targetFolder, filename, bytes);
   const link = wikiLink(file.path);
@@ -1851,6 +1850,22 @@ function readCliBoolean(args: CliArgs, key: string): boolean | undefined {
   if (["true", "1", "yes", "on"].includes(normalized)) return true;
   if (["false", "0", "no", "off"].includes(normalized)) return false;
   throw new Error(`${key} must be a boolean (got ${value})`);
+}
+
+function readCliDependencyScope(args: CliArgs, key: string): DependencyInstallScope | undefined {
+  if (!Object.prototype.hasOwnProperty.call(args, key)) return undefined;
+  const value = args[key];
+  if (typeof value !== "string") throw new Error(`${key} must be one of none, required, enhancements, all`);
+  const normalized = value.trim().toLowerCase();
+  if (
+    normalized === "none"
+    || normalized === "required"
+    || normalized === "enhancements"
+    || normalized === "all"
+  ) {
+    return normalized;
+  }
+  throw new Error(`${key} must be one of none, required, enhancements, all`);
 }
 
 function readCliTitle(args: CliArgs): string {

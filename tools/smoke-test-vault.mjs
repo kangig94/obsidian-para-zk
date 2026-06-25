@@ -15,7 +15,7 @@ import { basename, join, resolve } from "node:path";
 const args = parseArgs(process.argv.slice(2));
 const vaultPath = resolve(args.vault ?? inferVaultPath());
 const pluginDir = resolve(args.pluginDir ?? join(vaultPath, ".obsidian/plugins/para-zk"));
-const installDeps = args.installDeps !== false;
+const dependencyScope = resolveDependencyScope(args.deps);
 const stamp = args.stamp ?? timestamp();
 const runLocale = resolveRunLocale(args.locale);
 // Locale-dependent headings/titles the live assertions check. Ribbon/command
@@ -27,17 +27,20 @@ const LOCALIZED = {
 };
 const L = LOCALIZED[runLocale];
 const smokeModelId = "smoke-test-model";
-const requiredDependencyIds = [
+const coreDependencyIds = [
   "dataview",
-  "obsidian-tasks-plugin",
   "folder-notes",
   "update-time-on-edit",
+  "custom-sort"
+];
+const enhancementDependencyIds = [
+  "obsidian-tasks-plugin",
   "obsidian-trash-explorer",
-  "custom-sort",
   "homepage",
   "open-tab-settings",
   "remember-cursor-position"
 ];
+const dependencyIds = [...coreDependencyIds, ...enhancementDependencyIds];
 const guiLocaleExpectations = {
   en: {
     ribbonLabels: ["New project", "New area", "New resource", "New ZK", "Open daily note", "Quick memo"],
@@ -50,6 +53,13 @@ const guiLocaleExpectations = {
     emptyTrashLabel: "휴지통 비우기"
   }
 };
+
+function dependencyIsSelected(id) {
+  if (dependencyScope === "all") return true;
+  if (dependencyScope === "required") return coreDependencyIds.includes(id);
+  if (dependencyScope === "enhancements") return enhancementDependencyIds.includes(id);
+  return false;
+}
 
 prepareVault();
 
@@ -97,7 +107,7 @@ function prepareVault() {
 function setupVaultCli(extraArgs = [], label = "init") {
   const payload = cliJson("para-zk:setup", [
     ...extraArgs,
-    `installDeps=${installDeps}`,
+    `deps=${dependencyScope}`,
     "format=json"
   ]);
   assert(payload.ok === true, `${label} failed`);
@@ -110,7 +120,7 @@ function assertSetupEnvironment(setupPayload) {
     `init warnings: ${JSON.stringify(setupPayload.warnings)}`
   );
 
-  for (const id of requiredDependencyIds) {
+  for (const id of dependencyIds) {
     assertDependency(setupPayload, id);
   }
 
@@ -124,7 +134,7 @@ function assertSetupEnvironment(setupPayload) {
 }
 
 function ensureDataviewIndexReady() {
-  if (!installDeps) return;
+  if (!dependencyIsSelected("dataview")) return;
 
   run("optsidian", ["raw", "plugin:reload", "id=dataview"], { allowFailure: true });
   const snapshot = guiJson(`(async () => {
@@ -1588,15 +1598,12 @@ function assertDryRunInit() {
 
 function parseArgs(rawArgs) {
   const parsed = {
-    build: true,
-    installDeps: true
+    build: true
   };
 
   for (const arg of rawArgs) {
     if (arg === "--no-build") {
       parsed.build = false;
-    } else if (arg === "--no-install-deps") {
-      parsed.installDeps = false;
     } else if (arg.startsWith("--vault=")) {
       parsed.vault = arg.slice("--vault=".length);
     } else if (arg === "--vault") {
@@ -1613,6 +1620,10 @@ function parseArgs(rawArgs) {
       parsed.locale = arg.slice("--locale=".length);
     } else if (arg === "--locale") {
       parsed.locale = takeNext(rawArgs, arg);
+    } else if (arg.startsWith("--deps=")) {
+      parsed.deps = arg.slice("--deps=".length);
+    } else if (arg === "--deps") {
+      parsed.deps = takeNext(rawArgs, arg);
     } else if (arg === "--help" || arg === "-h") {
       printHelp();
       process.exit(0);
@@ -1637,8 +1648,14 @@ function resolveRunLocale(value) {
   return value;
 }
 
+function resolveDependencyScope(value) {
+  if (value === undefined) return "all";
+  if (value === "none" || value === "required" || value === "enhancements" || value === "all") return value;
+  throw new Error(`--deps must be 'none', 'required', 'enhancements', or 'all' (got '${value}')`);
+}
+
 function printHelp() {
-  console.log(`Usage: npm run smoke:vault -- [--vault <path>] [--no-build] [--no-install-deps]
+  console.log(`Usage: npm run smoke:vault -- [--vault <path>] [--no-build] [--deps <scope>]
 
 The vault CONTENTS are ALWAYS wiped and fully re-initialized before the run
 (the .obsidian config dir is preserved), so verification always starts from a
@@ -1655,7 +1672,7 @@ an instance that was already running on the empty vault.
 Options:
   --vault <path>       Disposable test vault path. Defaults to PARA_ZK_TEST_VAULT or a local para-zk vault.
   --no-build           Skip npm run build and plugin sync.
-  --no-install-deps    Run para-zk:setup without installing required dependencies.
+  --deps <scope>       Dependency scope for para-zk:setup: none, required, enhancements, all (default all).
   --stamp <value>      Stable suffix for generated smoke-test notes.
   --locale <en|ko>     Locale the live scenarios run in (default en). The en<->ko
                        switch is always exercised; this picks the settled locale.
@@ -1813,13 +1830,13 @@ function assertGuiLocaleLabels(expectedRibbonLabels, expectedCreateProjectComman
     snapshot.emptyTrashLabel === expectedEmptyTrashLabel,
     `empty trash label expected ${expectedEmptyTrashLabel}, got ${snapshot.emptyTrashLabel}`
   );
-  if (installDeps) {
+  if (dependencyIsSelected("obsidian-trash-explorer")) {
     assert(snapshot.emptyTrashCommandExists === true, "Trash Explorer empty-trash command is missing");
   }
 }
 
 function simulateMissedHomepageStartup() {
-  if (!installDeps) return;
+  if (!dependencyIsSelected("homepage")) return;
 
   guiJson(`(() => {
     const plugin = app.plugins.plugins.homepage;
@@ -1856,7 +1873,7 @@ function run(command, commandArgs, options = {}) {
 function assertDependency(setupPayload, id) {
   const dependency = setupPayload.dependencies?.find((item) => item.id === id);
   assert(dependency, `missing dependency result: ${id}`);
-  if (installDeps) {
+  if (dependencyIsSelected(id)) {
     assert(dependency.installed === true, `${id} is not installed`);
     assert(dependency.enabled === true, `${id} is not enabled`);
   }
@@ -1880,7 +1897,7 @@ function assertObsidianCoreConfig() {
 }
 
 function assertUpdateTimeOnEditConfig() {
-  if (!installDeps) return;
+  if (!dependencyIsSelected("update-time-on-edit")) return;
 
   const config = readVaultJson(".obsidian/plugins/update-time-on-edit/data.json");
   // dateFormat is intentionally plugin/user-owned; PARA-ZK only ensures ownership of the headers.
@@ -1899,7 +1916,7 @@ function assertUpdateTimeOnEditConfig() {
 }
 
 function assertCustomSortConfig() {
-  if (!installDeps) return;
+  if (!dependencyIsSelected("custom-sort")) return;
 
   const config = readVaultJson(".obsidian/plugins/custom-sort/data.json");
   assert(config.suspended === false, "custom-sort is suspended");
@@ -1930,7 +1947,7 @@ function assertCustomSortConfig() {
 }
 
 function assertHomepageConfig() {
-  if (!installDeps) return;
+  if (!dependencyIsSelected("homepage")) return;
 
   const config = readVaultJson(".obsidian/plugins/homepage/data.json");
   assert(config.version === 4, "homepage version is not 4");
@@ -1950,7 +1967,7 @@ function assertHomepageConfig() {
 }
 
 function assertOpenTabSettingsConfig() {
-  if (!installDeps) return;
+  if (!dependencyIsSelected("open-tab-settings")) return;
 
   const config = readVaultJson(".obsidian/plugins/open-tab-settings/data.json");
   assert(config.openInNewTab === true, "open-tab-settings openInNewTab is not enabled");
@@ -1965,7 +1982,7 @@ function assertOpenTabSettingsConfig() {
 }
 
 function assertHomepageRuntime() {
-  if (!installDeps) return;
+  if (!dependencyIsSelected("homepage")) return;
 
   const snapshot = guiJson(`(async () => {
     const plugin = app.plugins.plugins.homepage;

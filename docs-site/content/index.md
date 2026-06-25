@@ -22,7 +22,7 @@ BRAT -> Add beta plugin -> https://github.com/kangig94/obsidian-para-zk
 Then enable **PARA-ZK** and run setup:
 
 ```bash
-optsidian para-zk:setup installDeps=true
+optsidian para-zk:setup deps=required
 ```
 
 For manual installs, download `manifest.json`, `main.js`, and `styles.css` from the latest GitHub release. Local development checkouts should build first and install the generated `build/` folder.

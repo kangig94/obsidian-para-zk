@@ -81,7 +81,7 @@ Manual live iteration:
 OBSIDIAN_PLUGIN_DIR="$PARA_ZK_TEST_VAULT/.obsidian/plugins/para-zk" pnpm run build
 optsidian open-gui vault-path="$PARA_ZK_TEST_VAULT"
 optsidian raw plugin:reload id=para-zk
-optsidian para-zk:setup installDeps=true
+optsidian para-zk:setup deps=required
 ```
 
 For a clean run, preserve `.obsidian`, clear the rest of the vault, and remove

@@ -62,7 +62,7 @@ function addEmptyTrashButton(plugin: ParaZkPluginContext, container: HTMLElement
     event.preventDefault();
     event.stopPropagation();
     if (!executeCommand(plugin, EMPTY_TRASH_COMMAND_ID)) {
-      new Notice("Could not empty trash. Ensure Trash Explorer is enabled (run para-zk:setup installDeps=true).");
+      new Notice("Could not empty trash. Ensure Trash Explorer is enabled (run para-zk:setup deps=enhancements).");
     }
   });
 }

@@ -6,6 +6,7 @@ import { refreshEditorWidthControl } from "./editor-width";
 import { refreshExplorerActions } from "./actions/explorer";
 import { refreshRegisteredLocaleLabels } from "./locale-labels";
 import { refreshRibbonActions } from "./actions/ribbon";
+import { confirmAction } from "./prompts";
 
 export class ParaZkSettingTab extends PluginSettingTab {
   private readonly plugin: ParaZkPluginContext;
@@ -57,18 +58,29 @@ export class ParaZkSettingTab extends PluginSettingTab {
           .setButtonText(labels.settingsSetupVaultButton)
           .setCta()
           .onClick(() => {
-            void this.runSetupAction(button, { installDeps: false });
+            void this.confirmAndRunSetupAction(button);
           });
       });
 
     new Setting(containerEl)
-      .setName(labels.setupInstallDeps)
-      .setDesc(labels.setupInstallDepsDesc)
+      .setName(labels.setupRequiredDeps)
+      .setDesc(labels.setupRequiredDepsDesc)
       .addButton((button) => {
         button
-          .setButtonText(labels.settingsInstallDepsButton)
+          .setButtonText(labels.settingsInstallRequiredDepsButton)
           .onClick(() => {
-            void this.runSetupAction(button, { installDeps: true });
+            void this.runSetupAction(button, { deps: "required" });
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(labels.setupEnhancementDeps)
+      .setDesc(labels.setupEnhancementDepsDesc)
+      .addButton((button) => {
+        button
+          .setButtonText(labels.settingsInstallEnhancementDepsButton)
+          .onClick(() => {
+            void this.runSetupAction(button, { deps: "enhancements" });
           });
       });
 
@@ -113,12 +125,25 @@ export class ParaZkSettingTab extends PluginSettingTab {
 
   }
 
-  private async runSetupAction(button: ButtonComponent, options: Pick<SetupOptions, "installDeps">): Promise<void> {
+  private async confirmAndRunSetupAction(button: ButtonComponent): Promise<void> {
+    const labels = localePack(this.plugin.settings.locale).labels;
+    const confirmed = await confirmAction(
+      this.plugin.app,
+      labels.settingsSetupVaultConfirmTitle,
+      labels.settingsSetupVaultConfirmMessage,
+      labels.settingsSetupVaultConfirmButton,
+      labels.cancel
+    );
+    if (!confirmed) return;
+    await this.runSetupAction(button, { deps: "none" });
+  }
+
+  private async runSetupAction(button: ButtonComponent, options: Pick<SetupOptions, "deps">): Promise<void> {
     button.setDisabled(true);
     try {
       const result = await this.plugin.setupVault({
         locale: this.plugin.settings.locale,
-        installDeps: options.installDeps
+        deps: options.deps
       });
       new Notice(this.setupNotice(result));
       this.renderSettings();
@@ -132,7 +157,9 @@ export class ParaZkSettingTab extends PluginSettingTab {
 
   private setupNotice(result: SetupResult): string {
     const messages = localePack(this.plugin.settings.locale).messages;
-    const dependencyChanges = result.dependencies.filter((dependency) => dependency.action !== "none").length;
+    const dependencyChanges = result.dependencies.filter((dependency) => (
+      dependency.action !== "none" && dependency.action !== "warn"
+    )).length;
     const parts = [
       `${messages.setupReady}: ${result.created.length} created, ${result.updated.length} updated`
     ];
