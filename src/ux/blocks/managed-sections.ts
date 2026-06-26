@@ -8,77 +8,119 @@ import {
   type ManagedUiRenderAction,
   type ManagedUiRenderBlock
 } from "../../templates";
-import { normalizeFrontmatterType, readFrontmatterTypeFromContent } from "../../vault/sections";
+import { normalizeFrontmatterType } from "../../vault/sections";
 import { renderActionButtons } from "./action";
 import { DataviewViewRenderChild } from "./dataview";
 import { ReferenceBlockRenderChild } from "./references";
 import { applyBlockKind, renderBlockNotice } from "./shell";
 import { TaskBlockRenderChild } from "./tasks";
 
-const MANAGED_PANEL_BUFFER_SETTLE_TIMEOUT_MS = 1000;
+type RenderableManagedBlock = Exclude<ManagedUiRenderBlock, { kind: "action" }>;
 
-export async function renderManagedPanel(
-  plugin: ParaZkPluginContext,
-  el: HTMLElement,
-  sourcePath: string | undefined,
-  child: MarkdownRenderChild
-): Promise<void> {
-  const type = await resolveManagedType(plugin, sourcePath);
-  const blocks = type ? managedUiBlocksForType(type, plugin.settings) : undefined;
-  const expectedViewCount = countManagedDataviewViews(blocks);
-  const buffer = createManagedPanelBuffer(el);
+type ManagedBlockSpec = {
+  key: string;
+  block: RenderableManagedBlock;
+  actions: ManagedUiRenderAction[];
+};
 
-  resetManagedRenderChild(child);
+type ManagedBlockEntry = {
+  key: string;
+  separatorEl: HTMLElement;
+  blockEl: HTMLElement;
+  child: MarkdownRenderChild;
+};
 
-  try {
-    if (!type) {
-      renderBlockNotice(buffer, "managed", `No PARA-ZK managed UI for type: ${type || "(unknown)"}`);
-      replaceManagedPanel(el, buffer);
+export class ManagedPanelController {
+  private readonly plugin: ParaZkPluginContext;
+  private readonly el: HTMLElement;
+  private readonly child: MarkdownRenderChild;
+  private entries = new Map<string, ManagedBlockEntry>();
+  private sourcePath: string | undefined;
+
+  constructor(plugin: ParaZkPluginContext, el: HTMLElement, child: MarkdownRenderChild) {
+    this.plugin = plugin;
+    this.el = el;
+    this.child = child;
+  }
+
+  update(sourcePath: string | undefined, typeHint: string | undefined): void {
+    this.sourcePath = sourcePath;
+    const type = typeHint ?? cachedManagedType(this.plugin, sourcePath);
+    const blocks = type ? managedUiBlocksForType(type, this.plugin.settings) : undefined;
+
+    this.el.removeClass("para-zk-hidden");
+    if (!type || !blocks) {
+      this.disposeEntries();
+      renderBlockNotice(this.el, "managed", `No PARA-ZK managed UI for type: ${type || "(unknown)"}`);
       return;
     }
 
-    applyBlockKind(buffer, `managed-${type}`);
-    if (blocks) {
-      renderManagedBlocks(plugin, buffer, blocks, sourcePath, child);
-      await waitForManagedPanelSettled(buffer, expectedViewCount);
+    applyBlockKind(this.el, `managed-${type}`);
+    this.reconcile(managedBlockSpecs(blocks, sourcePath));
+  }
+
+  dispose(): void {
+    this.disposeEntries();
+  }
+
+  private reconcile(specs: ManagedBlockSpec[]): void {
+    if (this.entries.size === 0) this.el.empty();
+
+    const nextEntries = new Map<string, ManagedBlockEntry>();
+    for (const spec of specs) {
+      const existing = this.entries.get(spec.key);
+      const entry = existing ?? this.createEntry(spec);
+      nextEntries.set(spec.key, entry);
+      this.el.appendChild(entry.separatorEl);
+      this.el.appendChild(entry.blockEl);
+      if (!existing) this.child.addChild(entry.child);
     }
 
-    replaceManagedPanel(el, buffer);
-  } finally {
-    buffer.remove();
+    for (const [key, entry] of this.entries) {
+      if (nextEntries.has(key)) continue;
+      this.disposeEntry(entry);
+    }
+    this.entries = nextEntries;
+  }
+
+  private createEntry(spec: ManagedBlockSpec): ManagedBlockEntry {
+    const separatorEl = this.el.ownerDocument.createElement("hr");
+    const blockEl = this.el.ownerDocument.createElement("div");
+    blockEl.addClass(`block-language-para-zk-${spec.block.kind}`);
+    const child = createManagedBlockChild(
+      this.plugin,
+      blockEl,
+      spec.block,
+      this.sourcePath,
+      spec.actions
+    );
+    return { key: spec.key, separatorEl, blockEl, child };
+  }
+
+  private disposeEntries(): void {
+    for (const entry of this.entries.values()) this.disposeEntry(entry);
+    this.entries.clear();
+  }
+
+  private disposeEntry(entry: ManagedBlockEntry): void {
+    this.child.removeChild(entry.child);
+    entry.separatorEl.remove();
+    entry.blockEl.remove();
   }
 }
 
-async function resolveManagedType(
-  plugin: ParaZkPluginContext,
-  sourcePath: string | undefined
-): Promise<string | undefined> {
+function cachedManagedType(plugin: ParaZkPluginContext, sourcePath: string | undefined): string | undefined {
   if (!sourcePath) return undefined;
   const file = plugin.app.vault.getFileByPath(sourcePath);
   if (!(file instanceof TFile)) return undefined;
-
-  try {
-    const freshType = readFrontmatterTypeFromContent(await plugin.app.vault.read(file));
-    if (freshType) return freshType;
-  } catch {
-    // Fall through to the cache only if the fresh file read cannot provide a type.
-  }
-
   return normalizeFrontmatterType(plugin.app.metadataCache.getFileCache(file)?.frontmatter?.type);
 }
 
-function resetManagedRenderChild(child: MarkdownRenderChild): void {
-  child.unload();
-  child.load();
-}
-
-function renderManagedBlocks(
-  plugin: ParaZkPluginContext,
-  el: HTMLElement,
+function managedBlockSpecs(
   blocks: readonly ManagedUiRenderBlock[],
-  sourcePath: string | undefined,
-  child: MarkdownRenderChild
-): void {
+  sourcePath: string | undefined
+): ManagedBlockSpec[] {
+  const specs: ManagedBlockSpec[] = [];
   let pendingActions: ManagedUiRenderAction[] = [];
   for (const block of blocks) {
     if (block.kind === "action") {
@@ -86,133 +128,61 @@ function renderManagedBlocks(
       continue;
     }
 
-    appendManagedBlockSeparator(el);
-    const blockEl = appendManagedBlockContainer(el, block);
-    renderManagedBlock(plugin, blockEl, block, sourcePath, child, pendingActions);
+    specs.push({
+      key: managedBlockKey(block, pendingActions, sourcePath),
+      block,
+      actions: pendingActions
+    });
     pendingActions = [];
   }
+  return specs;
 }
 
-function renderManagedBlock(
+function createManagedBlockChild(
   plugin: ParaZkPluginContext,
   el: HTMLElement,
-  block: Exclude<ManagedUiRenderBlock, { kind: "action" }>,
+  block: RenderableManagedBlock,
   sourcePath: string | undefined,
-  child: MarkdownRenderChild,
   actions: readonly ManagedUiRenderAction[]
-): void {
+): MarkdownRenderChild {
   switch (block.kind) {
     case "tasks":
-      child.addChild(new TaskBlockRenderChild(
+      return new TaskBlockRenderChild(
         plugin,
         { root: "current", title: block.title },
         el,
         { sourcePath: sourcePath ?? "" }
-      ));
-      return;
+      );
     case "view":
-      child.addChild(new DataviewViewRenderChild(
+      return new DataviewViewRenderChild(
         plugin,
         el,
         { key: block.key, title: block.title },
         sourcePath,
         actions.length > 0 ? (actionsEl) => renderActionButtons(plugin, actionsEl, actions, sourcePath) : undefined
-      ));
-      return;
+      );
     case "references":
-      child.addChild(new ReferenceBlockRenderChild(
+      return new ReferenceBlockRenderChild(
         plugin,
         { root: "current", title: block.title },
         el,
         { sourcePath: sourcePath ?? "" }
-      ));
-      return;
+      );
   }
 }
 
-function appendManagedBlockSeparator(el: HTMLElement): void {
-  el.appendChild(el.ownerDocument.createElement("hr"));
-}
-
-function appendManagedBlockContainer(
-  el: HTMLElement,
-  block: Exclude<ManagedUiRenderBlock, { kind: "action" }>
-): HTMLElement {
-  const blockEl = el.ownerDocument.createElement("div");
-  blockEl.addClass(`block-language-para-zk-${block.kind}`);
-  el.appendChild(blockEl);
-  return blockEl;
-}
-
-function createManagedPanelBuffer(el: HTMLElement): HTMLElement {
-  const buffer = el.ownerDocument.createElement("div");
-  buffer.addClass("para-zk-managed-buffer");
-  buffer.setCssProps({
-    "--para-zk-buffer-width": `${Math.max(1, Math.round(el.getBoundingClientRect().width))}px`
-  });
-  buffer.contentEditable = "false";
-  buffer.setAttribute("contenteditable", "false");
-  buffer.setAttribute("aria-hidden", "true");
-  const parent = el.ownerDocument.body ?? el.parentElement;
-  if (parent) parent.appendChild(buffer);
-  else el.after(buffer);
-  return buffer;
-}
-
-function replaceManagedPanel(el: HTMLElement, rendered: HTMLElement): void {
-  el.removeClass("para-zk-hidden");
-  for (const className of Array.from(el.classList)) {
-    if (className === "para-zk-block" || className.startsWith("para-zk-block--")) {
-      el.removeClass(className);
-    }
+function managedBlockKey(
+  block: RenderableManagedBlock,
+  actions: readonly ManagedUiRenderAction[],
+  sourcePath: string | undefined
+): string {
+  const actionKey = actions.map((action) => ({
+    command: action.command,
+    label: action.label,
+    icon: action.icon
+  }));
+  if (block.kind === "view") {
+    return JSON.stringify({ sourcePath, kind: block.kind, key: block.key, title: block.title, actions: actionKey });
   }
-  for (const className of Array.from(rendered.classList)) {
-    if (className === "para-zk-block" || className.startsWith("para-zk-block--")) {
-      el.addClass(className);
-    }
-  }
-  el.replaceChildren(...Array.from(rendered.childNodes));
-}
-
-function countManagedDataviewViews(blocks: readonly ManagedUiRenderBlock[] | undefined): number {
-  return blocks?.filter((block) => block.kind === "view").length ?? 0;
-}
-
-function waitForManagedPanelSettled(el: HTMLElement, expectedViewCount: number): Promise<void> {
-  if (hasSettledManagedPanel(el, expectedViewCount)) return Promise.resolve();
-
-  return new Promise((resolve) => {
-    const timer = window.setTimeout(() => {
-      observer.disconnect();
-      resolve();
-    }, MANAGED_PANEL_BUFFER_SETTLE_TIMEOUT_MS);
-    const observer = new MutationObserver(() => {
-      if (hasSettledManagedPanel(el, expectedViewCount)) {
-        window.clearTimeout(timer);
-        observer.disconnect();
-        resolve();
-      }
-    });
-    observer.observe(el, { childList: true, subtree: true, characterData: true });
-  });
-}
-
-function hasSettledManagedPanel(el: HTMLElement, expectedViewCount: number): boolean {
-  if (expectedViewCount <= 0) return true;
-
-  const views = Array.from(el.querySelectorAll<HTMLElement>(".block-language-para-zk-view"));
-  return views.length >= expectedViewCount && views.every(hasSettledNestedDataviewView);
-}
-
-function hasSettledNestedDataviewView(view: HTMLElement): boolean {
-  const dataview = view.querySelector<HTMLElement>(".block-language-dataview");
-  if (!dataview) return false;
-
-  const text = dataview.textContent?.trim() ?? "";
-  if (!text || text === "Loading...") return false;
-
-  const loadingError = dataview.querySelector<HTMLElement>(".dataview-error")
-    ?.textContent
-    ?.trim();
-  return loadingError !== "Loading...";
+  return JSON.stringify({ sourcePath, kind: block.kind, title: block.title, actions: actionKey });
 }

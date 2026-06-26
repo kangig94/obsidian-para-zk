@@ -22,6 +22,10 @@ type DataviewRenderOptions = {
   preserveCurrent?: boolean;
 };
 
+type DataviewScheduleOptions = {
+  suppressDuringCurrentSourceQuiet?: boolean;
+};
+
 type DataviewRenderExpectation = {
   headers: string[];
 };
@@ -36,9 +40,11 @@ export class DataviewViewRenderChild extends MarkdownRenderChild {
   private readonly args: DataviewViewArgs;
   private readonly renderActions?: DataviewViewActionRenderer;
   private renderTimer: number | undefined;
+  private renderTimerSuppressesCurrentSourceQuiet = false;
   private renderGeneration = 0;
   private unloaded = true;
   private currentSourcePath: string | undefined;
+  private currentSourceQuietUntil = 0;
 
   constructor(
     plugin: ParaZkPluginContext,
@@ -62,9 +68,9 @@ export class DataviewViewRenderChild extends MarkdownRenderChild {
     this.registerEvent(this.plugin.app.vault.on("create", (file) => this.onVaultFile(file)));
     this.registerEvent(this.plugin.app.vault.on("delete", (file) => this.onVaultFile(file)));
     this.registerEvent(this.plugin.app.vault.on("rename", (file, oldPath) => this.onVaultFile(file, oldPath)));
-    this.registerEvent(this.plugin.app.metadataCache.on("changed", () => this.scheduleRender()));
-    this.registerEvent(this.plugin.app.metadataCache.on("resolve", () => this.scheduleRender()));
-    this.registerEvent(this.plugin.app.metadataCache.on("resolved", () => this.scheduleRender()));
+    this.registerEvent(this.plugin.app.metadataCache.on("changed", (file) => this.onMetadataFile(file)));
+    this.registerEvent(this.plugin.app.metadataCache.on("resolve", () => this.onMetadataResolution()));
+    this.registerEvent(this.plugin.app.metadataCache.on("resolved", () => this.onMetadataResolution()));
   }
 
   onunload(): void {
@@ -72,20 +78,70 @@ export class DataviewViewRenderChild extends MarkdownRenderChild {
     this.renderGeneration += 1;
     if (this.renderTimer !== undefined) window.clearTimeout(this.renderTimer);
     this.renderTimer = undefined;
+    this.renderTimerSuppressesCurrentSourceQuiet = false;
   }
 
   private onVaultFile(file: unknown, oldPath?: string): void {
     if (!(file instanceof TFile)) return;
     const renamedCurrentSource = oldPath !== undefined && oldPath === this.currentSourcePath;
     if (renamedCurrentSource) this.currentSourcePath = file.path;
+    if (
+      file.path === this.currentSourcePath
+      && !renamedCurrentSource
+      && this.canSuppressCurrentSourceChange()
+    ) {
+      this.markCurrentSourceQuietWindow();
+      return;
+    }
     if (!renamedCurrentSource && file.extension !== "md") return;
     this.scheduleRender();
   }
 
-  private scheduleRender(): void {
+  private onMetadataFile(file: unknown): void {
+    if (
+      file instanceof TFile
+      && file.path === this.currentSourcePath
+      && this.canSuppressCurrentSourceChange()
+    ) {
+      this.markCurrentSourceQuietWindow();
+      return;
+    }
+    this.scheduleRender();
+  }
+
+  private onMetadataResolution(): void {
+    this.scheduleRender({ suppressDuringCurrentSourceQuiet: true });
+  }
+
+  private markCurrentSourceQuietWindow(): void {
+    this.currentSourceQuietUntil = nowMs() + 1500;
+  }
+
+  private isInCurrentSourceQuietWindow(): boolean {
+    return nowMs() < this.currentSourceQuietUntil;
+  }
+
+  private canSuppressCurrentSourceChange(): boolean {
+    return this.args.key !== "spark-distill";
+  }
+
+  private scheduleRender(options: DataviewScheduleOptions = {}): void {
+    const suppressDuringCurrentSourceQuiet = options.suppressDuringCurrentSourceQuiet === true;
+    if (
+      this.renderTimer !== undefined
+      && !this.renderTimerSuppressesCurrentSourceQuiet
+      && suppressDuringCurrentSourceQuiet
+    ) {
+      return;
+    }
+
     if (this.renderTimer !== undefined) window.clearTimeout(this.renderTimer);
+    this.renderTimerSuppressesCurrentSourceQuiet = suppressDuringCurrentSourceQuiet;
     this.renderTimer = window.setTimeout(() => {
+      const shouldSuppress = this.renderTimerSuppressesCurrentSourceQuiet;
       this.renderTimer = undefined;
+      this.renderTimerSuppressesCurrentSourceQuiet = false;
+      if (shouldSuppress && this.isInCurrentSourceQuietWindow()) return;
       this.renderNow({ preserveCurrent: true });
     }, DATAVIEW_CHANGE_RERENDER_DELAY_MS);
   }
@@ -175,6 +231,7 @@ async function renderDataviewViewBuffered(
     await waitForSettledDataviewRender(buffer, isCurrent, options.timeoutMs, expectation);
     if (!isCurrent()) return;
     if (!hasSettledDataviewRender(buffer, expectation) && !options.replaceUnsettled) return;
+    if (hasEquivalentDataviewView(el, buffer)) return;
     replaceDataviewView(el, buffer);
   } finally {
     buffer.remove();
@@ -238,6 +295,51 @@ function replaceDataviewView(el: HTMLElement, rendered: HTMLElement): void {
     }
   }
   el.replaceChildren(...Array.from(rendered.childNodes));
+}
+
+function hasEquivalentDataviewView(left: HTMLElement, right: HTMLElement): boolean {
+  if (!hasSameBlockClasses(left, right)) return false;
+  const leftChildren = Array.from(left.childNodes);
+  const rightChildren = Array.from(right.childNodes);
+  if (leftChildren.length !== rightChildren.length) return false;
+  return leftChildren.every((leftChild, index) => nodesEquivalent(leftChild, rightChildren[index]));
+}
+
+function hasSameBlockClasses(left: HTMLElement, right: HTMLElement): boolean {
+  return blockClasses(left).join("\n") === blockClasses(right).join("\n");
+}
+
+function blockClasses(el: HTMLElement): string[] {
+  return Array.from(el.classList)
+    .filter((className) => className === "para-zk-block" || className.startsWith("para-zk-block--"))
+    .sort();
+}
+
+function nodesEquivalent(left: ChildNode, right: ChildNode): boolean {
+  if (typeof left.isEqualNode === "function" && left.isEqualNode(right)) return true;
+  return stableNodeSignature(left) === stableNodeSignature(right);
+}
+
+function stableNodeSignature(node: ChildNode): string {
+  const el = node as HTMLElement;
+  if (typeof el.tagName !== "string") return `#text:${node.textContent ?? ""}`;
+  return JSON.stringify({
+    tag: el.tagName.toLowerCase(),
+    classes: Array.from(el.classList).sort(),
+    attrs: stableAttributes(el),
+    text: Array.from(el.childNodes).length === 0 ? el.textContent ?? "" : undefined,
+    children: Array.from(el.childNodes).map(stableNodeSignature)
+  });
+}
+
+function stableAttributes(el: HTMLElement): Record<string, string> {
+  if (typeof el.getAttributeNames !== "function") return {};
+  const attrs: Record<string, string> = {};
+  for (const name of el.getAttributeNames().sort()) {
+    if (name === "style" || name === "aria-hidden") continue;
+    attrs[name] = el.getAttribute(name) ?? "";
+  }
+  return attrs;
 }
 
 function waitForSettledDataviewRender(
@@ -326,4 +428,8 @@ function viewClassName(key: string): string {
 function viewBlockKind(key: string): string {
   const className = key ? viewClassName(key) : "";
   return className ? `view-${className}` : "view";
+}
+
+function nowMs(): number {
+  return typeof performance === "undefined" ? Date.now() : performance.now();
 }

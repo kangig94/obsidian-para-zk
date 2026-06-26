@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MarkdownRenderer } from "obsidian";
+import { MarkdownRenderer, TFile } from "obsidian";
 import { DEFAULT_SETTINGS } from "../../src/types";
 import type { ParaZkPluginContext } from "../../src/plugin-interface";
 import { DataviewViewRenderChild } from "../../src/ux/blocks/dataview";
@@ -73,14 +73,99 @@ describe("DataviewViewRenderChild", () => {
     expect(render).toHaveBeenCalledTimes(3);
     child.unload();
   });
+
+  it("ignores global resolve events caused by the current source changing", async () => {
+    const metadata = createEventBus();
+    const vault = createVaultEventBus();
+    const plugin = fakeDataviewPlugin(metadata, vault);
+    const root = new FakeElement("div");
+    const render = vi.spyOn(MarkdownRenderer, "render")
+      .mockImplementation(async (_app, _markdown, el) => {
+        renderSettledDataview(el);
+      });
+    const sourcePath = "PARA/Resources/Paper.md";
+    const child = new DataviewViewRenderChild(plugin, root.asHtml(), {
+      key: "cited-by",
+      title: "Cited by"
+    }, sourcePath);
+
+    child.load();
+    await flushPromises();
+    expect(render).toHaveBeenCalledTimes(1);
+
+    metadata.emit("resolve");
+    vault.emit("modify", testFile(sourcePath));
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+
+    expect(render).toHaveBeenCalledTimes(1);
+    child.unload();
+  });
+
+  it("keeps real external changes from being masked by current-source quieting", async () => {
+    const metadata = createEventBus();
+    const vault = createVaultEventBus();
+    const plugin = fakeDataviewPlugin(metadata, vault);
+    const root = new FakeElement("div");
+    const render = vi.spyOn(MarkdownRenderer, "render")
+      .mockImplementation(async (_app, _markdown, el) => {
+        renderSettledDataview(el);
+      });
+    const sourcePath = "PARA/Resources/Paper.md";
+    const child = new DataviewViewRenderChild(plugin, root.asHtml(), {
+      key: "cited-by",
+      title: "Cited by"
+    }, sourcePath);
+
+    child.load();
+    await flushPromises();
+    expect(render).toHaveBeenCalledTimes(1);
+
+    vault.emit("modify", testFile(sourcePath));
+    vault.emit("modify", testFile("PARA/Resources/Other.md"));
+    metadata.emit("resolved");
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+
+    expect(render).toHaveBeenCalledTimes(2);
+    child.unload();
+  });
+
+  it("rerenders current-source dependent views when the current source changes", async () => {
+    const metadata = createEventBus();
+    const plugin = fakeDataviewPlugin(metadata);
+    const root = new FakeElement("div");
+    const render = vi.spyOn(MarkdownRenderer, "render")
+      .mockImplementation(async (_app, _markdown, el) => {
+        renderSettledDataview(el);
+      });
+    const sourcePath = "PARA/Sparks/Spark.md";
+    const child = new DataviewViewRenderChild(plugin, root.asHtml(), {
+      key: "spark-distill",
+      title: "Created from this"
+    }, sourcePath);
+
+    child.load();
+    await flushPromises();
+    expect(render).toHaveBeenCalledTimes(1);
+
+    metadata.emit("changed", testFile(sourcePath));
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+
+    expect(render).toHaveBeenCalledTimes(2);
+    child.unload();
+  });
 });
 
 type EventName = "changed" | "resolve" | "resolved";
-type Listener = () => void;
+type Listener = (file?: TFile) => void;
+type VaultEventName = "modify" | "create" | "delete" | "rename";
+type VaultListener = (file: TFile, oldPath?: string) => void;
 
 function createEventBus(): {
   on: (name: EventName, listener: Listener) => { detach: () => void };
-  emit: (name: EventName) => void;
+  emit: (name: EventName, file?: TFile) => void;
 } {
   const listeners = new Map<EventName, Listener[]>();
   return {
@@ -95,17 +180,43 @@ function createEventBus(): {
         }
       };
     },
-    emit: (name) => {
-      for (const listener of listeners.get(name) ?? []) listener();
+    emit: (name, file) => {
+      for (const listener of listeners.get(name) ?? []) listener(file);
     }
   };
 }
 
-function fakeDataviewPlugin(metadata: ReturnType<typeof createEventBus>): ParaZkPluginContext {
+function createVaultEventBus(): {
+  on: (name: VaultEventName, listener: VaultListener) => { detach: () => void };
+  emit: (name: VaultEventName, file: TFile, oldPath?: string) => void;
+} {
+  const listeners = new Map<VaultEventName, VaultListener[]>();
+  return {
+    on: (name, listener) => {
+      const current = listeners.get(name) ?? [];
+      current.push(listener);
+      listeners.set(name, current);
+      return {
+        detach: () => {
+          const next = (listeners.get(name) ?? []).filter((candidate) => candidate !== listener);
+          listeners.set(name, next);
+        }
+      };
+    },
+    emit: (name, file, oldPath) => {
+      for (const listener of listeners.get(name) ?? []) listener(file, oldPath);
+    }
+  };
+}
+
+function fakeDataviewPlugin(
+  metadata: ReturnType<typeof createEventBus>,
+  vault: ReturnType<typeof createVaultEventBus> = createVaultEventBus()
+): ParaZkPluginContext {
   return {
     app: {
       vault: {
-        on: () => ({ detach: () => {} })
+        on: vault.on
       },
       metadataCache: {
         on: metadata.on
@@ -123,6 +234,15 @@ function renderSettledDataview(el: HTMLElement): void {
   row.createEl("th", { text: "Filename" });
   row.createEl("th", { text: "Type" });
   row.createEl("th", { text: "Updated" });
+}
+
+function testFile(path: string): TFile {
+  const file = new TFile();
+  file.path = path;
+  file.name = path.split("/").pop() ?? path;
+  file.basename = file.name.replace(/\.md$/, "");
+  file.extension = "md";
+  return file;
 }
 
 async function flushPromises(): Promise<void> {

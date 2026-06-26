@@ -7,9 +7,10 @@ import type { ParaZkPluginContext } from "../../plugin-interface";
 import {
   buildCachedNoteChromeSpec,
   hasNoteChrome,
-  renderNoteChromeManaged,
-  renderNoteChromeProps
+  renderNoteChromeProps,
+  type NoteChromeSpec
 } from "../note-chrome-core";
+import { ManagedPanelController } from "./managed-sections";
 import { placeReadingManagedPanel, placeReadingPropsPanel } from "./reading-note-chrome-slots";
 import { refreshPreviewChromeSections } from "./reading-preview-height-sync";
 import { renderBlockNotice } from "./shell";
@@ -70,14 +71,18 @@ class NoteChromeController {
   private propsEl: HTMLElement | undefined;
   private managedEl: HTMLElement | undefined;
   private managedChild: NoteChromeManagedRenderChild | undefined;
+  private managedController: ManagedPanelController | undefined;
+  private managedControllerEl: HTMLElement | undefined;
+  private managedControllerChild: NoteChromeManagedRenderChild | undefined;
   private renderTimer: number | undefined;
   private layoutTimer: number | undefined;
   private refreshFrame: number | undefined;
-  private renderGeneration = 0;
-  private renderedSignature: string | undefined;
+  private renderedPropsSignature: string | undefined;
+  private renderedManagedLayoutSignature: string | undefined;
   private pendingSignature: string | undefined;
   private disposed = false;
   private readonly observer: MutationObserver;
+  private readonly resizeObserver: ResizeObserver | undefined;
   private readonly plugin: ParaZkPluginContext;
   private readonly container: HTMLElement;
   sourcePath: string;
@@ -95,6 +100,9 @@ class NoteChromeController {
     this.typeHint = typeHint;
     this.observer = new MutationObserver(() => this.scheduleLayout());
     this.observer.observe(container, { childList: true });
+    this.resizeObserver = typeof ResizeObserver === "undefined"
+      ? undefined
+      : new ResizeObserver(() => this.schedulePreviewChromeRefresh());
   }
 
   get isActive(): boolean {
@@ -109,8 +117,8 @@ class NoteChromeController {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.renderGeneration += 1;
-    this.renderedSignature = undefined;
+    this.renderedPropsSignature = undefined;
+    this.renderedManagedLayoutSignature = undefined;
     this.pendingSignature = undefined;
     if (this.renderTimer !== undefined) window.clearTimeout(this.renderTimer);
     this.renderTimer = undefined;
@@ -119,6 +127,7 @@ class NoteChromeController {
     if (this.refreshFrame !== undefined) window.cancelAnimationFrame(this.refreshFrame);
     this.refreshFrame = undefined;
     this.observer.disconnect();
+    this.resizeObserver?.disconnect();
     this.removeInjectedPanels();
     if (noteChromeControllers.get(this.container) === this) noteChromeControllers.delete(this.container);
     activeNoteChromeControllers.delete(this);
@@ -138,8 +147,9 @@ class NoteChromeController {
   }
 
   scheduleRender(delayMs = NOTE_CHROME_RERENDER_DELAY_MS): void {
-    const signature = buildCachedNoteChromeSpec(this.plugin, this.sourcePath, this.typeHint).signature;
-    if (signature === this.renderedSignature && this.hasRenderedPanels()) {
+    const spec = buildCachedNoteChromeSpec(this.plugin, this.sourcePath, this.typeHint);
+    const signature = renderSignature(spec);
+    if (signature === this.renderedSignature && this.hasRenderedPanels(spec)) {
       this.ensureLayout();
       this.schedulePreviewChromeRefresh();
       return;
@@ -165,38 +175,44 @@ class NoteChromeController {
     if (!hasNoteChrome(spec)) {
       this.removeInjectedPanels();
       this.schedulePreviewChromeRefresh();
-      this.renderedSignature = undefined;
       return;
     }
 
-    const signature = spec.signature;
-    const propsEl = this.ensurePropsEl();
-    const managedEl = this.ensureManagedEl();
-    propsEl.dataset.paraZkSourcePath = this.sourcePath;
-    managedEl.dataset.paraZkSourcePath = this.sourcePath;
-    if (!managedEl.hasChildNodes()) managedEl.addClass("para-zk-hidden");
-    this.ensureLayout();
+    if (spec.hasProps) {
+      const propsEl = this.ensurePropsEl();
+      propsEl.dataset.paraZkSourcePath = this.sourcePath;
+      if (spec.propsSignature !== this.renderedPropsSignature || !propsEl.isConnected) {
+        renderNoteChromeProps(this.plugin, propsEl, spec);
+      }
+      this.renderedPropsSignature = spec.propsSignature;
+    } else {
+      this.removePropsPanel();
+    }
 
-    const generation = ++this.renderGeneration;
-    const child = this.ensureManagedChild(managedEl);
-    renderNoteChromeProps(this.plugin, propsEl, spec);
-    this.schedulePreviewChromeRefresh();
-    void renderNoteChromeManaged(this.plugin, managedEl, spec, child)
-      .then(() => {
-        if (this.isCurrentRender(generation)) this.schedulePreviewChromeRefresh();
-      })
-      .catch((error: unknown) => {
-        if (this.isCurrentRender(generation)) {
+    if (spec.hasManaged) {
+      const managedEl = this.ensureManagedEl();
+      managedEl.dataset.paraZkSourcePath = this.sourcePath;
+      if (!managedEl.hasChildNodes()) managedEl.addClass("para-zk-hidden");
+      if (!managedEl.isConnected) placeReadingManagedPanel(this.container, managedEl);
+      if (spec.managedLayoutSignature !== this.renderedManagedLayoutSignature || !managedEl.isConnected) {
+        try {
+          this.ensureManagedController(managedEl).update(spec.sourcePath, spec.type);
+          this.renderedManagedLayoutSignature = spec.managedLayoutSignature;
+        } catch (error) {
+          this.disposeManagedController();
           managedEl.removeClass("para-zk-hidden");
           renderBlockNotice(managedEl, "managed", error instanceof Error ? error.message : String(error));
-          this.schedulePreviewChromeRefresh();
+          this.renderedManagedLayoutSignature = undefined;
         }
-      });
-    this.renderedSignature = signature;
-  }
+      } else {
+        this.renderedManagedLayoutSignature = spec.managedLayoutSignature;
+      }
+    } else {
+      this.removeManagedPanel();
+    }
 
-  private isCurrentRender(generation: number): boolean {
-    return !this.disposed && this.renderGeneration === generation;
+    this.ensureLayout();
+    this.schedulePreviewChromeRefresh();
   }
 
   private ensurePropsEl(): HTMLElement {
@@ -209,6 +225,7 @@ class NoteChromeController {
       this.propsEl = this.container.ownerDocument.createElement("div");
       this.propsEl.addClass("para-zk-note-chrome", "para-zk-note-chrome--props");
     }
+    this.resizeObserver?.observe(this.propsEl);
     removeDuplicatePropsPanels(this.container, this.propsEl);
     return this.propsEl;
   }
@@ -223,6 +240,7 @@ class NoteChromeController {
       this.managedEl = this.container.ownerDocument.createElement("div");
       this.managedEl.addClass("para-zk-note-chrome", "para-zk-note-chrome--managed");
     }
+    this.resizeObserver?.observe(this.managedEl);
     removeDuplicateManagedPanels(this.container, this.managedEl);
     return this.managedEl;
   }
@@ -265,23 +283,77 @@ class NoteChromeController {
     return this.managedChild;
   }
 
-  private hasRenderedPanels(): boolean {
-    return this.propsEl?.isConnected === true && this.managedEl?.isConnected === true;
+  private ensureManagedController(managedEl: HTMLElement): ManagedPanelController {
+    const currentChild = this.managedChild;
+    if (
+      this.managedController
+      && this.managedControllerEl === managedEl
+      && this.managedControllerChild === currentChild
+      && currentChild?.containerEl === managedEl
+    ) {
+      return this.managedController;
+    }
+
+    this.disposeManagedController();
+    const child = this.ensureManagedChild(managedEl);
+    this.managedController = new ManagedPanelController(this.plugin, managedEl, child);
+    this.managedControllerEl = managedEl;
+    this.managedControllerChild = child;
+    return this.managedController;
+  }
+
+  private disposeManagedController(): void {
+    this.managedController?.dispose();
+    this.managedController = undefined;
+    this.managedControllerEl = undefined;
+    this.managedControllerChild = undefined;
+  }
+
+  private get renderedSignature(): string {
+    return JSON.stringify({
+      props: this.renderedPropsSignature,
+      managed: this.renderedManagedLayoutSignature
+    });
+  }
+
+  private hasRenderedPanels(spec: NoteChromeSpec): boolean {
+    const propsReady = !spec.hasProps || this.propsEl?.isConnected === true;
+    const managedReady = !spec.hasManaged || this.managedEl?.isConnected === true;
+    return propsReady && managedReady;
+  }
+
+  private removePropsPanel(): void {
+    if (this.propsEl) this.resizeObserver?.unobserve(this.propsEl);
+    this.propsEl?.remove();
+    this.propsEl = undefined;
+    this.renderedPropsSignature = undefined;
+  }
+
+  private removeManagedPanel(): void {
+    this.disposeManagedController();
+    this.managedChild?.unload();
+    this.managedChild = undefined;
+    if (this.managedEl) this.resizeObserver?.unobserve(this.managedEl);
+    this.managedEl?.remove();
+    this.managedEl = undefined;
+    this.renderedManagedLayoutSignature = undefined;
   }
 
   private removeInjectedPanels(): void {
-    this.propsEl?.remove();
-    this.managedEl?.remove();
-    this.propsEl = undefined;
-    this.managedEl = undefined;
-    this.renderedSignature = undefined;
+    this.removePropsPanel();
+    this.removeManagedPanel();
     this.pendingSignature = undefined;
-    this.managedChild?.unload();
-    this.managedChild = undefined;
   }
 }
 
 class NoteChromeManagedRenderChild extends MarkdownRenderChild {}
+
+function renderSignature(spec: NoteChromeSpec): string {
+  return JSON.stringify({
+    props: spec.propsSignature,
+    managed: spec.managedLayoutSignature
+  });
+}
 
 function ensureNoteChromeController(
   plugin: ParaZkPluginContext,

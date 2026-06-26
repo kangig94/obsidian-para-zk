@@ -9,7 +9,7 @@ import {
 } from "../../src/ux/note-chrome-core";
 
 describe("note chrome core", () => {
-  it("builds one shared signature from cached file metadata", () => {
+  it("splits props data changes from managed layout", () => {
     const file = testFile("PARA/Resources/Paper.md");
     let frontmatter: Record<string, unknown> = {
       type: "resource",
@@ -31,7 +31,32 @@ describe("note chrome core", () => {
       url: "https://example.com/b"
     };
     const second = buildCachedNoteChromeSpec(plugin, file.path);
-    expect(second.signature).not.toBe(first.signature);
+    expect(second.propsSignature).not.toBe(first.propsSignature);
+    expect(second.managedLayoutSignature).toBe(first.managedLayoutSignature);
+  });
+
+  it("does not dirty top-level chrome signatures for reference content changes", () => {
+    const file = testFile("PARA/Projects/Launch.md");
+    let frontmatter: Record<string, unknown> = {
+      type: "project",
+      status: "active",
+      references: [{ link: "https://example.com/a" }]
+    };
+    const plugin = fakePlugin(file, () => frontmatter);
+
+    const first = buildCachedNoteChromeSpec(plugin, file.path);
+    frontmatter = {
+      type: "project",
+      status: "active",
+      references: [
+        { link: "https://example.com/a" },
+        { link: "https://example.com/b" }
+      ]
+    };
+    const second = buildCachedNoteChromeSpec(plugin, file.path);
+
+    expect(second.propsSignature).toBe(first.propsSignature);
+    expect(second.managedLayoutSignature).toBe(first.managedLayoutSignature);
   });
 
   it("prefers the live editor frontmatter type over stale cached metadata", () => {
@@ -58,7 +83,8 @@ describe("note chrome core", () => {
       "---",
       "body"
     ].join("\n"));
-    expect(updated.signature).not.toBe(spec.signature);
+    expect(updated.propsSignature).not.toBe(spec.propsSignature);
+    expect(updated.managedLayoutSignature).toBe(spec.managedLayoutSignature);
   });
 
   it("does not revive a removed live editor type from stale cached metadata", () => {

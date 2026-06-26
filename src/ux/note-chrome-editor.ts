@@ -26,11 +26,11 @@ import {
 import {
   buildEditorNoteChromeSpec,
   hasNoteChrome,
-  renderNoteChromeManaged,
   renderNoteChromeProps,
   type NoteChromeKind,
   type NoteChromeSpec
 } from "./note-chrome-core";
+import { ManagedPanelController } from "./blocks/managed-sections";
 import { renderBlockNotice } from "./blocks/shell";
 
 // Block widgets CANNOT be supplied through a ViewPlugin's `decorations` — CodeMirror
@@ -46,6 +46,8 @@ export function createNoteChromeEditorExtension(plugin: ParaZkPluginContext): Ex
     private readonly kind: NoteChromeKind;
     private readonly spec: NoteChromeSpec;
     private child: NoteChromeWidgetRenderChild | undefined;
+    private managedController: ManagedPanelController | undefined;
+    private managedUpdateFrame: number | undefined;
     private resizeObserver: ResizeObserver | undefined;
 
     constructor(
@@ -58,10 +60,18 @@ export function createNoteChromeEditorExtension(plugin: ParaZkPluginContext): Ex
     }
 
     eq(widget: WidgetType): boolean {
+      const signature = this.kind === "props"
+        ? this.spec.propsSignature
+        : this.spec.managedLayoutSignature;
+      const otherSignature = widget instanceof NoteChromeWidget
+        ? widget.kind === "props"
+          ? widget.spec.propsSignature
+          : widget.spec.managedLayoutSignature
+        : undefined;
       return widget instanceof NoteChromeWidget
         && widget.kind === this.kind
         && widget.spec.sourcePath === this.spec.sourcePath
-        && widget.spec.signature === this.spec.signature;
+        && otherSignature === signature;
     }
 
     get estimatedHeight(): number {
@@ -85,28 +95,51 @@ export function createNoteChromeEditorExtension(plugin: ParaZkPluginContext): Ex
       const child = new NoteChromeWidgetRenderChild(host);
       child.load();
       this.child = child;
-      void renderNoteChromeManaged(plugin, host, this.spec, child)
-        .then(() => {
-          if (!child.isUnloaded) view.requestMeasure();
-        })
-        .catch((error: unknown) => {
-          if (!child.isUnloaded) {
-            renderBlockNotice(host, "managed", error instanceof Error ? error.message : String(error));
-            view.requestMeasure();
-          }
-        });
+      this.scheduleManagedUpdate(plugin, host, child, view);
       return host;
     }
 
     destroy(): void {
+      if (this.managedUpdateFrame !== undefined) window.cancelAnimationFrame(this.managedUpdateFrame);
+      this.managedUpdateFrame = undefined;
       this.resizeObserver?.disconnect();
       this.resizeObserver = undefined;
+      this.managedController?.dispose();
+      this.managedController = undefined;
       this.child?.unload();
       this.child = undefined;
     }
 
     ignoreEvent(): boolean {
       return true;
+    }
+
+    private scheduleManagedUpdate(
+      plugin: ParaZkPluginContext,
+      host: HTMLElement,
+      child: NoteChromeWidgetRenderChild,
+      view: EditorView
+    ): void {
+      if (this.managedUpdateFrame !== undefined) window.cancelAnimationFrame(this.managedUpdateFrame);
+      const renderWhenConnected = () => {
+        this.managedUpdateFrame = undefined;
+        if (child.isUnloaded) return;
+        if (!host.isConnected) {
+          this.managedUpdateFrame = window.requestAnimationFrame(renderWhenConnected);
+          return;
+        }
+
+        try {
+          this.managedController = new ManagedPanelController(plugin, host, child);
+          this.managedController.update(this.spec.sourcePath, this.spec.type);
+        } catch (error) {
+          this.managedController?.dispose();
+          this.managedController = undefined;
+          renderBlockNotice(host, "managed", error instanceof Error ? error.message : String(error));
+        }
+        view.requestMeasure();
+      };
+      this.managedUpdateFrame = window.requestAnimationFrame(renderWhenConnected);
     }
   }
 
@@ -121,26 +154,30 @@ export function createNoteChromeEditorExtension(plugin: ParaZkPluginContext): Ex
     const spec = buildEditorNoteChromeSpec(plugin, file, content);
     if (!hasNoteChrome(spec)) return builder.finish();
 
-    const propsPos = frontmatterEndPosition(content);
-    const managedPos = state.doc.length;
-    builder.add(
-      propsPos,
-      propsPos,
-      Decoration.widget({
-        widget: new NoteChromeWidget("props", spec),
-        block: true,
-        side: -1
-      })
-    );
-    builder.add(
-      managedPos,
-      managedPos,
-      Decoration.widget({
-        widget: new NoteChromeWidget("managed", spec),
-        block: true,
-        side: 1
-      })
-    );
+    if (spec.hasProps) {
+      const propsPos = frontmatterEndPosition(content);
+      builder.add(
+        propsPos,
+        propsPos,
+        Decoration.widget({
+          widget: new NoteChromeWidget("props", spec),
+          block: true,
+          side: -1
+        })
+      );
+    }
+    if (spec.hasManaged) {
+      const managedPos = state.doc.length;
+      builder.add(
+        managedPos,
+        managedPos,
+        Decoration.widget({
+          widget: new NoteChromeWidget("managed", spec),
+          block: true,
+          side: 1
+        })
+      );
+    }
     return builder.finish();
   };
 
