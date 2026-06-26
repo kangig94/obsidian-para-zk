@@ -36,6 +36,9 @@ export class App {
     unresolvedLinks: {} as Record<string, Record<string, number>>
   };
 }
+export class AbstractInputSuggest<T> {
+  constructor(_app: App, _textInputEl: HTMLInputElement | HTMLDivElement) {}
+}
 export class Component {
   private readonly registeredCallbacks: Array<() => void> = [];
 

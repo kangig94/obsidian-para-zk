@@ -20,18 +20,18 @@ import {
   type EventRef
 } from "obsidian";
 import type { ParaZkPluginContext } from "../plugin-interface";
-import { inferPropsViewType } from "../props/schema";
-import { managedUiBlocksForType } from "../templates";
 import {
-  normalizeFrontmatterType,
-  readFrontmatterTypeFromContent,
   yamlFrontmatterRange
 } from "../vault/sections";
-import { renderManagedPanel } from "./blocks/managed-sections";
+import {
+  buildEditorNoteChromeSpec,
+  hasNoteChrome,
+  renderNoteChromeManaged,
+  renderNoteChromeProps,
+  type NoteChromeKind,
+  type NoteChromeSpec
+} from "./note-chrome-core";
 import { renderBlockNotice } from "./blocks/shell";
-import { renderPropsPanel } from "./props-controls";
-
-type NoteChromeWidgetKind = "props" | "managed";
 
 // Block widgets CANNOT be supplied through a ViewPlugin's `decorations` — CodeMirror
 // throws "Block decorations may not be specified via plugins". The props (top) and
@@ -43,28 +43,25 @@ const refreshNoteChrome = StateEffect.define<null>();
 
 export function createNoteChromeEditorExtension(plugin: ParaZkPluginContext): Extension {
   class NoteChromeWidget extends WidgetType {
-    private readonly kind: NoteChromeWidgetKind;
-    private readonly sourcePath: string;
-    private readonly signature: string;
+    private readonly kind: NoteChromeKind;
+    private readonly spec: NoteChromeSpec;
     private child: NoteChromeWidgetRenderChild | undefined;
     private resizeObserver: ResizeObserver | undefined;
 
     constructor(
-      kind: NoteChromeWidgetKind,
-      sourcePath: string,
-      signature: string
+      kind: NoteChromeKind,
+      spec: NoteChromeSpec
     ) {
       super();
       this.kind = kind;
-      this.sourcePath = sourcePath;
-      this.signature = signature;
+      this.spec = spec;
     }
 
     eq(widget: WidgetType): boolean {
       return widget instanceof NoteChromeWidget
         && widget.kind === this.kind
-        && widget.sourcePath === this.sourcePath
-        && widget.signature === this.signature;
+        && widget.spec.sourcePath === this.spec.sourcePath
+        && widget.spec.signature === this.spec.signature;
     }
 
     get estimatedHeight(): number {
@@ -74,13 +71,13 @@ export function createNoteChromeEditorExtension(plugin: ParaZkPluginContext): Ex
     toDOM(view: EditorView): HTMLElement {
       const host = activeDocument.createElement("div");
       host.addClass("para-zk-note-chrome-widget", `para-zk-note-chrome-widget--${this.kind}`);
-      host.dataset.paraZkSourcePath = this.sourcePath;
+      if (this.spec.sourcePath) host.dataset.paraZkSourcePath = this.spec.sourcePath;
       host.contentEditable = "false";
       host.setAttribute("contenteditable", "false");
       this.resizeObserver = observeWidgetResize(host, view);
 
       if (this.kind === "props") {
-        renderPropsPanel(plugin, host, this.sourcePath);
+        renderNoteChromeProps(plugin, host, this.spec);
         view.requestMeasure();
         return host;
       }
@@ -88,7 +85,7 @@ export function createNoteChromeEditorExtension(plugin: ParaZkPluginContext): Ex
       const child = new NoteChromeWidgetRenderChild(host);
       child.load();
       this.child = child;
-      void renderManagedPanel(plugin, host, this.sourcePath, child)
+      void renderNoteChromeManaged(plugin, host, this.spec, child)
         .then(() => {
           if (!child.isUnloaded) view.requestMeasure();
         })
@@ -121,18 +118,16 @@ export function createNoteChromeEditorExtension(plugin: ParaZkPluginContext): Ex
     if (!(file instanceof TFile)) return builder.finish();
 
     const content = state.doc.toString();
-    const type = readFrontmatterTypeFromContent(content)
-      ?? cachedFrontmatterType(plugin, file);
-    if (!isParaZkType(plugin, type)) return builder.finish();
+    const spec = buildEditorNoteChromeSpec(plugin, file, content);
+    if (!hasNoteChrome(spec)) return builder.finish();
 
-    const signature = noteChromeSignature(plugin, file, type);
     const propsPos = frontmatterEndPosition(content);
     const managedPos = state.doc.length;
     builder.add(
       propsPos,
       propsPos,
       Decoration.widget({
-        widget: new NoteChromeWidget("props", file.path, signature),
+        widget: new NoteChromeWidget("props", spec),
         block: true,
         side: -1
       })
@@ -141,7 +136,7 @@ export function createNoteChromeEditorExtension(plugin: ParaZkPluginContext): Ex
       managedPos,
       managedPos,
       Decoration.widget({
-        widget: new NoteChromeWidget("managed", file.path, signature),
+        widget: new NoteChromeWidget("managed", spec),
         block: true,
         side: 1
       })
@@ -229,23 +224,4 @@ function editorFilePath(state: EditorState): string | undefined {
 
 function frontmatterEndPosition(content: string): number {
   return yamlFrontmatterRange(content)?.end ?? 0;
-}
-
-function cachedFrontmatterType(plugin: ParaZkPluginContext, file: TFile): string | undefined {
-  return normalizeFrontmatterType(plugin.app.metadataCache.getFileCache(file)?.frontmatter?.type);
-}
-
-function isParaZkType(plugin: ParaZkPluginContext, type: string | undefined): boolean {
-  if (!type) return false;
-  return inferPropsViewType({ type }) !== undefined
-    || managedUiBlocksForType(type, plugin.settings) !== undefined;
-}
-
-function noteChromeSignature(plugin: ParaZkPluginContext, file: TFile, type: string | undefined): string {
-  const frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
-  return JSON.stringify({
-    type,
-    locale: plugin.settings.locale,
-    frontmatter
-  }) ?? "";
 }

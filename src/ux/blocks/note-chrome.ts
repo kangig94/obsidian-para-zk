@@ -4,11 +4,14 @@ import {
   TFile
 } from "obsidian";
 import type { ParaZkPluginContext } from "../../plugin-interface";
-import { inferPropsViewType } from "../../props/schema";
-import { managedUiBlocksForType } from "../../templates";
-import { normalizeFrontmatterType } from "../../vault/sections";
-import { renderPropsPanel } from "../props-controls";
-import { renderManagedPanel } from "./managed-sections";
+import {
+  buildCachedNoteChromeSpec,
+  hasNoteChrome,
+  renderNoteChromeManaged,
+  renderNoteChromeProps
+} from "../note-chrome-core";
+import { placeReadingManagedPanel, placeReadingPropsPanel } from "./reading-note-chrome-slots";
+import { refreshPreviewChromeSections } from "./reading-preview-height-sync";
 import { renderBlockNotice } from "./shell";
 
 // smoke:
@@ -135,7 +138,7 @@ class NoteChromeController {
   }
 
   scheduleRender(delayMs = NOTE_CHROME_RERENDER_DELAY_MS): void {
-    const signature = noteChromeSignature(this.plugin, this.sourcePath, this.typeHint);
+    const signature = buildCachedNoteChromeSpec(this.plugin, this.sourcePath, this.typeHint).signature;
     if (signature === this.renderedSignature && this.hasRenderedPanels()) {
       this.ensureLayout();
       this.schedulePreviewChromeRefresh();
@@ -158,14 +161,15 @@ class NoteChromeController {
       this.dispose();
       return;
     }
-    if (!isParaZkNote(this.plugin, this.sourcePath, this.typeHint)) {
+    const spec = buildCachedNoteChromeSpec(this.plugin, this.sourcePath, this.typeHint);
+    if (!hasNoteChrome(spec)) {
       this.removeInjectedPanels();
       this.schedulePreviewChromeRefresh();
       this.renderedSignature = undefined;
       return;
     }
 
-    const signature = noteChromeSignature(this.plugin, this.sourcePath, this.typeHint);
+    const signature = spec.signature;
     const propsEl = this.ensurePropsEl();
     const managedEl = this.ensureManagedEl();
     propsEl.dataset.paraZkSourcePath = this.sourcePath;
@@ -175,9 +179,9 @@ class NoteChromeController {
 
     const generation = ++this.renderGeneration;
     const child = this.ensureManagedChild(managedEl);
-    renderPropsPanel(this.plugin, propsEl, this.sourcePath);
+    renderNoteChromeProps(this.plugin, propsEl, spec);
     this.schedulePreviewChromeRefresh();
-    void renderManagedPanel(this.plugin, managedEl, this.sourcePath, child)
+    void renderNoteChromeManaged(this.plugin, managedEl, spec, child)
       .then(() => {
         if (this.isCurrentRender(generation)) this.schedulePreviewChromeRefresh();
       })
@@ -224,8 +228,8 @@ class NoteChromeController {
   }
 
   private ensureLayout(): void {
-    if (this.propsEl) insertPropsHeader(this.container, this.propsEl);
-    if (this.managedEl) insertManagedFooter(this.container, this.managedEl);
+    if (this.propsEl) placeReadingPropsPanel(this.container, this.propsEl);
+    if (this.managedEl) placeReadingManagedPanel(this.container, this.managedEl);
   }
 
   private scheduleLayout(): void {
@@ -358,9 +362,9 @@ function scanOpenReadingViews(plugin: ParaZkPluginContext): void {
     const container = leaf.view.containerEl.querySelector<HTMLElement>(".markdown-preview-sizer");
     if (!container) continue;
 
-    const typeHint = cachedFrontmatterType(plugin, file.path);
-    if (!isParaZkNote(plugin, file.path, typeHint)) continue;
-    ensureNoteChromeController(plugin, container, file.path, typeHint).scheduleRender(0);
+    const spec = buildCachedNoteChromeSpec(plugin, file.path);
+    if (!hasNoteChrome(spec)) continue;
+    ensureNoteChromeController(plugin, container, file.path, spec.type).scheduleRender(0);
   }
 }
 
@@ -456,132 +460,4 @@ function managedPanelCandidates(container: HTMLElement): HTMLElement[] {
 
 function isVisibleElement(el: HTMLElement): boolean {
   return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
-}
-
-// Props sits inside Obsidian's note header (`.mod-header`) so Reading view's virtual
-// renderer accounts for its height in the header section when scrolling. The header is the
-// only stable home: Reading view recycles its sections (header included) in and out of the
-// DOM while scrolling, so when the header is gone the panel is detached and left waiting.
-// Re-attaching it as a bare `.markdown-preview-sizer` child instead would place unaccounted
-// height above the viewport that Obsidian strips and we re-add on every scroll tick — a
-// thrash that shifts the scroll position (a visible jump, then a snap back).
-function insertPropsHeader(container: HTMLElement, propsEl: HTMLElement): void {
-  const header = container.querySelector<HTMLElement>(":scope > .mod-header");
-  if (!header) {
-    propsEl.remove();
-    return;
-  }
-  if (header.lastElementChild !== propsEl) header.appendChild(propsEl);
-}
-
-// Managed sits at the bottom of the note: inside Obsidian's footer (`.mod-footer`) when it
-// is rendered, otherwise as the last sizer child. Unlike props it must NOT be detached when
-// the footer is recycled away — its Dataview views (e.g. cited-by) only populate while
-// attached to the live DOM, and a detached panel keeps a stale/empty result. Because it
-// lives below the body, a bare sizer child here changes height *below* the viewport, so it
-// never produces the above-viewport scroll thrash that the header fallback did.
-function insertManagedFooter(container: HTMLElement, managedEl: HTMLElement): void {
-  const footer = container.querySelector<HTMLElement>(":scope > .mod-footer");
-  if (footer) {
-    if (footer.firstElementChild !== managedEl) footer.prepend(managedEl);
-    return;
-  }
-  if (container.lastElementChild !== managedEl) container.appendChild(managedEl);
-}
-
-interface PreviewRendererSection {
-  el?: HTMLElement;
-  height?: number;
-  computed?: boolean;
-}
-
-interface PreviewRenderer {
-  sections?: PreviewRendererSection[];
-  getSectionForElement?: (el: HTMLElement) => PreviewRendererSection | undefined;
-  updateVirtualDisplay?: () => void;
-}
-
-function refreshPreviewChromeSections(plugin: ParaZkPluginContext, container: HTMLElement): void {
-  const renderer = previewRendererForContainer(plugin, container);
-  try {
-    const headerChanged = syncPreviewSectionHeight(
-      renderer,
-      container.querySelector<HTMLElement>(":scope > .mod-header")
-    );
-    const footerChanged = syncPreviewSectionHeight(
-      renderer,
-      container.querySelector<HTMLElement>(":scope > .mod-footer")
-    );
-    if (headerChanged || footerChanged) renderer?.updateVirtualDisplay?.();
-  } catch {
-    // Obsidian's preview renderer hooks are private; failing to refresh height
-    // is better than breaking note rendering on a version mismatch.
-  }
-}
-
-function syncPreviewSectionHeight(renderer: PreviewRenderer | undefined, el: HTMLElement | null): boolean {
-  if (!renderer || !el) return false;
-  const section = renderer.getSectionForElement?.(el)
-    ?? renderer.sections?.find((candidate) => candidate.el === el);
-  if (!section) return false;
-
-  const height = Math.ceil(Math.max(el.offsetHeight, el.getBoundingClientRect().height));
-  if (!Number.isFinite(height)) return false;
-
-  const changed = section.height !== height || section.computed !== true;
-  section.height = height;
-  section.computed = true;
-  return changed;
-}
-
-function previewRendererForContainer(
-  plugin: ParaZkPluginContext,
-  container: HTMLElement
-): PreviewRenderer | undefined {
-  for (const leaf of plugin.app.workspace.getLeavesOfType("markdown")) {
-    if (!(leaf.view instanceof MarkdownView)) continue;
-    if (leaf.view.containerEl.querySelector(".markdown-preview-sizer") !== container) continue;
-    const viewWithPreview = leaf.view as MarkdownView & {
-      previewMode?: {
-        renderer?: PreviewRenderer;
-      };
-    };
-    return viewWithPreview.previewMode?.renderer;
-  }
-  return undefined;
-}
-
-function isParaZkNote(
-  plugin: ParaZkPluginContext,
-  sourcePath: string | undefined,
-  typeHint: string | undefined
-): boolean {
-  const type = typeHint ?? cachedFrontmatterType(plugin, sourcePath);
-  if (!type) return false;
-  return inferPropsViewType({ type }) !== undefined
-    || managedUiBlocksForType(type, plugin.settings) !== undefined;
-}
-
-function noteChromeSignature(
-  plugin: ParaZkPluginContext,
-  sourcePath: string | undefined,
-  typeHint: string | undefined
-): string {
-  const file = sourcePath ? plugin.app.vault.getFileByPath(sourcePath) : null;
-  const frontmatter = file instanceof TFile
-    ? plugin.app.metadataCache.getFileCache(file)?.frontmatter ?? {}
-    : {};
-  return JSON.stringify({
-    sourcePath,
-    type: typeHint ?? normalizeFrontmatterType(frontmatter.type),
-    locale: plugin.settings.locale,
-    frontmatter
-  });
-}
-
-function cachedFrontmatterType(plugin: ParaZkPluginContext, sourcePath: string | undefined): string | undefined {
-  if (!sourcePath) return undefined;
-  const file = plugin.app.vault.getFileByPath(sourcePath);
-  if (!(file instanceof TFile)) return undefined;
-  return normalizeFrontmatterType(plugin.app.metadataCache.getFileCache(file)?.frontmatter?.type);
 }
