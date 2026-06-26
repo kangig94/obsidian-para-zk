@@ -171,6 +171,7 @@ class NoteChromeController {
     if (this.renderTimer !== undefined) window.clearTimeout(this.renderTimer);
     this.renderTimer = window.setTimeout(() => {
       this.renderTimer = undefined;
+      this.pendingSignature = undefined;
       this.renderNow();
     }, delayMs);
   }
@@ -185,7 +186,6 @@ class NoteChromeController {
       this.removeInjectedPanels();
       this.schedulePreviewChromeRefresh();
       this.renderedSignature = undefined;
-      this.pendingSignature = undefined;
       return;
     }
 
@@ -203,10 +203,7 @@ class NoteChromeController {
     this.schedulePreviewChromeRefresh();
     void renderManagedPanel(this.plugin, managedEl, this.sourcePath, child)
       .then(() => {
-        if (this.isCurrentRender(generation)) {
-          this.renderedSignature = signature;
-          this.schedulePreviewChromeRefresh();
-        }
+        if (this.isCurrentRender(generation)) this.schedulePreviewChromeRefresh();
       })
       .catch((error: unknown) => {
         if (this.isCurrentRender(generation)) {
@@ -214,10 +211,8 @@ class NoteChromeController {
           renderBlockNotice(managedEl, "managed", error instanceof Error ? error.message : String(error));
           this.schedulePreviewChromeRefresh();
         }
-      })
-      .finally(() => {
-        if (this.pendingSignature === signature) this.pendingSignature = undefined;
       });
+    this.renderedSignature = signature;
   }
 
   private isCurrentRender(generation: number): boolean {

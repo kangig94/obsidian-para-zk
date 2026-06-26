@@ -36,7 +36,6 @@ export class DataviewViewRenderChild extends MarkdownRenderChild {
   private readonly args: DataviewViewArgs;
   private readonly renderActions?: DataviewViewActionRenderer;
   private renderTimer: number | undefined;
-  private initialRetryTimers: number[] = [];
   private renderGeneration = 0;
   private unloaded = true;
   private currentSourcePath: string | undefined;
@@ -73,8 +72,6 @@ export class DataviewViewRenderChild extends MarkdownRenderChild {
     this.renderGeneration += 1;
     if (this.renderTimer !== undefined) window.clearTimeout(this.renderTimer);
     this.renderTimer = undefined;
-    for (const timer of this.initialRetryTimers) window.clearTimeout(timer);
-    this.initialRetryTimers = [];
   }
 
   private onVaultFile(file: unknown, oldPath?: string): void {
@@ -96,10 +93,9 @@ export class DataviewViewRenderChild extends MarkdownRenderChild {
   private scheduleInitialRetries(): void {
     for (const delay of DATAVIEW_INITIAL_RETRY_DELAYS_MS) {
       const timer = window.setTimeout(() => {
-        this.initialRetryTimers = this.initialRetryTimers.filter((value) => value !== timer);
         this.renderNow({ preserveCurrent: true });
       }, delay);
-      this.initialRetryTimers.push(timer);
+      this.register(() => window.clearTimeout(timer));
     }
   }
 
