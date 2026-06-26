@@ -62,6 +62,7 @@ export function registerCitationRenderers(plugin: ParaZkPluginContext): void {
 }
 
 function renderCitations(plugin: ParaZkPluginContext, el: HTMLElement, ctx: MarkdownPostProcessorContext): void {
+  if (!el.textContent?.includes("PZ[")) return;
   if (!containsCitationCode(el)) return;
   ctx.addChild(new CitationRenderChild(plugin, el, ctx.sourcePath));
 }

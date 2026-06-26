@@ -1,12 +1,10 @@
 import {
   MarkdownView,
   MarkdownRenderChild,
-  TFile,
-  type MarkdownPostProcessorContext
+  TFile
 } from "obsidian";
 import type { ParaZkPluginContext } from "../../plugin-interface";
 import { inferPropsViewType } from "../../props/schema";
-import { isRecord } from "../../records";
 import { managedUiBlocksForType } from "../../templates";
 import { normalizeFrontmatterType } from "../../vault/sections";
 import { renderPropsPanel } from "../props-controls";
@@ -18,12 +16,9 @@ import { renderBlockNotice } from "./shell";
 // - Managed panel renders at the bottom of the note body (before the note footer).
 // - Notes with legacy para-zk-props/para-zk-managed fences render once because fences are swallowed.
 // - Frontmatter changes from CLI, MCP, or Properties editor trigger a re-render.
-// - Reading view mode switches attach even when the note has no body block for a post-processor.
-// Reading view only: Live Preview is handled by the CM6 editor extension. This processor
-// injects only when the element resolves to a `.markdown-preview-sizer` (the reading-view
-// content container), so Live Preview (no sizer) never double-renders.
+// - Reading view mode switches attach even when the note has no body block.
+// Reading view only: Live Preview is handled by the CM6 editor extension.
 
-const NOTE_CHROME_ATTACH_RETRY_LIMIT = 12;
 const NOTE_CHROME_ATTACH_RETRY_DELAY_MS = 30;
 const NOTE_CHROME_INITIAL_ATTACH_DELAY_MS = 60;
 const NOTE_CHROME_RERENDER_DELAY_MS = 120;
@@ -34,7 +29,6 @@ const activeNoteChromeControllers = new Set<NoteChromeController>();
 let openReadingViewScanTimers: number[] = [];
 
 export function registerNoteChromeRenderers(plugin: ParaZkPluginContext): void {
-  plugin.registerMarkdownPostProcessor((el, ctx) => renderNoteChrome(plugin, el, ctx));
   plugin.registerEvent(
     plugin.app.metadataCache.on("changed", (file) => {
       refreshNoteChromeForPath(file.path);
@@ -62,24 +56,6 @@ export function registerNoteChromeRenderers(plugin: ParaZkPluginContext): void {
     clearOpenReadingViewScanTimers();
     disposeAllNoteChromeControllers();
   });
-}
-
-function renderNoteChrome(
-  plugin: ParaZkPluginContext,
-  el: HTMLElement,
-  ctx: MarkdownPostProcessorContext
-): void {
-  // Skip embedded previews and nested renders from managed note chrome.
-  if (isNestedNoteChromeRender(el)) return;
-
-  const frontmatter: unknown = ctx.frontmatter;
-  const typeHint = normalizeFrontmatterType(isRecord(frontmatter) ? frontmatter.type : undefined);
-  if (!isParaZkNote(plugin, ctx.sourcePath, typeHint)) return;
-
-  // At post-processor time Obsidian may still hold the section in a detached fragment.
-  // Resolve the note container on a later tick, then let a sizer-level controller own
-  // the injected panels instead of tying note-level chrome to one section's lifecycle.
-  scheduleNoteChromeAttach(plugin, el, ctx.sourcePath, typeHint, 0);
 }
 
 // The props grid renders from metadataCache, so external frontmatter changes
@@ -303,34 +279,6 @@ class NoteChromeController {
 
 class NoteChromeManagedRenderChild extends MarkdownRenderChild {}
 
-function scheduleNoteChromeAttach(
-  plugin: ParaZkPluginContext,
-  el: HTMLElement,
-  sourcePath: string,
-  typeHint: string | undefined,
-  attempt: number
-): void {
-  window.setTimeout(() => {
-    if (isNestedNoteChromeRender(el)) return;
-
-    const container = resolveContainer(el);
-    if (container) {
-      ensureNoteChromeController(plugin, container, sourcePath, typeHint).scheduleRender(0);
-      return;
-    }
-
-    if (attempt < NOTE_CHROME_ATTACH_RETRY_LIMIT) {
-      scheduleNoteChromeAttach(plugin, el, sourcePath, typeHint, attempt + 1);
-    }
-  }, attempt === 0 ? NOTE_CHROME_INITIAL_ATTACH_DELAY_MS : NOTE_CHROME_ATTACH_RETRY_DELAY_MS);
-}
-
-function isNestedNoteChromeRender(el: HTMLElement): boolean {
-  return el.closest(
-    ".markdown-embed, .para-zk-note-chrome, .para-zk-note-chrome-widget, .para-zk-managed-buffer"
-  ) !== null;
-}
-
 function ensureNoteChromeController(
   plugin: ParaZkPluginContext,
   container: HTMLElement,
@@ -462,13 +410,6 @@ function disposeAllNoteChromeControllers(): void {
   for (const controller of Array.from(activeNoteChromeControllers)) {
     controller.dispose();
   }
-}
-
-// The reading-view content container that holds the note's rendered blocks. Returning
-// undefined for non-reading contexts (Live Preview has no sizer) keeps this processor
-// scoped to Reading view.
-function resolveContainer(el: HTMLElement): HTMLElement | undefined {
-  return el.closest<HTMLElement>(".markdown-preview-sizer") ?? undefined;
 }
 
 function removeDuplicatePropsPanels(container: HTMLElement, keep: HTMLElement): void {

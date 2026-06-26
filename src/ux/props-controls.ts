@@ -152,6 +152,8 @@ export function renderPropsPanel(
 }
 
 function renderInlinePropsInputs(plugin: ParaZkPluginContext, el: HTMLElement, ctx: MarkdownPostProcessorContext): void {
+  if (!el.textContent?.includes("PZ_INPUT[")) return;
+
   const codeEls = Array.from(el.querySelectorAll("code"));
   for (const codeEl of codeEls) {
     if (codeEl.closest("pre")) continue;
