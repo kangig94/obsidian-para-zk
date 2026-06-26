@@ -102,6 +102,19 @@ describe("note chrome core", () => {
     expect(hasNoteChrome(spec)).toBe(false);
   });
 
+  it("does not revive removed live editor frontmatter from stale cached metadata", () => {
+    const file = testFile("PARA/Projects/Launch.md");
+    const plugin = fakePlugin(file, () => ({
+      type: "project",
+      status: "active"
+    }));
+
+    const spec = buildEditorNoteChromeSpec(plugin, file, "body only");
+
+    expect(spec.type).toBeUndefined();
+    expect(hasNoteChrome(spec)).toBe(false);
+  });
+
   it("stays inert for ordinary notes", () => {
     const file = testFile("README.md");
     const plugin = fakePlugin(file, () => ({}));

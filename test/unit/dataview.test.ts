@@ -131,6 +131,38 @@ describe("DataviewViewRenderChild", () => {
     child.unload();
   });
 
+  it("discards buffered render children when the rendered Dataview output is unchanged", async () => {
+    const metadata = createEventBus();
+    const plugin = fakeDataviewPlugin(metadata);
+    const root = new FakeElement("div");
+    let cleanupCount = 0;
+    const render = vi.spyOn(MarkdownRenderer, "render")
+      .mockImplementation(async (_app, _markdown, el, _sourcePath, component) => {
+        component.register(() => {
+          cleanupCount += 1;
+        });
+        renderSettledDataview(el);
+      });
+    const child = new DataviewViewRenderChild(plugin, root.asHtml(), {
+      key: "cited-by",
+      title: "Cited by"
+    }, "PARA/Resources/Paper.md");
+
+    child.load();
+    await flushPromises();
+    expect(render).toHaveBeenCalledTimes(1);
+    expect(cleanupCount).toBe(0);
+
+    metadata.emit("resolve");
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+
+    expect(render).toHaveBeenCalledTimes(2);
+    expect(cleanupCount).toBe(1);
+    child.unload();
+    expect(cleanupCount).toBe(2);
+  });
+
   it("rerenders current-source dependent views when the current source changes", async () => {
     const metadata = createEventBus();
     const plugin = fakeDataviewPlugin(metadata);

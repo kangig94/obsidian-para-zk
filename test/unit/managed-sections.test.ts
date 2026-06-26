@@ -8,6 +8,7 @@ const childCounts = vi.hoisted(() => ({
   references: 0,
   tasks: 0,
   unloaded: 0,
+  throwOnDataviewLoad: false,
   connectedLoads: {
     dataview: [] as boolean[],
     references: [] as boolean[],
@@ -28,6 +29,7 @@ vi.mock("../../src/ux/blocks/dataview", () => ({
     }
 
     load(): void {
+      if (childCounts.throwOnDataviewLoad) throw new Error("dataview load failed");
       childCounts.connectedLoads.dataview.push(this.containerEl.isConnected);
       this.containerEl.createDiv({ cls: "mock-dataview" });
     }
@@ -92,6 +94,7 @@ describe("ManagedPanelController", () => {
     childCounts.references = 0;
     childCounts.tasks = 0;
     childCounts.unloaded = 0;
+    childCounts.throwOnDataviewLoad = false;
     childCounts.connectedLoads.dataview.length = 0;
     childCounts.connectedLoads.references.length = 0;
     childCounts.connectedLoads.tasks.length = 0;
@@ -128,6 +131,23 @@ describe("ManagedPanelController", () => {
 
     controller.dispose();
     expect(childCounts.unloaded).toBe(2);
+  });
+
+  it("removes newly appended entries when a managed child fails to load", async () => {
+    const { ManagedPanelController } = await import("../../src/ux/blocks/managed-sections");
+    const root = new FakeElement("div");
+    fakeDocumentBody.appendChild(root);
+    const parent = new MarkdownRenderChild(root.asHtml());
+    parent.load();
+    const controller = new ManagedPanelController(fakePlugin(), root.asHtml(), parent);
+    childCounts.throwOnDataviewLoad = true;
+
+    expect(() => controller.update("PARA/Resources/Paper.md", "resource")).toThrow("dataview load failed");
+
+    expect(root.querySelector(".block-language-para-zk-view")).toBeNull();
+    expect(childCounts.unloaded).toBe(1);
+    controller.dispose();
+    expect(childCounts.unloaded).toBe(1);
   });
 });
 

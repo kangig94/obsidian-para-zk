@@ -67,20 +67,29 @@ export class ManagedPanelController {
     if (this.entries.size === 0) this.el.empty();
 
     const nextEntries = new Map<string, ManagedBlockEntry>();
-    for (const spec of specs) {
-      const existing = this.entries.get(spec.key);
-      const entry = existing ?? this.createEntry(spec);
-      nextEntries.set(spec.key, entry);
-      this.el.appendChild(entry.separatorEl);
-      this.el.appendChild(entry.blockEl);
-      if (!existing) this.child.addChild(entry.child);
-    }
+    const createdEntries: ManagedBlockEntry[] = [];
+    try {
+      for (const spec of specs) {
+        const existing = this.entries.get(spec.key);
+        const entry = existing ?? this.createEntry(spec);
+        if (!existing) createdEntries.push(entry);
+        nextEntries.set(spec.key, entry);
+        this.el.appendChild(entry.separatorEl);
+        this.el.appendChild(entry.blockEl);
+        if (!existing) this.child.addChild(entry.child);
+      }
 
-    for (const [key, entry] of this.entries) {
-      if (nextEntries.has(key)) continue;
-      this.disposeEntry(entry);
+      for (const [key, entry] of this.entries) {
+        if (nextEntries.has(key)) continue;
+        this.disposeEntry(entry);
+      }
+      this.entries = nextEntries;
+    } catch (error) {
+      for (const entry of createdEntries) {
+        if (!this.entries.has(entry.key)) this.disposeEntry(entry);
+      }
+      throw error;
     }
-    this.entries = nextEntries;
   }
 
   private createEntry(spec: ManagedBlockSpec): ManagedBlockEntry {
@@ -103,7 +112,11 @@ export class ManagedPanelController {
   }
 
   private disposeEntry(entry: ManagedBlockEntry): void {
-    this.child.removeChild(entry.child);
+    try {
+      this.child.removeChild(entry.child);
+    } catch {
+      entry.child.unload();
+    }
     entry.separatorEl.remove();
     entry.blockEl.remove();
   }

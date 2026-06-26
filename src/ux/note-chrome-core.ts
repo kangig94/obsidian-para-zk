@@ -48,12 +48,11 @@ export function buildEditorNoteChromeSpec(
   file: TFile,
   content: string
 ): NoteChromeSpec {
-  const cached = cachedFrontmatterForFile(plugin, file);
   const hasLiveFrontmatter = yamlFrontmatterRange(content) !== undefined;
-  const frontmatter = hasLiveFrontmatter ? parseFrontmatterFromContent(content) : cached;
+  const frontmatter = hasLiveFrontmatter ? parseFrontmatterFromContent(content) : {};
   const type = hasLiveFrontmatter
     ? normalizeFrontmatterType(frontmatter.type) ?? readFrontmatterTypeFromContent(content)
-    : normalizeFrontmatterType(cached.type) ?? readFrontmatterTypeFromContent(content);
+    : undefined;
   return buildNoteChromeSpec(
     plugin,
     file.path,

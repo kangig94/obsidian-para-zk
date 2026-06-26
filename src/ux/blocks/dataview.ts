@@ -19,7 +19,6 @@ type DataviewViewActionRenderer = (actions: HTMLElement) => void;
 
 type DataviewRenderOptions = {
   bufferInitial?: boolean;
-  preserveCurrent?: boolean;
 };
 
 type DataviewScheduleOptions = {
@@ -45,6 +44,7 @@ export class DataviewViewRenderChild extends MarkdownRenderChild {
   private unloaded = true;
   private currentSourcePath: string | undefined;
   private currentSourceQuietUntil = 0;
+  private visibleRenderChild: MarkdownRenderChild | undefined;
 
   constructor(
     plugin: ParaZkPluginContext,
@@ -79,6 +79,7 @@ export class DataviewViewRenderChild extends MarkdownRenderChild {
     if (this.renderTimer !== undefined) window.clearTimeout(this.renderTimer);
     this.renderTimer = undefined;
     this.renderTimerSuppressesCurrentSourceQuiet = false;
+    this.disposeVisibleRenderChild();
   }
 
   private onVaultFile(file: unknown, oldPath?: string): void {
@@ -142,14 +143,14 @@ export class DataviewViewRenderChild extends MarkdownRenderChild {
       this.renderTimer = undefined;
       this.renderTimerSuppressesCurrentSourceQuiet = false;
       if (shouldSuppress && this.isInCurrentSourceQuietWindow()) return;
-      this.renderNow({ preserveCurrent: true });
+      this.renderNow();
     }, DATAVIEW_CHANGE_RERENDER_DELAY_MS);
   }
 
   private scheduleInitialRetries(): void {
     for (const delay of DATAVIEW_INITIAL_RETRY_DELAYS_MS) {
       const timer = window.setTimeout(() => {
-        this.renderNow({ preserveCurrent: true });
+        this.renderNow();
       }, delay);
       this.register(() => window.clearTimeout(timer));
     }
@@ -176,6 +177,32 @@ export class DataviewViewRenderChild extends MarkdownRenderChild {
   private isCurrentRender(generation: number): boolean {
     return !this.unloaded && this.renderGeneration === generation;
   }
+
+  createRenderChild(): MarkdownRenderChild {
+    const child = new MarkdownRenderChild(this.containerEl);
+    this.addChild(child);
+    return child;
+  }
+
+  adoptRenderChild(child: MarkdownRenderChild): void {
+    if (this.visibleRenderChild === child) return;
+    this.disposeVisibleRenderChild();
+    this.visibleRenderChild = child;
+  }
+
+  discardRenderChild(child: MarkdownRenderChild): void {
+    if (this.visibleRenderChild === child) {
+      this.visibleRenderChild = undefined;
+    }
+    this.removeChild(child);
+  }
+
+  private disposeVisibleRenderChild(): void {
+    if (!this.visibleRenderChild) return;
+    const child = this.visibleRenderChild;
+    this.visibleRenderChild = undefined;
+    this.removeChild(child);
+  }
 }
 
 async function renderDataviewView(
@@ -183,29 +210,19 @@ async function renderDataviewView(
   args: DataviewViewArgs,
   el: HTMLElement,
   sourcePath: string | undefined,
-  child: MarkdownRenderChild,
+  child: DataviewViewRenderChild,
   isCurrent: () => boolean,
   renderActions?: DataviewViewActionRenderer,
   options: DataviewRenderOptions = {}
 ): Promise<void> {
   if (!isCurrent()) return;
-  if (options.preserveCurrent && hasSettledDataviewRender(el)) {
-    await renderDataviewViewBuffered(plugin, args, el, sourcePath, child, isCurrent, renderActions, {
-      replaceUnsettled: false,
-      timeoutMs: DATAVIEW_BUFFER_SETTLE_TIMEOUT_MS
-    });
-    return;
-  }
-  if (options.bufferInitial) {
-    await renderDataviewViewBuffered(plugin, args, el, sourcePath, child, isCurrent, renderActions, {
-      replaceUnsettled: true,
-      timeoutMs: DATAVIEW_INITIAL_BUFFER_SETTLE_TIMEOUT_MS
-    });
-    return;
-  }
-
-  await renderDataviewViewInto(plugin, args, el, sourcePath, child, renderActions);
-  if (!isCurrent()) return;
+  const replaceUnsettled = options.bufferInitial === true || !hasSettledDataviewRender(el);
+  await renderDataviewViewBuffered(plugin, args, el, sourcePath, child, isCurrent, renderActions, {
+    replaceUnsettled,
+    timeoutMs: options.bufferInitial === true
+      ? DATAVIEW_INITIAL_BUFFER_SETTLE_TIMEOUT_MS
+      : DATAVIEW_BUFFER_SETTLE_TIMEOUT_MS
+  });
 }
 
 async function renderDataviewViewBuffered(
@@ -213,7 +230,7 @@ async function renderDataviewViewBuffered(
   args: DataviewViewArgs,
   el: HTMLElement,
   sourcePath: string | undefined,
-  child: MarkdownRenderChild,
+  child: DataviewViewRenderChild,
   isCurrent: () => boolean,
   renderActions: DataviewViewActionRenderer | undefined,
   options: { replaceUnsettled: boolean; timeoutMs: number }
@@ -226,14 +243,19 @@ async function renderDataviewViewBuffered(
   buffer.setAttribute("aria-hidden", "true");
   el.after(buffer);
 
+  const renderChild = child.createRenderChild();
+  let committed = false;
   try {
-    const expectation = await renderDataviewViewInto(plugin, args, buffer, sourcePath, child, renderActions);
+    const expectation = await renderDataviewViewInto(plugin, args, buffer, sourcePath, renderChild, renderActions);
     await waitForSettledDataviewRender(buffer, isCurrent, options.timeoutMs, expectation);
     if (!isCurrent()) return;
     if (!hasSettledDataviewRender(buffer, expectation) && !options.replaceUnsettled) return;
     if (hasEquivalentDataviewView(el, buffer)) return;
     replaceDataviewView(el, buffer);
+    child.adoptRenderChild(renderChild);
+    committed = true;
   } finally {
+    if (!committed) child.discardRenderChild(renderChild);
     buffer.remove();
   }
 }
