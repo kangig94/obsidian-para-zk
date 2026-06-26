@@ -154,13 +154,6 @@ const DEPENDENCIES: DependencySpec[] = [
     tier: "enhancement",
     reason: "PARA-ZK navigation opens notes from ribbon, dashboard, and view toolbar actions; consistent open-in-new-tab, focused-new-tab, and no-duplicate-tab behavior keeps the PARA/ZK workflow navigable",
     configuration: openTabSettingsDependencyConfiguration
-  },
-  {
-    id: "remember-cursor-position",
-    name: "Remember cursor position",
-    repo: "dy-sh/obsidian-remember-cursor-position",
-    tier: "enhancement",
-    reason: "PARA-ZK users frequently move between generated dashboards, root notes, and child notes; restoring each note's cursor and scroll position keeps context intact"
   }
 ];
 

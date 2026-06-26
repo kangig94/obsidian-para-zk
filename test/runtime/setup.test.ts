@@ -76,8 +76,7 @@ const ENHANCEMENT_DEPENDENCY_IDS = [
   "obsidian-tasks-plugin",
   "obsidian-trash-explorer",
   "homepage",
-  "open-tab-settings",
-  "remember-cursor-position"
+  "open-tab-settings"
 ] as const;
 
 function dependencyActions(result: Awaited<ReturnType<typeof runSetup>>["result"]): Map<string, string> {
