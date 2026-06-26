@@ -29,12 +29,14 @@ type DataviewRenderExpectation = {
 const DATAVIEW_CHANGE_RERENDER_DELAY_MS = 300;
 const DATAVIEW_BUFFER_SETTLE_TIMEOUT_MS = 2500;
 const DATAVIEW_INITIAL_BUFFER_SETTLE_TIMEOUT_MS = 700;
+const DATAVIEW_INITIAL_RETRY_DELAYS_MS = [1200, 3500];
 
 export class DataviewViewRenderChild extends MarkdownRenderChild {
   private readonly plugin: ParaZkPluginContext;
   private readonly args: DataviewViewArgs;
   private readonly renderActions?: DataviewViewActionRenderer;
   private renderTimer: number | undefined;
+  private initialRetryTimers: number[] = [];
   private renderGeneration = 0;
   private unloaded = true;
   private currentSourcePath: string | undefined;
@@ -56,10 +58,14 @@ export class DataviewViewRenderChild extends MarkdownRenderChild {
   onload(): void {
     this.unloaded = false;
     this.renderNow({ bufferInitial: true });
+    this.scheduleInitialRetries();
     this.registerEvent(this.plugin.app.vault.on("modify", (file) => this.onVaultFile(file)));
     this.registerEvent(this.plugin.app.vault.on("create", (file) => this.onVaultFile(file)));
     this.registerEvent(this.plugin.app.vault.on("delete", (file) => this.onVaultFile(file)));
     this.registerEvent(this.plugin.app.vault.on("rename", (file, oldPath) => this.onVaultFile(file, oldPath)));
+    this.registerEvent(this.plugin.app.metadataCache.on("changed", () => this.scheduleRender()));
+    this.registerEvent(this.plugin.app.metadataCache.on("resolve", () => this.scheduleRender()));
+    this.registerEvent(this.plugin.app.metadataCache.on("resolved", () => this.scheduleRender()));
   }
 
   onunload(): void {
@@ -67,6 +73,8 @@ export class DataviewViewRenderChild extends MarkdownRenderChild {
     this.renderGeneration += 1;
     if (this.renderTimer !== undefined) window.clearTimeout(this.renderTimer);
     this.renderTimer = undefined;
+    for (const timer of this.initialRetryTimers) window.clearTimeout(timer);
+    this.initialRetryTimers = [];
   }
 
   private onVaultFile(file: unknown, oldPath?: string): void {
@@ -83,6 +91,16 @@ export class DataviewViewRenderChild extends MarkdownRenderChild {
       this.renderTimer = undefined;
       this.renderNow({ preserveCurrent: true });
     }, DATAVIEW_CHANGE_RERENDER_DELAY_MS);
+  }
+
+  private scheduleInitialRetries(): void {
+    for (const delay of DATAVIEW_INITIAL_RETRY_DELAYS_MS) {
+      const timer = window.setTimeout(() => {
+        this.initialRetryTimers = this.initialRetryTimers.filter((value) => value !== timer);
+        this.renderNow({ preserveCurrent: true });
+      }, delay);
+      this.initialRetryTimers.push(timer);
+    }
   }
 
   private renderNow(options: DataviewRenderOptions = {}): void {

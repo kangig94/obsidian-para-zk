@@ -77,6 +77,17 @@ export class MarkdownRenderChild extends Component {
     super();
   }
 }
+export const MarkdownRenderer = {
+  async render(
+    _app: App,
+    markdown: string,
+    el: HTMLElement,
+    _sourcePath: string,
+    _component: Component
+  ): Promise<void> {
+    el.textContent = markdown;
+  }
+};
 export class MarkdownView {
   file: TFile | null = null;
   leaf: unknown = null;
