@@ -48,8 +48,8 @@ echo "Pages: 3"
     writeFileSync(
       marker,
       `#!/usr/bin/env node
-const fs = require("fs");
-const path = require("path");
+import fs from "node:fs";
+import path from "node:path";
 const args = process.argv.slice(2);
 fs.appendFileSync(${JSON.stringify(calls)}, args.join(" ") + "\\n");
 const out = args[args.indexOf("--output_dir") + 1];
@@ -130,8 +130,8 @@ echo "Pages: 3"
     writeFileSync(
       marker,
       `#!/usr/bin/env node
-const fs = require("fs");
-const path = require("path");
+import fs from "node:fs";
+import path from "node:path";
 const args = process.argv.slice(2);
 fs.appendFileSync(${JSON.stringify(calls)}, args.join(" ") + "\\n");
 const out = args[args.indexOf("--output_dir") + 1];

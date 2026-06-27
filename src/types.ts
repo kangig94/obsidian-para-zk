@@ -19,6 +19,7 @@ export type ParaZkSettings = {
   showEmptyTrashAction: boolean;
   editorWidthSliderEnabled: boolean;
   editorLineWidth: number;
+  rememberCursorPosition: boolean;
 };
 
 export type SetupResult = {
@@ -91,5 +92,6 @@ export const DEFAULT_SETTINGS: ParaZkSettings = {
   showRibbon: true,
   showEmptyTrashAction: true,
   editorWidthSliderEnabled: true,
-  editorLineWidth: 700
+  editorLineWidth: 700,
+  rememberCursorPosition: false
 };

@@ -123,6 +123,25 @@ export class ParaZkSettingTab extends PluginSettingTab {
           });
       });
 
+    new Setting(containerEl)
+      .setName(labels.settingsRememberCursorPosition)
+      .setDesc(labels.settingsRememberCursorPositionDesc)
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.rememberCursorPosition)
+          .onChange(async (value) => {
+            this.plugin.settings.rememberCursorPosition = value;
+            await this.plugin.saveSettings();
+            if (value) {
+              const { registerPositionMemory } = await import("./position-memory");
+              await registerPositionMemory(this.plugin);
+            } else {
+              const { unregisterPositionMemory } = await import("./position-memory");
+              unregisterPositionMemory(this.plugin);
+            }
+          });
+      });
+
   }
 
   private async confirmAndRunSetupAction(button: ButtonComponent): Promise<void> {

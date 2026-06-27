@@ -31,6 +31,9 @@ export function mergeSettings(loaded: unknown): ParaZkSettings {
     editorWidthSliderEnabled: typeof data.editorWidthSliderEnabled === "boolean"
       ? data.editorWidthSliderEnabled
       : DEFAULT_SETTINGS.editorWidthSliderEnabled,
+    rememberCursorPosition: typeof data.rememberCursorPosition === "boolean"
+      ? data.rememberCursorPosition
+      : DEFAULT_SETTINGS.rememberCursorPosition,
     editorLineWidth: readEditorLineWidth(data.editorLineWidth)
   };
 }

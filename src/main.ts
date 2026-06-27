@@ -46,6 +46,10 @@ export default class ParaZkPlugin extends Plugin {
     this.registerEditorExtension(createCitationEditorExtension(this));
     registerNoteChromeRenderers(this);
     this.registerEditorExtension(createNoteChromeEditorExtension(this));
+    if (this.settings.rememberCursorPosition) {
+      const { registerPositionMemory } = await import("./ux/position-memory");
+      await registerPositionMemory(this);
+    }
     this.registerEditorSuggest(new CitationSuggest(this));
 
     this.addSettingTab(new ParaZkSettingTab(this));

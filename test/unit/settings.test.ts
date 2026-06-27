@@ -47,6 +47,7 @@ describe("mergeSettings", () => {
       showRibbon: false,
       showEmptyTrashAction: false,
       editorWidthSliderEnabled: false,
+      rememberCursorPosition: false,
       editorLineWidth: 1100
     });
 
@@ -55,6 +56,7 @@ describe("mergeSettings", () => {
       showRibbon: false,
       showEmptyTrashAction: false,
       editorWidthSliderEnabled: false,
+      rememberCursorPosition: false,
       editorLineWidth: 1100
     });
   });
@@ -82,6 +84,22 @@ describe("mergeSettings", () => {
     for (const editorWidthSliderEnabled of ["false", 0, 1, null, undefined]) {
       expect(mergeSettings({ editorWidthSliderEnabled }).editorWidthSliderEnabled)
         .toBe(DEFAULT_SETTINGS.editorWidthSliderEnabled);
+    }
+  });
+
+  it("defaults rememberCursorPosition when absent", () => {
+    expect(mergeSettings({}).rememberCursorPosition).toBe(false);
+  });
+
+  it("preserves boolean rememberCursorPosition values", () => {
+    expect(mergeSettings({ rememberCursorPosition: true }).rememberCursorPosition).toBe(true);
+    expect(mergeSettings({ rememberCursorPosition: false }).rememberCursorPosition).toBe(false);
+  });
+
+  it("falls back for non-boolean rememberCursorPosition values", () => {
+    for (const rememberCursorPosition of ["false", 0, 1, null, undefined]) {
+      expect(mergeSettings({ rememberCursorPosition }).rememberCursorPosition)
+        .toBe(DEFAULT_SETTINGS.rememberCursorPosition);
     }
   });
 

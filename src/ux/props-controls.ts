@@ -675,6 +675,11 @@ async function focusMarkdownMode(
   const file = resolveBlockFile(plugin, sourcePath, blockEl);
   if (!file) throw new Error("current note not found");
 
+  if (plugin.settings.rememberCursorPosition) {
+    const { suppressNextPositionRestore } = await import("./position-memory");
+    suppressNextPositionRestore(plugin, file.path);
+  }
+
   const leaf = findMarkdownLeafForPath(plugin, file.path) ?? plugin.app.workspace.getLeaf(false);
   let view = leaf.view instanceof MarkdownView ? leaf.view : undefined;
   if (!view || view.file?.path !== file.path) {

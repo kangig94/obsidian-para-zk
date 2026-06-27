@@ -73,6 +73,21 @@ export class Component {
   registerEvent(eventRef: { detach?: () => void }): void {
     this.register(() => eventRef.detach?.());
   }
+
+  registerDomEvent(
+    el: { addEventListener?: (...args: unknown[]) => void; removeEventListener?: (...args: unknown[]) => void },
+    type: string,
+    callback: (...args: unknown[]) => void,
+    options?: boolean | AddEventListenerOptions
+  ): void {
+    el.addEventListener?.(type, callback, options);
+    this.register(() => el.removeEventListener?.(type, callback, options));
+  }
+
+  registerInterval(id: number): number {
+    this.register(() => clearInterval(id));
+    return id;
+  }
 }
 export class Plugin extends Component {}
 export class MarkdownRenderChild extends Component {
