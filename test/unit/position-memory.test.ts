@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Editor, MarkdownView } from "obsidian";
+import type { Editor, EditorSelectionOrCaret, MarkdownView } from "obsidian";
 import type { ParaZkPluginContext } from "../../src/plugin-interface";
 import { DEFAULT_SETTINGS } from "../../src/types";
 import {
@@ -142,20 +142,13 @@ describe("restorePosition", () => {
       scroll: 0,
       lines: ["abc", "de"]
     });
-    const entry: PositionEntry = {
-      updatedAt: 1,
-      lastMode: "source",
-      source: {
-        selections: [
-          {
-            anchor: { line: 10, ch: 99 },
-            head: { line: 0, ch: 5 }
-          }
-        ]
-      }
-    };
 
-    restoreCursorPosition(view, entry);
+    restoreCursorPosition(view, entryWithSourceSelections([
+      {
+        anchor: { line: 10, ch: 99 },
+        head: { line: 0, ch: 5 }
+      }
+    ]));
 
     expect(view.editor.setSelections).toHaveBeenCalledWith([
       {
@@ -166,31 +159,20 @@ describe("restorePosition", () => {
   });
 
   it("does not reapply an already restored source selection", () => {
+    const selections = [
+      {
+        anchor: { line: 1, ch: 1 },
+        head: { line: 1, ch: 1 }
+      }
+    ];
     const view = fakeView({
       mode: "source",
       scroll: 0,
       lines: ["abc", "de"],
-      selections: [
-        {
-          anchor: { line: 1, ch: 1 },
-          head: { line: 1, ch: 1 }
-        }
-      ]
+      selections
     });
-    const entry: PositionEntry = {
-      updatedAt: 1,
-      lastMode: "source",
-      source: {
-        selections: [
-          {
-            anchor: { line: 1, ch: 1 },
-            head: { line: 1, ch: 1 }
-          }
-        ]
-      }
-    };
 
-    restoreCursorPosition(view, entry);
+    restoreCursorPosition(view, entryWithSourceSelections(selections));
 
     expect(view.editor.setSelections).not.toHaveBeenCalled();
   });
@@ -201,19 +183,12 @@ describe("restorePosition", () => {
       scroll: 0,
       lines: ["# Title", "body"]
     });
-    const entry: PositionEntry = {
-      updatedAt: 1,
-      lastMode: "source",
-      source: {
-        scroll: 8,
-        selections: [
-          {
-            anchor: { line: 0, ch: 0 },
-            head: { line: 0, ch: 0 }
-          }
-        ]
+    const entry = entryWithSourceSelections([
+      {
+        anchor: { line: 0, ch: 0 },
+        head: { line: 0, ch: 0 }
       }
-    };
+    ], { scroll: 8 });
 
     restoreCursorPosition(view, entry);
     restoreScrollPosition(view, entry);
@@ -258,69 +233,14 @@ describe("registerPositionMemory", () => {
     vi.useFakeTimers();
     stubWindow();
 
-    const write = vi.fn(async () => {});
     const activeView = fakeView({
       mode: "preview",
       scroll: 42
     });
-    const handlers = new Map<string, (...args: unknown[]) => void>();
-    let child: { unload(): void } | undefined;
-    const removeChild = vi.fn((component: { unload(): void }) => {
-      component.unload();
-      if (component === child) child = undefined;
-      return component;
+    const { handlers, plugin, removeChild, write } = fakePlugin({
+      activeView,
+      dbExists: false
     });
-    const plugin = {
-      settings: {
-        ...DEFAULT_SETTINGS,
-        rememberCursorPosition: true
-      },
-      manifest: {
-        id: "para-zk",
-        name: "PARA-ZK",
-        author: "test",
-        version: "0.0.0",
-        minAppVersion: "1.0.0",
-        description: "",
-        dir: ".obsidian/plugins/para-zk"
-      },
-      app: {
-        vault: {
-          on: vi.fn(() => ({ detach: vi.fn() })),
-          adapter: {
-            exists: vi.fn(async () => false),
-            read: vi.fn(async () => "{}"),
-            write,
-            mkdir: vi.fn(async () => {})
-          }
-        },
-        workspace: {
-          containerEl: fakeEventTarget(),
-          on: vi.fn((name: string, callback: (...args: unknown[]) => void) => {
-            handlers.set(name, callback);
-            return { detach: vi.fn() };
-          }),
-          onLayoutReady: vi.fn(),
-          getActiveViewOfType: vi.fn(() => activeView)
-        }
-      },
-      addChild: vi.fn((component: { load(): void; unload(): void }) => {
-        child = component;
-        component.load();
-        return component;
-      }),
-      removeChild,
-      saveSettings: vi.fn(async () => {}),
-      setupVault: vi.fn(async () => ({
-        dryRun: false,
-        created: [],
-        updated: [],
-        existing: [],
-        skipped: [],
-        warnings: [],
-        dependencies: []
-      }))
-    } as unknown as ParaZkPluginContext;
 
     await registerPositionMemory(plugin);
     handlers.get("active-leaf-change")?.();
@@ -336,67 +256,10 @@ describe("registerPositionMemory", () => {
     stubWindow();
 
     let activeView: MarkdownView | undefined;
-    const handlers = new Map<string, (...args: unknown[]) => void>();
-    const plugin = {
-      settings: {
-        ...DEFAULT_SETTINGS,
-        rememberCursorPosition: true
-      },
-      manifest: {
-        id: "para-zk",
-        name: "PARA-ZK",
-        author: "test",
-        version: "0.0.0",
-        minAppVersion: "1.0.0",
-        description: "",
-        dir: ".obsidian/plugins/para-zk"
-      },
-      app: {
-        vault: {
-          on: vi.fn(() => ({ detach: vi.fn() })),
-          adapter: {
-            exists: vi.fn(async () => true),
-            read: vi.fn(async () => JSON.stringify({
-              version: 1,
-              entries: {
-                "Project.md": {
-                  updatedAt: 1,
-                  lastMode: "preview",
-                  preview: { scroll: 88 }
-                }
-              }
-            })),
-            write: vi.fn(async () => {}),
-            mkdir: vi.fn(async () => {})
-          }
-        },
-        workspace: {
-          containerEl: fakeEventTarget(),
-          on: vi.fn((name: string, callback: (...args: unknown[]) => void) => {
-            handlers.set(name, callback);
-            return { detach: vi.fn() };
-          }),
-          onLayoutReady: vi.fn(),
-          getActiveViewOfType: vi.fn(() => activeView ?? null),
-          getLeavesOfType: vi.fn(() => (activeView ? [{ view: activeView }] : []))
-        }
-      },
-      addChild: vi.fn((component: { load(): void }) => {
-        component.load();
-        return component;
-      }),
-      removeChild: vi.fn(),
-      saveSettings: vi.fn(async () => {}),
-      setupVault: vi.fn(async () => ({
-        dryRun: false,
-        created: [],
-        updated: [],
-        existing: [],
-        skipped: [],
-        warnings: [],
-        dependencies: []
-      }))
-    } as unknown as ParaZkPluginContext;
+    const { handlers, plugin } = fakePlugin({
+      entries: projectEntries(previewEntry(88)),
+      getActiveView: () => activeView
+    });
 
     await registerPositionMemory(plugin);
     handlers.get("file-open")?.({ path: "Project.md" });
@@ -420,67 +283,10 @@ describe("registerPositionMemory", () => {
       mode: "preview",
       scroll: 0
     });
-    const handlers = new Map<string, (...args: unknown[]) => void>();
-    const plugin = {
-      settings: {
-        ...DEFAULT_SETTINGS,
-        rememberCursorPosition: true
-      },
-      manifest: {
-        id: "para-zk",
-        name: "PARA-ZK",
-        author: "test",
-        version: "0.0.0",
-        minAppVersion: "1.0.0",
-        description: "",
-        dir: ".obsidian/plugins/para-zk"
-      },
-      app: {
-        vault: {
-          on: vi.fn(() => ({ detach: vi.fn() })),
-          adapter: {
-            exists: vi.fn(async () => true),
-            read: vi.fn(async () => JSON.stringify({
-              version: 1,
-              entries: {
-                "Project.md": {
-                  updatedAt: 1,
-                  lastMode: "preview",
-                  preview: { scroll: 120 }
-                }
-              }
-            })),
-            write: vi.fn(async () => {}),
-            mkdir: vi.fn(async () => {})
-          }
-        },
-        workspace: {
-          containerEl: fakeEventTarget(),
-          on: vi.fn((name: string, callback: (...args: unknown[]) => void) => {
-            handlers.set(name, callback);
-            return { detach: vi.fn() };
-          }),
-          onLayoutReady: vi.fn(),
-          getActiveViewOfType: vi.fn(() => activeView),
-          getLeavesOfType: vi.fn(() => [{ view: activeView }])
-        }
-      },
-      addChild: vi.fn((component: { load(): void }) => {
-        component.load();
-        return component;
-      }),
-      removeChild: vi.fn(),
-      saveSettings: vi.fn(async () => {}),
-      setupVault: vi.fn(async () => ({
-        dryRun: false,
-        created: [],
-        updated: [],
-        existing: [],
-        skipped: [],
-        warnings: [],
-        dependencies: []
-      }))
-    } as unknown as ParaZkPluginContext;
+    const { handlers, plugin } = fakePlugin({
+      activeView,
+      entries: projectEntries(previewEntry(120))
+    });
 
     await registerPositionMemory(plugin);
     handlers.get("active-leaf-change")?.();
@@ -499,75 +305,15 @@ describe("registerPositionMemory", () => {
       scroll: 0,
       lines: ["# Title", "body", "target"]
     });
-    const handlers = new Map<string, (...args: unknown[]) => void>();
-    const plugin = {
-      settings: {
-        ...DEFAULT_SETTINGS,
-        rememberCursorPosition: true
-      },
-      manifest: {
-        id: "para-zk",
-        name: "PARA-ZK",
-        author: "test",
-        version: "0.0.0",
-        minAppVersion: "1.0.0",
-        description: "",
-        dir: ".obsidian/plugins/para-zk"
-      },
-      app: {
-        vault: {
-          on: vi.fn(() => ({ detach: vi.fn() })),
-          adapter: {
-            exists: vi.fn(async () => true),
-            read: vi.fn(async () => JSON.stringify({
-              version: 1,
-              entries: {
-                "Project.md": {
-                  updatedAt: 1,
-                  lastMode: "source",
-                  source: {
-                    scroll: 72,
-                    selections: [
-                      {
-                        anchor: { line: 2, ch: 1 },
-                        head: { line: 2, ch: 1 }
-                      }
-                    ]
-                  }
-                }
-              }
-            })),
-            write: vi.fn(async () => {}),
-            mkdir: vi.fn(async () => {})
-          }
-        },
-        workspace: {
-          containerEl: fakeEventTarget(),
-          on: vi.fn((name: string, callback: (...args: unknown[]) => void) => {
-            handlers.set(name, callback);
-            return { detach: vi.fn() };
-          }),
-          onLayoutReady: vi.fn(),
-          getActiveViewOfType: vi.fn(() => activeView),
-          getLeavesOfType: vi.fn(() => [{ view: activeView }])
+    const { handlers, plugin } = fakePlugin({
+      activeView,
+      entries: projectEntries(sourceEntry(72, [
+        {
+          anchor: { line: 2, ch: 1 },
+          head: { line: 2, ch: 1 }
         }
-      },
-      addChild: vi.fn((component: { load(): void }) => {
-        component.load();
-        return component;
-      }),
-      removeChild: vi.fn(),
-      saveSettings: vi.fn(async () => {}),
-      setupVault: vi.fn(async () => ({
-        dryRun: false,
-        created: [],
-        updated: [],
-        existing: [],
-        skipped: [],
-        warnings: [],
-        dependencies: []
-      }))
-    } as unknown as ParaZkPluginContext;
+      ]))
+    });
 
     await registerPositionMemory(plugin);
     handlers.get("active-leaf-change")?.();
@@ -590,7 +336,6 @@ describe("registerPositionMemory", () => {
     vi.useFakeTimers();
     stubWindow();
 
-    const write = vi.fn(async () => {});
     const activeView = fakeView({
       mode: "source",
       scroll: 99,
@@ -602,89 +347,28 @@ describe("registerPositionMemory", () => {
         }
       ]
     });
-    const handlers = new Map<string, (...args: unknown[]) => void>();
-    const plugin = {
-      settings: {
-        ...DEFAULT_SETTINGS,
-        rememberCursorPosition: true
-      },
-      manifest: {
-        id: "para-zk",
-        name: "PARA-ZK",
-        author: "test",
-        version: "0.0.0",
-        minAppVersion: "1.0.0",
-        description: "",
-        dir: ".obsidian/plugins/para-zk"
-      },
-      app: {
-        vault: {
-          on: vi.fn(() => ({ detach: vi.fn() })),
-          adapter: {
-            exists: vi.fn(async () => true),
-            read: vi.fn(async () => JSON.stringify({
-              version: 1,
-              entries: {
-                "Project.md": {
-                  updatedAt: 1,
-                  lastMode: "source",
-                  source: {
-                    scroll: 72,
-                    selections: [
-                      {
-                        anchor: { line: 2, ch: 1 },
-                        head: { line: 2, ch: 1 }
-                      }
-                    ]
-                  }
-                }
-              }
-            })),
-            write,
-            mkdir: vi.fn(async () => {})
-          }
-        },
-        workspace: {
-          containerEl: fakeEventTarget(),
-          on: vi.fn((name: string, callback: (...args: unknown[]) => void) => {
-            handlers.set(name, callback);
-            return { detach: vi.fn() };
-          }),
-          onLayoutReady: vi.fn(),
-          getActiveViewOfType: vi.fn(() => activeView),
-          getLeavesOfType: vi.fn(() => [{ view: activeView }])
+    const { handlers, plugin, write } = fakePlugin({
+      activeView,
+      entries: projectEntries(sourceEntry(72, [
+        {
+          anchor: { line: 2, ch: 1 },
+          head: { line: 2, ch: 1 }
         }
-      },
-      addChild: vi.fn((component: { load(): void }) => {
-        component.load();
-        return component;
-      }),
-      removeChild: vi.fn(),
-      saveSettings: vi.fn(async () => {}),
-      setupVault: vi.fn(async () => ({
-        dryRun: false,
-        created: [],
-        updated: [],
-        existing: [],
-        skipped: [],
-        warnings: [],
-        dependencies: []
-      }))
-    } as unknown as ParaZkPluginContext;
+      ]))
+    });
 
     await registerPositionMemory(plugin);
     handlers.get("active-leaf-change")?.();
     await vi.advanceTimersByTimeAsync(3500);
 
-    expect(write).toHaveBeenCalled();
-    const saved = JSON.parse(write.mock.calls.at(-1)?.[1] as string);
-    expect(saved.entries["Project.md"].source.selections).toEqual([
+    const saved = lastSavedMemory(write);
+    expect(saved.entries["Project.md"].source?.selections).toEqual([
       {
         anchor: { line: 2, ch: 1 },
         head: { line: 2, ch: 1 }
       }
     ]);
-    expect(saved.entries["Project.md"].source.scroll).toBe(99);
+    expect(saved.entries["Project.md"].source?.scroll).toBe(99);
     unregisterPositionMemory(plugin);
   });
 
@@ -692,7 +376,6 @@ describe("registerPositionMemory", () => {
     vi.useFakeTimers();
     stubWindow();
 
-    const write = vi.fn(async () => {});
     const workspaceEl = fakeEventTarget();
     const activeView = fakeView({
       mode: "source",
@@ -705,80 +388,21 @@ describe("registerPositionMemory", () => {
         }
       ]
     });
-    const handlers = new Map<string, (...args: unknown[]) => void>();
-    const plugin = {
-      settings: {
-        ...DEFAULT_SETTINGS,
-        rememberCursorPosition: true
-      },
-      manifest: {
-        id: "para-zk",
-        name: "PARA-ZK",
-        author: "test",
-        version: "0.0.0",
-        minAppVersion: "1.0.0",
-        description: "",
-        dir: ".obsidian/plugins/para-zk"
-      },
-      app: {
-        vault: {
-          on: vi.fn(() => ({ detach: vi.fn() })),
-          adapter: {
-            exists: vi.fn(async () => true),
-            read: vi.fn(async () => JSON.stringify({
-              version: 1,
-              entries: {
-                "Project.md": {
-                  updatedAt: 1,
-                  lastMode: "source",
-                  source: {
-                    scroll: 72,
-                    selections: [
-                      {
-                        anchor: { line: 2, ch: 1 },
-                        head: { line: 2, ch: 1 }
-                      }
-                    ]
-                  }
-                }
-              }
-            })),
-            write,
-            mkdir: vi.fn(async () => {})
-          }
-        },
-        workspace: {
-          containerEl: workspaceEl,
-          on: vi.fn((name: string, callback: (...args: unknown[]) => void) => {
-            handlers.set(name, callback);
-            return { detach: vi.fn() };
-          }),
-          onLayoutReady: vi.fn(),
-          getActiveViewOfType: vi.fn(() => activeView),
-          getLeavesOfType: vi.fn(() => [{ view: activeView }])
+    const { handlers, plugin, write } = fakePlugin({
+      activeView,
+      entries: projectEntries(sourceEntry(72, [
+        {
+          anchor: { line: 2, ch: 1 },
+          head: { line: 2, ch: 1 }
         }
-      },
-      addChild: vi.fn((component: { load(): void }) => {
-        component.load();
-        return component;
-      }),
-      removeChild: vi.fn(),
-      saveSettings: vi.fn(async () => {}),
-      setupVault: vi.fn(async () => ({
-        dryRun: false,
-        created: [],
-        updated: [],
-        existing: [],
-        skipped: [],
-        warnings: [],
-        dependencies: []
-      }))
-    } as unknown as ParaZkPluginContext;
+      ])),
+      workspaceEl
+    });
 
     await registerPositionMemory(plugin);
     handlers.get("active-leaf-change")?.();
     await vi.advanceTimersByTimeAsync(700);
-    (activeView as unknown as MutableFakeMarkdownView).__setSelections([
+    activeView.__setSelections([
       {
         anchor: { line: 3, ch: 4 },
         head: { line: 3, ch: 4 }
@@ -787,9 +411,8 @@ describe("registerPositionMemory", () => {
     workspaceEl.__dispatch("pointerup", eventInsideView(activeView));
     await vi.advanceTimersByTimeAsync(3000);
 
-    expect(write).toHaveBeenCalled();
-    const saved = JSON.parse(write.mock.calls.at(-1)?.[1] as string);
-    expect(saved.entries["Project.md"].source.selections).toEqual([
+    const saved = lastSavedMemory(write);
+    expect(saved.entries["Project.md"].source?.selections).toEqual([
       {
         anchor: { line: 3, ch: 4 },
         head: { line: 3, ch: 4 }
@@ -800,12 +423,131 @@ describe("registerPositionMemory", () => {
 });
 
 type MutableFakeMarkdownView = MarkdownView & {
-  __setSelections(selections: Array<{ anchor: { line: number; ch: number }; head?: { line: number; ch: number } }>): void;
+  __setSelections(selections: EditorSelectionOrCaret[]): void;
 };
 
 type FakeEventTarget = HTMLElement & {
   __dispatch(type: string, event: Event): void;
 };
+
+type PositionMemoryFile = {
+  version: 1;
+  entries: Record<string, PositionEntry>;
+};
+
+type WorkspaceHandler = (...args: unknown[]) => void;
+
+function entryWithSourceSelections(
+  selections: EditorSelectionOrCaret[],
+  source: { scroll?: number } = {}
+): PositionEntry {
+  return {
+    updatedAt: 1,
+    lastMode: "source",
+    source: {
+      ...source,
+      selections
+    }
+  };
+}
+
+function sourceEntry(scroll: number, selections: EditorSelectionOrCaret[]): PositionEntry {
+  return entryWithSourceSelections(selections, { scroll });
+}
+
+function previewEntry(scroll: number): PositionEntry {
+  return {
+    updatedAt: 1,
+    lastMode: "preview",
+    preview: { scroll }
+  };
+}
+
+function projectEntries(entry: PositionEntry): Record<string, PositionEntry> {
+  return { "Project.md": entry };
+}
+
+function fakePlugin(options: {
+  activeView?: MarkdownView;
+  dbExists?: boolean;
+  entries?: Record<string, PositionEntry>;
+  getActiveView?: () => MarkdownView | null | undefined;
+  workspaceEl?: FakeEventTarget;
+}) {
+  const handlers = new Map<string, WorkspaceHandler>();
+  const workspaceEl = options.workspaceEl ?? fakeEventTarget();
+  const write = vi.fn(async () => {});
+  const activeView = () => options.getActiveView?.() ?? options.activeView ?? null;
+  const removeChild = vi.fn((component: { unload(): void }) => {
+    component.unload();
+    return component;
+  });
+  const plugin = {
+    settings: {
+      ...DEFAULT_SETTINGS,
+      rememberCursorPosition: true
+    },
+    manifest: {
+      id: "para-zk",
+      name: "PARA-ZK",
+      author: "test",
+      version: "0.0.0",
+      minAppVersion: "1.0.0",
+      description: "",
+      dir: ".obsidian/plugins/para-zk"
+    },
+    app: {
+      vault: {
+        on: vi.fn(() => ({ detach: vi.fn() })),
+        adapter: {
+          exists: vi.fn(async () => options.dbExists ?? true),
+          read: vi.fn(async () => JSON.stringify({
+            version: 1,
+            entries: options.entries ?? {}
+          })),
+          write,
+          mkdir: vi.fn(async () => {})
+        }
+      },
+      workspace: {
+        containerEl: workspaceEl,
+        on: vi.fn((name: string, callback: WorkspaceHandler) => {
+          handlers.set(name, callback);
+          return { detach: vi.fn() };
+        }),
+        onLayoutReady: vi.fn(),
+        getActiveViewOfType: vi.fn(() => activeView()),
+        getLeavesOfType: vi.fn(() => {
+          const view = activeView();
+          return view ? [{ view }] : [];
+        })
+      }
+    },
+    addChild: vi.fn((component: { load(): void }) => {
+      component.load();
+      return component;
+    }),
+    removeChild,
+    saveSettings: vi.fn(async () => {}),
+    setupVault: vi.fn(async () => ({
+      dryRun: false,
+      created: [],
+      updated: [],
+      existing: [],
+      skipped: [],
+      warnings: [],
+      dependencies: []
+    }))
+  } as unknown as ParaZkPluginContext;
+
+  return { handlers, plugin, removeChild, workspaceEl, write };
+}
+
+function lastSavedMemory(write: ReturnType<typeof vi.fn>): PositionMemoryFile {
+  expect(write).toHaveBeenCalled();
+  const call = write.mock.calls[write.mock.calls.length - 1];
+  return JSON.parse(call[1] as string) as PositionMemoryFile;
+}
 
 function fakeView(options: {
   mode: "source" | "preview";
@@ -813,15 +555,15 @@ function fakeView(options: {
   editorScroll?: number;
   modeScroll?: number;
   ephemeralScroll?: number;
-  selections?: Array<{ anchor: { line: number; ch: number }; head?: { line: number; ch: number } }>;
-  reportedSelectionsAfterSet?: Array<{ anchor: { line: number; ch: number }; head?: { line: number; ch: number } }>;
+  selections?: EditorSelectionOrCaret[];
+  reportedSelectionsAfterSet?: EditorSelectionOrCaret[];
   lines?: string[];
 }): MutableFakeMarkdownView {
   const lines = options.lines ?? [""];
   const editorScroll = options.editorScroll ?? options.scroll;
   const modeScroll = options.modeScroll ?? options.scroll;
   let selections = options.selections ?? [];
-  const setSelections = vi.fn((next: Array<{ anchor: { line: number; ch: number }; head?: { line: number; ch: number } }>) => {
+  const setSelections = vi.fn((next: EditorSelectionOrCaret[]) => {
     selections = options.reportedSelectionsAfterSet ?? next;
   });
   const setSelection = vi.fn((anchor: { line: number; ch: number }, head?: { line: number; ch: number }) => {

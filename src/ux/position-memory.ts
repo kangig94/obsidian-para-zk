@@ -21,14 +21,13 @@ const RESTORE_SETTLE_QUIET_MS = 120;
 const RESTORE_SETTLE_TIMEOUT_MS = 1200;
 const RESTORE_SUPPRESSION_MS = 1500;
 const RESTORE_RETRY_DELAYS_MS = [0, 100, 250, 500, 1000];
-const RESTORE_LATE_APPLY_DELAYS_MS = [250];
+const RESTORE_LATE_SCROLL_DELAY_MS = 250;
 const RESTORE_RETRY_WINDOW_MS = sum(RESTORE_RETRY_DELAYS_MS);
-const RESTORE_LATE_APPLY_WINDOW_MS = sum(RESTORE_LATE_APPLY_DELAYS_MS);
 const RESTORE_CAPTURE_PAUSE_MS = (
   RESTORE_RETRY_WINDOW_MS
   + RESTORE_SETTLE_TIMEOUT_MS
   + RESTORE_SETTLE_QUIET_MS
-  + RESTORE_LATE_APPLY_WINDOW_MS
+  + RESTORE_LATE_SCROLL_DELAY_MS
   + 250
 );
 
@@ -453,15 +452,6 @@ class PositionMemoryService extends Component {
     this.scheduleRestoreAttempt(path, 0);
   }
 
-  private scheduleRestoreForActiveView(): void {
-    if (!this.enabled()) return;
-    this.setRestoreTimer(() => {
-      const view = this.activeMarkdownView();
-      const path = view?.file?.path;
-      if (view && path) this.scheduleRestore(view, path);
-    }, 0);
-  }
-
   private scheduleRestoreAttempt(path: string, attempt: number): void {
     const delay = RESTORE_RETRY_DELAYS_MS[attempt];
     if (delay === undefined) {
@@ -515,13 +505,13 @@ class PositionMemoryService extends Component {
       if (!this.isCurrentRestore(view, path, token)) return;
 
       const suppression = this.currentSuppression(path);
-      const abort = createUserScrollAbort(view, session);
+      const abort = createUserInteractionAbort(view, session);
       try {
         if (!abort.cancelled) restorePositionState(view, entry, suppression);
         await waitForStableLayout(view, () => this.isCurrentRestore(view, path, token), abort, session);
         if (!this.isCurrentRestore(view, path, token) || abort.cancelled) return;
         if (!suppression.scroll) restoreScrollPosition(view, entry);
-        await this.applyLateRestores(view, path, entry, token, suppression, abort, session);
+        await this.applyLateScrollRestore(view, path, entry, token, suppression, abort, session);
       } finally {
         abort.dispose();
       }
@@ -630,7 +620,7 @@ class PositionMemoryService extends Component {
     this.captureTimer = undefined;
   }
 
-  private async applyLateRestores(
+  private async applyLateScrollRestore(
     view: MarkdownView,
     path: string,
     entry: PositionEntry,
@@ -639,11 +629,9 @@ class PositionMemoryService extends Component {
     abort: { readonly cancelled: boolean },
     session: RestoreSession
   ): Promise<void> {
-    for (const delayMs of RESTORE_LATE_APPLY_DELAYS_MS) {
-      await session.delay(delayMs);
-      if (!this.isCurrentRestore(view, path, token) || abort.cancelled) return;
-      if (!suppression.scroll) restoreScrollPosition(view, entry);
-    }
+    await session.delay(RESTORE_LATE_SCROLL_DELAY_MS);
+    if (!this.isCurrentRestore(view, path, token) || abort.cancelled) return;
+    if (!suppression.scroll) restoreScrollPosition(view, entry);
   }
 }
 
@@ -1054,7 +1042,7 @@ class RestoreSession {
   }
 }
 
-function createUserScrollAbort(
+function createUserInteractionAbort(
   view: MarkdownView,
   session: RestoreSession
 ): { readonly cancelled: boolean; dispose(): void } {
