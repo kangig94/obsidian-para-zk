@@ -251,6 +251,36 @@ describe("registerPositionMemory", () => {
     expect(removeChild).toHaveBeenCalled();
   });
 
+  it("repairs an unreadable position-memory file on load by overwriting valid empty data", async () => {
+    vi.useFakeTimers();
+    stubWindow();
+
+    const { plugin, write } = fakePlugin({ corruptDb: true });
+
+    await registerPositionMemory(plugin);
+
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(write.mock.calls[0][1] as string)).toEqual({ version: 1, entries: {} });
+    unregisterPositionMemory(plugin);
+  });
+
+  it("reports an error when repairing an unreadable file also fails", async () => {
+    vi.useFakeTimers();
+    stubWindow();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const { plugin } = fakePlugin({ corruptDb: true, failWrite: true });
+
+    await registerPositionMemory(plugin);
+
+    expect(warnSpy).toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith("PARA-ZK could not write position memory", expect.any(Error));
+    errorSpy.mockRestore();
+    warnSpy.mockRestore();
+    unregisterPositionMemory(plugin);
+  });
+
   it("retries restore until the opened markdown view is attached", async () => {
     vi.useFakeTimers();
     stubWindow();
@@ -470,13 +500,17 @@ function projectEntries(entry: PositionEntry): Record<string, PositionEntry> {
 function fakePlugin(options: {
   activeView?: MarkdownView;
   dbExists?: boolean;
+  corruptDb?: boolean;
+  failWrite?: boolean;
   entries?: Record<string, PositionEntry>;
   getActiveView?: () => MarkdownView | null | undefined;
   workspaceEl?: FakeEventTarget;
 }) {
   const handlers = new Map<string, WorkspaceHandler>();
   const workspaceEl = options.workspaceEl ?? fakeEventTarget();
-  const write = vi.fn(async () => {});
+  const write = vi.fn(async () => {
+    if (options.failWrite) throw new Error("disk full");
+  });
   const activeView = () => options.getActiveView?.() ?? options.activeView ?? null;
   const removeChild = vi.fn((component: { unload(): void }) => {
     component.unload();
@@ -501,10 +535,11 @@ function fakePlugin(options: {
         on: vi.fn(() => ({ detach: vi.fn() })),
         adapter: {
           exists: vi.fn(async () => options.dbExists ?? true),
-          read: vi.fn(async () => JSON.stringify({
-            version: 1,
-            entries: options.entries ?? {}
-          })),
+          read: vi.fn(async () => (
+            options.corruptDb
+              ? "{ \"version\": 1, \"entries\": { 'broken"
+              : JSON.stringify({ version: 1, entries: options.entries ?? {} })
+          )),
           write,
           mkdir: vi.fn(async () => {})
         }

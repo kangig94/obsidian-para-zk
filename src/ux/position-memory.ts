@@ -658,9 +658,9 @@ class PositionMemoryStore {
       this.data = parsePositionMemoryData(JSON.parse(raw));
       this.lastSavedJson = serializePositionMemoryData(this.data);
     } catch (error) {
-      console.warn("PARA-ZK could not read position memory", error);
+      console.warn("PARA-ZK could not read position memory; resetting", error);
       this.data = emptyPositionMemoryData();
-      this.lastSavedJson = serializePositionMemoryData(this.data);
+      await this.persist(serializePositionMemoryData(this.data));
     }
   }
 
@@ -711,6 +711,10 @@ class PositionMemoryStore {
       return;
     }
 
+    await this.persist(json);
+  }
+
+  private async persist(json: string): Promise<void> {
     try {
       await this.ensureParentFolder();
       await this.plugin.app.vault.adapter.write(this.path(), json);
