@@ -29,7 +29,7 @@ Two layers:
 
 ## Execution
 
-1. **Orient**: Run `optsidian para-zk:conventions` ONCE first for this task, then call `optsidian para-zk:describe` / `optsidian para-zk:describe type=<t>` as reference. Use the returned invocation style for subsequent `para-zk:*` calls. Confirm the surface exposes `para-zk:audit`, `para-zk:list`, `para-zk:read-llm-wiki`, and `para-zk:update-llm-wiki`. If the vault is unavailable, stop with the CLI error.
+1. **Orient**: Run `optsidian para-zk:conventions` ONCE first for this task, then call `optsidian para-zk:describe` / `optsidian para-zk:describe type=<t>` as reference. Use the returned invocation style for subsequent `para-zk:*` calls — run them via `optsidian` or the native `obsidian` CLI (`obsidian para-zk:…`), interchangeable; use whichever is on `PATH`. Confirm the surface exposes `para-zk:audit`, `para-zk:list`, `para-zk:read-llm-wiki`, and `para-zk:update-llm-wiki`. If the vault is unavailable, stop with the CLI error.
 
 2. **Resolve scope**: For `full`, enumerate pages with `optsidian para-zk:list type=llm-wiki limit=all`. For `scoped`, use the provided `paths` (reject if empty).
 

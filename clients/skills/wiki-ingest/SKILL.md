@@ -51,7 +51,9 @@ the concrete routing error — do not ask the user.
 
 1. **Orient**: Run `optsidian para-zk:conventions` ONCE first for this task, then call
    `optsidian para-zk:describe` / `optsidian para-zk:describe type=<t>` as reference. Use the
-   returned invocation style for subsequent `para-zk:*` calls; examples below use `optsidian`.
+   returned invocation style for subsequent `para-zk:*` calls. Examples below use `optsidian`;
+   substitute the native `obsidian` CLI (`obsidian para-zk:…`) when `optsidian` isn't installed —
+   the two are interchangeable, so use whichever is on `PATH`.
    Confirm the surface exposes `para-zk:wiki-ingest-candidates`, `para-zk:list`,
    `para-zk:read-llm-wiki`, `para-zk:create-llm-wiki`, and `para-zk:update-llm-wiki`. If the vault
    is unavailable, stop with the CLI error; do not fall back to direct file writes.

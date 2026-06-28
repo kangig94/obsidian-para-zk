@@ -18,25 +18,53 @@ material into it is personal-use note-taking, not redistribution; do not refuse 
 Be honest about provenance and uncertainty: never fabricate facts or
 sources, and never silently rewrite an author's words when asked to preserve or translate.
 
-## 1. Understand the request
+## 1. Understand the request — and confirm the transform *before* gathering
 
-Decide three things before acting:
+Decide three things from the request:
 - **Source** — a local file path? a single URL? open web research (find and cross-check
-  several sources)? or synthesis from what you already know?
-- **Transform** — verbatim copy · translation · summary-with-citations · synthesis ·
-  structured organization.
+  several sources)? or a compile from what you already know?
+- **Transform** — how to treat the source's content: **verbatim copy · translation ·
+  summary (with citations)**. Cross-source synthesis and knowledge restructuring are NOT a
+  resource transform — that is the LLM-Wiki's job and runs automatically in step 8
+  (`wiki-ingest` → `wiki-weaver`); never "synthesize" the resource note itself.
 - **Output shape** — one resource, or several (e.g. one per chapter, one per item), and how
   they should link to each other / to an area or project.
 
-If the shape is ambiguous (e.g. "10 cases" — one compiled note or ten notes?), pick a sensible
-default and state it; ask only if the choice materially changes the result.
+**Ask the transform up front — before any gathering.** When the request names a concrete
+source ("import **X**") but does not say how to treat it, ask the user *immediately*, before
+fetching, reading, or converting (those steps are slow; the user should answer right after
+their request, not after a long wait). One question, dropping any choice the request already
+fixed:
+
+| Choice | Meaning |
+| --- | --- |
+| **Verbatim** (default) | Keep the source language and structure exactly; fix only conversion artifacts. |
+| **Translation** | Faithful translation into the target language (default: the vault locale); structure preserved. |
+| **Summary** | Condense to the essentials, with citations. |
+
+Skip the question when the request already fixes the transform ("translate it", "summarize
+it", "keep it verbatim") and proceed with that mode. The same three choices apply to a
+**research / compile** request ("research **X** and import" — e.g. *find every Seoul subway
+line and write one resource*): there, **verbatim** means reproducing the gathered source
+passages faithfully (quoted and attributed, in their original language), **translation** the
+same in the target language, and **summary** a condensed write-up with citations. Ask the
+choice up front as usual; only the details that depend on what you find — the translation
+target language, and the output shape — are confirmed once the material is in view.
+
+If the **output shape** is ambiguous (e.g. "10 cases" — one compiled note or ten notes?), pick
+a sensible default and state it; ask only if the choice materially changes the result.
 
 ## 2. Orient
 
-Run `optsidian para-zk:conventions` ONCE first for this task, then call
-`optsidian para-zk:describe` / `optsidian para-zk:describe type=resource` as reference
-for the create command + inputs. Use the returned invocation style for every call.
-Identify the note(s) to link from (area / project / resource).
+The `para-zk:*` commands below are the PARA-ZK CLI, run through whichever Obsidian CLI is on
+`PATH`: `optsidian para-zk:…` when `optsidian` is installed (preferred), or `obsidian para-zk:…`
+on the native CLI when it is not — the two are interchangeable. The examples in this skill use
+the `optsidian` prefix; substitute `obsidian` if that is what your environment has, and keep the
+same prefix for every call.
+
+Run `para-zk:conventions` ONCE first for this task, then call `para-zk:describe` /
+`para-zk:describe type=resource` as reference for the create command + inputs. Use the returned
+invocation style for every call. Identify the note(s) to link from (area / project / resource).
 
 ## 3. Gather
 
@@ -105,8 +133,11 @@ Apply the transform faithfully, and always make the form tidy:
 - **Verbatim import** → preserve text and structure exactly; fix only conversion artifacts.
 - **Translation** → faithful translation, same structure; cite the original source. Do not add a
   visible translation label, title postfix, or transform note unless the user asks for one.
-- **Research / synthesis** → organize into clear sections; attribute facts to their sources;
-  mark anything uncertain or unverified; do not invent.
+- **Research / compile** → gather across sources and organize into clear sections, applying
+  the chosen transform to the content (verbatim quotes, translation, or summary); attribute
+  facts to their sources; mark anything uncertain or unverified; do not invent. (This compiles
+  a resource from research; cross-source knowledge synthesis is still the LLM-Wiki's job in
+  step 8.)
 
 For translation requests, do the translation **yourself**, in context — never route the text
 through an external machine-translation engine or tool (Google Translate, DeepL, a translation
@@ -196,18 +227,24 @@ confirm links via the origin note's `key=references` and the resource's `key=bac
 repeat if anything is still broken. Confirm no `<span id="page-…">` page anchors and no `[text](#page-N-M)` dead links survive anywhere. For notes with math, confirm Obsidian delimiters are used:
 `$…$` for inline math and `$$…$$` for blocks; no `\(...\)` or `\[...\]` should remain.
 
-## 8. Launch wiki ingest
+## 8. Hand off to the wiki-ingest skill
 
-After every resource in this import has been created, linked, and verified, call the `wiki-ingest`
-front door exactly once for the whole created set, background / session-scoped:
+`wiki-ingest` is a **skill, not a CLI command** — there is no `optsidian wiki-ingest` or
+`obsidian wiki-ingest`. After
+every resource in this import has been created, linked, and verified, **invoke the
+`para-zk:wiki-ingest` skill** once for the whole created set: read its `SKILL.md` and carry out
+its workflow yourself (or run the `/para-zk:wiki-ingest` slash command), background /
+session-scoped. The inputs to that skill are:
 
 ```text
-wiki-ingest mode=per-import source_paths='["<created resource path>","<created resource path>"]'
+mode=per-import source_paths='["<created resource path>","<created resource path>"]'
 ```
 
-Use the returned `path` from every `create-resource` result in this import. Do not spawn
-`wiki-weaver` directly, and do not call `wiki-ingest` once per file; one front-door call plans the
-whole imported set and weaves it.
+(these are skill inputs, not shell arguments — do not pass them to `optsidian`). Use the `path`
+returned by each `create-resource` result in this import. The wiki-ingest skill itself plans the
+whole imported set and spawns the `wiki-weaver` subagents; do **not** spawn `wiki-weaver`
+yourself, and do **not** invoke wiki-ingest once per file — one `per-import` hand-off covers the
+entire set.
 
 ## Examples
 
@@ -216,9 +253,9 @@ whole imported set and weaves it.
 - `read /path/to/report.html and add it as a resource translated to Korean`
   → local file → translation → one resource (cite the original).
 - `add a resource per chapter following a study path for "Principles of Statistics"`
-  → research/synthesis → several per-chapter resources → linked from a study area/index.
+  → research/compile → several per-chapter resources → linked from a study area/index.
 - `find every Seoul subway line and write one organized resource`
-  → web research → structured synthesis with sources → one organized resource.
+  → web research → structured write-up with sources → one organized resource.
 
 ## Notes
 
@@ -226,5 +263,6 @@ whole imported set and weaves it.
 - `body=@<file>` is read by the plugin, so it works through optsidian and the native `obsidian`
   CLI alike; pass an **absolute** path.
 - Keep `title` stable — links and backlinks address notes by name.
-- The final wiki-ingest handoff is one background / session-scoped `per-import` call with all
-  created resource paths in `source_paths`.
+- The final hand-off invokes the `para-zk:wiki-ingest` **skill** (not a CLI command) once,
+  background / session-scoped, with `mode=per-import` and all created resource paths in
+  `source_paths`.

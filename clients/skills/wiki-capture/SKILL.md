@@ -38,7 +38,9 @@ content an existing page already fully covers. If nothing durable emerged, stop 
 
 1. **Orient**: Run `optsidian para-zk:conventions` ONCE first for this task, then call
    `optsidian para-zk:describe` / `optsidian para-zk:describe type=<t>` as reference. Use the
-   returned invocation style for subsequent `para-zk:*` calls. Confirm the surface exposes
+   returned invocation style for subsequent `para-zk:*` calls — run them via `optsidian` or the
+   native `obsidian` CLI (`obsidian para-zk:…`), interchangeable; use whichever is on `PATH`.
+   Confirm the surface exposes
    `para-zk:list`, `para-zk:read-llm-wiki`, `para-zk:create-llm-wiki`, and
    `para-zk:update-llm-wiki`. If the vault is unavailable, stop with the CLI error; do not fall back
    to direct file writes.
