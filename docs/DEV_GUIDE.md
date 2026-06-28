@@ -25,7 +25,7 @@ workflows build on Node 26:
 
 `build/` is the Obsidian deployment shape (`main.js`, `manifest.json` — staged from the
 committed root copy — and `styles.css`); it is **gitignored** and shipped as GitHub
-Release assets (BRAT installs from those). The MCP bundle is the exception: it stays
+Release assets (Obsidian installs the plugin from those). The MCP bundle is the exception: it stays
 committed at `clients/para-zk-mcp.mjs` because the Claude Code / Codex marketplace ships
 `clients/` via git clone with no install-time build.
 

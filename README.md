@@ -18,17 +18,10 @@ tools (`replace`/`set`/`add`) so scripts and LLMs can drive the vault.
 
 ### Obsidian plugin
 
-Install the beta with [BRAT](https://github.com/TfTHacker/obsidian42-brat): install
-**BRAT** from community plugins, then BRAT → **Add beta plugin** → enter
-`https://github.com/kangig94/obsidian-para-zk`. BRAT downloads the latest published
-release and keeps it updated; enable **PARA-ZK** under Settings → Community plugins.
+Install **PARA-ZK** from Obsidian's community plugin browser: Settings → Community
+plugins → Browse, search **PARA-ZK**, then install and enable it.
 
-The official install path is always a published **release**: BRAT (above), or a manual
-download of `manifest.json`, `main.js`, and `styles.css` from the
-[latest release](https://github.com/kangig94/obsidian-para-zk/releases) into
-`<vault>/.obsidian/plugins/para-zk/`. Build outputs are no longer committed to the repo.
-
-For local development only, build first (`pnpm build`) and deploy the generated `build/`
+For local development, build first (`pnpm build`) and deploy the generated `build/`
 folder — e.g. with [`optsidian`](https://github.com/kangig94/optsidian):
 `optsidian plugin:install path=build enable`.
 
@@ -102,6 +95,6 @@ pnpm version patch        # bumps package.json, rebuilds + syncs every manifest,
 git push --follow-tags    # the release workflow builds and creates a DRAFT GitHub release
 ```
 
-Then review the draft release on GitHub and **publish** it (BRAT only sees published
-releases). The tag must equal `manifest.json` version exactly, with no `v` prefix; the
-workflow enforces this.
+Then review the draft release on GitHub and **publish** it — Obsidian's plugin update
+check only reads published releases. The tag must equal `manifest.json` version exactly,
+with no `v` prefix; the workflow enforces this.
