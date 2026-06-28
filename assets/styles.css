@@ -837,3 +837,48 @@ body.para-zk-width-active .markdown-preview-view [class*="block-language-para-zk
   color: var(--text-error);
   cursor: help;
 }
+
+.para-zk-donate-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0.5em 0 1em;
+}
+
+.para-zk-donate-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 10px;
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.para-zk-donate-button:hover {
+  opacity: 0.9;
+  text-decoration: none;
+}
+
+.para-zk-donate-button.is-sponsors {
+  background-color: #db61a2;
+}
+
+.para-zk-donate-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.para-zk-donate-badge {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.para-zk-donate-badge-img {
+  height: 42px;
+  width: auto;
+}

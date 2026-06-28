@@ -1,5 +1,7 @@
 import { ButtonComponent, Notice, PluginSettingTab, Setting } from "obsidian";
+import type { PluginManifest } from "obsidian";
 import { localePack, normalizeLocale } from "../i18n";
+import { BUY_ME_A_COFFEE_BADGE_URI, GITHUB_SPONSORS_MARK_URI } from "./donate-badges";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import type { SetupOptions, SetupResult } from "../types";
 import { refreshEditorWidthControl } from "./editor-width";
@@ -142,6 +144,45 @@ export class ParaZkSettingTab extends PluginSettingTab {
           });
       });
 
+    this.renderSupportSection();
+  }
+
+  private renderSupportSection(): void {
+    const links = fundingLinks(this.plugin.manifest);
+    if (!links) return;
+
+    const { containerEl } = this;
+    const labels = localePack(this.plugin.settings.locale).labels;
+    new Setting(containerEl)
+      .setName(labels.settingsSupportHeading)
+      .setHeading();
+    containerEl.createEl("p", {
+      cls: "para-zk-setting-note",
+      text: labels.settingsSupportNote
+    });
+
+    const row = containerEl.createDiv({ cls: "para-zk-donate-row" });
+
+    const sponsors = row.createEl("a", {
+      cls: "para-zk-donate-button is-sponsors",
+      href: links.githubSponsors,
+      attr: { target: "_blank", rel: "noopener", "aria-label": "GitHub Sponsors" }
+    });
+    sponsors.createEl("img", {
+      cls: "para-zk-donate-icon",
+      attr: { src: GITHUB_SPONSORS_MARK_URI, alt: "" }
+    });
+    sponsors.createSpan({ cls: "para-zk-donate-label", text: "Sponsors" });
+
+    const coffee = row.createEl("a", {
+      cls: "para-zk-donate-badge",
+      href: links.buyMeACoffee,
+      attr: { target: "_blank", rel: "noopener", "aria-label": "Buy me a coffee" }
+    });
+    coffee.createEl("img", {
+      cls: "para-zk-donate-badge-img",
+      attr: { src: BUY_ME_A_COFFEE_BADGE_URI, alt: "Buy me a coffee" }
+    });
   }
 
   private async confirmAndRunSetupAction(button: ButtonComponent): Promise<void> {
@@ -190,4 +231,24 @@ export class ParaZkSettingTab extends PluginSettingTab {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+type FundingLinks = {
+  githubSponsors: string;
+  buyMeACoffee: string;
+};
+
+// The manifest fundingUrl is the single source for the sponsor account; both
+// donation buttons are derived from its trailing handle so README, manifest, and
+// settings stay in sync.
+export function fundingLinks(manifest: PluginManifest): FundingLinks | null {
+  const fundingUrl = (manifest as { fundingUrl?: string }).fundingUrl;
+  const account = typeof fundingUrl === "string"
+    ? fundingUrl.split("/").filter(Boolean).pop() ?? ""
+    : "";
+  if (!account) return null;
+  return {
+    githubSponsors: `https://github.com/sponsors/${account}`,
+    buyMeACoffee: `https://www.buymeacoffee.com/${account}`
+  };
 }
