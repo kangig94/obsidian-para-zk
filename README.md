@@ -1,5 +1,8 @@
 # PARA-ZK (with LLM-Wiki)
 
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-❤-pink)](https://github.com/sponsors/kangig94)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-tip-brightgreen)](https://buymeacoffee.com/kangig94)
+
 An LLM-maintained PARA + Zettelkasten knowledge wiki for Obsidian.
 
 You curate the sources and ask the questions; PARA-ZK's workflows ingest them into

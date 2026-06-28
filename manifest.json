@@ -6,5 +6,6 @@
   "description": "PARA, Zettelkasten, and LLM-Wiki workflows with MCP/CLI access for Claude Code, Codex, and other clients.",
   "author": "kangig94",
   "authorUrl": "https://github.com/kangig94",
+  "fundingUrl": "https://github.com/sponsors/kangig94",
   "isDesktopOnly": false
 }
