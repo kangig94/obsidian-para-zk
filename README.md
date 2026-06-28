@@ -3,6 +3,8 @@
 [![GitHub Sponsors](https://img.shields.io/badge/Sponsor-❤-pink)](https://github.com/sponsors/kangig94)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-tip-brightgreen)](https://buymeacoffee.com/kangig94)
 
+![](assets/para-zk-home.png)
+
 > An LLM-maintained PARA + Zettelkasten knowledge wiki for Obsidian.
 
 You curate the sources and ask the questions; PARA-ZK's workflows ingest them into
@@ -13,6 +15,13 @@ PARA-ZK runs as an Obsidian plugin (GUI commands + ribbon shortcuts) and, while
 Obsidian is running, exposes the full workflow contract through a native CLI.
 Its thin MCP server discovers that CLI contract and exposes shell-safe edit
 tools (`replace`/`set`/`add`) so scripts and LLMs can drive the vault.
+
+### **Curious what the output looks like?**
+
+![](assets/para-zk-llm-wiki.png)
+
+Browse a generated LLM-Wiki example (AI papers → interlinked concept pages):  
+<https://kangig94.github.io/obsidian-para-zk/examples/llm-wiki/index>
 
 ## Install
 

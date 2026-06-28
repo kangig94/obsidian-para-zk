@@ -4,19 +4,13 @@ title: Installation
 
 PARA-ZK is installed from published release assets. You do not need to build the repo unless you are doing local development.
 
-## Install With BRAT
+## Install From Community Plugins
 
-Install the beta with [BRAT](https://github.com/TfTHacker/obsidian42-brat):
+Install **PARA-ZK** from Obsidian's community plugin browser:
 
-1. Install and enable BRAT from Obsidian community plugins.
-2. Run **BRAT: Add a beta plugin for testing**.
-3. Enter:
-
-```text
-https://github.com/kangig94/obsidian-para-zk
-```
-
-BRAT downloads the latest published release and keeps it updated. Enable **PARA-ZK** under **Settings -> Community plugins**.
+1. Open **Settings -> Community plugins -> Browse**.
+2. Search for **PARA-ZK**.
+3. Install it, then enable **PARA-ZK** under **Settings -> Community plugins**.
 
 ## Install With Optsidian
 

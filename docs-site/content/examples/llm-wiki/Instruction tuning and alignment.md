@@ -1,0 +1,53 @@
+---
+title: "Instruction tuning and alignment"
+tags:
+  - llm-wiki/ai
+---
+Instruction tuning and alignment is the post-training layer that turns a pretrained next-token model into an assistant. [[Pretraining and transfer learning|Pre-training]] supplies broad linguistic, factual, and task capability; instruction tuning and alignment reshape that capability into behaviors users recognize as useful: following instructions, answering in a stable chat format, refusing unsafe requests, using tools correctly, and choosing when to spend compute on deliberation. InstructGPT established the canonical loop of supervised demonstrations, preference modeling, and RL optimization, while later systems broadened the loop into DPO, safety-specific data, tool trajectories, strong-to-weak distillation, and hybrid thinking/direct modes [^qn9qjz] [^039uqa] [^bb1vjc] [^nartn8] [^tav1wu] [^qyy5f2].
+
+The main throughline is that alignment is not one method. It is a stack of data design, human or AI feedback, reward modeling, optimization, evaluation, and deployment controls. InstructGPT framed the target as being helpful, honest, and harmless according to labeler judgments and API prompt distributions, not as discovering universal values [^qn9qjz]. Llama 2 and Llama 3 make the same practical move in open releases: ship pretrained and chat/post-trained variants, train separate or specialized safety components, and expose the gap between base capability and assistant behavior [^039uqa] [^nartn8]. Qwen3 and GLM-4.5 show the newer frontier: alignment also controls whether the model behaves as a fast chat assistant, a long-reasoning model, or an [[Agentic and coding models|agentic and coding model]] that calls tools and interacts with environments [^tav1wu] [^qyy5f2].
+
+## RLHF and preference modeling
+
+RLHF converts vague assistant quality into trainable signals. In InstructGPT, human-written demonstrations produce a supervised fine-tuned policy, ranked model outputs train a reward model, and PPO optimizes the policy against that reward with a KL penalty to keep it near the supervised model; the PPO-ptx variant mixes in pre-training updates to reduce the alignment tax on public NLP tasks [^qn9qjz]. The striking result was that a 1.3B InstructGPT model was preferred over the 175B GPT-3 model on labeler judgments, showing that preference alignment can dominate raw parameter scale for instruction-following user experience [^qn9qjz].
+
+Llama 2 keeps the same high-level RLHF shape but separates helpfulness and safety preference signals. It uses SFT, reward models trained on binary preferences, rejection sampling, PPO, and fresh preference data across iterations so the reward models stay close to the current policy distribution [^039uqa]. The paper's key operational lesson is that humans often give better and cheaper signal by comparing outputs than by writing ideal answers from scratch, which is why preference data becomes the scaling path for chat quality [^039uqa].
+
+Llama 3 shifts the large-scale preference stage toward DPO after SFT and rejection sampling. Its reward model ranks edited, chosen, and rejected responses, while DPO uses recent preference batches from the current policy family and adds stabilizers such as masking special formatting tokens and adding an NLL term on chosen sequences [^nartn8]. GLM-4.5 generalizes preference optimization into a hybrid feedback system: rule-based feedback for verifiable tasks, human preference reward models for subjective qualities such as safety and factual correctness, and model-based critique or scoring where scale matters [^qyy5f2].
+
+## Chat model fine-tuning
+
+Chat fine-tuning is partly about content and partly about protocol. Llama 2 trains chat models with SFT data selected for quality rather than sheer quantity, then iterates RLHF for dialogue helpfulness and safety [^039uqa]. Llama 3 makes the protocol explicit: chat headers and termination tokens define who is speaking, where messages are routed, and how tool calls fit into a conversation; SFT loss is applied to target tokens while prompt tokens are masked [^nartn8]. This turns alignment into an interface contract, not only a preference objective.
+
+The data mix also becomes capability-specific. Llama 3 post-training includes general English, code, multilingual, reasoning/tool, and long-context data, then prunes it with topic classifiers, reward-model scores, Llama-based quality scores, difficulty estimates, and semantic deduplication [^nartn8]. For code and tool use, it adds execution feedback, unit tests, function-calling traces, file-upload tasks, and multi-step tool trajectories, linking instruction tuning directly to [[Agentic and coding models|agentic and coding models]] rather than leaving tool use to prompting alone [^nartn8].
+
+Qwen3 and GLM-4.5 continue this trend with chat templates as part of model behavior. Qwen3 uses /think and /no_think flags, empty thinking blocks, and mixed thinking/non-thinking SFT data so one model can obey different response modes [^tav1wu]. GLM-4.5 changes function-call formatting to XML-like tags to reduce escaping burden for code-heavy tool arguments, then trains agentic SFT data from frameworks, real APIs, MCP servers, synthesized tasks, generated trajectories, and quality-filtered completions [^qyy5f2].
+
+## Safety and helpfulness post-training
+
+Safety alignment is a tradeoff between avoiding harmful compliance and avoiding useless over-refusal. InstructGPT reduced toxicity and improved truthfulness on some evaluations, but it also exposed limits: the model was aligned to a particular labeler and prompt distribution, still failed on false premises and multi-constraint instructions, and did not solve bias broadly [^qn9qjz]. GPT-4 uses a broader safety pipeline with domain expert red teaming, safety RLHF prompts, and rule-based reward models that reward correct refusals while also rewarding non-refusal on safe prompts; the report measures large reductions in disallowed-content responses but still treats jailbreak robustness and deployment monitoring as ongoing work [^bb1vjc].
+
+Llama 2 organizes safety post-training into supervised safety examples, safety RLHF, and safety context distillation, with red teaming across risk categories and adversarial prompts [^039uqa]. Its safety data improves adversarial response behavior, but can increase false refusals, especially near policy boundaries [^039uqa]. Llama 3 makes the same tension central by evaluating violation rate and false refusal rate together, adding borderline prompts to teach safe helpfulness, and tuning different safety mixes by model size [^nartn8].
+
+Open assistant releases increasingly combine model-level and system-level safety. Llama 3 pairs safety finetuning with Llama Guard 3, Prompt Guard, and Code Shield, making deployment safety a configurable layer around the model as well as a property of the model weights [^nartn8]. GLM-4.5 evaluates safety with SafetyBench and reports strong aggregate safety scores while noting weaker performance on unfairness and bias, reinforcing that safety alignment remains category-specific rather than a single scalar property [^qyy5f2].
+
+## Thinking vs direct-response modes
+
+A newer alignment target is not just what the model says, but how much reasoning it should spend before answering. This connects instruction tuning to [[Reasoning with large language models|reasoning with large language models]]. Qwen3 explicitly unifies thinking mode and non-thinking mode in one model: long-CoT cold-start data and reasoning RL build the thinking model, then SFT fuses thinking and non-thinking data so users can switch behavior through chat templates [^tav1wu]. Its thinking-budget mechanism halts the thinking process at a user-defined threshold and asks the model to answer from accumulated reasoning, giving an inference-time control knob over latency and performance [^tav1wu].
+
+GLM-4.5 uses a similar hybrid reasoning idea for ARC tasks. It first trains expert models for reasoning, agents, and general chat, then distills them into a unified model that can produce deliberative long-CoT answers or direct responses depending on the task [^qyy5f2]. The reason this matters for alignment is practical: chit chat, translation, and routine QA often degrade if forced through long reasoning, while math, coding, browsing, and multi-step tool use benefit from explicit deliberation and environment interaction [^qyy5f2].
+
+Llama 3 reaches the same design pressure through targeted capability data. It trains step-wise reasoning traces, outcome and stepwise reward models, MCTS-generated reasoning traces, code execution feedback, and tool-use trajectories, all of which teach not only answers but procedures for producing answers [^nartn8]. In that sense, thinking/direct-response control is an alignment policy over computation: the model must learn when to be terse, when to reason, and when to externalize work into tools.
+
+## Alignment in open model releases
+
+For [[Open foundation model families|open foundation model families]], alignment determines what is actually useful to release. Llama 2 and Llama 3 both distinguish base models from chat or instruct variants, and their open releases include safety evaluations, use guidance, and auxiliary safety models rather than only weights [^039uqa] [^nartn8]. Qwen3 releases dense and [[Mixture-of-Experts language models|Mixture-of-Experts]] models under Apache 2.0 while emphasizing strong-to-weak distillation so smaller open models inherit post-training behavior from larger teachers at much lower cost [^tav1wu].
+
+GLM-4.5 frames open release around agentic, reasoning, and coding capability. Its post-training combines expert iteration, reasoning RL, agentic RL, instruction-following RL, function-calling RL, pathology RL, and safety evaluation, then releases both a large MoE model and a smaller Air variant [^qyy5f2]. The release pattern across Llama, Qwen, and GLM suggests that open alignment is becoming a reproducible systems recipe: base model plus post-trained assistant, mode/control templates, safety classifiers or policies, evaluation toolkits, and enough documentation for downstream developers to adapt the model without treating raw pre-training as the product.
+
+[^qn9qjz]: [[Training language models to follow instructions with human feedback]]
+[^039uqa]: [[Llama 2 - Open Foundation and Fine-Tuned Chat Models]]
+[^bb1vjc]: [[GPT-4 Technical Report]]
+[^nartn8]: [[The Llama 3 Herd of Models]]
+[^tav1wu]: [[Qwen3 Technical Report]]
+[^qyy5f2]: [[GLM-4.5 - Agentic, Reasoning, and Coding (ARC) Foundation Models]]

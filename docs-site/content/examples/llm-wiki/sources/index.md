@@ -1,0 +1,41 @@
+---
+title: "Sources (example stubs)"
+tags:
+  - resource/ai
+---
+Metadata-only stubs for the papers cited by the [[llm-wiki/index|LLM-Wiki Example (AI)]]. Original text is omitted; each links to its public original.
+
+- [[An Image is Worth 16x16 Words - Transformers for Image Recognition at Scale]]
+- [[Attention Is All You Need]]
+- [[BERT - Pre-training of Deep Bidirectional Transformers for Language Understanding]]
+- [[Chain-of-Thought Prompting Elicits Reasoning in Large Language Models]]
+- [[DeepSeek-R1 - Incentivizing Reasoning Capability in LLMs via Reinforcement Learning]]
+- [[DeepSeek-V3 Technical Report]]
+- [[DeepSeek-V3.2 - Pushing the Frontier of Open Large Language Models]]
+- [[Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer]]
+- [[FlashAttention - Fast and Memory-Efficient Exact Attention with IO-Awareness]]
+- [[GLM-4.5 - Agentic, Reasoning, and Coding (ARC) Foundation Models]]
+- [[GPT-4 Technical Report]]
+- [[Improving Language Understanding by Generative Pre-Training]]
+- [[Improving language models by retrieving from trillions of tokens]]
+- [[Kimi K2 - Open Agentic Intelligence]]
+- [[Kimi k1.5 - Scaling Reinforcement Learning with LLMs]]
+- [[LLaMA - Open and Efficient Foundation Language Models]]
+- [[Language Models are Few-Shot Learners]]
+- [[Language Models are Unsupervised Multitask Learners]]
+- [[Learning Transferable Visual Models From Natural Language Supervision]]
+- [[Llama 2 - Open Foundation and Fine-Tuned Chat Models]]
+- [[LoRA - Low-Rank Adaptation of Large Language Models]]
+- [[Mamba - Linear-Time Sequence Modeling with Selective State Spaces]]
+- [[Mixtral of Experts]]
+- [[QLoRA - Efficient Finetuning of Quantized LLMs]]
+- [[Qwen3 Technical Report]]
+- [[Qwen3-Coder-Next Technical Report]]
+- [[Retentive Network - A Successor to Transformer for Large Language Models]]
+- [[Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks]]
+- [[Scaling Laws for Neural Language Models]]
+- [[The Llama 3 Herd of Models]]
+- [[Training Compute-Optimal Large Language Models]]
+- [[Training language models to follow instructions with human feedback]]
+- [[Transformers are SSMs - Generalized Models and Efficient Algorithms Through Structured State Space Duality]]
+- [[mHC - Manifold-Constrained Hyper-Connections]]

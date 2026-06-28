@@ -15,11 +15,7 @@ It turns a hand-built PARA + ZK vault into repeatable, plugin-owned workflows. T
 
 ## Quick Install
 
-```text
-BRAT -> Add beta plugin -> https://github.com/kangig94/obsidian-para-zk
-```
-
-Then enable **PARA-ZK** and run setup:
+Install **PARA-ZK** from Obsidian's community plugin browser (**Settings -> Community plugins -> Browse**), then enable it and run setup:
 
 ```bash
 optsidian para-zk:setup deps=required
@@ -37,6 +33,7 @@ For manual installs, download `manifest.json`, `main.js`, and `styles.css` from 
 - [[features/para|Use PARA workflows]]
 - [[features/zettelkasten|Use Zettelkasten workflows]]
 - [[features/llm-wiki|Maintain the LLM-Wiki]]
+- [[examples/llm-wiki/index|Browse a generated LLM-Wiki example]]
 - [[features/journal|Capture daily notes and memos]]
 - [[cli|Drive PARA-ZK from the CLI]]
 - [[mcp|Connect MCP clients]]

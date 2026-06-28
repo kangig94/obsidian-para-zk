@@ -6,6 +6,9 @@ title: LLM-Wiki
 
 Canonical knowledge lives in Resources, PARA notes, and ZK notes. Wiki pages summarize and connect those sources so future LLM work can read a compact map before acting.
 
+> [!example] See it
+> Browse a generated wiki: [[examples/llm-wiki/index|LLM-Wiki example (AI papers)]].
+
 ## Link Direction
 
 Wiki pages cite canonical notes through their `references` registry and backtick citation tokens:
