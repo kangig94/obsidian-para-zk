@@ -20,6 +20,7 @@ export type ParaZkSettings = {
   editorWidthSliderEnabled: boolean;
   editorLineWidth: number;
   rememberCursorPosition: boolean;
+  retopologyCacheMaxMiB: number;
 };
 
 export type SetupResult = {
@@ -86,6 +87,8 @@ export type CaptureResult = {
 export const EDITOR_LINE_WIDTH_MIN = 600;
 export const EDITOR_LINE_WIDTH_MAX = 1600;
 export const EDITOR_LINE_WIDTH_STEP = 20;
+export const RETOPOLOGY_CACHE_MAX_MIB_MIN = 1;
+export const RETOPOLOGY_CACHE_MAX_MIB_MAX = 1024;
 
 export const DEFAULT_SETTINGS: ParaZkSettings = {
   locale: "en",
@@ -93,5 +96,6 @@ export const DEFAULT_SETTINGS: ParaZkSettings = {
   showEmptyTrashAction: true,
   editorWidthSliderEnabled: true,
   editorLineWidth: 700,
-  rememberCursorPosition: false
+  rememberCursorPosition: false,
+  retopologyCacheMaxMiB: 16
 };

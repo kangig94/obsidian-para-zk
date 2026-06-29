@@ -3,6 +3,7 @@ import { isRecord } from "../records";
 import { fileFrontmatter, readType } from "../vault/frontmatter";
 import { normalizeVaultPath } from "../vault/paths";
 import { stripManagedPrelude } from "../vault/sections";
+import { DEFAULT_SETTINGS } from "../types";
 import type { TFile } from "obsidian";
 import type {
   WikiRetopologyCandidate,
@@ -24,7 +25,8 @@ const BODY_BIGRAM_WEIGHT = 0.4;
 const COSINE_SCORE_WEIGHT = 0.7;
 const OVERLAP_SCORE_WEIGHT = 0.3;
 const CACHE_FILE = "retopology-cache.json";
-const MAX_CACHE_BYTES = 16 * 1024 * 1024;
+const MIB_BYTES = 1024 * 1024;
+const CACHE_WARNING_RATIO = 0.95;
 const MAX_TERM_LENGTH = 128;
 const STOPWORD_LIST = [
   "a",
@@ -97,12 +99,22 @@ type RetopologyCache = {
   indexes: Record<string, CachedIndexTerms>;
 };
 
+type CacheReadResult = {
+  cache?: RetopologyCache;
+  bytes?: number;
+};
+
+type DomainIndexReadResult = {
+  indexes: DomainIndex[];
+  warnings: string[];
+};
+
 export async function wikiRetopologyCandidates(
   ctx: WorkflowContext,
   options: WikiRetopologyCandidatesOptions = {}
 ): Promise<WikiRetopologyCandidatesResult> {
   const limit = normalizeLimit(options.limit);
-  const indexes = await readDomainIndexes(ctx);
+  const { indexes, warnings } = await readDomainIndexes(ctx);
   const byDomain = new Map(indexes.map((index) => [index.domain, index]));
   const focus = normalizeDomainOption(options.domain, byDomain);
   const depth = normalizeDepth(options.depth);
@@ -121,6 +133,7 @@ export async function wikiRetopologyCandidates(
     limit,
     returned: page.length,
     has_more: page.length < candidates.length,
+    ...(warnings.length > 0 ? { warnings } : {}),
     candidates: page
   };
 }
@@ -154,12 +167,15 @@ function normalizeDomainOption(value: unknown, byDomain: Map<string, DomainIndex
   throw new Error(`domain index not found: ${domain}`);
 }
 
-async function readDomainIndexes(ctx: WorkflowContext): Promise<DomainIndex[]> {
+async function readDomainIndexes(ctx: WorkflowContext): Promise<DomainIndexReadResult> {
   const wikiRoot = normalizeVaultPath(PARA_ZK_PATHS.wikiFolder);
   const indexes: RawDomainIndex[] = [];
   const cacheSources: DomainIndexFile[] = [];
+  const cacheMaxBytes = retopologyCacheMaxBytes(ctx);
   const nextCache: RetopologyCache | undefined = ctx.cache ? { key: CACHE_KEY, indexes: {} } : undefined;
-  const cache = nextCache ? await readCache(ctx) : undefined;
+  const cacheRead = nextCache ? await readCache(ctx, cacheMaxBytes) : {};
+  const cache = cacheRead.cache;
+  let cacheBytes = cacheRead.bytes;
   let cacheChanged = Boolean(nextCache && !cache);
 
   for (const file of ctx.host.getMarkdownFiles()) {
@@ -187,10 +203,13 @@ async function readDomainIndexes(ctx: WorkflowContext): Promise<DomainIndex[]> {
     cacheChanged = true;
   }
   if (nextCache && cacheChanged && cacheSourcesFresh(ctx, wikiRoot, cacheSources)) {
-    await writeCache(ctx, nextCache);
+    cacheBytes = await writeCache(ctx, nextCache);
   }
 
-  return tfIdfIndexes(indexes).sort((left, right) => left.domain.localeCompare(right.domain));
+  return {
+    indexes: tfIdfIndexes(indexes).sort((left, right) => left.domain.localeCompare(right.domain)),
+    warnings: retopologyCacheWarnings(cacheBytes, cacheMaxBytes)
+  };
 }
 
 function domainIndexFile(ctx: WorkflowContext, file: TFile, wikiRoot: string): DomainIndexFile | undefined {
@@ -225,31 +244,34 @@ function cacheSourcesFresh(ctx: WorkflowContext, wikiRoot: string, sources: Doma
   return true;
 }
 
-async function readCache(ctx: WorkflowContext): Promise<RetopologyCache | undefined> {
+async function readCache(ctx: WorkflowContext, maxBytes: number): Promise<CacheReadResult> {
   const raw = await ctx.cache?.readText(CACHE_FILE);
-  if (!raw) return undefined;
-  if (exceedsUtf8Bytes(raw, MAX_CACHE_BYTES)) return undefined;
+  if (!raw) return {};
+  const bytes = utf8ByteLength(raw);
+  if (bytes > maxBytes) return { bytes };
   try {
     const parsed = JSON.parse(raw) as unknown;
-    if (!isRecord(parsed) || parsed.key !== CACHE_KEY || !isRecord(parsed.indexes)) return undefined;
+    if (!isRecord(parsed) || parsed.key !== CACHE_KEY || !isRecord(parsed.indexes)) return { bytes };
     const indexes: RetopologyCache["indexes"] = {};
     for (const [path, value] of Object.entries(parsed.indexes)) {
-      if (!isCachedIndexTerms(value)) return undefined;
+      if (!isCachedIndexTerms(value)) return { bytes };
       indexes[path] = value;
     }
-    return { key: CACHE_KEY, indexes };
+    return { cache: { key: CACHE_KEY, indexes }, bytes };
   } catch {
-    return undefined;
+    return { bytes };
   }
 }
 
-async function writeCache(ctx: WorkflowContext, cache: RetopologyCache): Promise<void> {
+async function writeCache(ctx: WorkflowContext, cache: RetopologyCache): Promise<number> {
   const payload = `${JSON.stringify(cache)}\n`;
+  const bytes = utf8ByteLength(payload);
   if (ctx.cache?.replaceText) {
     await ctx.cache.replaceText(CACHE_FILE, payload);
-    return;
+    return bytes;
   }
   await ctx.cache?.writeText(CACHE_FILE, payload);
+  return bytes;
 }
 
 function isCachedIndexTerms(value: unknown): value is CachedIndexTerms {
@@ -288,7 +310,27 @@ function cacheKeyHash(value: string): string {
   return `fnv1a-${(hash >>> 0).toString(36)}`;
 }
 
-function exceedsUtf8Bytes(value: string, maxBytes: number): boolean {
+function retopologyCacheMaxBytes(ctx: WorkflowContext): number {
+  const maxMiB = Number.isFinite(ctx.settings.retopologyCacheMaxMiB) && ctx.settings.retopologyCacheMaxMiB > 0
+    ? ctx.settings.retopologyCacheMaxMiB
+    : DEFAULT_SETTINGS.retopologyCacheMaxMiB;
+  return Math.round(maxMiB) * MIB_BYTES;
+}
+
+function retopologyCacheWarnings(bytes: number | undefined, maxBytes: number): string[] {
+  if (bytes === undefined || bytes / maxBytes <= CACHE_WARNING_RATIO) return [];
+  const percent = Math.round((bytes / maxBytes) * 100);
+  return [
+    `retopology cache 용량이 상한에 근접했습니다. optsidian config로 retopologyCacheMaxMiB 상한을 늘리세요. 현재 ${formatMiB(maxBytes)} MiB 중 ${percent}% 도달했습니다.`
+  ];
+}
+
+function formatMiB(bytes: number): string {
+  const value = bytes / MIB_BYTES;
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function utf8ByteLength(value: string): number {
   let bytes = 0;
   for (let index = 0; index < value.length; index += 1) {
     const code = value.charCodeAt(index);
@@ -303,9 +345,8 @@ function exceedsUtf8Bytes(value: string, maxBytes: number): boolean {
     } else {
       bytes += 3;
     }
-    if (bytes > maxBytes) return true;
   }
-  return false;
+  return bytes;
 }
 
 function candidatesForAll(

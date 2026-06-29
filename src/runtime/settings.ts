@@ -5,6 +5,8 @@ import {
   EDITOR_LINE_WIDTH_MAX,
   EDITOR_LINE_WIDTH_MIN,
   EDITOR_LINE_WIDTH_STEP,
+  RETOPOLOGY_CACHE_MAX_MIB_MAX,
+  RETOPOLOGY_CACHE_MAX_MIB_MIN,
   type ParaZkSettings
 } from "../types";
 import { isRecord } from "../records";
@@ -34,7 +36,8 @@ export function mergeSettings(loaded: unknown): ParaZkSettings {
     rememberCursorPosition: typeof data.rememberCursorPosition === "boolean"
       ? data.rememberCursorPosition
       : DEFAULT_SETTINGS.rememberCursorPosition,
-    editorLineWidth: readEditorLineWidth(data.editorLineWidth)
+    editorLineWidth: readEditorLineWidth(data.editorLineWidth),
+    retopologyCacheMaxMiB: readRetopologyCacheMaxMiB(data.retopologyCacheMaxMiB)
   };
 }
 
@@ -48,4 +51,16 @@ function readEditorLineWidth(value: unknown): number {
     return DEFAULT_SETTINGS.editorLineWidth;
   }
   return Math.round(value / EDITOR_LINE_WIDTH_STEP) * EDITOR_LINE_WIDTH_STEP;
+}
+
+function readRetopologyCacheMaxMiB(value: unknown): number {
+  if (
+    typeof value !== "number"
+    || !Number.isFinite(value)
+    || value < RETOPOLOGY_CACHE_MAX_MIB_MIN
+    || value > RETOPOLOGY_CACHE_MAX_MIB_MAX
+  ) {
+    return DEFAULT_SETTINGS.retopologyCacheMaxMiB;
+  }
+  return Math.round(value);
 }

@@ -426,7 +426,10 @@ pair list to choose which indexes to inspect directly.
 When running inside Obsidian, the command caches per-index term counts in
 `.obsidian/plugins/para-zk/retopology-cache.json`, invalidated by a hash of the
 term-counting rules plus index path, modified time, and size. Final TF-IDF scores
-are still recomputed for the current domain set each run.
+are still recomputed for the current domain set each run. The cache read limit
+defaults to `16` MiB and can be raised by setting `retopologyCacheMaxMiB` in the
+plugin config. When the cache reaches more than 95% of that limit, the result
+includes a warning with the current MiB limit and usage percentage.
 
 Options:
 
@@ -449,6 +452,8 @@ Text output includes:
 - up to two evidence lines per pair, including shared terms or explicit index links;
 - the shortest index-to-index `connection` for global candidates;
 - in focused mode, the undirected index graph neighborhood from the focus domain.
+- a `warning:` line when `retopology-cache.json` exceeds 95% of the configured
+  MiB limit.
 
 Connections and focused graphs use only resolved links between `<domain>/index`
 hubs. If a minimum path is direct, only that edge is shown; if it is two hops, only

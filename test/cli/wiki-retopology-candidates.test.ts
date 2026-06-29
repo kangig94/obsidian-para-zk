@@ -250,6 +250,28 @@ describe("wiki retopology candidates", () => {
     expect(healedTerms).not.toHaveProperty(overlongTerm);
   });
 
+  it("warns when retopology cache usage exceeds 95 percent of the configured MiB limit", async () => {
+    const { ctx, app } = createTestContext();
+    ctx.settings.retopologyCacheMaxMiB = 1;
+    const largeBody = Array.from({ length: 30_000 }, (_item, index) => `term${index}`).join(" ");
+    await createWikiPage(app, "LLM-Wiki/alpha/index.md", largeBody);
+    await createWikiPage(app, "LLM-Wiki/beta/index.md", "Diffusion policy control.");
+
+    const cache = new Map<string, string>();
+    ctx.cache = {
+      readText: async (name) => cache.get(name),
+      writeText: async (name, value) => {
+        cache.set(name, value);
+      }
+    };
+
+    const result = await wikiRetopologyCandidates(ctx, { limit: 10 });
+
+    expect(result.warnings?.[0]).toContain("optsidian config");
+    expect(result.warnings?.[0]).toContain("retopologyCacheMaxMiB");
+    expect(result.warnings?.[0]).toMatch(/현재 1 MiB 중 \d+% 도달했습니다\./);
+  });
+
   it("replaces the plugin cache through a unique temp file and cleans stale temps", async () => {
     const { ctx: baseCtx, app } = createTestContext();
     const pluginDir = ".obsidian/plugins/para-zk";

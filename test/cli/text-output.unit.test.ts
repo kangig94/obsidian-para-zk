@@ -195,7 +195,10 @@ describe("renderCliText", () => {
             { domain: "robotics", index: "robotics/index", distance: 1, path: ["language-models", "robotics"] }
           ],
           edges: []
-        }
+        },
+        warnings: [
+          "retopology cache 용량이 상한에 근접했습니다. optsidian config로 retopologyCacheMaxMiB 상한을 늘리세요. 현재 16 MiB 중 97% 도달했습니다."
+        ]
       }, "wiki retopology candidates listed");
 
       expect(text).toContain("1 retopology candidates for language-models");
@@ -204,6 +207,9 @@ describe("renderCliText", () => {
       expect(text).toContain("connection d1: language-models -> robotics");
       expect(text).toContain("graph root=language-models depth=2");
       expect(text).toContain("d1  robotics/index  via language-models -> robotics");
+      expect(text.split("\n").at(-1)).toBe(
+        "warning: retopology cache 용량이 상한에 근접했습니다. optsidian config로 retopologyCacheMaxMiB 상한을 늘리세요. 현재 16 MiB 중 97% 도달했습니다."
+      );
     });
   });
 

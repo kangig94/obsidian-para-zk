@@ -48,7 +48,8 @@ describe("mergeSettings", () => {
       showEmptyTrashAction: false,
       editorWidthSliderEnabled: false,
       rememberCursorPosition: false,
-      editorLineWidth: 1100
+      editorLineWidth: 1100,
+      retopologyCacheMaxMiB: 32
     });
 
     expect(settings).toEqual({
@@ -57,7 +58,8 @@ describe("mergeSettings", () => {
       showEmptyTrashAction: false,
       editorWidthSliderEnabled: false,
       rememberCursorPosition: false,
-      editorLineWidth: 1100
+      editorLineWidth: 1100,
+      retopologyCacheMaxMiB: 32
     });
   });
 
@@ -130,6 +132,22 @@ describe("mergeSettings", () => {
   it("falls back for non-boolean showEmptyTrashAction values", () => {
     for (const showEmptyTrashAction of ["false", 0, 1, null, undefined]) {
       expect(mergeSettings({ showEmptyTrashAction }).showEmptyTrashAction).toBe(DEFAULT_SETTINGS.showEmptyTrashAction);
+    }
+  });
+
+  it("defaults retopologyCacheMaxMiB when absent", () => {
+    expect(mergeSettings({}).retopologyCacheMaxMiB).toBe(16);
+  });
+
+  it("preserves valid retopologyCacheMaxMiB values", () => {
+    expect(mergeSettings({ retopologyCacheMaxMiB: 32 }).retopologyCacheMaxMiB).toBe(32);
+    expect(mergeSettings({ retopologyCacheMaxMiB: 32.2 }).retopologyCacheMaxMiB).toBe(32);
+  });
+
+  it("falls back for invalid retopologyCacheMaxMiB values", () => {
+    for (const retopologyCacheMaxMiB of [NaN, Infinity, "32", 0, 1025, null, undefined]) {
+      expect(mergeSettings({ retopologyCacheMaxMiB }).retopologyCacheMaxMiB)
+        .toBe(DEFAULT_SETTINGS.retopologyCacheMaxMiB);
     }
   });
 

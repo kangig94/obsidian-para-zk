@@ -337,6 +337,7 @@ export type WikiRetopologyCandidatesResult = {
   returned: number;
   has_more: boolean;
   candidates: WikiRetopologyCandidate[];
+  warnings?: string[];
 };
 
 export type AuditSeverity = "high" | "medium" | "low";
