@@ -108,10 +108,12 @@ token like `arXiv` when none fits, never a long sentence), `kind` as a code. Kee
 transform notes such as "translated", "converted", or "cleaned" unless the user explicitly asks for
 that metadata or it is needed to avoid ambiguity. For images:
 - A **web** image → embed it by its source URL with `![alt](https://…)`; Obsidian renders
-  remote images inline, so do **not** download or attach it.
+  remote images inline, so do **not** download or attach it. For HTML/web sources, preserve or
+  absolutize the image URL; do not rewrite it into a vault wikilink such as
+  `![[assets/<slug>/figure.png]]` unless the user explicitly asked for offline/local assets.
 - A **local** image — from a local-file source, or a figure `marker` extracted from a PDF →
-  `optsidian para-zk:attach-file source=<abs-path> folder=assets/<slug>`, then
-  embed the returned `![[…]]`.
+  `optsidian para-zk:attach-file source=<abs-path> folder=assets/<slug>`, then embed only the
+  returned `![[…]]`. Never invent an `assets/...` path by hand.
 
 ## 4. Produce clean Markdown — never a raw dump
 
@@ -197,6 +199,22 @@ headings and ordinary prose are target-language, identity-bearing names are pres
 References titles remain in the source language. If the result reads like source-language
 sentences with target-language particles, rewrite it before storing.
 
+For long translations, quality-sample the **beginning, middle, and end** before storing. The
+translation quality must be consistent across the whole source; a polished abstract/introduction
+does not compensate for later sections reverting to source-language phrasing. If a sampled later
+section is weaker than the opening, continue the revision pass from that point onward and sample
+again.
+
+Run a source-language residue scan on the translated draft before storing. Search for common
+ordinary terms that agents often over-preserve in technical prose (for ML papers, terms such as
+`model`, `layer`, `network`, `input`, `output`, `position`, `sequence`, `training`, `task`,
+`dataset`, `performance`, `method`, `approach`, `result`, `experiment`, `figure`, `table`,
+`section`, `sentence`, `token`, `feature`, `fine-tuning`, `pre-training`, `learning rate`, and
+`batch size`). Each hit must be either an identity-bearing name, code/API identifier, table label
+that is intentionally preserved, or a field-conventional source-script term; otherwise translate
+it into natural target-language technical prose. This scan is a whitelist-or-translate check, not
+a blanket ban on source-language terms.
+
 ## 6. Store (shell-safe) and link
 
 For each resource, write the cleaned body to a temp file and create it with a file-backed body
@@ -239,7 +257,9 @@ hub — an area, a project, or an index resource — so the set is navigable.
 Run `para-zk:read-resource title="<title>" key=frontmatter` and `key=body` after creation. Confirm
 metadata, body persistence, backlinks/references when linked, no dead page anchors, and Obsidian
 math delimiters (`$…$`, `$$…$$`; no `\(...\)` or `\[...\]`). Fix and repeat if anything is still
-broken.
+broken. Also verify every image embed: web/HTML-origin figures should be remote
+`![alt](https://…)` links, and every local `![[…]]` image/PDF must have been produced by
+`para-zk:attach-file` and resolve in the vault.
 
 ## 8. Hand off to the wiki-ingest skill
 
