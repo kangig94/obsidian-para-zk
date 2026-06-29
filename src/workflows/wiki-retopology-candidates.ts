@@ -21,6 +21,8 @@ const SCORE_PRECISION = 4;
 const MAX_SHARED_TERMS = 8;
 const BODY_UNIGRAM_WEIGHT = 1;
 const BODY_BIGRAM_WEIGHT = 0.4;
+const COSINE_SCORE_WEIGHT = 0.7;
+const OVERLAP_SCORE_WEIGHT = 0.3;
 const CACHE_FILE = "retopology-cache.json";
 const STOPWORD_LIST = [
   "a",
@@ -70,9 +72,10 @@ type DomainIndex = {
   path: string;
   vector: Map<string, number>;
   length: number;
+  weightSum: number;
 };
 
-type RawDomainIndex = Omit<DomainIndex, "vector" | "length"> & {
+type RawDomainIndex = Omit<DomainIndex, "vector" | "length" | "weightSum"> & {
   termCounts: Map<string, number>;
 };
 
@@ -465,7 +468,7 @@ function candidateForPair(
   connection?: WikiRetopologyConnection
 ): WikiRetopologyCandidate {
   const explicitLinks = explicitIndexLinks(ctx, left, right);
-  const score = roundScore(cosine(left, right));
+  const score = roundScore(similarityScore(left, right));
   const sharedTerms = topSharedTerms(left, right);
   const evidence = candidateEvidence(sharedTerms, explicitLinks);
   return {
@@ -561,7 +564,8 @@ function tfIdfIndexes(indexes: RawDomainIndex[]): DomainIndex[] {
       title: index.title,
       path: index.path,
       vector,
-      length: vectorLength(vector)
+      length: vectorLength(vector),
+      weightSum: vectorWeightSum(vector)
     };
   });
 }
@@ -610,6 +614,17 @@ function vectorLength(vector: Map<string, number>): number {
   return Math.sqrt(sum);
 }
 
+function vectorWeightSum(vector: Map<string, number>): number {
+  let sum = 0;
+  for (const weight of vector.values()) sum += weight;
+  return sum;
+}
+
+function similarityScore(left: DomainIndex, right: DomainIndex): number {
+  return (COSINE_SCORE_WEIGHT * cosine(left, right))
+    + (OVERLAP_SCORE_WEIGHT * weightedOverlap(left, right));
+}
+
 function cosine(left: DomainIndex, right: DomainIndex): number {
   if (left.length === 0 || right.length === 0) return 0;
   let dot = 0;
@@ -621,6 +636,19 @@ function cosine(left: DomainIndex, right: DomainIndex): number {
     if (rightWeight !== undefined) dot += leftWeight * rightWeight;
   }
   return dot / (left.length * right.length);
+}
+
+function weightedOverlap(left: DomainIndex, right: DomainIndex): number {
+  if (left.weightSum === 0 || right.weightSum === 0) return 0;
+  let overlap = 0;
+  const [small, large] = left.vector.size <= right.vector.size
+    ? [left.vector, right.vector]
+    : [right.vector, left.vector];
+  for (const [token, leftWeight] of small.entries()) {
+    const rightWeight = large.get(token);
+    if (rightWeight !== undefined) overlap += Math.min(leftWeight, rightWeight);
+  }
+  return overlap / Math.min(left.weightSum, right.weightSum);
 }
 
 function topSharedTerms(left: DomainIndex, right: DomainIndex): string[] {

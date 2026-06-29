@@ -88,6 +88,20 @@ describe("wiki retopology candidates", () => {
     expect(phrasePair.shared_terms).toContain("diffusion policy");
   });
 
+  it("blends cosine with weighted overlap so shared bridges are not over-penalized", async () => {
+    const { ctx, app } = createTestContext();
+    await createWikiPage(app, "LLM-Wiki/alpha/index.md", "Shared bridge.");
+    await createWikiPage(app, "LLM-Wiki/beta/index.md", "Shared bridge.");
+
+    const result = await wikiRetopologyCandidates(ctx, { limit: 10 });
+
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0].score).toBeGreaterThan(0.08);
+    expect(result.candidates[0].shared_terms).toEqual(
+      expect.arrayContaining(["shared", "bridge", "shared bridge"])
+    );
+  });
+
   it("caches index term counts and invalidates them by file stat", async () => {
     const { ctx, app } = createTestContext();
     await createWikiPage(app, "LLM-Wiki/alpha/index.md", "Diffusion policy action.");
