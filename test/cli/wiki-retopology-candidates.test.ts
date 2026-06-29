@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import type { ParaZkPluginContext } from "../../src/plugin-interface";
+import { workflowContext } from "../../src/vault/host";
 import { wikiRetopologyCandidates } from "../../src/workflows";
 import { createCliHarness, type CliHarness } from "../harness/cli";
 import { createTestContext, type MockApp } from "../harness/vault";
@@ -127,6 +129,59 @@ describe("wiki retopology candidates", () => {
 
     await wikiRetopologyCandidates(ctx, { limit: 10 });
     expect(readPaths).toContain("LLM-Wiki/alpha/index.md");
+  });
+
+  it("replaces the plugin cache through a unique temp file and cleans stale temps", async () => {
+    const { ctx: baseCtx, app } = createTestContext();
+    const pluginDir = ".obsidian/plugins/para-zk";
+    const cachePath = `${pluginDir}/retopology-cache.json`;
+    const staleTempPath = `${cachePath}.1-dead.tmp`;
+    const ctx = workflowContext({
+      app,
+      settings: baseCtx.settings,
+      manifest: { id: "para-zk", dir: pluginDir }
+    } as unknown as ParaZkPluginContext);
+    await createWikiPage(app, "LLM-Wiki/alpha/index.md", "Diffusion policy action.");
+    await createWikiPage(app, "LLM-Wiki/beta/index.md", "Diffusion policy control.");
+    await app.vault.adapter.write(staleTempPath, "stale");
+
+    await wikiRetopologyCandidates(ctx, { limit: 10 });
+
+    const cached = JSON.parse(app.readPath(cachePath) ?? "{}") as Record<string, unknown>;
+    expect(cached.key).toEqual(expect.stringMatching(/^fnv1a-/));
+    expect(cached).toHaveProperty("indexes");
+    expect(app.listPaths()).not.toContain(staleTempPath);
+    expect(app.listPaths().filter((path) => path.startsWith(`${cachePath}.`) && path.endsWith(".tmp"))).toEqual([]);
+  });
+
+  it("skips cache writes when index files change during rebuild", async () => {
+    const { ctx, app } = createTestContext();
+    await createWikiPage(app, "LLM-Wiki/alpha/index.md", "Diffusion policy action.");
+    await createWikiPage(app, "LLM-Wiki/beta/index.md", "Diffusion policy control.");
+
+    let writes = 0;
+    ctx.cache = {
+      readText: async () => undefined,
+      writeText: async () => {
+        writes += 1;
+      }
+    };
+    const originalRead = ctx.host.read;
+    let changed = false;
+    ctx.host.read = async (file) => {
+      const text = await originalRead(file);
+      if (!changed && file.path === "LLM-Wiki/alpha/index.md") {
+        changed = true;
+        await app.vault.modify(file, markdown("Diffusion policy action changed during rebuild."));
+      }
+      return text;
+    };
+
+    await wikiRetopologyCandidates(ctx, { limit: 10 });
+    expect(writes).toBe(0);
+
+    await wikiRetopologyCandidates(ctx, { limit: 10 });
+    expect(writes).toBe(1);
   });
 
   it("does not read concept pages when computing index-only candidates", async () => {

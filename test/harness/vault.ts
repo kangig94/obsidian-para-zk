@@ -95,8 +95,36 @@ export class MockApp {
       this.deletePath(file.path);
     },
     adapter: {
+      read: async (path: string): Promise<string> => {
+        const content = this.contents.get(path);
+        if (content === undefined) throw new Error(`file not found: ${path}`);
+        return content;
+      },
+      write: async (path: string, content: string): Promise<void> => {
+        const file = this.fileObjs.get(path);
+        if (file) {
+          this.contents.set(path, content);
+          file.stat.size = content.length;
+          this.rewire();
+          return;
+        }
+        this.createFile(path, content);
+      },
       exists: async (path: string): Promise<boolean> =>
-        this.fileObjs.has(path) || this.folderObjs.has(path)
+        this.fileObjs.has(path) || this.folderObjs.has(path),
+      rename: async (path: string, newPath: string): Promise<void> => {
+        if (!this.fileObjs.has(path) && !this.folderObjs.has(path)) throw new Error(`file not found: ${path}`);
+        if (this.fileObjs.has(newPath) || this.folderObjs.has(newPath)) this.deletePath(newPath);
+        this.relocate(path, newPath);
+      },
+      remove: async (path: string): Promise<void> => {
+        if (!this.fileObjs.has(path) && !this.folderObjs.has(path)) throw new Error(`file not found: ${path}`);
+        this.deletePath(path);
+      },
+      list: async (path: string): Promise<{ files: string[]; folders: string[] }> => ({
+        files: [...this.fileObjs.keys()].filter((candidate) => parentPath(candidate) === path),
+        folders: [...this.folderObjs.keys()].filter((candidate) => parentPath(candidate) === path)
+      })
     },
     on: (name: VaultEventName, callback: VaultEventCallback): { detach: () => void } => {
       const listeners = this.vaultEventListeners.get(name) ?? new Set<VaultEventCallback>();

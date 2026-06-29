@@ -3,6 +3,7 @@ import { isRecord } from "../records";
 import { fileFrontmatter, readType } from "../vault/frontmatter";
 import { normalizeVaultPath } from "../vault/paths";
 import { stripManagedPrelude } from "../vault/sections";
+import type { TFile } from "obsidian";
 import type {
   WikiRetopologyCandidate,
   WikiRetopologyCandidatesOptions,
@@ -75,6 +76,14 @@ type RawDomainIndex = Omit<DomainIndex, "vector" | "length"> & {
   termCounts: Map<string, number>;
 };
 
+type DomainIndexFile = {
+  path: string;
+  domain: string;
+  title: string;
+  mtime: number;
+  size: number;
+};
+
 type CachedIndexTerms = [mtime: number, size: number, terms: Record<string, number>];
 
 type RetopologyCache = {
@@ -142,27 +151,22 @@ function normalizeDomainOption(value: unknown, byDomain: Map<string, DomainIndex
 async function readDomainIndexes(ctx: WorkflowContext): Promise<DomainIndex[]> {
   const wikiRoot = normalizeVaultPath(PARA_ZK_PATHS.wikiFolder);
   const indexes: RawDomainIndex[] = [];
+  const cacheSources: DomainIndexFile[] = [];
   const nextCache: RetopologyCache | undefined = ctx.cache ? { key: CACHE_KEY, indexes: {} } : undefined;
   const cache = nextCache ? await readCache(ctx) : undefined;
   let cacheChanged = Boolean(nextCache && !cache);
 
   for (const file of ctx.host.getMarkdownFiles()) {
-    const path = normalizeVaultPath(file.path);
-    if (!path.startsWith(`${wikiRoot}/`)) continue;
-    if (readType(fileFrontmatter(ctx, file)) !== "llm-wiki") continue;
+    const source = domainIndexFile(ctx, file, wikiRoot);
+    if (!source) continue;
 
-    const segments = path.slice(wikiRoot.length + 1).split("/");
-    if (segments.length !== 2 || file.basename !== DOMAIN_INDEX_CONCEPT) continue;
-
-    const domain = segments[0];
-    const title = `${domain}/${DOMAIN_INDEX_CONCEPT}`;
+    const { path, domain, title, mtime, size } = source;
     const cached = cache?.indexes[path];
-    const mtime = file.stat?.mtime ?? 0;
-    const size = file.stat?.size ?? 0;
     const cacheHit = cached && cached[0] === mtime && cached[1] === size;
     const termCounts = cacheHit
       ? mapFromRecord(cached[2])
       : indexTermCounts(domain, stripManagedPrelude(await ctx.host.read(file)));
+    cacheSources.push(source);
     if (nextCache) nextCache.indexes[path] = [mtime, size, recordFromMap(termCounts)];
     if (nextCache && !cacheHit) cacheChanged = true;
     indexes.push({
@@ -176,9 +180,43 @@ async function readDomainIndexes(ctx: WorkflowContext): Promise<DomainIndex[]> {
   if (cache && nextCache && Object.keys(cache.indexes).length !== Object.keys(nextCache.indexes).length) {
     cacheChanged = true;
   }
-  if (nextCache && cacheChanged) await writeCache(ctx, nextCache);
+  if (nextCache && cacheChanged && cacheSourcesFresh(ctx, wikiRoot, cacheSources)) {
+    await writeCache(ctx, nextCache);
+  }
 
   return tfIdfIndexes(indexes).sort((left, right) => left.domain.localeCompare(right.domain));
+}
+
+function domainIndexFile(ctx: WorkflowContext, file: TFile, wikiRoot: string): DomainIndexFile | undefined {
+  const path = normalizeVaultPath(file.path);
+  if (!path.startsWith(`${wikiRoot}/`)) return undefined;
+  if (readType(fileFrontmatter(ctx, file)) !== "llm-wiki") return undefined;
+
+  const segments = path.slice(wikiRoot.length + 1).split("/");
+  if (segments.length !== 2 || file.basename !== DOMAIN_INDEX_CONCEPT) return undefined;
+
+  const domain = segments[0];
+  return {
+    path,
+    domain,
+    title: `${domain}/${DOMAIN_INDEX_CONCEPT}`,
+    mtime: file.stat?.mtime ?? 0,
+    size: file.stat?.size ?? 0
+  };
+}
+
+function cacheSourcesFresh(ctx: WorkflowContext, wikiRoot: string, sources: DomainIndexFile[]): boolean {
+  const current = new Map<string, DomainIndexFile>();
+  for (const file of ctx.host.getMarkdownFiles()) {
+    const source = domainIndexFile(ctx, file, wikiRoot);
+    if (source) current.set(source.path, source);
+  }
+  if (current.size !== sources.length) return false;
+  for (const source of sources) {
+    const fresh = current.get(source.path);
+    if (!fresh || fresh.mtime !== source.mtime || fresh.size !== source.size) return false;
+  }
+  return true;
 }
 
 async function readCache(ctx: WorkflowContext): Promise<RetopologyCache | undefined> {
@@ -199,7 +237,12 @@ async function readCache(ctx: WorkflowContext): Promise<RetopologyCache | undefi
 }
 
 async function writeCache(ctx: WorkflowContext, cache: RetopologyCache): Promise<void> {
-  await ctx.cache?.writeText(CACHE_FILE, `${JSON.stringify(cache)}\n`);
+  const payload = `${JSON.stringify(cache)}\n`;
+  if (ctx.cache?.replaceText) {
+    await ctx.cache.replaceText(CACHE_FILE, payload);
+    return;
+  }
+  await ctx.cache?.writeText(CACHE_FILE, payload);
 }
 
 function isCachedIndexTerms(value: unknown): value is CachedIndexTerms {

@@ -14,6 +14,7 @@ export type WorkflowContext = {
 type WorkflowCache = {
   readText(name: string): Promise<string | undefined>;
   writeText(name: string, value: string): Promise<void>;
+  replaceText?(name: string, value: string): Promise<void>;
 };
 
 export type CreateProjectOptions = {
