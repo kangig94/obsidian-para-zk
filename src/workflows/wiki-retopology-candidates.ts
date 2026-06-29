@@ -78,8 +78,8 @@ type RawDomainIndex = Omit<DomainIndex, "vector" | "length"> & {
 type CachedIndexTerms = [mtime: number, size: number, terms: Record<string, number>];
 
 type RetopologyCache = {
-  k: string;
-  i: Record<string, CachedIndexTerms>;
+  key: string;
+  indexes: Record<string, CachedIndexTerms>;
 };
 
 export async function wikiRetopologyCandidates(
@@ -142,7 +142,7 @@ function normalizeDomainOption(value: unknown, byDomain: Map<string, DomainIndex
 async function readDomainIndexes(ctx: WorkflowContext): Promise<DomainIndex[]> {
   const wikiRoot = normalizeVaultPath(PARA_ZK_PATHS.wikiFolder);
   const indexes: RawDomainIndex[] = [];
-  const nextCache: RetopologyCache | undefined = ctx.cache ? { k: CACHE_KEY, i: {} } : undefined;
+  const nextCache: RetopologyCache | undefined = ctx.cache ? { key: CACHE_KEY, indexes: {} } : undefined;
   const cache = nextCache ? await readCache(ctx) : undefined;
   let cacheChanged = Boolean(nextCache && !cache);
 
@@ -156,14 +156,14 @@ async function readDomainIndexes(ctx: WorkflowContext): Promise<DomainIndex[]> {
 
     const domain = segments[0];
     const title = `${domain}/${DOMAIN_INDEX_CONCEPT}`;
-    const cached = cache?.i[path];
+    const cached = cache?.indexes[path];
     const mtime = file.stat?.mtime ?? 0;
     const size = file.stat?.size ?? 0;
     const cacheHit = cached && cached[0] === mtime && cached[1] === size;
     const termCounts = cacheHit
       ? mapFromRecord(cached[2])
       : indexTermCounts(domain, stripManagedPrelude(await ctx.host.read(file)));
-    if (nextCache) nextCache.i[path] = [mtime, size, recordFromMap(termCounts)];
+    if (nextCache) nextCache.indexes[path] = [mtime, size, recordFromMap(termCounts)];
     if (nextCache && !cacheHit) cacheChanged = true;
     indexes.push({
       domain,
@@ -173,7 +173,7 @@ async function readDomainIndexes(ctx: WorkflowContext): Promise<DomainIndex[]> {
     });
   }
 
-  if (cache && nextCache && Object.keys(cache.i).length !== Object.keys(nextCache.i).length) {
+  if (cache && nextCache && Object.keys(cache.indexes).length !== Object.keys(nextCache.indexes).length) {
     cacheChanged = true;
   }
   if (nextCache && cacheChanged) await writeCache(ctx, nextCache);
@@ -186,13 +186,13 @@ async function readCache(ctx: WorkflowContext): Promise<RetopologyCache | undefi
   if (!raw) return undefined;
   try {
     const parsed = JSON.parse(raw) as unknown;
-    if (!isRecord(parsed) || parsed.k !== CACHE_KEY || !isRecord(parsed.i)) return undefined;
-    const indexes: RetopologyCache["i"] = {};
-    for (const [path, value] of Object.entries(parsed.i)) {
+    if (!isRecord(parsed) || parsed.key !== CACHE_KEY || !isRecord(parsed.indexes)) return undefined;
+    const indexes: RetopologyCache["indexes"] = {};
+    for (const [path, value] of Object.entries(parsed.indexes)) {
       if (!isCachedIndexTerms(value)) return undefined;
       indexes[path] = value;
     }
-    return { k: CACHE_KEY, i: indexes };
+    return { key: CACHE_KEY, indexes };
   } catch {
     return undefined;
   }

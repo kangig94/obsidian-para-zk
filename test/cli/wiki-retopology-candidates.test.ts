@@ -101,11 +101,13 @@ describe("wiki retopology candidates", () => {
 
     await wikiRetopologyCandidates(ctx, { limit: 10 });
     const cached = JSON.parse(cache.get("retopology-cache.json") ?? "{}") as Record<string, unknown>;
-    const alphaEntry = (cached.i as Record<string, unknown>)["LLM-Wiki/alpha/index.md"] as unknown[];
-    expect(cached.k).toEqual(expect.stringMatching(/^fnv1a-/));
+    const alphaEntry = (cached.indexes as Record<string, unknown>)["LLM-Wiki/alpha/index.md"] as unknown[];
+    expect(cached.key).toEqual(expect.stringMatching(/^fnv1a-/));
+    expect(cached).toHaveProperty("indexes");
+    expect(cached).not.toHaveProperty("k");
+    expect(cached).not.toHaveProperty("i");
     expect(cached).not.toHaveProperty("v");
     expect(cached).not.toHaveProperty("version");
-    expect(cached).not.toHaveProperty("indexes");
     expect(alphaEntry).toHaveLength(3);
     expect(alphaEntry[2]).toMatchObject({ "diffusion policy": 0.4 });
 
