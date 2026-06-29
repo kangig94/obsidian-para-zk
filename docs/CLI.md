@@ -415,10 +415,11 @@ When a domain has no index, enumerate that domain's pages with
 ### `para-zk:wiki-retopology-candidates`
 
 Ranks LLM-Wiki domain index pairs for retopology review. This is an index-only
-triage primitive: it reads `<domain>/index` hubs, compares their domain/index text,
-and boosts explicit cross-domain links found in those index hubs. It does not read
-concept-page bodies and does not decide the topology by itself; use the returned
-pair list to choose which indexes to inspect directly.
+triage primitive: it reads `<domain>/index` hubs, compares their domain/index text
+with TF-IDF weighted cosine scores, and boosts explicit cross-domain links found
+in those index hubs. It does not read concept-page bodies and does not decide the
+topology by itself; use the returned pair list to choose which indexes to inspect
+directly.
 
 Options:
 

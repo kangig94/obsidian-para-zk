@@ -57,7 +57,8 @@ Do not ask the user to resolve invalid arguments; stop with the concrete routing
    - Read the roster: `optsidian para-zk:list type=llm-wiki limit=all`.
    - For `scope=all`, get global index-pair candidates:
      `optsidian para-zk:wiki-retopology-candidates limit=<k>`. Each candidate includes
-     the shortest index-to-index `connection` within `depth=2` by default.
+     a TF-IDF weighted score and the shortest index-to-index `connection` within
+     `depth=2` by default.
    - For `scope=domain`, get focused candidates:
      `optsidian para-zk:wiki-retopology-candidates domain="<domain>" limit=<k>`; it also
      returns an undirected index graph neighborhood with `depth=2` by default.

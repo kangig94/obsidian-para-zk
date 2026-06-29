@@ -52,19 +52,22 @@ describe("wiki retopology candidates", () => {
     expect(result.candidates[0].score).toBeGreaterThan(result.candidates[1].score);
   });
 
-  it("weights shared terms by index-wide TF-IDF contribution", async () => {
+  it("weights ranking and shared terms by index-wide TF-IDF contribution", async () => {
     const { ctx, app } = createTestContext();
-    await createWikiPage(app, "LLM-Wiki/alpha/index.md", "shared wiki bridge transformer planning.");
-    await createWikiPage(app, "LLM-Wiki/beta/index.md", "shared wiki bridge transformer retrieval.");
-    await createWikiPage(app, "LLM-Wiki/gamma/index.md", "shared wiki bridge estimation contact.");
+    await createWikiPage(app, "LLM-Wiki/alpha/index.md", "shared bridge transformer retrieval.");
+    await createWikiPage(app, "LLM-Wiki/beta/index.md", "shared bridge transformer.");
+    await createWikiPage(app, "LLM-Wiki/gamma/index.md", "shared bridge retrieval.");
+    await createWikiPage(app, "LLM-Wiki/delta/index.md", "shared bridge retrieval.");
 
-    const result = await wikiRetopologyCandidates(ctx, { limit: 1 });
+    const result = await wikiRetopologyCandidates(ctx, { limit: 10 });
+    const rarePair = result.candidates.find((candidate) => candidate.domains.join("/") === "alpha/beta");
+    const commonPair = result.candidates.find((candidate) => candidate.domains.join("/") === "delta/gamma");
+    if (!rarePair || !commonPair) throw new Error("expected TF-IDF comparison pairs");
 
     expect(result.candidates[0].domains).toEqual(["alpha", "beta"]);
-    expect(result.candidates[0].shared_terms[0]).toBe("transformer");
-    expect(result.candidates[0].shared_terms.indexOf("transformer")).toBeLessThan(
-      result.candidates[0].shared_terms.indexOf("shared")
-    );
+    expect(rarePair.score).toBeGreaterThan(commonPair.score);
+    expect(rarePair.shared_terms[0]).toBe("transformer");
+    expect(commonPair.shared_terms[0]).toBe("retrieval");
   });
 
   it("does not read concept pages when computing index-only candidates", async () => {
