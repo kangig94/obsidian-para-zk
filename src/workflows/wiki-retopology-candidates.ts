@@ -539,9 +539,7 @@ function compareCandidates(left: WikiRetopologyCandidate, right: WikiRetopologyC
 function indexTermCounts(domain: string, body: string): Map<string, number> {
   const vector = new Map<string, number>();
   for (const token of tokens(domain)) addWeight(vector, token, 3);
-  const bodyTokens = tokens(body);
-  for (const token of bodyTokens) addWeight(vector, token, BODY_UNIGRAM_WEIGHT);
-  for (const token of bodyBigrams(body)) addWeight(vector, token, BODY_BIGRAM_WEIGHT);
+  addBodyTerms(vector, body);
   return vector;
 }
 
@@ -600,20 +598,15 @@ function wikiLinkLabel(target: string, alias: string | undefined): string {
   return trimmedTarget.split("/").pop()?.replace(/\.md$/i, "") ?? trimmedTarget;
 }
 
-function bodyBigrams(body: string): string[] {
-  return markdownTokenSegments(body).flatMap((segment) => bigrams(tokens(segment)));
-}
-
-function markdownTokenSegments(markdown: string): string[] {
-  const segments: string[] = [];
+function addBodyTerms(vector: Map<string, number>, body: string): void {
   let paragraph: string[] = [];
   const flushParagraph = () => {
     if (paragraph.length === 0) return;
-    segments.push(paragraph.join("\n"));
+    addBodyTokenSegment(vector, paragraph.join("\n"));
     paragraph = [];
   };
 
-  for (const line of markdown.split(/\r?\n/)) {
+  for (const line of body.split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed) {
       flushParagraph();
@@ -621,14 +614,13 @@ function markdownTokenSegments(markdown: string): string[] {
     }
     if (isMarkdownSegmentBoundary(trimmed)) {
       flushParagraph();
-      segments.push(trimmed);
+      addBodyTokenSegment(vector, trimmed);
       continue;
     }
     paragraph.push(line);
   }
 
   flushParagraph();
-  return segments;
 }
 
 function isMarkdownSegmentBoundary(trimmedLine: string): boolean {
@@ -636,12 +628,13 @@ function isMarkdownSegmentBoundary(trimmedLine: string): boolean {
     || /^(?:[-*+]\s+|\d+\.\s+)/.test(trimmedLine);
 }
 
-function bigrams(values: string[]): string[] {
-  const result: string[] = [];
-  for (let index = 0; index < values.length - 1; index += 1) {
-    result.push(`${values[index]} ${values[index + 1]}`);
+function addBodyTokenSegment(vector: Map<string, number>, segment: string): void {
+  let previous: string | undefined;
+  for (const token of tokens(segment)) {
+    addWeight(vector, token, BODY_UNIGRAM_WEIGHT);
+    if (previous !== undefined) addWeight(vector, `${previous} ${token}`, BODY_BIGRAM_WEIGHT);
+    previous = token;
   }
-  return result;
 }
 
 function vectorLength(vector: Map<string, number>): number {
