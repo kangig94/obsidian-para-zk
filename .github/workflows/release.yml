@@ -1,9 +1,9 @@
 name: Release Obsidian plugin
 
 # Builds the plugin and publishes the release assets (main.js, manifest.json,
-# styles.css) whenever a version tag is pushed. A NEW tag creates a
-# DRAFT release (review, then publish); re-pushing an EXISTING tag refreshes that
-# release's assets in place (a retag re-releases the same version with a fresh build).
+# styles.css) whenever a version tag is pushed. A NEW tag creates a published
+# release immediately; re-pushing an EXISTING tag refreshes that release's assets
+# in place (a retag re-releases the same version with a fresh build).
 # Tag name must equal manifest.json "version" exactly, no "v" prefix (e.g. 0.0.2).
 on:
   push:
@@ -62,13 +62,14 @@ jobs:
           fi
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" build/main.js build/manifest.json build/styles.css --clobber
+            edit_args=(--draft=false)
             if [ "${notes_args[0]}" = "--notes-file" ]; then
-              gh release edit "$tag" --notes-file docs/CHANGELOG.md
+              edit_args+=(--notes-file docs/CHANGELOG.md)
             fi
+            gh release edit "$tag" "${edit_args[@]}"
           else
             gh release create "$tag" \
               --title "$tag" \
-              --draft \
               "${notes_args[@]}" \
               build/main.js build/manifest.json build/styles.css
           fi
