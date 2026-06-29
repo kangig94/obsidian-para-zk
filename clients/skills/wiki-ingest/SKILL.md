@@ -96,9 +96,22 @@ the concrete routing error — do not ask the user.
        do not cover it. Project-operational / ephemeral material (status memos, test logs, trip
        checklists) is NOT a concept — skip it (record why) or fold under a project hub. Prefer FEWER,
        denser pages.
-     - **Domains:** one level, `<domain>/<concept>`. REUSE a roster domain when a concept fits; mint a
-       new domain only for a genuinely new area; never near-synonyms (`RL` vs `Reinforcement
-       Learning`). One concept = one page across the whole wiki.
+     - **Domains:** one level, `<domain>/<concept>`. Treat a domain as a stable research lineage,
+       problem area, or system family that can sustain a useful hub — not as a universal umbrella.
+       Avoid vague catch-all domains such as `ai`, `ml`, `research`, or `papers` unless the existing
+       wiki already uses one coherently and the candidate truly cannot fit a narrower lineage. For
+       broad corpora like "LLM papers", infer the corpus axes from the sources and prefer the
+       narrowest stable domain that can hold multiple pages (for example `scaling-laws`,
+       `chain-of-thought`, `mixture-of-experts`, `retrieval-augmented-generation`, `alignment`, or
+       `language-models`). A method name becomes a domain only when it has enough internal structure
+       for multiple child pages; otherwise keep it as a concept page under a broader domain. A
+       one-page domain is acceptable only when it names a durable area expected to grow or when the
+       existing wiki already uses it as a necessary bridge; otherwise prefer a concept page under the
+       nearest coherent domain. REUSE a roster domain when a concept fits; mint a new domain only for
+       a genuinely new area; never near-synonyms (`RL` vs `Reinforcement Learning`). Before finalizing
+       each new domain, write a one-sentence domain rationale in the plan guidance: what stable
+       lineage/problem area it represents, expected child concepts, and why it is not better placed
+       under an existing broader/narrower domain. One concept = one page across the whole wiki.
      - **Assignment & cross-links:** assign every candidate source to ≥1 page (a source spanning N
        concepts goes into N pages' `sources`); set each page's `links` to the related pages.
      - **Spine:** every domain's hub is `<domain>/index` (create-llm-wiki auto-mints it as an empty
