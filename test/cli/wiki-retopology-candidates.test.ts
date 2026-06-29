@@ -147,9 +147,11 @@ describe("wiki retopology candidates", () => {
     await createWikiPage(
       cli.app,
       "LLM-Wiki/alpha/index.md",
-      "Alpha bridge points at [[LLM-Wiki/beta/index]]."
+      "Alpha bridge points at [[LLM-Wiki/beta/hydraulic-actuator]] and [[LLM-Wiki/beta/contact-model|contact dynamics]]."
     );
     await createWikiPage(cli.app, "LLM-Wiki/beta/index.md", "Hydraulic actuator contact dynamics.");
+    await createWikiPage(cli.app, "LLM-Wiki/beta/hydraulic-actuator.md", "Hydraulic actuator detail.");
+    await createWikiPage(cli.app, "LLM-Wiki/beta/contact-model.md", "Contact model detail.");
 
     const contentOnly = await cli.run("para-zk:wiki-retopology-candidates", { limit: "1" });
     const boosted = await cli.run("para-zk:wiki-retopology-candidates", { links: "true", limit: "1" });
@@ -158,9 +160,14 @@ describe("wiki retopology candidates", () => {
     expect(boosted).toMatchObject({ ok: true, links: true });
     const boostedCandidate = (boosted.candidates as Array<Record<string, unknown>>)[0];
     const contentOnlyCandidate = (contentOnly.candidates as Array<Record<string, unknown>>)[0];
-    expect(boostedCandidate.explicit_links).toHaveLength(1);
+    expect(boostedCandidate.explicit_links).toHaveLength(2);
     expect(contentOnlyCandidate.explicit_links).toEqual(boostedCandidate.explicit_links);
-    expect(contentOnlyCandidate.evidence).toContain("index link: alpha/index -> beta/index");
+    expect(contentOnlyCandidate.evidence).toContain("index link: alpha/index -> beta/contact-model");
+    expect(contentOnlyCandidate.shared_terms).toEqual(
+      expect.arrayContaining(["hydraulic", "actuator", "contact", "dynamics"])
+    );
+    expect(contentOnlyCandidate.shared_terms).not.toContain("beta");
+    expect(contentOnlyCandidate.score as number).toBeGreaterThan(0);
     expect(contentOnlyCandidate.score as number).toBeLessThan(boostedCandidate.score as number);
   });
 

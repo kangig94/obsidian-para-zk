@@ -1586,7 +1586,7 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<number>",
       },
       "links": {
-        "description": "Include explicit index-link boost and link-count tie-break in scores (default: false).",
+        "description": "Include full wikilink target path tokens, explicit index-link boost, and link-count tie-break in scores (default: false).",
         "value": "<true|false>",
       },
     },

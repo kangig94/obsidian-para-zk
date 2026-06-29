@@ -145,11 +145,11 @@ timestamp is newer than at least one citing wiki page.
 `describe.workflows`. Invoke it through the CLI when an agent needs an index-only
 top-k over domain pairs before a topology pass: pass `domain=<domain>` for a focused
 ranking, or omit it for a global ranking, plus `limit`, `depth`, and `links=true`
-when explicit index links should boost score and break score ties.
+when full wikilink target path tokens and explicit index links should affect scoring.
 Focused mode always includes an undirected index graph neighborhood with default
 `depth=2`. It compares domain index hubs only with TF-IDF weighted scores by default,
-keeps explicit cross-domain links as evidence, and its text output lists candidate
-domain pairs, scores,
+reduces wikilinks to visible labels for default scoring, keeps explicit cross-domain
+links as evidence, and its text output lists candidate domain pairs, scores,
 evidence, and the shortest undirected index-to-index path between each candidate
 pair within `depth`.
 

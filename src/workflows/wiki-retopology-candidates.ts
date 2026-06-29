@@ -65,11 +65,11 @@ export async function wikiRetopologyCandidates(
   options: WikiRetopologyCandidatesOptions = {}
 ): Promise<WikiRetopologyCandidatesResult> {
   const limit = normalizeLimit(options.limit);
-  const indexes = await readDomainIndexes(ctx);
+  const links = normalizeLinks(options.links);
+  const indexes = await readDomainIndexes(ctx, links);
   const byDomain = new Map(indexes.map((index) => [index.domain, index]));
   const focus = normalizeDomainOption(options.domain, byDomain);
   const depth = normalizeDepth(options.depth);
-  const links = normalizeLinks(options.links);
   const graphEdges = indexGraphEdges(ctx, indexes);
   const adjacency = graphAdjacency(graphEdges);
   const candidates = focus
@@ -125,7 +125,7 @@ function normalizeDomainOption(value: unknown, byDomain: Map<string, DomainIndex
   throw new Error(`domain index not found: ${domain}`);
 }
 
-async function readDomainIndexes(ctx: WorkflowContext): Promise<DomainIndex[]> {
+async function readDomainIndexes(ctx: WorkflowContext, links: boolean): Promise<DomainIndex[]> {
   const wikiRoot = normalizeVaultPath(PARA_ZK_PATHS.wikiFolder);
   const indexes: RawDomainIndex[] = [];
 
@@ -144,7 +144,7 @@ async function readDomainIndexes(ctx: WorkflowContext): Promise<DomainIndex[]> {
       domain,
       title: `${domain}/${DOMAIN_INDEX_CONCEPT}`,
       path,
-      termCounts: indexTermCounts(domain, body)
+      termCounts: indexTermCounts(domain, body, links)
     });
   }
 
@@ -418,10 +418,10 @@ function compareCandidates(left: WikiRetopologyCandidate, right: WikiRetopologyC
   return left.domains.join("\0").localeCompare(right.domains.join("\0"));
 }
 
-function indexTermCounts(domain: string, body: string): Map<string, number> {
+function indexTermCounts(domain: string, body: string, links: boolean): Map<string, number> {
   const vector = new Map<string, number>();
   for (const token of tokens(domain)) addWeight(vector, token, 3);
-  for (const token of tokens(body)) addWeight(vector, token, 1);
+  for (const token of tokens(body, links)) addWeight(vector, token, 1);
   return vector;
 }
 
@@ -461,13 +461,23 @@ function addWeight(vector: Map<string, number>, token: string, weight: number): 
   vector.set(token, (vector.get(token) ?? 0) + weight);
 }
 
-function tokens(value: string): string[] {
+function tokens(value: string, links = false): string[] {
   const normalized = value
     .toLowerCase()
-    .replace(/\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g, " $1 ")
+    .replace(/\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g, (_match, target: string, alias: string | undefined) => {
+      const label = wikiLinkLabel(target, alias);
+      return links ? ` ${target} ${alias?.trim() ?? ""} ` : ` ${label} `;
+    })
     .replace(/`[^`]*`/g, " ");
   const matches = normalized.match(/[\p{L}\p{N}]+/gu) ?? [];
   return matches.filter((token) => token.length >= 2 && !STOPWORDS.has(token));
+}
+
+function wikiLinkLabel(target: string, alias: string | undefined): string {
+  const trimmedAlias = alias?.trim();
+  if (trimmedAlias) return trimmedAlias;
+  const trimmedTarget = target.trim();
+  return trimmedTarget.split("/").pop()?.replace(/\.md$/i, "") ?? trimmedTarget;
 }
 
 function vectorLength(vector: Map<string, number>): number {

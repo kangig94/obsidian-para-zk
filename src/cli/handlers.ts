@@ -902,7 +902,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     options: {
       domain: { value: "<domain>", description: "Optional focus domain. When omitted, rank global domain pairs." },
       depth: { value: "<number>", description: "Undirected index graph depth for focused graph or global pair connections (default: 2)." },
-      links: { value: "<true|false>", description: "Include explicit index-link boost and link-count tie-break in scores (default: false)." },
+      links: { value: "<true|false>", description: "Include full wikilink target path tokens, explicit index-link boost, and link-count tie-break in scores (default: false)." },
       limit: { value: "<number>", description: "Maximum candidates to return (default: 20)." },
     },
     text: "wiki retopology candidates listed",
