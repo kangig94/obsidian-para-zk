@@ -52,6 +52,21 @@ describe("wiki retopology candidates", () => {
     expect(result.candidates[0].score).toBeGreaterThan(result.candidates[1].score);
   });
 
+  it("weights shared terms by index-wide TF-IDF contribution", async () => {
+    const { ctx, app } = createTestContext();
+    await createWikiPage(app, "LLM-Wiki/alpha/index.md", "shared wiki bridge transformer planning.");
+    await createWikiPage(app, "LLM-Wiki/beta/index.md", "shared wiki bridge transformer retrieval.");
+    await createWikiPage(app, "LLM-Wiki/gamma/index.md", "shared wiki bridge estimation contact.");
+
+    const result = await wikiRetopologyCandidates(ctx, { limit: 1 });
+
+    expect(result.candidates[0].domains).toEqual(["alpha", "beta"]);
+    expect(result.candidates[0].shared_terms[0]).toBe("transformer");
+    expect(result.candidates[0].shared_terms.indexOf("transformer")).toBeLessThan(
+      result.candidates[0].shared_terms.indexOf("shared")
+    );
+  });
+
   it("does not read concept pages when computing index-only candidates", async () => {
     const { ctx, app } = createTestContext();
     await createWikiPage(app, "LLM-Wiki/alpha/index.md", "Alpha overview.");

@@ -56,6 +56,10 @@ type DomainIndex = {
   length: number;
 };
 
+type RawDomainIndex = Omit<DomainIndex, "vector" | "length"> & {
+  termCounts: Map<string, number>;
+};
+
 export async function wikiRetopologyCandidates(
   ctx: WorkflowContext,
   options: WikiRetopologyCandidatesOptions = {}
@@ -115,7 +119,7 @@ function normalizeDomainOption(value: unknown, byDomain: Map<string, DomainIndex
 
 async function readDomainIndexes(ctx: WorkflowContext): Promise<DomainIndex[]> {
   const wikiRoot = normalizeVaultPath(PARA_ZK_PATHS.wikiFolder);
-  const indexes: DomainIndex[] = [];
+  const indexes: RawDomainIndex[] = [];
 
   for (const file of ctx.host.getMarkdownFiles()) {
     const path = normalizeVaultPath(file.path);
@@ -128,17 +132,15 @@ async function readDomainIndexes(ctx: WorkflowContext): Promise<DomainIndex[]> {
     const domain = segments[0];
     const content = await ctx.host.read(file);
     const body = stripManagedPrelude(content);
-    const vector = indexVector(domain, body);
     indexes.push({
       domain,
       title: `${domain}/${DOMAIN_INDEX_CONCEPT}`,
       path,
-      vector,
-      length: vectorLength(vector)
+      termCounts: indexTermCounts(domain, body)
     });
   }
 
-  return indexes.sort((left, right) => left.domain.localeCompare(right.domain));
+  return tfIdfIndexes(indexes).sort((left, right) => left.domain.localeCompare(right.domain));
 }
 
 function candidatesForAll(
@@ -404,11 +406,43 @@ function compareCandidates(left: WikiRetopologyCandidate, right: WikiRetopologyC
   return left.domains.join("\0").localeCompare(right.domains.join("\0"));
 }
 
-function indexVector(domain: string, body: string): Map<string, number> {
+function indexTermCounts(domain: string, body: string): Map<string, number> {
   const vector = new Map<string, number>();
   for (const token of tokens(domain)) addWeight(vector, token, 3);
   for (const token of tokens(body)) addWeight(vector, token, 1);
   return vector;
+}
+
+function tfIdfIndexes(indexes: RawDomainIndex[]): DomainIndex[] {
+  const documentFrequencies = new Map<string, number>();
+  for (const index of indexes) {
+    for (const token of index.termCounts.keys()) {
+      documentFrequencies.set(token, (documentFrequencies.get(token) ?? 0) + 1);
+    }
+  }
+
+  return indexes.map((index) => {
+    const vector = new Map<string, number>();
+    for (const [token, count] of index.termCounts.entries()) {
+      const frequency = documentFrequencies.get(token) ?? 1;
+      vector.set(token, sublinearTermFrequency(count) * inverseDocumentFrequency(indexes.length, frequency));
+    }
+    return {
+      domain: index.domain,
+      title: index.title,
+      path: index.path,
+      vector,
+      length: vectorLength(vector)
+    };
+  });
+}
+
+function sublinearTermFrequency(count: number): number {
+  return 1 + Math.log(count);
+}
+
+function inverseDocumentFrequency(documentCount: number, documentFrequency: number): number {
+  return Math.log((documentCount + 1) / documentFrequency);
 }
 
 function addWeight(vector: Map<string, number>, token: string, weight: number): void {
@@ -448,7 +482,7 @@ function topSharedTerms(left: DomainIndex, right: DomainIndex): string[] {
   for (const [token, leftWeight] of left.vector.entries()) {
     const rightWeight = right.vector.get(token);
     if (rightWeight === undefined) continue;
-    terms.push({ token, weight: Math.min(leftWeight, rightWeight) });
+    terms.push({ token, weight: leftWeight * rightWeight });
   }
   return terms
     .sort((a, b) => b.weight - a.weight || a.token.localeCompare(b.token))
