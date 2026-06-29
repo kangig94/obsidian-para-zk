@@ -36,6 +36,8 @@ derive from the material.
 
 `mode` (required) selects what to discover. `init`/`delta` take no source args; `per-import`/`re-ingest`
 require one of `source_path` or `source_paths`, passed through to `para-zk:wiki-ingest-candidates`.
+`type` is optional and filters ingestable source kind (`resource`, `digest`, `permanent`, `subnote`);
+use `mode=init type=resource` to inspect existing Resources that have never been cited by the wiki.
 
 | `mode` | Targets |
 |--------|---------|
@@ -59,13 +61,13 @@ the concrete routing error — do not ask the user.
    is unavailable, stop with the CLI error; do not fall back to direct file writes.
 
 2. **Resolve mode**: Normalize exactly one mode from `{per-import, delta, init, re-ingest}`. Preserve
-   `limit`/`offset` when supplied. For targeted modes, preserve exactly one of `source_path` or
+   `limit`/`offset` and optional `type` when supplied. For targeted modes, preserve exactly one of `source_path` or
    `source_paths`; for untargeted modes, reject either source selector before doing any reads.
 
 3. **Discover candidates**:
 
    ```bash
-   optsidian para-zk:wiki-ingest-candidates mode=<mode> [source_path=<path>|source_paths='<json-or-comma-list>'] [limit=<n|all>] [offset=<n>]
+   optsidian para-zk:wiki-ingest-candidates mode=<mode> [type=<resource|digest|permanent|subnote>] [source_path=<path>|source_paths='<json-or-comma-list>'] [limit=<n|all>] [offset=<n>]
    ```
 
    Gate on the envelope. Candidate reasons are `missing_wiki_citation` or `source_newer_than_wiki`;

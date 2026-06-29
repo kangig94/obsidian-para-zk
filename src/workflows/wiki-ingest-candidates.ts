@@ -28,6 +28,7 @@ export type IngestableCanonicalSource = {
 type NormalizedWikiIngestOptions = {
   mode: WikiIngestMode;
   sourcePaths: string[];
+  type?: IngestableType;
   offset: number;
   limit: number | "all";
 };
@@ -48,14 +49,15 @@ export async function wikiIngestCandidates(
   const candidates = normalized.sourcePaths.length > 0
     ? targetedCandidates(ctx, normalized.mode, normalized.sourcePaths, citationsBySource)
     : sourceCandidates(normalized.mode, sources, citationsBySource);
-  const page = pageCandidates(candidates, normalized);
+  const filteredCandidates = filterCandidatesByType(candidates, normalized.type);
+  const page = pageCandidates(filteredCandidates, normalized);
 
   return {
-    count: candidates.length,
+    count: filteredCandidates.length,
     offset: normalized.offset,
     limit: normalized.limit,
     returned: page.length,
-    has_more: normalized.offset + page.length < candidates.length,
+    has_more: normalized.offset + page.length < filteredCandidates.length,
     candidates: page
   };
 }
@@ -97,11 +99,13 @@ function normalizeWikiIngestOptions(options: WikiIngestCandidatesOptions): Norma
     throw new Error("source_path and source_paths are only valid for per-import and re-ingest");
   }
 
+  const type = normalizeIngestableType(options.type);
   const offset = Math.max(0, options.offset ?? 0);
   const limit = options.limit === "all" ? "all" : Math.max(0, options.limit ?? 50);
   return {
     mode,
     sourcePaths,
+    type,
     offset,
     limit
   };
@@ -250,6 +254,22 @@ function pageCandidates(candidates: WikiIngestCandidate[], options: NormalizedWi
   return options.limit === "all"
     ? candidates.slice(options.offset)
     : candidates.slice(options.offset, options.offset + options.limit);
+}
+
+function filterCandidatesByType(
+  candidates: WikiIngestCandidate[],
+  type: IngestableType | undefined
+): WikiIngestCandidate[] {
+  if (!type) return candidates;
+  return candidates.filter((candidate) => candidate.type === type);
+}
+
+function normalizeIngestableType(value: unknown): IngestableType | undefined {
+  if (value === undefined || value === "") return undefined;
+  if (typeof value !== "string" || !isIngestableType(value)) {
+    throw new Error(`type must be one of ${INGESTABLE_TYPES.join(", ")}`);
+  }
+  return value;
 }
 
 function isIngestableType(value: string): value is IngestableType {

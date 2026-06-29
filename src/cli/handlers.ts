@@ -871,6 +871,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     description: "List canonical source notes that should be folded into the LLM-Wiki",
     options: {
       mode: { value: "<per-import|delta|init|re-ingest>", description: "Candidate discovery mode." },
+      type: { value: "<resource|digest|permanent|subnote>", description: "Optional ingestable source type filter." },
       source_path: { value: "<vault-path>", description: "Single source note path. Required for per-import and re-ingest; rejected for delta and init." },
       source_paths: { value: "<json|comma-list>", description: "Multiple source note paths. Required for per-import and re-ingest when source_path is omitted; rejected for delta and init." },
       offset: { value: "<number>", description: "Zero-based candidate offset (default: 0)." },
@@ -1978,6 +1979,7 @@ function readCliWikiIngestCandidatesOptions(args: CliArgs): WikiIngestCandidates
   const sourcePaths = parseList(readCliString(args, "source_paths"));
   const options: WikiIngestCandidatesOptions = {
     mode: readCliString(args, "mode") as WikiIngestCandidatesOptions["mode"],
+    type: readCliString(args, "type"),
     offset: readCliInteger(args, "offset"),
     limit: readCliCollectionLimit(args)
   };

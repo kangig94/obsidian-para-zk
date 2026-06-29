@@ -81,12 +81,13 @@ Use `para-zk:wiki-ingest-candidates` to list active, non-template canonical sour
 
 ```bash
 optsidian para-zk:wiki-ingest-candidates mode=init limit=all format=json
+optsidian para-zk:wiki-ingest-candidates mode=init type=resource limit=all format=json
 optsidian para-zk:wiki-ingest-candidates mode=delta limit=50 format=json
 optsidian para-zk:wiki-ingest-candidates mode=per-import source_paths='["PARA/Resources/Source Paper.md"]' format=json
 optsidian para-zk:wiki-ingest-candidates mode=re-ingest source_path="PARA/Resources/Source Paper.md" format=json
 ```
 
-`mode` is one of `per-import`, `delta`, `init`, or `re-ingest`. `source_path` or `source_paths=<json|comma-list>` is required for `per-import` and `re-ingest`, and rejected for `delta` and `init`. The command also accepts `offset=<n>`, `limit=<n|all>` (default `50`), and `format`. Results include `{ ok, command, count, offset, limit, returned, has_more, candidates }`; each candidate has `{ path, type, title, updated, updated_ms, stale_llm_wikis, reason }`.
+`mode` is one of `per-import`, `delta`, `init`, or `re-ingest`. `source_path` or `source_paths=<json|comma-list>` is required for `per-import` and `re-ingest`, and rejected for `delta` and `init`. The command also accepts `type=<resource|digest|permanent|subnote>`, `offset=<n>`, `limit=<n|all>` (default `50`), and `format`. Results include `{ ok, command, count, offset, limit, returned, has_more, candidates }`; each candidate has `{ path, type, title, updated, updated_ms, stale_llm_wikis, reason }`.
 
 Reason codes are `missing_wiki_citation`, `source_newer_than_wiki`, `per_import`, and `reingest_requested`. `source_newer_than_wiki` derives staleness from page `updated`: the source is newer than at least one citing wiki page, listed in `stale_llm_wikis` as `{ path, title, updated_ms }`.
 

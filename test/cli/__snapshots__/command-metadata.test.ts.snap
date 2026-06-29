@@ -1742,6 +1742,10 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Multiple source note paths. Required for per-import and re-ingest when source_path is omitted; rejected for delta and init.",
         "value": "<json|comma-list>",
       },
+      "type": {
+        "description": "Optional ingestable source type filter.",
+        "value": "<resource|digest|permanent|subnote>",
+      },
     },
   },
 ]

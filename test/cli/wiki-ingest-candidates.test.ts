@@ -46,6 +46,9 @@ async function seedCandidateVault(app: MockApp): Promise<void> {
   await createNote(app, "PARA/Archives/Resources/Archived.md", ["type: resource", "updated: 2026-01-01 09:00"]);
   await createNote(app, "Templates/para-zk/template_resource.md", ["type: resource", "updated: 2026-01-01 09:00"]);
   await createNote(app, "Notes/Plain.md", ["type: note", "updated: 2026-01-01 09:00"]);
+  await createNote(app, "ZK/Digests/Uncited Digest.md", ["type: digest", "updated: 2026-01-01 09:00"]);
+  await createNote(app, "ZK/Permanent/Uncited Permanent.md", ["type: permanent", "updated: 2026-01-01 09:00"]);
+  await createNote(app, "PARA/Projects/Example/Uncited Subnote.md", ["type: subnote", "updated: 2026-01-01 09:00"]);
   await createNote(
     app,
     "LLM-Wiki/Old Concept.md",
@@ -103,13 +106,24 @@ describe("wiki ingest candidates", () => {
 
     const init = await wikiIngestCandidates(ctx, { mode: "init", limit: "all" });
     expect(init.candidates.map((candidate) => [candidate.path, candidate.reason])).toEqual([
-      ["PARA/Resources/Uncited.md", "missing_wiki_citation"]
+      ["PARA/Projects/Example/Uncited Subnote.md", "missing_wiki_citation"],
+      ["PARA/Resources/Uncited.md", "missing_wiki_citation"],
+      ["ZK/Digests/Uncited Digest.md", "missing_wiki_citation"],
+      ["ZK/Permanent/Uncited Permanent.md", "missing_wiki_citation"]
+    ]);
+
+    const initResources = await wikiIngestCandidates(ctx, { mode: "init", type: "resource", limit: "all" });
+    expect(initResources.candidates.map((candidate) => [candidate.path, candidate.type, candidate.reason])).toEqual([
+      ["PARA/Resources/Uncited.md", "resource", "missing_wiki_citation"]
     ]);
 
     const delta = await wikiIngestCandidates(ctx, { mode: "delta", limit: "all" });
     expect(delta.candidates.map((candidate) => [candidate.path, candidate.reason])).toEqual([
+      ["PARA/Projects/Example/Uncited Subnote.md", "missing_wiki_citation"],
       ["PARA/Resources/Cited Stale.md", "source_newer_than_wiki"],
-      ["PARA/Resources/Uncited.md", "missing_wiki_citation"]
+      ["PARA/Resources/Uncited.md", "missing_wiki_citation"],
+      ["ZK/Digests/Uncited Digest.md", "missing_wiki_citation"],
+      ["ZK/Permanent/Uncited Permanent.md", "missing_wiki_citation"]
     ]);
     expect(delta).not.toHaveProperty("ledger_warnings");
     const stale = delta.candidates.find((candidate) => candidate.path === "PARA/Resources/Cited Stale.md");
@@ -125,6 +139,12 @@ describe("wiki ingest candidates", () => {
     // Cited, but its own `updated` is null → never stale even though a 2026-05 page cites it.
     expect(delta.candidates.find((candidate) => candidate.path === "PARA/Resources/Null Updated Source.md"))
       .toBeUndefined();
+
+    const deltaResources = await wikiIngestCandidates(ctx, { mode: "delta", type: "resource", limit: "all" });
+    expect(deltaResources.candidates.map((candidate) => [candidate.path, candidate.type, candidate.reason])).toEqual([
+      ["PARA/Resources/Cited Stale.md", "resource", "source_newer_than_wiki"],
+      ["PARA/Resources/Uncited.md", "resource", "missing_wiki_citation"]
+    ]);
 
     const perImport = await wikiIngestCandidates(ctx, {
       mode: "per-import",
@@ -150,8 +170,9 @@ describe("wiki ingest candidates", () => {
 
   it("surfaces the stable CLI envelope and rejects targeted paths in init and delta modes", async () => {
     await createNote(cli.app, "PARA/Resources/Source.md", ["type: resource", "updated: 2026-01-01 09:00"]);
+    await createNote(cli.app, "ZK/Digests/Source Digest.md", ["type: digest", "updated: 2026-01-01 09:00"]);
 
-    const result = await cli.run("para-zk:wiki-ingest-candidates", { mode: "init", limit: "all" });
+    const result = await cli.run("para-zk:wiki-ingest-candidates", { mode: "init", type: "resource", limit: "all" });
 
     expect(result).toMatchObject({
       ok: true,
@@ -164,9 +185,14 @@ describe("wiki ingest candidates", () => {
     expect(result).not.toHaveProperty("ledger_warnings");
     expect((result.candidates as Array<Record<string, unknown>>)[0]).toMatchObject({
       path: "PARA/Resources/Source.md",
+      type: "resource",
       reason: "missing_wiki_citation",
       stale_llm_wikis: []
     });
+
+    const invalidType = await cli.run("para-zk:wiki-ingest-candidates", { mode: "init", type: "project" });
+    expect(invalidType.ok).toBe(false);
+    expect(String(invalidType.error)).toContain("type must be one of");
 
     const rejected = await cli.run("para-zk:wiki-ingest-candidates", {
       mode: "delta",

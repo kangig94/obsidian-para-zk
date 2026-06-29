@@ -381,6 +381,7 @@ Options:
 | Option | Values | Notes |
 | --- | --- | --- |
 | `mode` | `per-import`, `delta`, `init`, `re-ingest` | Required candidate discovery mode. |
+| `type` | `resource`, `digest`, `permanent`, `subnote` | Optional ingestable source type filter. Use `type=resource` with `mode=init` to list only never-cited resources. |
 | `source_path` | vault path | Single source note path. Required for `per-import` and `re-ingest` when `source_paths` is omitted; rejected for `delta` and `init`. |
 | `source_paths` | JSON array or comma list | Multiple source note paths. Required for `per-import` and `re-ingest` when `source_path` is omitted; rejected for `delta` and `init`. |
 | `offset` | number | Zero-based candidate offset (default `0`). |
@@ -389,6 +390,7 @@ Options:
 
 ```bash
 optsidian para-zk:wiki-ingest-candidates mode=init limit=all
+optsidian para-zk:wiki-ingest-candidates mode=init type=resource limit=all
 optsidian para-zk:wiki-ingest-candidates mode=delta limit=50
 optsidian para-zk:wiki-ingest-candidates mode=per-import source_paths='["PARA/Resources/Source Paper.md","ZK/Permanent/Stable Interfaces.md"]'
 optsidian para-zk:wiki-ingest-candidates mode=re-ingest source_path="PARA/Resources/Source Paper.md"

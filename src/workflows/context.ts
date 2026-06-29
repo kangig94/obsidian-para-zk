@@ -221,6 +221,7 @@ export type WikiIngestCandidatesOptions = {
   mode: WikiIngestMode;
   source_path?: string;
   source_paths?: string[];
+  type?: string;
   offset?: number;
   limit?: number | "all";
 };
