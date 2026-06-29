@@ -1,6 +1,7 @@
 import type { App, CachedMetadata, TAbstractFile, TFile } from "obsidian";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import type { WorkflowContext } from "../workflows/context";
+import { joinVaultPath, obsidianConfigPath } from "./paths";
 
 export interface WorkflowHost {
   getFile(path: string): TFile | null;
@@ -50,5 +51,37 @@ function createObsidianHost(app: App): WorkflowHost {
 }
 
 export function workflowContext(plugin: ParaZkPluginContext): WorkflowContext {
-  return { host: createObsidianHost(plugin.app), settings: plugin.settings };
+  return {
+    host: createObsidianHost(plugin.app),
+    settings: plugin.settings,
+    cache: createPluginCache(plugin)
+  };
+}
+
+function createPluginCache(plugin: ParaZkPluginContext): WorkflowContext["cache"] {
+  const manifest = (plugin as { manifest?: { id?: string; dir?: string } }).manifest;
+  const adapter = plugin.app.vault.adapter as {
+    read?: (path: string) => Promise<string>;
+    write?: (path: string, data: string) => Promise<void>;
+  };
+  if (!manifest?.id || typeof adapter.read !== "function" || typeof adapter.write !== "function") return undefined;
+
+  const pluginDir = manifest.dir ?? obsidianConfigPath(plugin.app.vault, "plugins", manifest.id);
+
+  return {
+    readText: async (name) => {
+      try {
+        return await adapter.read!(joinVaultPath(pluginDir, name));
+      } catch {
+        return undefined;
+      }
+    },
+    writeText: async (name, value) => {
+      try {
+        await adapter.write!(joinVaultPath(pluginDir, name), value);
+      } catch {
+        // Cache writes should never make a workflow fail.
+      }
+    }
+  };
 }

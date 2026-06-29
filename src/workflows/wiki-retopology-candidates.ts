@@ -1,4 +1,5 @@
 import { PARA_ZK_PATHS } from "../layout";
+import { isRecord } from "../records";
 import { fileFrontmatter, readType } from "../vault/frontmatter";
 import { normalizeVaultPath } from "../vault/paths";
 import { stripManagedPrelude } from "../vault/sections";
@@ -17,6 +18,10 @@ const DEFAULT_LIMIT = 20;
 const DEFAULT_GRAPH_DEPTH = 2;
 const SCORE_PRECISION = 4;
 const MAX_SHARED_TERMS = 8;
+const BODY_UNIGRAM_WEIGHT = 1;
+const BODY_BIGRAM_WEIGHT = 0.6;
+const CACHE_FILE = "retopology-cache.json";
+const CACHE_VERSION = 2;
 const STOPWORDS = new Set([
   "a",
   "an",
@@ -57,6 +62,20 @@ type DomainIndex = {
 
 type RawDomainIndex = Omit<DomainIndex, "vector" | "length"> & {
   termCounts: Map<string, number>;
+};
+
+type CachedIndexTerms = {
+  path: string;
+  domain: string;
+  title: string;
+  mtime: number;
+  size: number;
+  terms: Array<[string, number]>;
+};
+
+type RetopologyCache = {
+  version: number;
+  indexes: Record<string, CachedIndexTerms>;
 };
 
 export async function wikiRetopologyCandidates(
@@ -119,6 +138,9 @@ function normalizeDomainOption(value: unknown, byDomain: Map<string, DomainIndex
 async function readDomainIndexes(ctx: WorkflowContext): Promise<DomainIndex[]> {
   const wikiRoot = normalizeVaultPath(PARA_ZK_PATHS.wikiFolder);
   const indexes: RawDomainIndex[] = [];
+  const cache = await readCache(ctx);
+  const nextCache: RetopologyCache = { version: CACHE_VERSION, indexes: {} };
+  let cacheChanged = !cache || cache.version !== CACHE_VERSION;
 
   for (const file of ctx.host.getMarkdownFiles()) {
     const path = normalizeVaultPath(file.path);
@@ -129,17 +151,77 @@ async function readDomainIndexes(ctx: WorkflowContext): Promise<DomainIndex[]> {
     if (segments.length !== 2 || file.basename !== DOMAIN_INDEX_CONCEPT) continue;
 
     const domain = segments[0];
-    const content = await ctx.host.read(file);
-    const body = stripManagedPrelude(content);
+    const cached = cache?.indexes[path];
+    const mtime = file.stat?.mtime ?? 0;
+    const size = file.stat?.size ?? 0;
+    const cacheHit = cached && cached.domain === domain && cached.mtime === mtime && cached.size === size;
+    const termCounts = cacheHit
+      ? mapFromEntries(cached.terms)
+      : indexTermCounts(domain, stripManagedPrelude(await ctx.host.read(file)));
+    nextCache.indexes[path] = {
+      path,
+      domain,
+      title: `${domain}/${DOMAIN_INDEX_CONCEPT}`,
+      mtime,
+      size,
+      terms: [...termCounts.entries()]
+    };
+    if (!cacheHit) cacheChanged = true;
     indexes.push({
       domain,
       title: `${domain}/${DOMAIN_INDEX_CONCEPT}`,
       path,
-      termCounts: indexTermCounts(domain, body)
+      termCounts
     });
   }
 
+  if (cache && Object.keys(cache.indexes).length !== Object.keys(nextCache.indexes).length) {
+    cacheChanged = true;
+  }
+  if (cacheChanged) await writeCache(ctx, nextCache);
+
   return tfIdfIndexes(indexes).sort((left, right) => left.domain.localeCompare(right.domain));
+}
+
+async function readCache(ctx: WorkflowContext): Promise<RetopologyCache | undefined> {
+  const raw = await ctx.cache?.readText(CACHE_FILE);
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isRecord(parsed) || parsed.version !== CACHE_VERSION || !isRecord(parsed.indexes)) return undefined;
+    const indexes: RetopologyCache["indexes"] = {};
+    for (const [path, value] of Object.entries(parsed.indexes)) {
+      if (!isCachedIndexTerms(value)) return undefined;
+      indexes[path] = value;
+    }
+    return { version: CACHE_VERSION, indexes };
+  } catch {
+    return undefined;
+  }
+}
+
+async function writeCache(ctx: WorkflowContext, cache: RetopologyCache): Promise<void> {
+  await ctx.cache?.writeText(CACHE_FILE, `${JSON.stringify(cache)}\n`);
+}
+
+function isCachedIndexTerms(value: unknown): value is CachedIndexTerms {
+  return isRecord(value)
+    && typeof value.path === "string"
+    && typeof value.domain === "string"
+    && typeof value.title === "string"
+    && typeof value.mtime === "number"
+    && typeof value.size === "number"
+    && Array.isArray(value.terms)
+    && value.terms.every((entry) => (
+      Array.isArray(entry)
+      && entry.length === 2
+      && typeof entry[0] === "string"
+      && typeof entry[1] === "number"
+    ));
+}
+
+function mapFromEntries(entries: Array<[string, number]>): Map<string, number> {
+  return new Map(entries);
 }
 
 function candidatesForAll(
@@ -405,7 +487,9 @@ function compareCandidates(left: WikiRetopologyCandidate, right: WikiRetopologyC
 function indexTermCounts(domain: string, body: string): Map<string, number> {
   const vector = new Map<string, number>();
   for (const token of tokens(domain)) addWeight(vector, token, 3);
-  for (const token of tokens(body)) addWeight(vector, token, 1);
+  const bodyTokens = tokens(body);
+  for (const token of bodyTokens) addWeight(vector, token, BODY_UNIGRAM_WEIGHT);
+  for (const token of bigrams(bodyTokens)) addWeight(vector, token, BODY_BIGRAM_WEIGHT);
   return vector;
 }
 
@@ -461,6 +545,14 @@ function wikiLinkLabel(target: string, alias: string | undefined): string {
   if (trimmedAlias) return trimmedAlias;
   const trimmedTarget = target.trim();
   return trimmedTarget.split("/").pop()?.replace(/\.md$/i, "") ?? trimmedTarget;
+}
+
+function bigrams(values: string[]): string[] {
+  const result: string[] = [];
+  for (let index = 0; index < values.length - 1; index += 1) {
+    result.push(`${values[index]} ${values[index + 1]}`);
+  }
+  return result;
 }
 
 function vectorLength(vector: Map<string, number>): number {

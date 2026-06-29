@@ -70,6 +70,55 @@ describe("wiki retopology candidates", () => {
     expect(commonPair.shared_terms[0]).toBe("retrieval");
   });
 
+  it("adds body bigrams to index similarity without indexing concept pages", async () => {
+    const { ctx, app } = createTestContext();
+    await createWikiPage(app, "LLM-Wiki/alpha/index.md", "Diffusion policy trains robot action.");
+    await createWikiPage(app, "LLM-Wiki/beta/index.md", "Diffusion policy learns control action.");
+    await createWikiPage(app, "LLM-Wiki/gamma/index.md", "Diffusion planning policy studies action.");
+    await createWikiPage(app, "LLM-Wiki/beta/diffusion-policy.md", "Concept body must not affect ranking.");
+
+    const result = await wikiRetopologyCandidates(ctx, { limit: 10 });
+    const phrasePair = result.candidates.find((candidate) => candidate.domains.join("/") === "alpha/beta");
+    const splitPair = result.candidates.find((candidate) => candidate.domains.join("/") === "alpha/gamma");
+    if (!phrasePair || !splitPair) throw new Error("expected bigram comparison pairs");
+
+    expect(phrasePair.score).toBeGreaterThan(splitPair.score);
+    expect(phrasePair.shared_terms[0]).toBe("diffusion policy");
+  });
+
+  it("caches index term counts and invalidates them by file stat", async () => {
+    const { ctx, app } = createTestContext();
+    await createWikiPage(app, "LLM-Wiki/alpha/index.md", "Diffusion policy action.");
+    await createWikiPage(app, "LLM-Wiki/beta/index.md", "Diffusion policy control.");
+
+    const cache = new Map<string, string>();
+    ctx.cache = {
+      readText: async (name) => cache.get(name),
+      writeText: async (name, value) => {
+        cache.set(name, value);
+      }
+    };
+
+    await wikiRetopologyCandidates(ctx, { limit: 10 });
+
+    const originalRead = ctx.host.read;
+    const readPaths: string[] = [];
+    ctx.host.read = async (file) => {
+      readPaths.push(file.path);
+      return originalRead(file);
+    };
+
+    await wikiRetopologyCandidates(ctx, { limit: 10 });
+    expect(readPaths).toEqual([]);
+
+    const alpha = app.vault.getFileByPath("LLM-Wiki/alpha/index.md");
+    if (!alpha) throw new Error("expected alpha index");
+    await app.vault.modify(alpha, markdown("Diffusion policy action changed."));
+
+    await wikiRetopologyCandidates(ctx, { limit: 10 });
+    expect(readPaths).toContain("LLM-Wiki/alpha/index.md");
+  });
+
   it("does not read concept pages when computing index-only candidates", async () => {
     const { ctx, app } = createTestContext();
     await createWikiPage(app, "LLM-Wiki/alpha/index.md", "Alpha overview.");

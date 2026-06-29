@@ -8,6 +8,12 @@ import type { ZkKindCode } from "../zk/kinds";
 export type WorkflowContext = {
   host: WorkflowHost;
   settings: ParaZkSettings;
+  cache?: WorkflowCache;
+};
+
+type WorkflowCache = {
+  readText(name: string): Promise<string | undefined>;
+  writeText(name: string, value: string): Promise<void>;
 };
 
 export type CreateProjectOptions = {

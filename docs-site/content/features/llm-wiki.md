@@ -84,7 +84,7 @@ optsidian para-zk:wiki-retopology-candidates domain=language-models limit=10
 optsidian para-zk:wiki-retopology-candidates domain=language-models depth=3 limit=10
 ```
 
-Use it to choose which hubs to inspect during domain split, merge, refile, or cross-domain link planning. Scores use TF-IDF weighted visible index text, with wikilinks reduced to their labels; explicit cross-domain links stay visible as evidence and graph connections without affecting the score. Each candidate includes the shortest undirected index-to-index `connection` within `depth`; focused mode also returns an undirected index graph neighborhood. `depth` defaults to `2`. It is a triage signal, not the final topology judgment.
+Use it to choose which hubs to inspect during domain split, merge, refile, or cross-domain link planning. Scores use TF-IDF weighted visible index text, with wikilinks reduced to their labels and body bigrams included at lighter weight; explicit cross-domain links stay visible as evidence and graph connections without affecting the score. In Obsidian, per-index term counts are cached in `.obsidian/plugins/para-zk/retopology-cache.json` and invalidated by file stat plus scoring version. Each candidate includes the shortest undirected index-to-index `connection` within `depth`; focused mode also returns an undirected index graph neighborhood. `depth` defaults to `2`. It is a triage signal, not the final topology judgment.
 
 ## Audit Checks
 

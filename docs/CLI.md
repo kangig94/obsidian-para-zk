@@ -417,10 +417,16 @@ When a domain has no index, enumerate that domain's pages with
 Ranks LLM-Wiki domain index pairs for retopology review. This is an index-only
 triage primitive: it reads `<domain>/index` hubs, compares their domain/index text
 with TF-IDF weighted cosine scores, reducing wikilinks to their visible labels
-(alias text, or the target basename when no alias). Explicit cross-domain links
-are reported as evidence and graph connections, but do not affect the score. It
-does not read concept-page bodies and does not decide the topology by itself; use
-the returned pair list to choose which indexes to inspect directly.
+(alias text, or the target basename when no alias), and adding lightly weighted
+body bigrams such as `diffusion policy`. Explicit cross-domain links are reported
+as evidence and graph connections, but do not affect the score. It does not read
+concept-page bodies and does not decide the topology by itself; use the returned
+pair list to choose which indexes to inspect directly.
+
+When running inside Obsidian, the command caches per-index term counts in
+`.obsidian/plugins/para-zk/retopology-cache.json`, invalidated by scoring version,
+index path, modified time, and size. Final TF-IDF scores are still recomputed for
+the current domain set each run.
 
 Options:
 

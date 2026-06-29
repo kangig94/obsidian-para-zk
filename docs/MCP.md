@@ -147,8 +147,9 @@ top-k over domain pairs before a topology pass: pass `domain=<domain>` for a foc
 ranking, or omit it for a global ranking, plus `limit` and `depth`.
 Focused mode always includes an undirected index graph neighborhood with default
 `depth=2`. It compares domain index hubs only with TF-IDF weighted scores, reduces
-wikilinks to visible labels for scoring, keeps explicit cross-domain links as evidence,
-and its text output lists candidate domain pairs, scores,
+wikilinks to visible labels for scoring, includes lightly weighted body bigrams,
+keeps explicit cross-domain links as evidence, caches per-index term counts in
+`retopology-cache.json` when plugin storage is available, and its text output lists candidate domain pairs, scores,
 evidence, and the shortest undirected index-to-index path between each candidate
 pair within `depth`.
 
