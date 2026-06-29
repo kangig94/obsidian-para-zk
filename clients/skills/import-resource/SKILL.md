@@ -20,13 +20,16 @@ sources, and never silently rewrite an author's words when asked to preserve or 
 
 ## 1. Understand the request — and confirm the transform *before* gathering
 
-Decide three things from the request:
+Decide four things from the request:
 - **Source** — a local file path? a single URL? open web research (find and cross-check
   several sources)? or a compile from what you already know?
 - **Transform** — how to treat the source's content: **verbatim copy · translation ·
   summary (with citations)**. Cross-source synthesis and knowledge restructuring are NOT a
   resource transform — that is the LLM-Wiki's job and runs automatically in step 8
   (`wiki-ingest` → `wiki-weaver`); never "synthesize" the resource note itself.
+- **Scope** — full source, selected sections/pages, abstract, or excerpt. For
+  translation and verbatim imports, the default is **full source** unless the user explicitly
+  asks for a summary, abstract-only, excerpt, or selected range.
 - **Output shape** — one resource, or several (e.g. one per chapter, one per item), and how
   they should link to each other / to an area or project.
 
@@ -39,7 +42,7 @@ fixed:
 | Choice | Meaning |
 | --- | --- |
 | **Verbatim** (default) | Keep the source language and structure exactly; fix only conversion artifacts. |
-| **Translation** | Faithful translation into the target language (default: the vault locale); structure preserved. |
+| **Translation** | Faithful translation into the target language (default: the vault locale). For concrete sources, default scope is full source, not summary. |
 | **Summary** | Condense to the essentials, with citations. |
 
 Skip the question when the request already fixes the transform ("translate it", "summarize
@@ -50,6 +53,18 @@ passages faithfully (quoted and attributed, in their original language), **trans
 same in the target language, and **summary** a condensed write-up with citations. Ask the
 choice up front as usual; only the details that depend on what you find — the translation
 target language, and the output shape — are confirmed once the material is in view.
+
+For multiple concrete sources, create one translated/verbatim resource per source unless the
+user requested a compiled overview. If the source set is large, proceed source-by-source and
+report progress; ask about narrowing only when the user has not fixed the scope or completion is
+practically impossible in the current run. For open-ended research, state the selected source set
+once known before committing to the output set.
+
+For multi-source imports, before starting each new source, re-state the active import contract
+in one line: transform, scope, output title rule, source-language preservation rule, and
+verification target. Do not reread this whole skill unless the source type changes or the
+previous source revealed an ambiguity; when the type changes, read only the relevant reference
+(for example PDF conversion).
 
 If the **output shape** is ambiguous (e.g. "10 cases" — one compiled note or ten notes?), pick
 a sensible default and state it; ask only if the choice materially changes the result.
@@ -80,39 +95,10 @@ or `https://ar5iv.org/abs/<id>`) first; if citations/bibliography come through u
 fetch the arXiv source bundle and use its `.tex`/`.bbl`/`.bib` to restore numbered citations
 and the bibliography.
 
-**When you work from a PDF, convert it with `marker` — always, for any PDF.** You cannot know
-a PDF's math, tables, or figures until you open it, and `marker` recovers LaTeX equations,
-Markdown tables, and figure images (saved as files) far better than plain-text extraction or
-OCR. Prefer the bundled script via `uv run --with marker-pdf ...`; this guarantees marker and
-progress support for that run. If `marker_single` is already on PATH, plain
-`python3 scripts/marker_pdf_convert.py ...` can reuse that installed marker environment. Only
-install marker persistently (`uv tool install marker-pdf`, or venv + `pip install marker-pdf`)
-when repeated runs need it. The install/cache is heavy (Torch + models, several GB, first run a
-few minutes) — say so before starting. If your runtime sandboxes shell commands, relax it for
-the install/cache and the run: the model download (network) and marker's GPU access are blocked
-otherwise, and a resulting "no GPU" or blocked-network error means the sandbox, not a real
-absence. Only if there is no Python at all, fall back to
-poppler: `pdftotext -layout` for text, and `pdftoppm -png -r 200 -f<page> -l<page> -x -y -W -H`
-to crop each figure (find the box from `pdftotext -bbox` — the figure sits between the preceding
-paragraph's last line and the `Figure N:` caption).
-
-Run the bundled converter script first:
-`uv run --with marker-pdf python scripts/marker_pdf_convert.py <file.pdf>`
-(or `python3 scripts/marker_pdf_convert.py ...` when `marker_single` is already installed).
-Arguments: omit `--output_dir` to let the script choose a temp directory, pass
-`--output_dir <dir>` to choose one, pass `--page-range <range>` to convert selected pages, and
-use `--chunk-size <n>` only when needed. Keep marker on its local defaults; do not use marker's
-LLM mode by default because this skill reviews and cleans the Markdown after conversion. The
-script prints the save directory, marker/tqdm progress, and device/runtime guidance on stderr,
-with a short text result on stdout (`Markdown:`, `Mode:`, `Scope:`, `Pages:`, `Device:`). If
-stdout says `Device: cpu`, warn the user that PDF conversion will be very slow (10 pages can
-exceed 10 minutes) and ask whether to continue, use a GPU-visible runtime, or narrow the page
-range. If the script is unavailable, run `marker_single` directly and handle page ranges
-manually. Treat the Markdown as a **draft, not the final note**: in step 5 fix marker's
-residual glitches (an occasional garbled caption clause, an equation number left
-outside `\tag{}`, a mis-leveled heading), and embed the figures it extracted as local images
-(attach each with `para-zk:attach-file`, step 6) under edited/translated captions — dropping
-marker's duplicate/debug images.
+If the source itself is a PDF, or no clean HTML/source rendering exists, read
+[references/pdf.md](references/pdf.md) before converting. Convert PDFs with marker via the
+bundled script, then treat marker Markdown as a **draft**: repair residual extraction glitches,
+attach useful extracted figures, and drop duplicate/debug images before applying the transform.
 
 Record source provenance for everything (URL, file path, identifier, date, license/permission
 where relevant). The four core fields go in the resource **frontmatter** at create time (see step 6):
@@ -131,8 +117,9 @@ that metadata or it is needed to avoid ambiguity. For images:
 
 Apply the transform faithfully, and always make the form tidy:
 - **Verbatim import** → preserve text and structure exactly; fix only conversion artifacts.
-- **Translation** → faithful translation, same structure; cite the original source. Do not add a
-  visible translation label, title postfix, or transform note unless the user asks for one.
+- **Translation** → faithful full-source translation, same structure; cite the original source.
+  Do not summarize, abridge, or omit sections unless the user explicitly asked for that. Do not
+  add a visible translation label, title postfix, or transform note unless the user asks for one.
 - **Research / compile** → gather across sources and organize into clear sections, applying
   the chosen transform to the content (verbatim quotes, translation, or summary); attribute
   facts to their sources; mark anything uncertain or unverified; do not invent. (This compiles
@@ -144,19 +131,24 @@ through an external machine-translation engine or tool (Google Translate, DeepL,
 API or `trans`-style CLI); only your own translation can apply the rules below, and a generic MT
 pass yields translationese and mangles terminology, math, and citations.
 
-Preserve the source's structure, argument flow, and domain precision, and **default to
-translating** — the arbiter is how the source's field actually *writes* each term in the target
-language, not whether a target word exists. Keep the source-language form for **(a)** atoms with
-no target equivalent — proper nouns, acronyms, symbols, units, code-/API-facing identifiers, and
-method/model/architecture names (e.g. *Diffusion Policy*, *ResNet*); and **(b)** the handful of
-ordinary terms the field itself conventionally writes in the **source script** even though a
-target word exists (for ML, e.g. *epoch*, *gradient*, *baseline*, *advantage*, *rollout*).
-Translate everything else into the field's settled target-language form — its standard word
-(observation, demonstration, learning, policy, action, task, inference, success rate,
-manipulation) or, where the field writes a loanword, its standard transliteration (benchmark,
-embedding, minibatch). Being technical or sitting next to a formula is **not** a reason to keep a
-word, and **when unsure, translate**. This test is **relative to the source's field**, so apply
-it the same way in economics, law, or biology.
+Preserve the source's structure, argument flow, and domain precision, but write natural
+target-language technical prose. A translation is **not** transliteration, and not source
+language with target-language particles attached. Keep the source-language form only for
+source titles and identity-bearing technical names: paper/book/article titles,
+model/method/architecture names, dataset and benchmark names, standard acronyms/initialisms,
+proper nouns, symbols, units, code-/API-facing identifiers, citation keys, URLs, and method
+names (e.g. *Attention Is All You Need*, *Diffusion Policy*, *ResNet*, *ImageNet*, *MMLU*).
+Also keep the handful of ordinary terms the field itself conventionally writes in the **source
+script** even though a target word exists (for ML, e.g. *epoch*, *gradient*, *baseline*,
+*advantage*, *rollout*).
+
+Translate ordinary prose and non-identity terms into the field's settled target-language form:
+common nouns, verbs, adjectives, generic headings, and explanatory phrases should not remain in
+the source language just because the topic is technical or near a formula. Use the target
+field's standard word (observation, demonstration, learning, policy, action, task, inference,
+success rate, manipulation) or, where the field writes a loanword, its standard transliteration
+(benchmark, embedding, minibatch). For ordinary prose, **when unsure, translate**. For
+identity-bearing names, preserve the source form.
 
 **Decide each recurring term once and apply it uniformly**; never alternate between the source
 word and its translation for the same concept. Inflect the sentence naturally around any kept
@@ -166,6 +158,13 @@ tables, and figure references unless instructed otherwise. Keep citation markers
 (`[27]`); resolve bare citation keys back to the paper's numbered form, and do not rewrite
 `introduced in [27]` as "Zhang et al." unless the source itself does.
 
+Preserve the full source title in the H1, alias, or provenance as requested; translate generic
+section headings such as Introduction, Related Work, Method, Experiments, Results, Discussion,
+Conclusion, and Appendix into the target language. Keep identity-bearing section titles in the
+source language only for the named object portion. Do not infer translation style from existing
+vault notes unless the user explicitly names a note as the style reference; use these rules and
+the source text as the standard.
+
 Across all of them: real headings (`#`/`##`), valid Markdown tables (no empty cells, no
 equations trapped in cells), math as Obsidian MathJax LaTeX (`$…$` inline, `$$…$$` block;
 do not use `\(...\)`/`\[...\]`), figures embedded (web images by URL,
@@ -174,27 +173,42 @@ only when there is useful overflow detail beyond `url`/`first_author`/`license`/
 version, extra URLs) add a short **Source / provenance** section at the top — otherwise omit it.
 
 For verbatim imports and translations, include the source's own References/Bibliography section
-in the body unless the user asks to omit it. Numbered in-text citations and bibliography entries
-(`[1]`, `[2]`, …) stay plain text — keep each entry as its own plain line `[1] …`. Never write
-them as a `- [1]` list item: Obsidian renders `- [x]` whose bracket holds a single character
-(so `- [0]` through `- [9]`) as a task checkbox, silently turning a bibliography into a to-do
-list. These are the source's content, not the note's reference registry — do **not** copy them
-into PARA-ZK `references`. That registry holds only the connections the vault owner deliberately
-curates (the area/project it belongs to, related vault notes); leave it to them to register the
-few they want, as `[[wiki]]` links to notes they actually keep.
+in the body unless the user asks to omit it. Preserve bibliography entries in their original
+bibliographic form, including paper/book titles; do not translate cited work titles inside
+References. Numbered in-text citations and bibliography entries (`[1]`, `[2]`, …) stay plain text
+— keep each entry as its own plain line `[1] …`. Never write them as a `- [1]` list item:
+Obsidian renders `- [x]` whose bracket holds a single character (so `- [0]` through `- [9]`) as a
+task checkbox, silently turning a bibliography into a to-do list. These are the source's content,
+not the note's reference registry — do **not** copy them into PARA-ZK `references`. That registry
+holds only the connections the vault owner deliberately curates (the area/project it belongs to,
+related vault notes); leave it to them to register the few they want, as `[[wiki]]` links to notes
+they actually keep.
 
 ## 5. Correction & verification pass — DO NOT SKIP
 
-Re-read each note and repair: conversion artifacts, broken/empty table cells, stray HTML,
-duplicated headers, dangling markers; verify claims and that links resolve. The note must read
-as hand-written, not auto-generated. This is the step most often skipped — it is the point of
-this skill.
+Before storing, re-read each draft and repair conversion artifacts, broken/empty table cells,
+stray HTML, duplicated headers, dangling markers, bad math delimiters, and broken figure embeds.
+The note must read as hand-written, not auto-generated.
+
+For translations, do not treat artifact checks as quality checks. Compare the source and
+translated draft for coverage: title, authors, abstract, every section/subsection, tables,
+equations, figures/captions, appendices, acknowledgments, and references. Confirm that generic
+headings and ordinary prose are target-language, identity-bearing names are preserved, and
+References titles remain in the source language. If the result reads like source-language
+sentences with target-language particles, rewrite it before storing.
 
 ## 6. Store (shell-safe) and link
 
 For each resource, write the cleaned body to a temp file and create it with a file-backed body
 (avoids shell-mangling of long/multiline content; use an absolute path), recording provenance in
 the structured frontmatter:
+
+For a paper resource title / filename, use the source's full title by default. Use a short title
+only when the source is widely identified by the model, method, dataset, benchmark, standard, or
+acronym it introduced (`Transformer`, `BERT`, `GPT-3`, `T5`, `DPO`, `RAG`), or when the source
+title itself names the work in a `Name: descriptive subtitle` form (then use `Name`). Preserve the
+full original source title in the body metadata/provenance. Do not invent a new abbreviation; if
+no recognized representative name exists, use the original title.
 
 ```
 optsidian para-zk:create-resource title="<title>" body=@/tmp/<file>.md \
@@ -222,10 +236,10 @@ hub — an area, a project, or an index resource — so the set is navigable.
 
 ## 7. Verify
 
-Run `para-zk:read-resource title="<title>" key=body` and re-scan for artifacts;
-confirm links via the origin note's `key=references` and the resource's `key=backlinks`. Fix and
-repeat if anything is still broken. Confirm no `<span id="page-…">` page anchors and no `[text](#page-N-M)` dead links survive anywhere. For notes with math, confirm Obsidian delimiters are used:
-`$…$` for inline math and `$$…$$` for blocks; no `\(...\)` or `\[...\]` should remain.
+Run `para-zk:read-resource title="<title>" key=frontmatter` and `key=body` after creation. Confirm
+metadata, body persistence, backlinks/references when linked, no dead page anchors, and Obsidian
+math delimiters (`$…$`, `$$…$$`; no `\(...\)` or `\[...\]`). Fix and repeat if anything is still
+broken.
 
 ## 8. Hand off to the wiki-ingest skill
 
@@ -248,8 +262,10 @@ entire set.
 
 ## Examples
 
-- `find the paper "Attention Is All You Need", add it as a resource, and add a ref from the AI area`
-  → web research → arXiv → verbatim import (math/figures) → one resource → ref from the AI area.
+- `find the paper "Attention Is All You Need", translate it to Korean, and add it as a resource`
+  → web research → arXiv → title `Papers/LLM/Transformer` because the paper introduced the
+  Transformer architecture and is widely identified by that representative name → full Korean
+  translation with source title preserved and References titles left in English.
 - `read /path/to/report.html and add it as a resource translated to Korean`
   → local file → translation → one resource (cite the original).
 - `add a resource per chapter following a study path for "Principles of Statistics"`
