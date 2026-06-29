@@ -145,7 +145,7 @@ script** even though a target word exists (for ML, e.g. *epoch*, *gradient*, *ba
 *advantage*, *rollout*).
 
 Translate ordinary prose and non-identity terms into the field's settled target-language form:
-common nouns, verbs, adjectives, generic headings, and explanatory phrases should not remain in
+common nouns, verbs, adjectives, and explanatory phrases should not remain in
 the source language just because the topic is technical or near a formula. Use the target
 field's standard word (observation, demonstration, learning, policy, action, task, inference,
 success rate, manipulation) or, where the field writes a loanword, its standard transliteration
@@ -160,12 +160,11 @@ tables, and figure references unless instructed otherwise. Keep citation markers
 (`[27]`); resolve bare citation keys back to the paper's numbered form, and do not rewrite
 `introduced in [27]` as "Zhang et al." unless the source itself does.
 
-Preserve the full source title in the H1, alias, or provenance as requested; translate generic
-section headings such as Introduction, Related Work, Method, Experiments, Results, Discussion,
-Conclusion, and Appendix into the target language. Keep identity-bearing section titles in the
-source language only for the named object portion. Do not infer translation style from existing
-vault notes unless the user explicitly names a note as the style reference; use these rules and
-the source text as the standard.
+Preserve the full source title in the H1, alias, or provenance as requested. When a heading
+contains an identity-bearing source title, model/method/architecture name, dataset/benchmark
+name, acronym, proper noun, symbol, or code/API identifier, preserve that named object in source
+form. Do not infer translation style from existing vault notes unless the user explicitly names
+a note as the style reference; use these rules and the source text as the standard.
 
 Across all of them: real headings (`#`/`##`), valid Markdown tables (no empty cells, no
 equations trapped in cells), math as Obsidian MathJax LaTeX (`$…$` inline, `$$…$$` block;
@@ -194,10 +193,10 @@ The note must read as hand-written, not auto-generated.
 
 For translations, do not treat artifact checks as quality checks. Compare the source and
 translated draft for coverage: title, authors, abstract, every section/subsection, tables,
-equations, figures/captions, appendices, acknowledgments, and references. Confirm that generic
-headings and ordinary prose are target-language, identity-bearing names are preserved, and
-References titles remain in the source language. If the result reads like source-language
-sentences with target-language particles, rewrite it before storing.
+equations, figures/captions, appendices, acknowledgments, and references. Confirm that ordinary
+prose is target-language, identity-bearing names are preserved, and References titles remain in
+the source language. If the result reads like source-language sentences with target-language
+particles, rewrite it before storing.
 
 For long translations, quality-sample the **beginning, middle, and end** before storing. The
 translation quality must be consistent across the whole source; a polished abstract/introduction
