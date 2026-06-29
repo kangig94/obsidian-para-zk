@@ -24,6 +24,8 @@ const BODY_BIGRAM_WEIGHT = 0.4;
 const COSINE_SCORE_WEIGHT = 0.7;
 const OVERLAP_SCORE_WEIGHT = 0.3;
 const CACHE_FILE = "retopology-cache.json";
+const MAX_CACHE_BYTES = 16 * 1024 * 1024;
+const MAX_TERM_LENGTH = 128;
 const STOPWORD_LIST = [
   "a",
   "an",
@@ -61,6 +63,7 @@ const CACHE_KEY = cacheKeyHash(JSON.stringify({
   bodyUnigramWeight: BODY_UNIGRAM_WEIGHT,
   bodyBigramWeight: BODY_BIGRAM_WEIGHT,
   minTokenLength: 2,
+  maxTermLength: MAX_TERM_LENGTH,
   tokenizer: "lowercase-wikilink-visible-label-code-strip-unicode-alnum",
   bigrams: "adjacent-filtered-markdown-segment-tokens",
   stopwords: [...STOPWORD_LIST].sort()
@@ -225,6 +228,7 @@ function cacheSourcesFresh(ctx: WorkflowContext, wikiRoot: string, sources: Doma
 async function readCache(ctx: WorkflowContext): Promise<RetopologyCache | undefined> {
   const raw = await ctx.cache?.readText(CACHE_FILE);
   if (!raw) return undefined;
+  if (exceedsUtf8Bytes(raw, MAX_CACHE_BYTES)) return undefined;
   try {
     const parsed = JSON.parse(raw) as unknown;
     if (!isRecord(parsed) || parsed.key !== CACHE_KEY || !isRecord(parsed.indexes)) return undefined;
@@ -251,10 +255,18 @@ async function writeCache(ctx: WorkflowContext, cache: RetopologyCache): Promise
 function isCachedIndexTerms(value: unknown): value is CachedIndexTerms {
   return Array.isArray(value)
     && value.length === 3
-    && typeof value[0] === "number"
-    && typeof value[1] === "number"
+    && Number.isFinite(value[0])
+    && Number.isFinite(value[1])
+    && value[0] >= 0
+    && value[1] >= 0
     && isRecord(value[2])
-    && Object.values(value[2]).every((count) => typeof count === "number");
+    && Object.entries(value[2]).every(([term, count]) => (
+      term.length > 0
+      && term.length <= MAX_TERM_LENGTH
+      && typeof count === "number"
+      && Number.isFinite(count)
+      && count > 0
+    ));
 }
 
 function mapFromRecord(record: Record<string, number>): Map<string, number> {
@@ -274,6 +286,26 @@ function cacheKeyHash(value: string): string {
     hash = Math.imul(hash, 16777619);
   }
   return `fnv1a-${(hash >>> 0).toString(36)}`;
+}
+
+function exceedsUtf8Bytes(value: string, maxBytes: number): boolean {
+  let bytes = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code < 0x80) {
+      bytes += 1;
+    } else if (code < 0x800) {
+      bytes += 2;
+    } else if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) index += 1;
+      bytes += 4;
+    } else {
+      bytes += 3;
+    }
+    if (bytes > maxBytes) return true;
+  }
+  return false;
 }
 
 function candidatesForAll(
@@ -577,6 +609,7 @@ function inverseDocumentFrequency(documentCount: number, documentFrequency: numb
 }
 
 function addWeight(vector: Map<string, number>, token: string, weight: number): void {
+  if (token.length > MAX_TERM_LENGTH) return;
   vector.set(token, (vector.get(token) ?? 0) + weight);
 }
 

@@ -171,6 +171,85 @@ describe("wiki retopology candidates", () => {
     expect(readPaths).toContain("LLM-Wiki/alpha/index.md");
   });
 
+  it("ignores oversized retopology cache payloads and rewrites them", async () => {
+    const { ctx, app } = createTestContext();
+    await createWikiPage(app, "LLM-Wiki/alpha/index.md", "Diffusion policy action.");
+    await createWikiPage(app, "LLM-Wiki/beta/index.md", "Diffusion policy control.");
+
+    const cache = new Map<string, string>();
+    ctx.cache = {
+      readText: async (name) => cache.get(name),
+      writeText: async (name, value) => {
+        cache.set(name, value);
+      }
+    };
+
+    await wikiRetopologyCandidates(ctx, { limit: 10 });
+    const cached = JSON.parse(cache.get("retopology-cache.json") ?? "{}") as Record<string, unknown>;
+    cache.set("retopology-cache.json", `${JSON.stringify({
+      ...cached,
+      padding: "x".repeat(16 * 1024 * 1024)
+    })}\n`);
+
+    const originalRead = ctx.host.read;
+    const readPaths: string[] = [];
+    ctx.host.read = async (file) => {
+      readPaths.push(file.path);
+      return originalRead(file);
+    };
+
+    await wikiRetopologyCandidates(ctx, { limit: 10 });
+
+    expect(readPaths.sort()).toEqual([
+      "LLM-Wiki/alpha/index.md",
+      "LLM-Wiki/beta/index.md"
+    ]);
+    expect(cache.get("retopology-cache.json")?.length).toBeLessThan(16 * 1024 * 1024);
+  });
+
+  it("skips overlong generated terms and heals caches that contain them", async () => {
+    const { ctx, app } = createTestContext();
+    const overlongTerm = "x".repeat(129);
+    await createWikiPage(app, "LLM-Wiki/alpha/index.md", `${overlongTerm} diffusion policy action.`);
+    await createWikiPage(app, "LLM-Wiki/beta/index.md", "Diffusion policy control.");
+
+    const cache = new Map<string, string>();
+    ctx.cache = {
+      readText: async (name) => cache.get(name),
+      writeText: async (name, value) => {
+        cache.set(name, value);
+      }
+    };
+
+    await wikiRetopologyCandidates(ctx, { limit: 10 });
+    const cached = JSON.parse(cache.get("retopology-cache.json") ?? "{}") as Record<string, unknown>;
+    const indexes = cached.indexes as Record<string, unknown[]>;
+    const alphaTerms = indexes["LLM-Wiki/alpha/index.md"][2] as Record<string, number>;
+    expect(alphaTerms).not.toHaveProperty(overlongTerm);
+    expect(Object.keys(alphaTerms).every((term) => term.length <= 128)).toBe(true);
+
+    alphaTerms[overlongTerm] = 1;
+    cache.set("retopology-cache.json", `${JSON.stringify(cached)}\n`);
+
+    const originalRead = ctx.host.read;
+    const readPaths: string[] = [];
+    ctx.host.read = async (file) => {
+      readPaths.push(file.path);
+      return originalRead(file);
+    };
+
+    await wikiRetopologyCandidates(ctx, { limit: 10 });
+
+    expect(readPaths.sort()).toEqual([
+      "LLM-Wiki/alpha/index.md",
+      "LLM-Wiki/beta/index.md"
+    ]);
+    const healed = JSON.parse(cache.get("retopology-cache.json") ?? "{}") as Record<string, unknown>;
+    const healedEntry = (healed.indexes as Record<string, unknown[]>)["LLM-Wiki/alpha/index.md"];
+    const healedTerms = healedEntry[2] as Record<string, number>;
+    expect(healedTerms).not.toHaveProperty(overlongTerm);
+  });
+
   it("replaces the plugin cache through a unique temp file and cleans stale temps", async () => {
     const { ctx: baseCtx, app } = createTestContext();
     const pluginDir = ".obsidian/plugins/para-zk";
