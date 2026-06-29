@@ -1585,6 +1585,10 @@ exports[`native CLI command metadata is stable 1`] = `
         "description": "Maximum candidates to return (default: 20).",
         "value": "<number>",
       },
+      "links": {
+        "description": "Include explicit index-link boost and link-count tie-break in scores (default: false).",
+        "value": "<true|false>",
+      },
     },
   },
 ]

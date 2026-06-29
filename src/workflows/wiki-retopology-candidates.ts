@@ -69,17 +69,19 @@ export async function wikiRetopologyCandidates(
   const byDomain = new Map(indexes.map((index) => [index.domain, index]));
   const focus = normalizeDomainOption(options.domain, byDomain);
   const depth = normalizeDepth(options.depth);
+  const links = normalizeLinks(options.links);
   const graphEdges = indexGraphEdges(ctx, indexes);
   const adjacency = graphAdjacency(graphEdges);
   const candidates = focus
-    ? candidatesForDomain(ctx, byDomain.get(focus)!, indexes)
-    : candidatesForAll(ctx, indexes, graphEdges, adjacency, depth);
+    ? candidatesForDomain(ctx, byDomain.get(focus)!, indexes, links)
+    : candidatesForAll(ctx, indexes, graphEdges, adjacency, depth, links);
   const page = candidates.slice(0, limit);
 
   return {
     mode: focus ? "domain" : "global",
     ...(focus ? { domain: focus } : {}),
     ...(focus ? { graph: graphForDomain(byDomain.get(focus)!, graphEdges, adjacency, depth) } : {}),
+    links,
     count: candidates.length,
     limit,
     returned: page.length,
@@ -101,6 +103,12 @@ function normalizeDepth(value: unknown): number {
   if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
     throw new Error("depth must be a non-negative integer");
   }
+  return value;
+}
+
+function normalizeLinks(value: unknown): boolean {
+  if (value === undefined) return false;
+  if (typeof value !== "boolean") throw new Error("links must be a boolean");
   return value;
 }
 
@@ -148,7 +156,8 @@ function candidatesForAll(
   indexes: DomainIndex[],
   edges: WikiRetopologyGraphEdge[],
   adjacency: Map<string, WikiRetopologyGraphEdge[]>,
-  depth: number
+  depth: number,
+  links: boolean
 ): WikiRetopologyCandidate[] {
   const candidates: WikiRetopologyCandidate[] = [];
   for (let i = 0; i < indexes.length; i += 1) {
@@ -157,22 +166,24 @@ function candidatesForAll(
         ctx,
         indexes[i],
         indexes[j],
-        shortestConnection(indexes[i].domain, indexes[j].domain, edges, adjacency, depth)
+        shortestConnection(indexes[i].domain, indexes[j].domain, edges, adjacency, depth),
+        links
       ));
     }
   }
-  return candidates.sort(compareCandidates);
+  return candidates.sort((left, right) => compareCandidates(left, right, links));
 }
 
 function candidatesForDomain(
   ctx: WorkflowContext,
   focus: DomainIndex,
-  indexes: DomainIndex[]
+  indexes: DomainIndex[],
+  links: boolean
 ): WikiRetopologyCandidate[] {
   return indexes
     .filter((index) => index.domain !== focus.domain)
-    .map((index) => candidateForPair(ctx, focus, index))
-    .sort(compareCandidates);
+    .map((index) => candidateForPair(ctx, focus, index, undefined, links))
+    .sort((left, right) => compareCandidates(left, right, links));
 }
 
 function graphForDomain(
@@ -332,11 +343,12 @@ function candidateForPair(
   ctx: WorkflowContext,
   left: DomainIndex,
   right: DomainIndex,
-  connection?: WikiRetopologyConnection
+  connection?: WikiRetopologyConnection,
+  links = false
 ): WikiRetopologyCandidate {
   const explicitLinks = explicitIndexLinks(ctx, left, right);
   const baseScore = cosine(left, right);
-  const score = roundScore(Math.min(1, baseScore + explicitLinks.length * EXPLICIT_LINK_BOOST));
+  const score = roundScore(Math.min(1, baseScore + (links ? explicitLinks.length * EXPLICIT_LINK_BOOST : 0)));
   const sharedTerms = topSharedTerms(left, right);
   const evidence = candidateEvidence(sharedTerms, explicitLinks);
   return {
@@ -398,11 +410,11 @@ function candidateEvidence(shared: string[], explicitLinks: Array<{ from: string
   return evidence;
 }
 
-function compareCandidates(left: WikiRetopologyCandidate, right: WikiRetopologyCandidate): number {
+function compareCandidates(left: WikiRetopologyCandidate, right: WikiRetopologyCandidate, links = false): number {
   const score = right.score - left.score;
   if (score !== 0) return score;
-  const links = right.explicit_links.length - left.explicit_links.length;
-  if (links !== 0) return links;
+  const explicitLinks = links ? right.explicit_links.length - left.explicit_links.length : 0;
+  if (explicitLinks !== 0) return explicitLinks;
   return left.domains.join("\0").localeCompare(right.domains.join("\0"));
 }
 

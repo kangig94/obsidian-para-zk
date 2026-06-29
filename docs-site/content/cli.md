@@ -94,12 +94,13 @@ Reason codes are `missing_wiki_citation`, `source_newer_than_wiki`, `per_import`
 For retopology, use `para-zk:wiki-retopology-candidates` to rank domain index pairs before reading hubs:
 
 ```bash
-optsidian para-zk:wiki-retopology-candidates limit=20 format=json
-optsidian para-zk:wiki-retopology-candidates domain=language-models limit=10 format=json
-optsidian para-zk:wiki-retopology-candidates domain=language-models depth=3 limit=10 format=json
+optsidian para-zk:wiki-retopology-candidates limit=20
+optsidian para-zk:wiki-retopology-candidates links=true limit=20
+optsidian para-zk:wiki-retopology-candidates domain=language-models limit=10
+optsidian para-zk:wiki-retopology-candidates domain=language-models depth=3 limit=10
 ```
 
-It compares `<domain>/index` hubs only with TF-IDF weighted cosine scores, boosts explicit cross-domain links found in those hubs, and returns `{ mode, domain?, graph?, count, limit, returned, has_more, candidates }` with `{ domains, indexes, score, shared_terms, explicit_links, evidence, connection }` candidates. `connection` is the shortest undirected index-to-index path within `depth`; focused mode also includes an undirected index graph neighborhood. `depth` defaults to `2`.
+It compares `<domain>/index` hubs only with TF-IDF weighted cosine scores and returns `{ mode, domain?, graph?, links, count, limit, returned, has_more, candidates }` with `{ domains, indexes, score, shared_terms, explicit_links, evidence, connection }` candidates. By default, explicit cross-domain links do not boost scores or break score ties; pass `links=true` to include that boost. Explicit links still appear as evidence and graph connections either way. `connection` is the shortest undirected index-to-index path within `depth`; focused mode also includes an undirected index graph neighborhood. `depth` defaults to `2`.
 
 The audit checks include `upward_wiki_link` (`medium`), which flags a non-`llm-wiki` note that links into an `llm-wiki` note; `orphan_wiki_page` (`low`), an advisory hint for a wiki page that no other wiki page links to; and `wiki_tag_domain_mismatch` (`low`), which can be fixed with `audit fix=true`.
 

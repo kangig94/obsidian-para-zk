@@ -143,6 +143,27 @@ describe("wiki retopology candidates", () => {
     });
   });
 
+  it("can score candidates without explicit link boosts while keeping link evidence", async () => {
+    await createWikiPage(
+      cli.app,
+      "LLM-Wiki/alpha/index.md",
+      "Alpha bridge points at [[LLM-Wiki/beta/index]]."
+    );
+    await createWikiPage(cli.app, "LLM-Wiki/beta/index.md", "Hydraulic actuator contact dynamics.");
+
+    const contentOnly = await cli.run("para-zk:wiki-retopology-candidates", { limit: "1" });
+    const boosted = await cli.run("para-zk:wiki-retopology-candidates", { links: "true", limit: "1" });
+
+    expect(contentOnly).toMatchObject({ ok: true, links: false });
+    expect(boosted).toMatchObject({ ok: true, links: true });
+    const boostedCandidate = (boosted.candidates as Array<Record<string, unknown>>)[0];
+    const contentOnlyCandidate = (contentOnly.candidates as Array<Record<string, unknown>>)[0];
+    expect(boostedCandidate.explicit_links).toHaveLength(1);
+    expect(contentOnlyCandidate.explicit_links).toEqual(boostedCandidate.explicit_links);
+    expect(contentOnlyCandidate.evidence).toContain("index link: alpha/index -> beta/index");
+    expect(contentOnlyCandidate.score as number).toBeLessThan(boostedCandidate.score as number);
+  });
+
   it("returns an undirected index graph for focused domains with configurable depth", async () => {
     const { ctx, app } = createTestContext();
     await createWikiPage(app, "LLM-Wiki/a/index.md", "A links [[LLM-Wiki/c/index]].");

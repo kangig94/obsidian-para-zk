@@ -59,6 +59,8 @@ Do not ask the user to resolve invalid arguments; stop with the concrete routing
      `optsidian para-zk:wiki-retopology-candidates limit=<k>`. Each candidate includes
      a TF-IDF weighted score and the shortest index-to-index `connection` within
      `depth=2` by default.
+     Scoring is content-only by default; use `links=true` only when explicit index-link
+     boosts should affect ranking. Link evidence and graph connections are always reported.
    - For `scope=domain`, get focused candidates:
      `optsidian para-zk:wiki-retopology-candidates domain="<domain>" limit=<k>`; it also
      returns an undirected index graph neighborhood with `depth=2` by default.

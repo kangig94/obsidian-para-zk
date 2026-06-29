@@ -79,12 +79,13 @@ Ingestable source types are `resource`, `digest`, `permanent`, and `subnote`.
 `para-zk:wiki-retopology-candidates` ranks domain index pairs without reading concept-page bodies:
 
 ```bash
-optsidian para-zk:wiki-retopology-candidates limit=20 format=json
-optsidian para-zk:wiki-retopology-candidates domain=language-models limit=10 format=json
-optsidian para-zk:wiki-retopology-candidates domain=language-models depth=3 limit=10 format=json
+optsidian para-zk:wiki-retopology-candidates limit=20
+optsidian para-zk:wiki-retopology-candidates links=true limit=20
+optsidian para-zk:wiki-retopology-candidates domain=language-models limit=10
+optsidian para-zk:wiki-retopology-candidates domain=language-models depth=3 limit=10
 ```
 
-Use it to choose which hubs to inspect during domain split, merge, refile, or cross-domain link planning. Scores use TF-IDF weighted index-term overlap plus explicit cross-domain index links. Each candidate includes the shortest undirected index-to-index `connection` within `depth`; focused mode also returns an undirected index graph neighborhood. `depth` defaults to `2`. It is a triage signal, not the final topology judgment.
+Use it to choose which hubs to inspect during domain split, merge, refile, or cross-domain link planning. Scores use TF-IDF weighted index-term overlap by default; pass `links=true` to add explicit cross-domain index-link boosts while keeping link evidence visible either way. Each candidate includes the shortest undirected index-to-index `connection` within `depth`; focused mode also returns an undirected index graph neighborhood. `depth` defaults to `2`. It is a triage signal, not the final topology judgment.
 
 ## Audit Checks
 

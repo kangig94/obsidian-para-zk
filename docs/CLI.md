@@ -427,11 +427,13 @@ Options:
 | --- | --- | --- |
 | `domain` | domain name | Optional focus domain. When provided, returns the top candidates between that domain's index and every other domain index, plus an undirected index graph neighborhood. |
 | `depth` | number | Maximum undirected index graph depth for candidate connections and focused graph neighborhoods (default `2`). |
+| `links` | boolean | Include explicit cross-domain index links in score boosts and link-count tie-breaks (default `false`). Explicit links still appear as evidence and graph connections when omitted or false. |
 | `limit` | number | Maximum candidates to return (default `20`). |
 
 ```bash
 optsidian para-zk:wiki-retopology-candidates
 optsidian para-zk:wiki-retopology-candidates limit=30
+optsidian para-zk:wiki-retopology-candidates links=true limit=30
 optsidian para-zk:wiki-retopology-candidates domain=language-models limit=10
 optsidian para-zk:wiki-retopology-candidates domain=language-models depth=3 limit=10
 ```
