@@ -11,7 +11,7 @@ function noteWithBareRef(link: string): string {
   return ["---", "type: resource", "references:", `  - link: "${link}"`, "    id: aaa111", "---", "body line"].join("\n");
 }
 
-describe("CLI text output (default format)", () => {
+describe("CLI text output", () => {
   it("audit renders findings, not just a static summary", async () => {
     await cli.app.vault.create("PARA/Resources/Paper/ASAP.md", "---\ntype: resource\n---\n");
     await cli.app.vault.create("Note.md", noteWithBareRef("[[ASAP]]"));
@@ -60,13 +60,11 @@ describe("CLI text output (default format)", () => {
     expect(text.startsWith("error: ")).toBe(true);
   });
 
-  it("format=json stays an opt-in machine envelope", async () => {
+  it("rejects format overrides", async () => {
     await cli.app.vault.create("PARA/Resources/Paper/ASAP.md", "---\ntype: resource\n---\n");
     await cli.app.vault.create("Note.md", noteWithBareRef("[[ASAP]]"));
 
-    const json = await cli.runText("para-zk:audit", { check: "bare_reference", format: "json" });
-    const parsed = JSON.parse(json) as Record<string, unknown>;
-    expect(parsed.ok).toBe(true);
-    expect((parsed.findings as unknown[]).length).toBeGreaterThan(0);
+    const text = await cli.runText("para-zk:audit", { check: "bare_reference", format: "json" });
+    expect(text).toBe("error: format is not supported; PARA-ZK CLI output is always text");
   });
 });

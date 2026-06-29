@@ -1,9 +1,6 @@
 // CLI harness: drives the same native CLI handlers the smoke test exercises,
-// but against the in-memory MockApp instead of a live Obsidian. It intercepts
-// handler registration, then invokes a command with `format=json` and parses
-// the JSON envelope, so assertions match the live `optsidian para-zk:*`
-// payloads (ok / error / fields) one-to-one.
-import { registerNativeCliHandlers } from "../../src/cli/handlers";
+// but against the in-memory MockApp instead of a live Obsidian.
+import { registerNativeCliHandlers, runNativeCliCommandPayload } from "../../src/cli/handlers";
 import type { ParaZkPluginContext } from "../../src/plugin-interface";
 import { DEFAULT_SETTINGS, type ParaZkSettings } from "../../src/types";
 import { MockApp } from "./vault";
@@ -14,8 +11,8 @@ export type CliHarness = {
   app: MockApp;
   settings: ParaZkSettings;
   run: (command: string, args?: Record<string, unknown>) => Promise<Record<string, unknown>>;
-  // Invokes a command in its default (text) format and returns the raw rendered
-  // string, so tests can assert the human-facing output the JSON `run` hides.
+  // Invokes a command through the public text renderer and returns the raw
+  // string, so tests can assert the human-facing output.
   runText: (command: string, args?: Record<string, unknown>) => Promise<string>;
 };
 
@@ -41,12 +38,7 @@ export function createCliHarness(overrides: Partial<ParaZkSettings> = {}): CliHa
   return {
     app,
     settings,
-    run: async (command, args = {}) => {
-      const handler = handlers.get(command);
-      if (!handler) throw new Error(`unknown CLI command: ${command}`);
-      const output = await handler({ ...args, format: "json" });
-      return JSON.parse(output) as Record<string, unknown>;
-    },
+    run: (command, args = {}) => runNativeCliCommandPayload(plugin as unknown as ParaZkPluginContext, command, args),
     runText: async (command, args = {}) => {
       const handler = handlers.get(command);
       if (!handler) throw new Error(`unknown CLI command: ${command}`);

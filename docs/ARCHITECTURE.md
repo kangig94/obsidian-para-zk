@@ -56,14 +56,13 @@ edges, so this is allowed.
 | Surface | Entry | How it reaches workflow logic |
 |---------|-------|-------------------------------|
 | GUI | `src/main.ts` → `src/ux/*` | Calls `src/workflows/` **directly** |
-| Native CLI | `src/cli/handlers.ts` (registered by `registerNativeCliHandlers`) | Calls `src/workflows/` **directly**, wraps results in a stable JSON envelope |
-| MCP | `src/mcp/server.ts` → `clients/para-zk-mcp.mjs` | **Proxy** — `execFile`s the `optsidian`/`obsidian` native CLI; does NOT link the core |
+| Native CLI | `src/cli/handlers.ts` (registered by `registerNativeCliHandlers`) | Calls `src/workflows/` **directly**, then renders readable text |
+| MCP | `src/mcp/server.ts` → `clients/para-zk-mcp.mjs` | **Discovery proxy** — exposes `conventions`/`describe` text from `optsidian`/`obsidian`; does NOT link the core |
 
 GUI and CLI are two thin adapters over the same core (the "GUI and CLI behave the same"
-contract). MCP is a separate Node process that drives the running Obsidian app through
-its native CLI, so it reuses workflow logic transitively. This is the single most
-important architectural fact to keep in mind when editing: **MCP changes are CLI-argv
-mapping, not core changes.**
+contract). MCP is a separate Node process that drives only the discovery commands
+through the host CLI. Vault mutations stay on the public CLI/host command runner, so
+MCP changes are discovery text and fallback behavior, not core workflow changes.
 
 ## Core Module Roles (`src/workflows/`)
 

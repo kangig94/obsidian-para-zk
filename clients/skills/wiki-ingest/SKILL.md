@@ -71,13 +71,14 @@ the concrete routing error — do not ask the user.
    optsidian para-zk:wiki-ingest-candidates mode=<mode> [type=<resource|digest|permanent|subnote>] [source_path=<path>|source_paths='<json-or-comma-list>'] [limit=<n|all>] [offset=<n>]
    ```
 
-   Gate on the envelope. Candidate reasons are `missing_wiki_citation` or `source_newer_than_wiki`;
-   candidates may include `stale_llm_wikis: [{path,title,updated_ms}]` (the citing LLM-Wiki pages
-   older than the source). If `ok` is false or the command errors, stop. If `returned` is `0`, report
-   that none were returned and stop. If `has_more` is true, plan/ingest only the returned page and
-   report that another bounded page remains; do not auto-page into a full scan. Collect candidate
-   `path`s and any `stale_llm_wikis`; for subnote candidates, collect their parent project/area note
-   paths as framing `context`.
+   Read the text output. It starts with a candidate count and then one line per candidate:
+   `<path> [<reason>]`, optionally followed by `(stale: <wiki pages>)`. Candidate reasons are
+   `missing_wiki_citation` or `source_newer_than_wiki`; targeted modes may also report
+   `per_import` or `reingest_requested`. If the command prints `error:`, stop. If it reports
+   `0 candidates`, report that none were returned and stop. If it prints a trailing pagination hint,
+   plan/ingest only the returned page and report that another bounded page remains; do not auto-page
+   into a full scan. Collect candidate paths and any stale wiki labels; for subnote candidates,
+   collect their parent project/area note paths as framing `context`.
 
 4. **Plan** (you, the orchestrator — inline): read enough to decide the global page structure, then
    decide it.

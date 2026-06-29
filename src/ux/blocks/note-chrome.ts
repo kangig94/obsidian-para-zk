@@ -63,7 +63,7 @@ export function registerNoteChromeRenderers(plugin: ParaZkPluginContext): void {
 }
 
 // The props grid renders from metadataCache, so external frontmatter changes
-// (CLI/MCP writes, Obsidian properties edits, sync) must re-render it after the
+// (CLI writes, Obsidian properties edits, sync) must re-render it after the
 // cache reparses. Controllers are scoped to the preview sizer, not a markdown
 // section, because Obsidian can unload/rebuild individual sections while keeping
 // the reading-view container alive.

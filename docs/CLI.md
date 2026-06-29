@@ -16,10 +16,9 @@ obsidian para-zk:describe
 optsidian para-zk:describe
 ```
 
-**Output format**: text is the default and the human-facing contract. It renders
-the command's data readably (findings, lists, the note surface, the resulting
-path), not as a static one-line summary. JSON is reserved for internal automation
-that must machine-parse an envelope.
+**Output**: commands always render readable text (findings, lists, the note
+surface, the resulting path), not a static one-line summary. `format=` is not a
+supported PARA-ZK CLI option.
 
 Notes are addressed **by name, never by file path** — the CLI never exposes a
 `path` option. Directly-addressable notes use their own selectors: `title`
@@ -47,14 +46,18 @@ running — so you can inspect arguments without first hitting a "required" erro
 
 ```bash
 optsidian para-zk:create-area help=true
-# → {"ok":true,"description":"...",
-#    "options":[{"name":"title","value":"<title>","description":"Area title."}, ...]}
+# → para-zk:create-area
+#     Create a root PARA area note
+#
+#   Options:
+#     title=<title>
+#         Area title.
 ```
 
-`help=true` works identically through every surface (optsidian, native obsidian,
-MCP) because it rides the same `key=value` parsing. A bare `--help`/`-h` flag is
-honored too when the host forwards it. For the full machine-readable surface
-(types, stable keys, create inputs), `para-zk:describe` remains the index.
+`help=true` works through both optsidian passthrough and the native Obsidian CLI
+because it rides the same `key=value` parsing. A bare `--help`/`-h` flag is honored
+too when the host forwards it. For the full surface index (types, stable keys,
+create inputs), `para-zk:describe` remains the index.
 
 ### Large text from a file
 
@@ -135,41 +138,10 @@ free | checklist | todo | plan | research | meeting | decision | guide | risk | 
 
 Boolean options accept `true`, `false`, `1`, `0`, `yes`, `no`, `on`, and `off`.
 
-## Automation Envelope
+## Command Semantics
 
-Shapes below describe the machine envelope used by automation and MCP. The
-default CLI output is text and may compact this data for readability.
-
-Successful workflow commands return JSON like:
-
-```json
-{
-  "ok": true,
-  "path": "PARA/Projects/Example/Example.md",
-  "title": "Example",
-  "created": true,
-  "areas": [
-    {
-      "title": "AI",
-      "path": "PARA/Areas/AI/AI.md",
-      "link": "[[PARA/Areas/AI/AI.md|AI]]",
-      "created": false
-    }
-  ]
-}
-```
-
-Errors return JSON like:
-
-```json
-{
-  "ok": false,
-  "error": "status must be one of: idea|in_progress|paused|done|archived (received: active)"
-}
-```
-
-LLMs should read `ok` first. If `ok` is false, correct the invalid option or
-missing file and retry.
+Errors render as one text line beginning with `error:`. Correct the invalid
+option or missing file and retry.
 
 Create is **get-or-create**: every `create-*` command resolves a deterministic path
 from the title and, if a note already exists there, returns that existing note with
@@ -351,19 +323,12 @@ optsidian para-zk:audit severity=high type=resource
 optsidian para-zk:audit fix=true
 ```
 
-JSON output fields:
+Text output includes:
 
-- `ok`: true on success.
-- `command`: `para-zk:audit`.
-- `counts`: finding counts by check code after filters and before pagination.
-- `count`, `offset`, `limit`, `returned`, `has_more`: pagination envelope over
-  the flat filtered finding list.
-- `findings`: array of `{ code, severity, path, type, detail, fix }`.
-- `fixed`: present only when `fix=true`; each item is `{ code, path, action }` —
-  `idless_reference`/`backfillReferenceIds` for a backfilled reference,
-  `wiki_tag_domain_mismatch`/`setWikiDomainTag` for a corrected wiki tag, or
-  `bare_reference`/`expandBareReferenceLinks` for expanded reference links, or
-  `managed_block_in_body`/`stripManagedBlocks` for removed legacy scaffolding fences.
+- finding counts by check code;
+- each finding's code, severity, path, type, and detail;
+- fixed-item summaries when `fix=true`;
+- pagination hints when more findings are available.
 
 ### `para-zk:wiki-ingest-candidates`
 
@@ -431,25 +396,21 @@ Options:
 | --- | --- | --- |
 | `offset` | number | Zero-based domain offset (default `0`). |
 | `limit` | number or `all` | Maximum domains to return (default `50`). |
-| `format` | `json`, `text` | Default `text` renders the data readably; use `json` when the output is machine-parsed. |
 
 ```bash
 optsidian para-zk:wiki-domains
 optsidian para-zk:wiki-domains limit=all
 ```
 
-JSON output fields:
+Text output includes:
 
-- `ok`: true on success.
-- `command`: `para-zk:wiki-domains`.
-- `count`, `offset`, `limit`, `returned`, `has_more`: pagination envelope over the
-  domain list.
-- `domains`: array of `{ domain, pages, has_index }`, sorted by `domain`. `domain`
-  is the name to pass back as `read-llm-wiki title="<domain>/index"`; `pages` is the
-  count of concept pages in the domain, **excluding** the `index` hub; `has_index` is
-  whether the `<domain>/index` hub exists. When `has_index` is `false`, enumerate
-  that domain's pages with `list type=llm-wiki query=<domain>/` instead of reading
-  an index.
+- one line per domain, sorted by domain name;
+- the concept-page count, excluding the `index` hub;
+- whether the `<domain>/index` hub exists;
+- pagination hints when more domains are available.
+
+When a domain has no index, enumerate that domain's pages with
+`list type=llm-wiki query=<domain>/` instead of reading an index.
 
 ### `para-zk:wiki-retopology-candidates`
 
@@ -497,7 +458,6 @@ Options:
 | `locale` | `ko`, `en` | Locale for generated labels and tags. |
 | `dryRun` | boolean | Plan without writing. |
 | `deps` | `none`, `required`, `enhancements`, `all` | Install and enable a dependency group. Default: `none`. |
-| `format` | `json`, `text` | Default `text` renders the data readably; use `json` when the output is machine-parsed. |
 
 Managed scaffolding (templates, dashboards, READMEs) is plugin-owned. Setup
 overwrites those files when generated content differs and leaves matching files
@@ -580,7 +540,6 @@ Options:
 | `folder` | vault-relative path | Target attachment folder. Defaults to `assets`. Rejects `.` and `..` path segments. |
 | `name` | filename | Optional destination filename for a single file source only. When omitted, the source filename is used; when supplied without an extension, the source extension is appended. Rejects `.` and `..` path segments. |
 | `recursive` | boolean | Directory sources include nested files by default (`true`). Use `false` to copy only files directly inside each directory. |
-| `format` | `json`, `text` | Default `text` renders the data readably; use `json` when the output is machine-parsed. |
 
 Directory sources copy files under `<folder>/<directory-name>/`. Nested
 directories keep their relative folder names when `recursive=true`. `name` is

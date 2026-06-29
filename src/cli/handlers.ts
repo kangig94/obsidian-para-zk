@@ -77,22 +77,19 @@ const UPDATE_OPTIONS: Record<string, CliOptionSpec> = {
   value_json: { value: "<json>", description: "Structured value for frontmatter updates and task inserts." },
   match: { value: "<text>", description: "Exact text to match inside the selected key for op=replace." },
   with: { value: "<text>", description: "Replacement text for op=replace." },
-  all: { value: "<true|false>", description: "For op=replace, replace all matches instead of requiring a single match." },
-  format: { value: "<text|json>", description: "Output format (default: text)." }
+  all: { value: "<true|false>", description: "For op=replace, replace all matches instead of requiring a single match." }
 };
 
 const CURRENT_TITLE_OPTION: CliOptionSpec = { value: "<title>", description: "Current note title." };
 
 const RENAME_OPTIONS: Record<string, CliOptionSpec> = {
   title: CURRENT_TITLE_OPTION,
-  new_title: { value: "<title>", description: "New note title." },
-  format: { value: "<text|json>", description: "Output format (default: text)." }
+  new_title: { value: "<title>", description: "New note title." }
 };
 
 const DELETE_OPTIONS: Record<string, CliOptionSpec> = {
   title: CURRENT_TITLE_OPTION,
-  force: { value: "<true|false>", description: "Required when deleting a folder-style note that contains child files." },
-  format: { value: "<text|json>", description: "Output format (default: text)." }
+  force: { value: "<true|false>", description: "Required when deleting a folder-style note that contains child files." }
 };
 
 const READ_COLLECTION_OPTIONS: Record<string, CliOptionSpec> = {
@@ -234,7 +231,6 @@ type ChildAddress = {
   child: string[];
 };
 
-const FORMAT_OPTION: CliOptionSpec = { value: "<text|json>", description: "Output format (default: text)." };
 const ALIAS_OPTION: CliOptionSpec = { value: "<text>", description: "Optional single Obsidian alias to store in frontmatter." };
 const BY_OPTION: CliOptionSpec = { value: "<model-id>", description: "Locale-neutral model id to stamp as llm-wiki authorship." };
 const RESOURCE_CREATE_TITLE_OPTION: CliOptionSpec = {
@@ -527,7 +523,6 @@ function readCommandOptions(selector: SelectorVariant, key: CliOptionSpec): Reco
     ...selectorDefaultAddressOptions(selector),
     key,
     ...READ_COLLECTION_OPTIONS,
-    format: FORMAT_OPTION
   };
 }
 
@@ -543,7 +538,6 @@ function renameCommandOptions(selector: Extract<SelectorVariant, { variant: "by-
   return {
     ...selectorCurrentTitleOption(selector),
     new_title: RENAME_OPTIONS.new_title,
-    format: RENAME_OPTIONS.format,
     ...selectorKindOption(selector),
     ...selectorArchiveOption(selector)
   };
@@ -553,7 +547,6 @@ function deleteCommandOptions(selector: Exclude<SelectorVariant, { variant: "jou
   return {
     ...selectorCurrentTitleOption(selector),
     force: DELETE_OPTIONS.force,
-    format: DELETE_OPTIONS.format,
     ...selectorKindOption(selector),
     ...selectorDateOption(selector),
     ...selectorArchiveOption(selector)
@@ -789,7 +782,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     command: "para-zk:conventions",
     description: "Describe PARA-ZK usage conventions to fetch once per task",
     options: {
-      format: { value: "<text|json>", description: "Output format (default: text)" }
     },
     text: "conventions described",
     run: async () => ({
@@ -806,7 +798,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     description: "Describe PARA-ZK CLI surface types, stable read/write keys, and collection filters",
     options: {
       type: { value: `<${surfaceTypes().join("|")}>`, description: "Optional surface type. Omit to describe all supported surfaces." },
-      format: { value: "<text|json>", description: "Output format (default: text)" }
     },
     text: "CLI surface described",
     run: async (_plugin, args) => {
@@ -836,7 +827,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       query: { value: "<text>", description: "Optional case-insensitive substring filter over the note's name or address path. Use query=<subpath>/ to scope to a subfolder (e.g. a wiki domain or Resources folder)." },
       offset: { value: "<number>", description: "Zero-based item offset (default: 0)." },
       limit: { value: "<number|all>", description: "Maximum items to return (default: 50)." },
-      format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "notes listed",
     run: workflowRun("listNotes", (args) => ({
@@ -857,7 +847,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       offset: { value: "<number>", description: "Zero-based finding offset (default: 0)." },
       limit: { value: "<number|all>", description: "Maximum findings to return (default: 50)." },
       fix: { value: "<true|false>", description: "When true, apply auto-repairs vault-wide: backfill id-less reference ids, expand unique bare reference links to full paths, correct llm-wiki tag domains, and remove legacy managed-block scaffolding fences (leading para-zk-props and trailing para-zk-managed); all other findings (including ambiguous bare references) remain report-only." },
-      format: FORMAT_OPTION
     },
     text: "vault audited",
     run: async (plugin, args) => {
@@ -879,7 +868,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       source_paths: { value: "<json|comma-list>", description: "Multiple source note paths. Required for per-import and re-ingest when source_path is omitted; rejected for delta and uncited." },
       offset: { value: "<number>", description: "Zero-based candidate offset (default: 0)." },
       limit: { value: "<number|all>", description: "Maximum candidates to return (default: 50)." },
-      format: FORMAT_OPTION
     },
     text: "wiki ingest candidates listed",
     run: async (plugin, args) => {
@@ -897,7 +885,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     options: {
       offset: { value: "<number>", description: "Zero-based domain offset (default: 0)." },
       limit: { value: "<number|all>", description: "Maximum domains to return (default: 50)." },
-      format: FORMAT_OPTION
     },
     text: "wiki domains listed",
     run: async (plugin, args) => {
@@ -916,7 +903,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       domain: { value: "<domain>", description: "Optional focus domain. When omitted, rank global domain pairs." },
       depth: { value: "<number>", description: "Undirected index graph depth for focused graph or global pair connections (default: 2)." },
       limit: { value: "<number>", description: "Maximum candidates to return (default: 20)." },
-      format: FORMAT_OPTION
     },
     text: "wiki retopology candidates listed",
     run: async (plugin, args) => {
@@ -938,7 +924,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       locale: { value: "<ko|en>", description: "Language for UI, generated files, and tags." },
       dryRun: { value: "<true|false>", description: "Plan changes without writing." },
       deps: { value: "<none|required|enhancements|all>", description: "Community plugin dependency group to install and enable." },
-      format: { value: "<text|json>", description: "Output format (default: text)" }
     },
     text: "vault set up",
     run: async (plugin, args) => {
@@ -963,7 +948,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       folder: { value: "<vault-folder>", description: "Vault-relative target folder (default: assets)." },
       name: { value: "<filename>", description: "Optional destination filename. The source extension is preserved when omitted." },
       recursive: { value: "<true|false>", description: "For directory sources, include nested files (default: true)." },
-      format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "file attached",
     run: async (plugin, args) => attachLocalFile(plugin, args)
@@ -1056,7 +1040,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       title: LLM_WIKI_CURRENT_TITLE_OPTION,
       domain: { value: "<domain>", description: "Target one-segment LLM-Wiki domain folder." },
       by: BY_OPTION,
-      format: FORMAT_OPTION
     },
     text: "llm-wiki refiled",
     run: workflowRun("refileLlmWiki", readCliRefileLlmWikiOptions)
@@ -1091,7 +1074,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     description: "Move a daily journal note to Obsidian trash and report incoming links",
     options: {
       date: JOURNAL_DATE_OPTION,
-      format: FORMAT_OPTION
     },
     text: "journal deleted",
     run: workflowRun("deleteJournal", (args) => ({
@@ -1114,7 +1096,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       archived: ARCHIVED_OPTION,
       key: CHILD_READ_KEY_OPTION,
       ...READ_COLLECTION_OPTIONS,
-      format: FORMAT_OPTION
     },
     text: "child read",
     run: childWorkflowRun({ project: "readProject", area: "readArea" }, (args, address) => ({
@@ -1149,7 +1130,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       ...CHILD_ADDRESS_OPTIONS,
       archived: ARCHIVED_OPTION,
       force: DELETE_OPTIONS.force,
-      format: FORMAT_OPTION
     },
     text: "child deleted",
     run: childWorkflowRun({ project: "deleteProject", area: "deleteArea" }, (args, address) => ({
@@ -1166,7 +1146,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       ...CHILD_ADDRESS_OPTIONS,
       archived: ARCHIVED_OPTION,
       new_title: RENAME_OPTIONS.new_title,
-      format: FORMAT_OPTION
     },
     text: "child renamed",
     run: childWorkflowRun({ project: "renameProject", area: "renameArea" }, (args, address) => ({
@@ -1187,7 +1166,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       body: { value: "<markdown>", description: "type=subnote only. Optional initial free-form body content." },
       inherit_parent_tag: { value: "<true|false>", description: "type=area only. Include the parent area tag as well as the child tag (default true)." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
-      format: FORMAT_OPTION
     },
     text: "child created",
     preResolve: (args) => {
@@ -1207,7 +1185,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       status: { value: `<${PROJECT_STATUS_CODE_HELP}>`, description: "Locale-neutral project status code." },
       priority: { value: `<${PRIORITY_CODE_HELP}>`, description: "Locale-neutral project priority code." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
-      format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "project created",
     run: workflowRun("createProject", (args) => ({
@@ -1226,7 +1203,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     options: {
       title: { value: "<title>", description: "Area title." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
-      format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "area created",
     run: workflowRun("createArea", (args) => {
@@ -1253,7 +1229,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       domain: { value: "<domain>", description: "Optional subject domain for the identity tag (<type>/<domain>, e.g. resource/ai); omit for a flat type tag. Reuse an existing domain vocabulary." },
       body: { value: "<markdown>", description: "Optional initial free-form body content." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
-      format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "resource created",
     run: workflowRun("createResource", (args) => {
@@ -1283,7 +1258,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       body: { value: "<markdown>", description: "Optional initial free-form body content." },
       by: BY_OPTION,
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
-      format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "llm-wiki created",
     run: workflowRun("createLlmWiki", (args) => ({
@@ -1303,7 +1277,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       title: { value: "<title>", description: "Retro title segment." },
       date: { value: "<YYYY-MM-DD>", description: "Date used for ISO week calculation." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
-      format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "retro created",
     run: workflowRun("createRetro", (args) => ({
@@ -1324,7 +1297,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
       body: { value: "<markdown>", description: "Optional initial free-form body content." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
-      format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "ZK note created",
     run: workflowRun("createZk", (args) => ({
@@ -1345,7 +1317,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       time: { value: "<HH:mm>", description: "Memo time." },
       energy: { value: `<${ENERGY_CODE_HELP}>`, description: "Locale-neutral daily energy code." },
       open: { value: "<true|false>", description: "Open the journal note in Obsidian." },
-      format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "journal captured",
     run: workflowRun("captureJournal", (args) => ({
@@ -1366,7 +1337,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
       body: { value: "<markdown>", description: "Optional initial free-form body content." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
-      format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "ZK note created from resource",
     run: workflowRun("createFromResource", (args) => ({
@@ -1388,7 +1358,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       discard: { value: "<true|false>", description: "Discard the spark (move to trash) instead of keeping it marked processed. Default false." },
       body: { value: "<markdown>", description: "Optional initial free-form body content for the new permanent." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
-      format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "spark distilled",
     run: workflowRun("distillSpark", (args) => ({
@@ -1409,7 +1378,6 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       maturity: { value: `<${MATURITY_CODE_HELP}>`, description: "Permanent-note maturity code." },
       body: { value: "<markdown>", description: "Optional initial free-form body content." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
-      format: { value: "<text|json>", description: "Output format (default: text)." }
     },
     text: "permanent created",
     run: workflowRun("createFromDigest", (args) => ({
@@ -1433,7 +1401,7 @@ const COMPOUNDING_CONVENTION = "When answering against the wiki surfaces a durab
 // Discoverability: derive create/workflow inputs from the real command option
 // specs so `describe` is self-contained (a caller never needs `obsidian help`).
 // Sourced from NATIVE_CLI_COMMANDS itself, so there is no drift to maintain.
-const UNIVERSAL_OPTIONS = new Set(["open", "format"]);
+const UNIVERSAL_OPTIONS = new Set(["open"]);
 const NAMED_WORKFLOW_COMMANDS = [
   "para-zk:conventions",
   "para-zk:list",
@@ -1528,8 +1496,13 @@ export function registerNativeCliHandlers(plugin: ParaZkPluginContext): void {
       command.description,
       command.options,
       async (args = {}) => {
-        if (isHelpRequest(args)) return renderCommandHelp(command, args);
-        return withCliErrors(command.command, args, async () => {
+        if (isHelpRequest(args)) {
+          const formatError = formatArgError(args);
+          return formatError ? `error: ${formatError}` : renderCommandHelp(command);
+        }
+        return withCliErrors(command.command, async () => {
+          const formatError = formatArgError(args);
+          if (formatError) throw new Error(formatError);
           command.preResolve?.(args);
           rejectUnsupportedByArg(command, args);
           const resolved = await resolveFileBackedArgs(args, command.options);
@@ -1538,6 +1511,40 @@ export function registerNativeCliHandlers(plugin: ParaZkPluginContext): void {
       }
     );
   }
+}
+
+/** @internal Test harness entry point for command payload assertions. */
+export async function runNativeCliCommandPayload(
+  plugin: ParaZkPluginContext,
+  commandName: string,
+  args: CliArgs = {}
+): Promise<Record<string, unknown>> {
+  const command = NATIVE_CLI_COMMANDS.find((candidate) => candidate.command === commandName);
+  if (!command) throw new Error(`unknown CLI command: ${commandName}`);
+
+  if (isHelpRequest(args)) return commandHelpPayload(command);
+
+  const formatError = formatArgError(args);
+  if (formatError) return { ok: false, error: formatError };
+
+  try {
+    command.preResolve?.(args);
+    rejectUnsupportedByArg(command, args);
+    const resolved = await resolveFileBackedArgs(args, command.options);
+    const payload = await command.run(plugin, resolved);
+    return { ...payload, ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
+function formatArgError(args: CliArgs): string | undefined {
+  return Object.prototype.hasOwnProperty.call(args, "format")
+    ? "format is not supported; PARA-ZK CLI output is always text"
+    : undefined;
 }
 
 function rejectUnsupportedByArg(command: NativeCliCommand, args: CliArgs): void {
@@ -1563,17 +1570,22 @@ function isHelpRequest(args: CliArgs): boolean {
   return false;
 }
 
-function renderCommandHelp(command: NativeCliCommand, args: CliArgs): string {
+function commandHelpPayload(command: NativeCliCommand): Record<string, unknown> {
   const options = Object.entries(command.options).map(([name, spec]) => ({
     name,
     value: spec.value ?? null,
     description: spec.description
   }));
-  if (readCliString(args, "format") === "json") {
-    return JSON.stringify({ ok: true, description: command.description, options });
-  }
+  return { ok: true, description: command.description, options };
+}
+
+function renderCommandHelp(command: NativeCliCommand): string {
+  const help = commandHelpPayload(command) as {
+    description: string;
+    options: Array<{ name: string; value: string | null; description: string }>;
+  };
   const lines = [command.command, `  ${command.description}`, "", "Options:"];
-  for (const { name, value, description } of options) {
+  for (const { name, value, description } of help.options) {
     lines.push(`  ${value ? `${name}=${value}` : name}`);
     lines.push(`      ${description}`);
   }
@@ -1582,19 +1594,18 @@ function renderCommandHelp(command: NativeCliCommand, args: CliArgs): string {
 
 async function withCliErrors(
   command: string,
-  args: CliArgs,
   fn: () => Promise<Record<string, unknown>>,
   text: string
 ): Promise<string> {
   try {
     const payload = await fn();
-    return renderCli(command, args, {
+    return renderCli(command, {
       ...payload,
       ok: true
     }, text);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return renderCli(command, args, {
+    return renderCli(command, {
       ok: false,
       error: message
     }, `error: ${message}`);
@@ -1864,8 +1875,7 @@ function describeCollectionFilters(surfaces: SurfaceDescription[]): Record<strin
   );
 }
 
-function renderCli(command: string, args: CliArgs, payload: Record<string, unknown>, text: string): string {
-  if (readCliString(args, "format") === "json") return JSON.stringify(payload);
+function renderCli(command: string, payload: Record<string, unknown>, text: string): string {
   return renderCliText(command, payload, text);
 }
 

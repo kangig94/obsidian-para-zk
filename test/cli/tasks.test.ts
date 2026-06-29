@@ -205,7 +205,7 @@ describe("structured task field updates", () => {
     expect(currentShard()).toContain("\u{23EB}");
   });
 
-  it("returns an error envelope for an invalid field value", async () => {
+  it("returns an error payload for an invalid field value", async () => {
     const taskId = await insertTask("Invalid priority");
 
     const updated = await setTaskField(taskId, "priority", "urgent");
@@ -215,14 +215,14 @@ describe("structured task field updates", () => {
     expect((await readTask(taskId)).priority).toBeUndefined();
   });
 
-  it("returns an error envelope when setting a nonexistent task id", async () => {
+  it("returns an error payload when setting a nonexistent task id", async () => {
     const updated = await setTaskField("ghost-id", "due", "2026-06-12");
 
     expect(updated.ok).toBe(false);
     expect(String(updated.error)).toContain("task not found");
   });
 
-  it("returns an error envelope for an unknown task field", async () => {
+  it("returns an error payload for an unknown task field", async () => {
     const taskId = await insertTask("Unknown field");
 
     const updated = await setTaskField(taskId, "foobar", "value");
@@ -334,7 +334,7 @@ describe("structured task deletes", () => {
     expect(cli.app.deleted).not.toContain(shardPath);
   });
 
-  it("returns an error envelope when deleting a task id that does not exist", async () => {
+  it("returns an error payload when deleting a task id that does not exist", async () => {
     await insertTask("Existing task");
 
     const deleted = await deleteTask("missing-task-id");

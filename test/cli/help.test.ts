@@ -37,7 +37,7 @@ describe("per-command help", () => {
     expect(help.ok).toBe(true);
     expect(String(help.description)).toContain("once per task");
     const options = help.options as Array<{ name: string }>;
-    expect(options.map((option) => option.name)).toEqual(["format"]);
+    expect(options.map((option) => option.name)).toEqual([]);
   });
 
   it("advertises resource subdirectory title paths in per-command help", async () => {

@@ -168,7 +168,7 @@ describe("wiki ingest candidates", () => {
     expect(new Set(readPaths)).toEqual(new Set());
   });
 
-  it("surfaces the stable CLI envelope and rejects targeted paths in uncited and delta modes", async () => {
+  it("surfaces the stable CLI payload and rejects targeted paths in uncited and delta modes", async () => {
     await createNote(cli.app, "PARA/Resources/Source.md", ["type: resource", "updated: 2026-01-01 09:00"]);
     await createNote(cli.app, "ZK/Digests/Source Digest.md", ["type: digest", "updated: 2026-01-01 09:00"]);
 

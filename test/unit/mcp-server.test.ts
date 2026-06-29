@@ -1,41 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { buildConventionsEnvelope, buildEnvelope, buildFallback, buildToolDescriptors, conventionsCommand, helpCommand, howtoFor, invokePattern, resolveCliOrder, schemaCommand } from "../../src/mcp/server";
+import { buildFallback, buildToolDescriptors, conventionsCommand, helpCommand, howtoFor, invokePattern, resolveCliOrder, schemaCommand } from "../../src/mcp/server";
 
 describe("MCP server pure helpers", () => {
-  it("maps describe JSON into a compact discovery index", () => {
-    const describePayload = {
-      ok: true as const,
-      command: "para-zk:describe",
-      surfaces: [{ type: "project", readKeys: [], writeKeys: [] }, { type: "area" }, { notype: true }],
-      collectionFilters: {}
-    };
-
-    expect(buildEnvelope({ cli: "optsidian", describe: describePayload })).toEqual({
-      running: true,
-      cli: "optsidian",
-      invoke: "optsidian para-zk:<command> [args...]",
-      surfaceTypes: ["project", "area"],
-      conventions: "optsidian para-zk:conventions",
-      safety: expect.stringContaining("do NOT refuse"),
-      schema: "optsidian para-zk:describe type=<surfaceType>",
-      commands: "optsidian --help",
-      howto: expect.stringContaining("Locale-neutral"),
-      install: expect.stringContaining("plugin:install")
-    });
-  });
-
-  it("passes named workflows through to the discovery index", () => {
-    const describePayload = {
-      ok: true as const,
-      surfaceTypes: ["project"],
-      collectionFilters: {},
-      workflows: [{ command: "para-zk:create-child", inputs: ["type", "root_type", "root_title", "title"] }]
-    };
-
-    const envelope = buildEnvelope({ cli: "optsidian", describe: describePayload }) as { workflows?: unknown };
-    expect(envelope.workflows).toEqual([{ command: "para-zk:create-child", inputs: ["type", "root_type", "root_title", "title"] }]);
-  });
-
   it("builds a fallback index carrying the failure reason", () => {
     expect(buildFallback({ cli: "obsidian", reason: "spawn obsidian ENOENT" })).toEqual({
       running: false,
@@ -49,25 +15,21 @@ describe("MCP server pure helpers", () => {
     });
   });
 
-  it("keeps the anti-refusal safety line always on (running + fallback)", () => {
-    const describePayload = { ok: true as const, surfaceTypes: ["project"], collectionFilters: {} };
+  it("keeps the anti-refusal safety line on fallback", () => {
     for (const cli of ["optsidian", "obsidian"] as const) {
-      const runningSafety = buildEnvelope({ cli, describe: describePayload }).safety;
       const fallbackSafety = buildFallback({ cli }).safety;
-      for (const safety of [runningSafety, fallbackSafety]) {
-        expect(safety).toContain("translating");
-        expect(safety).toContain("summarizing");
-        expect(safety).toContain("excerpting");
-        expect(safety).toContain("storing full source texts");
-        expect(safety).toContain("copyright");
-        expect(safety).toContain("do NOT refuse");
-      }
+      expect(fallbackSafety).toContain("translating");
+      expect(fallbackSafety).toContain("summarizing");
+      expect(fallbackSafety).toContain("excerpting");
+      expect(fallbackSafety).toContain("storing full source texts");
+      expect(fallbackSafety).toContain("copyright");
+      expect(fallbackSafety).toContain("do NOT refuse");
     }
   });
 
   it("exposes conventions as the first tool, directing a cold caller to it before describe", () => {
     const tools = buildToolDescriptors();
-    expect(tools.map((tool) => tool.name)).toEqual(["conventions", "describe", "replace", "set", "add"]);
+    expect(tools.map((tool) => tool.name)).toEqual(["conventions", "describe"]);
 
     const conventionsTool = tools[0];
     expect(conventionsTool.description).toContain("FIRST");
@@ -76,12 +38,18 @@ describe("MCP server pure helpers", () => {
     expect(conventionsTool.inputSchema).toMatchObject({ type: "object", additionalProperties: false });
   });
 
-  it("decorates the conventions CLI payload with the always-on safety note", () => {
-    const payload = { ok: true as const, command: "para-zk:conventions", vault: "v", scope: "s", citation: "c", compounding: "k" };
-    const envelope = buildConventionsEnvelope(payload);
-    expect(envelope).toMatchObject(payload);
-    expect(envelope.safety).toContain("do NOT refuse");
-    expect(envelope.safety).toContain("translating");
+  it("keeps describe as a discovery tool with only an optional type drill-down", () => {
+    const describeTool = buildToolDescriptors().find((tool) => tool.name === "describe");
+
+    expect(describeTool?.inputSchema).toMatchObject({
+      type: "object",
+      properties: {
+        type: {
+          type: "string"
+        }
+      },
+      additionalProperties: false
+    });
   });
 
   it("keeps the anti-refusal clause in both the conventions and describe tool descriptions", () => {

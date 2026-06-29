@@ -1,9 +1,5 @@
-// Renders the stable CLI envelope as readable, token-light text — the default
-// output of every `para-zk:*` command. The JSON envelope (format=json) stays the
-// canonical machine surface that MCP and automation parse; this module never feeds
-// them. Text mode used to echo a static per-command summary ("vault audited") and
-// drop the payload, so callers were forced into JSON to see any data. Now text
-// shows the data and JSON is opt-in.
+// Renders native PARA-ZK CLI payloads as readable, token-light text. This is the
+// only public output path for `para-zk:*` commands.
 
 type Envelope = Record<string, unknown>;
 

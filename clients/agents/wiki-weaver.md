@@ -74,20 +74,17 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
     `optsidian para-zk:*` run via Bash fails with "unable to find Obsidian". Call it as
     `command_run({ command: "para-zk:create-llm-wiki", args: ["title=Robotics/Diffusion Policy", "by=<model-id>"] })`;
     `args` is argv (no shell): each `key=value` is its own token, and values may contain spaces/
-    quotes/newlines verbatim. Prefer the default text output for para-zk commands; request JSON only
-    when a caller must machine-parse fields. Pass body/value content INLINE in `args`
+    quotes/newlines verbatim. PARA-ZK commands return text. Pass body/value content INLINE in `args`
     (`value=<full markdown>`) — there is no shell and no temp file. Use `command_run` for every
     para-zk/optsidian command. NEVER write files directly.
 
     READ EACH SOURCE BODY via the host `read` command through `command_run` — the packet gives each
     source's vault-relative `path`, never its body. para-zk's own reads cannot line-chunk a body and a
     whole-body read overflows, so host `read` is the only line-paged reader. Call
-    `command_run({ command: "read", args: ["path=<path>", "lines=<a>:<b>", "format=json"] })`;
-    `stdout` parses to `{ range: {start,end,total}, truncated, numberedText }`. `numberedText` prefixes
-    each line with its number + a tab — IGNORE the prefixes (and the page-1 frontmatter); integrate only
-    the prose. Page in modest windows (start ~60 lines; SHRINK and re-read if a page returns
-    `truncated:true`), advancing until `range.end == range.total` so you read the WHOLE body. NEVER
-    skip lines or integrate a truncated/partial source.
+    `command_run({ command: "read", args: ["path=<path>", "lines=<a>:<b>"] })`;
+    integrate only the returned prose and ignore line prefixes/frontmatter. Page in modest windows
+    (start ~60 lines; SHRINK and re-read if the output indicates truncation), advancing until the
+    whole body has been read. NEVER skip lines or integrate a truncated/partial source.
 
     DOMAIN & TITLE: your `page.title` is already `<domain>/<concept>` — write that page, do not pick a
     domain or re-file. `create-llm-wiki title=<page.title>` is get-or-create: if the page exists it

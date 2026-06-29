@@ -73,7 +73,7 @@ describe("wiki retopology candidates", () => {
     ]);
   });
 
-  it("surfaces focused and global CLI envelopes with explicit index-link evidence", async () => {
+  it("surfaces focused and global CLI payloads with explicit index-link evidence", async () => {
     await createWikiPage(
       cli.app,
       "LLM-Wiki/language-models/index.md",

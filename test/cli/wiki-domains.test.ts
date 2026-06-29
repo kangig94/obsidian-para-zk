@@ -64,7 +64,7 @@ describe("wiki domains", () => {
     expect(page.domains).toEqual([{ domain: "Bio", pages: 1, has_index: true }]);
   });
 
-  it("surfaces the stable CLI envelope and rejects offset/limit aliases", async () => {
+  it("surfaces the stable CLI payload and rejects offset/limit aliases", async () => {
     await cli.run("para-zk:create-llm-wiki", { title: "AI/Diffusion Policy" });
 
     const result = await cli.run("para-zk:wiki-domains", { limit: "all" });

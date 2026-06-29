@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderCliText } from "../../src/cli/text-output";
 
-// Direct tests over the pure renderer: each constructed envelope mirrors a real
+// Direct tests over the pure renderer: each constructed payload mirrors a real
 // command payload, so every distinctive output shape (pagination hints, the
 // AMBIGUOUS finding line, exact-key reads, collection pages, candidates, describe,
 // appended warnings) is asserted without driving the whole CLI harness.
