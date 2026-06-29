@@ -91,6 +91,7 @@ describe("wiki retopology candidates", () => {
       command: "para-zk:wiki-retopology-candidates",
       mode: "domain",
       domain: "language-models",
+      depth: 2,
       count: 1,
       returned: 1,
       has_more: false
@@ -112,6 +113,7 @@ describe("wiki retopology candidates", () => {
       ok: true,
       command: "para-zk:wiki-retopology-candidates",
       mode: "global",
+      depth: 2,
       count: 1,
       returned: 1
     });
