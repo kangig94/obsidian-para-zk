@@ -21,8 +21,7 @@ const MAX_SHARED_TERMS = 8;
 const BODY_UNIGRAM_WEIGHT = 1;
 const BODY_BIGRAM_WEIGHT = 0.4;
 const CACHE_FILE = "retopology-cache.json";
-const CACHE_VERSION = 3;
-const STOPWORDS = new Set([
+const STOPWORD_LIST = [
   "a",
   "an",
   "and",
@@ -50,7 +49,19 @@ const STOPWORDS = new Set([
   "this",
   "to",
   "with"
-]);
+] as const;
+const STOPWORDS = new Set<string>(STOPWORD_LIST);
+const CACHE_KEY = cacheKeyHash(JSON.stringify({
+  schema: "compact-term-counts",
+  domainIndexConcept: DOMAIN_INDEX_CONCEPT,
+  domainWeight: 3,
+  bodyUnigramWeight: BODY_UNIGRAM_WEIGHT,
+  bodyBigramWeight: BODY_BIGRAM_WEIGHT,
+  minTokenLength: 2,
+  tokenizer: "lowercase-wikilink-visible-label-code-strip-unicode-alnum",
+  bigrams: "adjacent-filtered-body-tokens",
+  stopwords: [...STOPWORD_LIST].sort()
+}));
 
 type DomainIndex = {
   domain: string;
@@ -64,18 +75,11 @@ type RawDomainIndex = Omit<DomainIndex, "vector" | "length"> & {
   termCounts: Map<string, number>;
 };
 
-type CachedIndexTerms = {
-  path: string;
-  domain: string;
-  title: string;
-  mtime: number;
-  size: number;
-  terms: Array<[string, number]>;
-};
+type CachedIndexTerms = [mtime: number, size: number, terms: Record<string, number>];
 
 type RetopologyCache = {
-  version: number;
-  indexes: Record<string, CachedIndexTerms>;
+  k: string;
+  i: Record<string, CachedIndexTerms>;
 };
 
 export async function wikiRetopologyCandidates(
@@ -138,9 +142,9 @@ function normalizeDomainOption(value: unknown, byDomain: Map<string, DomainIndex
 async function readDomainIndexes(ctx: WorkflowContext): Promise<DomainIndex[]> {
   const wikiRoot = normalizeVaultPath(PARA_ZK_PATHS.wikiFolder);
   const indexes: RawDomainIndex[] = [];
-  const cache = await readCache(ctx);
-  const nextCache: RetopologyCache = { version: CACHE_VERSION, indexes: {} };
-  let cacheChanged = !cache || cache.version !== CACHE_VERSION;
+  const nextCache: RetopologyCache | undefined = ctx.cache ? { k: CACHE_KEY, i: {} } : undefined;
+  const cache = nextCache ? await readCache(ctx) : undefined;
+  let cacheChanged = Boolean(nextCache && !cache);
 
   for (const file of ctx.host.getMarkdownFiles()) {
     const path = normalizeVaultPath(file.path);
@@ -152,27 +156,15 @@ async function readDomainIndexes(ctx: WorkflowContext): Promise<DomainIndex[]> {
 
     const domain = segments[0];
     const title = `${domain}/${DOMAIN_INDEX_CONCEPT}`;
-    const cached = cache?.indexes[path];
+    const cached = cache?.i[path];
     const mtime = file.stat?.mtime ?? 0;
     const size = file.stat?.size ?? 0;
-    const cacheHit = cached
-      && cached.path === path
-      && cached.domain === domain
-      && cached.title === title
-      && cached.mtime === mtime
-      && cached.size === size;
+    const cacheHit = cached && cached[0] === mtime && cached[1] === size;
     const termCounts = cacheHit
-      ? mapFromEntries(cached.terms)
+      ? mapFromRecord(cached[2])
       : indexTermCounts(domain, stripManagedPrelude(await ctx.host.read(file)));
-    nextCache.indexes[path] = {
-      path,
-      domain,
-      title,
-      mtime,
-      size,
-      terms: [...termCounts.entries()]
-    };
-    if (!cacheHit) cacheChanged = true;
+    if (nextCache) nextCache.i[path] = [mtime, size, recordFromMap(termCounts)];
+    if (nextCache && !cacheHit) cacheChanged = true;
     indexes.push({
       domain,
       title,
@@ -181,10 +173,10 @@ async function readDomainIndexes(ctx: WorkflowContext): Promise<DomainIndex[]> {
     });
   }
 
-  if (cache && Object.keys(cache.indexes).length !== Object.keys(nextCache.indexes).length) {
+  if (cache && nextCache && Object.keys(cache.i).length !== Object.keys(nextCache.i).length) {
     cacheChanged = true;
   }
-  if (cacheChanged) await writeCache(ctx, nextCache);
+  if (nextCache && cacheChanged) await writeCache(ctx, nextCache);
 
   return tfIdfIndexes(indexes).sort((left, right) => left.domain.localeCompare(right.domain));
 }
@@ -194,13 +186,13 @@ async function readCache(ctx: WorkflowContext): Promise<RetopologyCache | undefi
   if (!raw) return undefined;
   try {
     const parsed = JSON.parse(raw) as unknown;
-    if (!isRecord(parsed) || parsed.version !== CACHE_VERSION || !isRecord(parsed.indexes)) return undefined;
-    const indexes: RetopologyCache["indexes"] = {};
-    for (const [path, value] of Object.entries(parsed.indexes)) {
+    if (!isRecord(parsed) || parsed.k !== CACHE_KEY || !isRecord(parsed.i)) return undefined;
+    const indexes: RetopologyCache["i"] = {};
+    for (const [path, value] of Object.entries(parsed.i)) {
       if (!isCachedIndexTerms(value)) return undefined;
       indexes[path] = value;
     }
-    return { version: CACHE_VERSION, indexes };
+    return { k: CACHE_KEY, i: indexes };
   } catch {
     return undefined;
   }
@@ -211,23 +203,31 @@ async function writeCache(ctx: WorkflowContext, cache: RetopologyCache): Promise
 }
 
 function isCachedIndexTerms(value: unknown): value is CachedIndexTerms {
-  return isRecord(value)
-    && typeof value.path === "string"
-    && typeof value.domain === "string"
-    && typeof value.title === "string"
-    && typeof value.mtime === "number"
-    && typeof value.size === "number"
-    && Array.isArray(value.terms)
-    && value.terms.every((entry) => (
-      Array.isArray(entry)
-      && entry.length === 2
-      && typeof entry[0] === "string"
-      && typeof entry[1] === "number"
-    ));
+  return Array.isArray(value)
+    && value.length === 3
+    && typeof value[0] === "number"
+    && typeof value[1] === "number"
+    && isRecord(value[2])
+    && Object.values(value[2]).every((count) => typeof count === "number");
 }
 
-function mapFromEntries(entries: Array<[string, number]>): Map<string, number> {
-  return new Map(entries);
+function mapFromRecord(record: Record<string, number>): Map<string, number> {
+  return new Map(Object.entries(record));
+}
+
+function recordFromMap(map: Map<string, number>): Record<string, number> {
+  const record: Record<string, number> = {};
+  for (const [term, count] of map.entries()) record[term] = count;
+  return record;
+}
+
+function cacheKeyHash(value: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `fnv1a-${(hash >>> 0).toString(36)}`;
 }
 
 function candidatesForAll(

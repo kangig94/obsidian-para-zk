@@ -424,9 +424,9 @@ concept-page bodies and does not decide the topology by itself; use the returned
 pair list to choose which indexes to inspect directly.
 
 When running inside Obsidian, the command caches per-index term counts in
-`.obsidian/plugins/para-zk/retopology-cache.json`, invalidated by scoring version,
-index path, modified time, and size. Final TF-IDF scores are still recomputed for
-the current domain set each run.
+`.obsidian/plugins/para-zk/retopology-cache.json`, invalidated by a hash of the
+term-counting rules plus index path, modified time, and size. Final TF-IDF scores
+are still recomputed for the current domain set each run.
 
 Options:
 
