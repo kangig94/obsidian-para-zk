@@ -380,17 +380,17 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `mode` | `per-import`, `delta`, `init`, `re-ingest` | Required candidate discovery mode. |
-| `type` | `resource`, `digest`, `permanent`, `subnote` | Optional ingestable source type filter. Use `type=resource` with `mode=init` to list only never-cited resources. |
-| `source_path` | vault path | Single source note path. Required for `per-import` and `re-ingest` when `source_paths` is omitted; rejected for `delta` and `init`. |
-| `source_paths` | JSON array or comma list | Multiple source note paths. Required for `per-import` and `re-ingest` when `source_path` is omitted; rejected for `delta` and `init`. |
+| `mode` | `per-import`, `delta`, `uncited`, `re-ingest` | Required candidate discovery mode. |
+| `type` | `resource`, `digest`, `permanent`, `subnote` | Optional ingestable source type filter. Use `type=resource` with `mode=uncited` to list only never-cited resources. |
+| `source_path` | vault path | Single source note path. Required for `per-import` and `re-ingest` when `source_paths` is omitted; rejected for `delta` and `uncited`. |
+| `source_paths` | JSON array or comma list | Multiple source note paths. Required for `per-import` and `re-ingest` when `source_path` is omitted; rejected for `delta` and `uncited`. |
 | `offset` | number | Zero-based candidate offset (default `0`). |
 | `limit` | number or `all` | Maximum candidates to return (default `50`). |
 | `format` | `json`, `text` | Default `text` renders the data readably; use `json` when the output is machine-parsed. |
 
 ```bash
-optsidian para-zk:wiki-ingest-candidates mode=init limit=all
-optsidian para-zk:wiki-ingest-candidates mode=init type=resource limit=all
+optsidian para-zk:wiki-ingest-candidates mode=uncited limit=all
+optsidian para-zk:wiki-ingest-candidates mode=uncited type=resource limit=all
 optsidian para-zk:wiki-ingest-candidates mode=delta limit=50
 optsidian para-zk:wiki-ingest-candidates mode=per-import source_paths='["PARA/Resources/Source Paper.md","ZK/Permanent/Stable Interfaces.md"]'
 optsidian para-zk:wiki-ingest-candidates mode=re-ingest source_path="PARA/Resources/Source Paper.md"
@@ -407,7 +407,7 @@ JSON output fields:
 
 Reason codes:
 
-- `missing_wiki_citation`: in `init` or `delta`, an ingestable source has no
+- `missing_wiki_citation`: in `uncited` or `delta`, an ingestable source has no
   incoming citation from an `llm-wiki` note.
 - `source_newer_than_wiki`: in `delta`, the source is cited and its current
   `updated` value is newer than the minimum `updated` value of the LLM-Wiki

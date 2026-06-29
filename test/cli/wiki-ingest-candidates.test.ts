@@ -93,7 +93,7 @@ async function seedCandidateVault(app: MockApp): Promise<void> {
 }
 
 describe("wiki ingest candidates", () => {
-  it("classifies init, delta, per-import, and re-ingest from page updated timestamps without body reads", async () => {
+  it("classifies uncited, delta, per-import, and re-ingest from page updated timestamps without body reads", async () => {
     const { ctx, app } = createTestContext();
     await seedCandidateVault(app);
 
@@ -104,16 +104,16 @@ describe("wiki ingest candidates", () => {
       return originalRead(file);
     };
 
-    const init = await wikiIngestCandidates(ctx, { mode: "init", limit: "all" });
-    expect(init.candidates.map((candidate) => [candidate.path, candidate.reason])).toEqual([
+    const uncited = await wikiIngestCandidates(ctx, { mode: "uncited", limit: "all" });
+    expect(uncited.candidates.map((candidate) => [candidate.path, candidate.reason])).toEqual([
       ["PARA/Projects/Example/Uncited Subnote.md", "missing_wiki_citation"],
       ["PARA/Resources/Uncited.md", "missing_wiki_citation"],
       ["ZK/Digests/Uncited Digest.md", "missing_wiki_citation"],
       ["ZK/Permanent/Uncited Permanent.md", "missing_wiki_citation"]
     ]);
 
-    const initResources = await wikiIngestCandidates(ctx, { mode: "init", type: "resource", limit: "all" });
-    expect(initResources.candidates.map((candidate) => [candidate.path, candidate.type, candidate.reason])).toEqual([
+    const uncitedResources = await wikiIngestCandidates(ctx, { mode: "uncited", type: "resource", limit: "all" });
+    expect(uncitedResources.candidates.map((candidate) => [candidate.path, candidate.type, candidate.reason])).toEqual([
       ["PARA/Resources/Uncited.md", "resource", "missing_wiki_citation"]
     ]);
 
@@ -168,11 +168,11 @@ describe("wiki ingest candidates", () => {
     expect(new Set(readPaths)).toEqual(new Set());
   });
 
-  it("surfaces the stable CLI envelope and rejects targeted paths in init and delta modes", async () => {
+  it("surfaces the stable CLI envelope and rejects targeted paths in uncited and delta modes", async () => {
     await createNote(cli.app, "PARA/Resources/Source.md", ["type: resource", "updated: 2026-01-01 09:00"]);
     await createNote(cli.app, "ZK/Digests/Source Digest.md", ["type: digest", "updated: 2026-01-01 09:00"]);
 
-    const result = await cli.run("para-zk:wiki-ingest-candidates", { mode: "init", type: "resource", limit: "all" });
+    const result = await cli.run("para-zk:wiki-ingest-candidates", { mode: "uncited", type: "resource", limit: "all" });
 
     expect(result).toMatchObject({
       ok: true,
@@ -190,7 +190,7 @@ describe("wiki ingest candidates", () => {
       stale_llm_wikis: []
     });
 
-    const invalidType = await cli.run("para-zk:wiki-ingest-candidates", { mode: "init", type: "project" });
+    const invalidType = await cli.run("para-zk:wiki-ingest-candidates", { mode: "uncited", type: "project" });
     expect(invalidType.ok).toBe(false);
     expect(String(invalidType.error)).toContain("type must be one of");
 
@@ -201,12 +201,12 @@ describe("wiki ingest candidates", () => {
     expect(rejected.ok).toBe(false);
     expect(String(rejected.error)).toContain("source_path");
 
-    const initRejected = await cli.run("para-zk:wiki-ingest-candidates", {
-      mode: "init",
+    const uncitedRejected = await cli.run("para-zk:wiki-ingest-candidates", {
+      mode: "uncited",
       source_paths: '["PARA/Resources/Source.md"]'
     });
-    expect(initRejected.ok).toBe(false);
-    expect(String(initRejected.error)).toContain("source_path");
+    expect(uncitedRejected.ok).toBe(false);
+    expect(String(uncitedRejected.error)).toContain("source_path");
 
     // `source`/`sources` collide with the path-alias convention and must be rejected
     // in favour of the canonical source_path/source_paths.

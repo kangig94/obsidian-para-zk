@@ -119,7 +119,7 @@ The `install` field is present in both states (the active vault running PARA-ZK 
 `para-zk:wiki-ingest-candidates` is surfaced through the `describe.workflows`
 array, not as a separate MCP tool, consistent with `list` and `audit`. Invoke it
 through the CLI when an agent needs the body-read-free source set for LLM-Wiki
-ingest: `mode=<per-import|delta|init|re-ingest>`, `source_path=<vault-path>` or
+ingest: `mode=<per-import|delta|uncited|re-ingest>`, `source_path=<vault-path>` or
 `source_paths=<json|comma-list>` for targeted modes only, plus `offset`,
 `limit`, and `format`. Its envelope includes `{ ok, command, count, offset,
 limit, returned, has_more, candidates }`, where each candidate has

@@ -731,10 +731,10 @@ function assertWikiIngestCandidatesScenario() {
   assertCreated(source, "wiki ingest source");
   assertGeneratedNoteTemplateShape(source.path, "resource");
 
-  const initCandidate = waitForWikiIngestCandidate(source.path, true);
+  const uncitedCandidate = waitForWikiIngestCandidate(source.path, true);
   assert(
-    initCandidate.reason === "missing_wiki_citation",
-    `uncited source should be an init candidate: ${JSON.stringify(initCandidate)}`
+    uncitedCandidate.reason === "missing_wiki_citation",
+    `uncited source should be an uncited candidate: ${JSON.stringify(uncitedCandidate)}`
   );
 
   const insert = cliJson("para-zk:update-llm-wiki", [
@@ -758,7 +758,7 @@ function assertWikiIngestCandidatesScenario() {
   );
 }
 
-function waitForWikiIngestCandidate(path, expectedPresent, mode = "init", timeoutMs = 3000) {
+function waitForWikiIngestCandidate(path, expectedPresent, mode = "uncited", timeoutMs = 3000) {
   const deadline = Date.now() + timeoutMs;
   let lastPayload = null;
   let match = undefined;

@@ -870,10 +870,10 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     command: "para-zk:wiki-ingest-candidates",
     description: "List canonical source notes that should be folded into the LLM-Wiki",
     options: {
-      mode: { value: "<per-import|delta|init|re-ingest>", description: "Candidate discovery mode." },
+      mode: { value: "<per-import|delta|uncited|re-ingest>", description: "Candidate discovery mode." },
       type: { value: "<resource|digest|permanent|subnote>", description: "Optional ingestable source type filter." },
-      source_path: { value: "<vault-path>", description: "Single source note path. Required for per-import and re-ingest; rejected for delta and init." },
-      source_paths: { value: "<json|comma-list>", description: "Multiple source note paths. Required for per-import and re-ingest when source_path is omitted; rejected for delta and init." },
+      source_path: { value: "<vault-path>", description: "Single source note path. Required for per-import and re-ingest; rejected for delta and uncited." },
+      source_paths: { value: "<json|comma-list>", description: "Multiple source note paths. Required for per-import and re-ingest when source_path is omitted; rejected for delta and uncited." },
       offset: { value: "<number>", description: "Zero-based candidate offset (default: 0)." },
       limit: { value: "<number|all>", description: "Maximum candidates to return (default: 50)." },
       format: FORMAT_OPTION

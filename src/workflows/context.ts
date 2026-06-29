@@ -209,7 +209,7 @@ export type ListOptions = {
   limit?: number | "all";
 };
 
-export type WikiIngestMode = "per-import" | "delta" | "init" | "re-ingest";
+export type WikiIngestMode = "per-import" | "delta" | "uncited" | "re-ingest";
 
 export type WikiIngestCandidateReason =
   | "missing_wiki_citation"

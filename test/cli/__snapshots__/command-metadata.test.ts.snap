@@ -1728,18 +1728,18 @@ exports[`native CLI command metadata is stable 1`] = `
       },
       "mode": {
         "description": "Candidate discovery mode.",
-        "value": "<per-import|delta|init|re-ingest>",
+        "value": "<per-import|delta|uncited|re-ingest>",
       },
       "offset": {
         "description": "Zero-based candidate offset (default: 0).",
         "value": "<number>",
       },
       "source_path": {
-        "description": "Single source note path. Required for per-import and re-ingest; rejected for delta and init.",
+        "description": "Single source note path. Required for per-import and re-ingest; rejected for delta and uncited.",
         "value": "<vault-path>",
       },
       "source_paths": {
-        "description": "Multiple source note paths. Required for per-import and re-ingest when source_path is omitted; rejected for delta and init.",
+        "description": "Multiple source note paths. Required for per-import and re-ingest when source_path is omitted; rejected for delta and uncited.",
         "value": "<json|comma-list>",
       },
       "type": {

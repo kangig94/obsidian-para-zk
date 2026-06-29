@@ -1,7 +1,7 @@
 ---
 name: wiki-ingest
-description: "Use when ingesting canonical PARA-ZK sources into the LLM-Wiki — per-import, delta, init, or targeted re-ingest."
-argument-hint: "mode=<init|delta|per-import|re-ingest>"
+description: "Use when ingesting canonical PARA-ZK sources into the LLM-Wiki — per-import, delta, uncited, or targeted re-ingest."
+argument-hint: "mode=<uncited|delta|per-import|re-ingest>"
 ---
 
 # Wiki Ingest
@@ -34,19 +34,19 @@ derive from the material.
 
 ## Argument Routing
 
-`mode` (required) selects what to discover. `init`/`delta` take no source args; `per-import`/`re-ingest`
+`mode` (required) selects what to discover. `uncited`/`delta` take no source args; `per-import`/`re-ingest`
 require one of `source_path` or `source_paths`, passed through to `para-zk:wiki-ingest-candidates`.
 `type` is optional and filters ingestable source kind (`resource`, `digest`, `permanent`, `subnote`);
-use `mode=init type=resource` to inspect existing Resources that have never been cited by the wiki.
+use `mode=uncited type=resource` to inspect existing Resources that have never been cited by the wiki.
 
 | `mode` | Targets |
 |--------|---------|
-| `init` | all ingestable sources missing an incoming LLM-Wiki citation |
+| `uncited` | all ingestable sources missing an incoming LLM-Wiki citation |
 | `delta` | new/uncited sources + sources whose `updated` is newer than the LLM-Wiki pages citing them (best-effort, via `updated` timestamps; force-refresh a known change with `re-ingest`) |
 | `per-import` | exactly the given `source_path`/`source_paths` |
 | `re-ingest` | exactly the given `source_path`/`source_paths`, even if already cited/fresh |
 
-On invalid args (source args with `init`/`delta`, or none with `per-import`/`re-ingest`), stop with
+On invalid args (source args with `uncited`/`delta`, or none with `per-import`/`re-ingest`), stop with
 the concrete routing error — do not ask the user.
 
 ## Execution
@@ -60,7 +60,7 @@ the concrete routing error — do not ask the user.
    `para-zk:read-llm-wiki`, `para-zk:create-llm-wiki`, and `para-zk:update-llm-wiki`. If the vault
    is unavailable, stop with the CLI error; do not fall back to direct file writes.
 
-2. **Resolve mode**: Normalize exactly one mode from `{per-import, delta, init, re-ingest}`. Preserve
+2. **Resolve mode**: Normalize exactly one mode from `{per-import, delta, uncited, re-ingest}`. Preserve
    `limit`/`offset` and optional `type` when supplied. For targeted modes, preserve exactly one of `source_path` or
    `source_paths`; for untargeted modes, reject either source selector before doing any reads.
 

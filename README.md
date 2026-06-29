@@ -75,7 +75,7 @@ Once the plugin is installed (above), these PARA-ZK skills are available as slas
 | Skill | Description |
 | --- | --- |
 | `import-resource` | Import a file, URL, web research, or synthesis into the vault as a resource note |
-| `wiki-ingest` | Ingest canonical sources into the LLM-Wiki (`init` / `delta` / `per-import` / `re-ingest`) |
+| `wiki-ingest` | Ingest canonical sources into the LLM-Wiki (`uncited` / `delta` / `per-import` / `re-ingest`) |
 | `wiki-capture` | File a durable synthesis from a wiki conversation back as a new or updated wiki page (writes only on confirmation) |
 | `wiki-lint` | Lint or health-check the LLM-Wiki on demand |
 | `codex-setup` | Install or refresh PARA-ZK's Codex custom agents (e.g. `wiki-weaver`) |

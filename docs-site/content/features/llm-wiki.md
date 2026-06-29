@@ -54,14 +54,14 @@ Then cite that stable id from the body with `` `PZ[<id>]` ``. Bare `PZ[<id>]` te
 `para-zk:wiki-ingest-candidates` lists source notes that should be folded into the wiki without reading source or wiki bodies:
 
 ```bash
-optsidian para-zk:wiki-ingest-candidates mode=init type=resource limit=all format=json
+optsidian para-zk:wiki-ingest-candidates mode=uncited type=resource limit=all format=json
 optsidian para-zk:wiki-ingest-candidates mode=delta limit=50 format=json
 optsidian para-zk:wiki-ingest-candidates mode=per-import source_path="PARA/Resources/Source Paper.md" format=json
 ```
 
 Candidate modes:
 
-- `init`: find uncited ingestable sources for an initial wiki build.
+- `uncited`: find ingestable sources with no incoming LLM-Wiki citation.
 - `delta`: find uncited sources and sources newer than citing wiki pages.
 - `per-import`: process source paths immediately after import.
 - `re-ingest`: deliberately refresh selected source paths.

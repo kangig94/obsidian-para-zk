@@ -85,7 +85,7 @@ export function ingestableCanonicalSource(
 function normalizeWikiIngestOptions(options: WikiIngestCandidatesOptions): NormalizedWikiIngestOptions {
   const mode = options.mode;
   if (!isWikiIngestMode(mode)) {
-    throw new Error("mode must be one of per-import, delta, init, re-ingest");
+    throw new Error("mode must be one of per-import, delta, uncited, re-ingest");
   }
 
   const sourcePaths = normalizeSourcePaths(options);
@@ -112,7 +112,7 @@ function normalizeWikiIngestOptions(options: WikiIngestCandidatesOptions): Norma
 }
 
 function isWikiIngestMode(value: unknown): value is WikiIngestMode {
-  return value === "per-import" || value === "delta" || value === "init" || value === "re-ingest";
+  return value === "per-import" || value === "delta" || value === "uncited" || value === "re-ingest";
 }
 
 function normalizeSourcePaths(options: WikiIngestCandidatesOptions): string[] {
@@ -209,7 +209,7 @@ function candidateReason(
   cited: boolean,
   stale: boolean
 ): WikiIngestCandidateReason | undefined {
-  if (mode === "init") {
+  if (mode === "uncited") {
     return cited ? undefined : "missing_wiki_citation";
   }
   if (mode !== "delta") return undefined;
