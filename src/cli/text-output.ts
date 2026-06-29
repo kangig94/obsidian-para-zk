@@ -243,10 +243,34 @@ function renderRetopologyCandidates(payload: Envelope): string {
     const evidence = stringList(candidate.evidence);
     lines.push(`  ${domains}  score=${score}`);
     for (const item of evidence.slice(0, 2)) lines.push(`    ${item}`);
+    if (isRecord(candidate.connection)) lines.push(`    ${connectionLine(candidate.connection)}`);
   }
+  if (isRecord(payload.graph)) lines.push(...renderRetopologyGraph(payload.graph));
   const hint = topKHint(payload);
   if (hint) lines.push(hint);
   return lines.join("\n");
+}
+
+function connectionLine(connection: Envelope): string {
+  const depth = typeof connection.depth === "number" ? connection.depth : 0;
+  if (connection.connected !== true) return `connection: none within depth ${depth}`;
+  const distance = typeof connection.distance === "number" ? connection.distance : 0;
+  const path = Array.isArray(connection.path) ? connection.path.map(strOf).filter(Boolean).join(" -> ") : "";
+  return `connection d${distance}: ${path}`;
+}
+
+function renderRetopologyGraph(graph: Envelope): string[] {
+  const depth = typeof graph.depth === "number" ? graph.depth : 0;
+  const root = strOf(graph.root);
+  const lines = [`graph root=${root} depth=${depth}`];
+  const nodes = Array.isArray(graph.nodes) ? graph.nodes : [];
+  for (const node of nodes) {
+    if (!isRecord(node)) continue;
+    const distance = typeof node.distance === "number" ? node.distance : 0;
+    const path = Array.isArray(node.path) ? node.path.map(strOf).filter(Boolean).join(" -> ") : strOf(node.domain);
+    lines.push(`  d${distance}  ${strOf(node.index)}  via ${path}`);
+  }
+  return lines;
 }
 
 function topKHint(page: Envelope): string | undefined {

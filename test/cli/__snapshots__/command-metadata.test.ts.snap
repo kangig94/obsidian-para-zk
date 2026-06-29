@@ -1774,6 +1774,10 @@ exports[`native CLI command metadata is stable 1`] = `
     "command": "para-zk:wiki-retopology-candidates",
     "description": "Rank LLM-Wiki domain index pairs for retopology review",
     "options": {
+      "depth": {
+        "description": "Undirected index graph depth for focused graph or global pair connections (default: 2).",
+        "value": "<number>",
+      },
       "domain": {
         "description": "Optional focus domain. When omitted, rank global domain pairs.",
         "value": "<domain>",

@@ -469,7 +469,8 @@ Options:
 
 | Option | Values | Notes |
 | --- | --- | --- |
-| `domain` | domain name | Optional focus domain. When provided, returns the top candidates between that domain's index and every other domain index. |
+| `domain` | domain name | Optional focus domain. When provided, returns the top candidates between that domain's index and every other domain index, plus an undirected index graph neighborhood. |
+| `depth` | number | Maximum undirected index graph depth for candidate connections and focused graph neighborhoods (default `2`). |
 | `limit` | number | Maximum candidates to return (default `20`). |
 | `format` | `json`, `text` | Default `text` renders the data readably; use `json` when the output is machine-parsed. |
 
@@ -477,6 +478,7 @@ Options:
 optsidian para-zk:wiki-retopology-candidates
 optsidian para-zk:wiki-retopology-candidates limit=30
 optsidian para-zk:wiki-retopology-candidates domain=language-models limit=10
+optsidian para-zk:wiki-retopology-candidates domain=language-models depth=3 limit=10
 ```
 
 JSON output fields:
@@ -485,13 +487,22 @@ JSON output fields:
 - `command`: `para-zk:wiki-retopology-candidates`.
 - `mode`: `global` when `domain` is omitted, otherwise `domain`.
 - `domain`: present only for focused mode.
+- `graph`: present only for focused mode. `{ root, depth, nodes, edges }`, where
+  `nodes` carry `{ domain, index, distance, path }` and `edges` carry
+  `{ domains, indexes, links }`.
 - `count`, `limit`, `returned`, `has_more`: top-k envelope over candidate pairs.
 - `candidates`: array of
-  `{ domains, indexes, score, shared_terms, explicit_links, evidence }`.
+  `{ domains, indexes, score, shared_terms, explicit_links, evidence, connection }`.
 
 `domains` and `indexes` are two-item arrays. `shared_terms` summarizes index-text
 overlap. `explicit_links` lists cross-domain links emitted by one index into the
 other domain, and those links are also reflected in `evidence`.
+`connection` is the shortest undirected index-to-index graph path between that
+candidate's two domains within `depth`: `{ connected, depth, distance, path, edges }`.
+If the minimum path is direct, it returns that single edge; if the minimum path is
+two hops, it returns only those two connecting edges. `graph` uses the same
+`<domain>/index` to `<domain>/index` resolved links and treats them as undirected
+for focused neighborhood traversal.
 
 ### `para-zk:setup`
 

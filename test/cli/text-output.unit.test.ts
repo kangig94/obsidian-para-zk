@@ -178,13 +178,32 @@ describe("renderCliText", () => {
         candidates: [{
           domains: ["language-models", "robotics"],
           score: 0.82,
-          evidence: ["index link: language-models/index -> robotics/index"]
-        }]
+          evidence: ["index link: language-models/index -> robotics/index"],
+          connection: {
+            connected: true,
+            depth: 2,
+            distance: 1,
+            path: ["language-models", "robotics"],
+            edges: []
+          }
+        }],
+        graph: {
+          root: "language-models",
+          depth: 2,
+          nodes: [
+            { domain: "language-models", index: "language-models/index", distance: 0, path: ["language-models"] },
+            { domain: "robotics", index: "robotics/index", distance: 1, path: ["language-models", "robotics"] }
+          ],
+          edges: []
+        }
       }, "wiki retopology candidates listed");
 
       expect(text).toContain("1 retopology candidates for language-models");
       expect(text).toContain("language-models <-> robotics  score=0.8200");
       expect(text).toContain("index link: language-models/index -> robotics/index");
+      expect(text).toContain("connection d1: language-models -> robotics");
+      expect(text).toContain("graph root=language-models depth=2");
+      expect(text).toContain("d1  robotics/index  via language-models -> robotics");
     });
   });
 

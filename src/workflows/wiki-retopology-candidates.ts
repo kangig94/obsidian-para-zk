@@ -6,11 +6,15 @@ import type {
   WikiRetopologyCandidate,
   WikiRetopologyCandidatesOptions,
   WikiRetopologyCandidatesResult,
+  WikiRetopologyConnection,
+  WikiRetopologyGraph,
+  WikiRetopologyGraphEdge,
   WorkflowContext
 } from "./context";
 
 const DOMAIN_INDEX_CONCEPT = "index";
 const DEFAULT_LIMIT = 20;
+const DEFAULT_GRAPH_DEPTH = 2;
 const EXPLICIT_LINK_BOOST = 0.35;
 const SCORE_PRECISION = 4;
 const MAX_SHARED_TERMS = 8;
@@ -60,14 +64,18 @@ export async function wikiRetopologyCandidates(
   const indexes = await readDomainIndexes(ctx);
   const byDomain = new Map(indexes.map((index) => [index.domain, index]));
   const focus = normalizeDomainOption(options.domain, byDomain);
+  const depth = normalizeDepth(options.depth);
+  const graphEdges = indexGraphEdges(ctx, indexes);
+  const adjacency = graphAdjacency(graphEdges);
   const candidates = focus
     ? candidatesForDomain(ctx, byDomain.get(focus)!, indexes)
-    : candidatesForAll(ctx, indexes);
+    : candidatesForAll(ctx, indexes, graphEdges, adjacency, depth);
   const page = candidates.slice(0, limit);
 
   return {
     mode: focus ? "domain" : "global",
     ...(focus ? { domain: focus } : {}),
+    ...(focus ? { graph: graphForDomain(byDomain.get(focus)!, graphEdges, adjacency, depth) } : {}),
     count: candidates.length,
     limit,
     returned: page.length,
@@ -80,6 +88,14 @@ function normalizeLimit(value: unknown): number {
   if (value === undefined) return DEFAULT_LIMIT;
   if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
     throw new Error("limit must be a non-negative integer");
+  }
+  return value;
+}
+
+function normalizeDepth(value: unknown): number {
+  if (value === undefined) return DEFAULT_GRAPH_DEPTH;
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
+    throw new Error("depth must be a non-negative integer");
   }
   return value;
 }
@@ -125,11 +141,22 @@ async function readDomainIndexes(ctx: WorkflowContext): Promise<DomainIndex[]> {
   return indexes.sort((left, right) => left.domain.localeCompare(right.domain));
 }
 
-function candidatesForAll(ctx: WorkflowContext, indexes: DomainIndex[]): WikiRetopologyCandidate[] {
+function candidatesForAll(
+  ctx: WorkflowContext,
+  indexes: DomainIndex[],
+  edges: WikiRetopologyGraphEdge[],
+  adjacency: Map<string, WikiRetopologyGraphEdge[]>,
+  depth: number
+): WikiRetopologyCandidate[] {
   const candidates: WikiRetopologyCandidate[] = [];
   for (let i = 0; i < indexes.length; i += 1) {
     for (let j = i + 1; j < indexes.length; j += 1) {
-      candidates.push(candidateForPair(ctx, indexes[i], indexes[j]));
+      candidates.push(candidateForPair(
+        ctx,
+        indexes[i],
+        indexes[j],
+        shortestConnection(indexes[i].domain, indexes[j].domain, edges, adjacency, depth)
+      ));
     }
   }
   return candidates.sort(compareCandidates);
@@ -146,7 +173,165 @@ function candidatesForDomain(
     .sort(compareCandidates);
 }
 
-function candidateForPair(ctx: WorkflowContext, left: DomainIndex, right: DomainIndex): WikiRetopologyCandidate {
+function graphForDomain(
+  root: DomainIndex,
+  edges: WikiRetopologyGraphEdge[],
+  adjacency: Map<string, WikiRetopologyGraphEdge[]>,
+  depth: number
+): WikiRetopologyGraph {
+  const visits = new Map<string, { distance: number; path: string[] }>([
+    [root.domain, { distance: 0, path: [root.domain] }]
+  ]);
+  const queue = [root.domain];
+
+  while (queue.length > 0) {
+    const domain = queue.shift()!;
+    const visit = visits.get(domain)!;
+    if (visit.distance >= depth) continue;
+    for (const edge of adjacency.get(domain) ?? []) {
+      const next = edge.domains[0] === domain ? edge.domains[1] : edge.domains[0];
+      if (visits.has(next)) continue;
+      visits.set(next, {
+        distance: visit.distance + 1,
+        path: [...visit.path, next]
+      });
+      queue.push(next);
+    }
+  }
+
+  const nodes = [...visits.entries()]
+    .map(([domain, visit]) => ({
+      domain,
+      index: `${domain}/${DOMAIN_INDEX_CONCEPT}`,
+      distance: visit.distance,
+      path: visit.path
+    }))
+    .sort((left, right) => left.distance - right.distance || left.domain.localeCompare(right.domain));
+  const visibleEdges = edges.filter((edge) => visits.has(edge.domains[0]) && visits.has(edge.domains[1]));
+
+  return {
+    root: root.domain,
+    depth,
+    nodes,
+    edges: visibleEdges
+  };
+}
+
+function indexGraphEdges(ctx: WorkflowContext, indexes: DomainIndex[]): WikiRetopologyGraphEdge[] {
+  const byPath = new Map(indexes.map((index) => [index.path, index]));
+  const byKey = new Map<string, WikiRetopologyGraphEdge>();
+
+  for (const source of indexes) {
+    const targets = ctx.host.resolvedLinks()[source.path] ?? {};
+    for (const [targetPath, count] of Object.entries(targets)) {
+      if (typeof count !== "number" || count <= 0) continue;
+      const target = byPath.get(normalizeVaultPath(targetPath));
+      if (!target || target.domain === source.domain) continue;
+
+      const [left, right] = source.domain.localeCompare(target.domain) <= 0
+        ? [source, target]
+        : [target, source];
+      const key = `${left.domain}\0${right.domain}`;
+      const edge = byKey.get(key) ?? {
+        domains: [left.domain, right.domain],
+        indexes: [left.title, right.title],
+        links: []
+      };
+      edge.links.push({ from: source.title, to: target.title });
+      byKey.set(key, edge);
+    }
+  }
+
+  return [...byKey.values()]
+    .map((edge) => ({
+      ...edge,
+      links: edge.links.sort((a, b) => `${a.from}\0${a.to}`.localeCompare(`${b.from}\0${b.to}`))
+    }))
+    .sort((a, b) => a.domains.join("\0").localeCompare(b.domains.join("\0")));
+}
+
+function graphAdjacency(edges: WikiRetopologyGraphEdge[]): Map<string, WikiRetopologyGraphEdge[]> {
+  const adjacency = new Map<string, WikiRetopologyGraphEdge[]>();
+  for (const edge of edges) {
+    for (const domain of edge.domains) {
+      const list = adjacency.get(domain) ?? [];
+      list.push(edge);
+      adjacency.set(domain, list);
+    }
+  }
+  for (const list of adjacency.values()) {
+    list.sort((left, right) => left.domains.join("\0").localeCompare(right.domains.join("\0")));
+  }
+  return adjacency;
+}
+
+function shortestConnection(
+  from: string,
+  to: string,
+  edges: WikiRetopologyGraphEdge[],
+  adjacency: Map<string, WikiRetopologyGraphEdge[]>,
+  depth: number
+): WikiRetopologyConnection {
+  const byKey = new Map(edges.map((edge) => [edge.domains.join("\0"), edge]));
+  const visits = new Map<string, { distance: number; path: string[] }>([
+    [from, { distance: 0, path: [from] }]
+  ]);
+  const queue = [from];
+
+  while (queue.length > 0) {
+    const domain = queue.shift()!;
+    const visit = visits.get(domain)!;
+    if (domain === to) break;
+    if (visit.distance >= depth) continue;
+    for (const edge of adjacency.get(domain) ?? []) {
+      const next = edge.domains[0] === domain ? edge.domains[1] : edge.domains[0];
+      if (visits.has(next)) continue;
+      visits.set(next, {
+        distance: visit.distance + 1,
+        path: [...visit.path, next]
+      });
+      queue.push(next);
+    }
+  }
+
+  const hit = visits.get(to);
+  if (!hit) {
+    return {
+      connected: false,
+      depth,
+      distance: null,
+      path: [],
+      edges: []
+    };
+  }
+
+  return {
+    connected: true,
+    depth,
+    distance: hit.distance,
+    path: hit.path,
+    edges: pathEdges(hit.path, byKey)
+  };
+}
+
+function pathEdges(path: string[], byKey: Map<string, WikiRetopologyGraphEdge>): WikiRetopologyGraphEdge[] {
+  const edges: WikiRetopologyGraphEdge[] = [];
+  for (let index = 0; index < path.length - 1; index += 1) {
+    const [left, right] = path[index].localeCompare(path[index + 1]) <= 0
+      ? [path[index], path[index + 1]]
+      : [path[index + 1], path[index]];
+    const edge = byKey.get(`${left}\0${right}`);
+    if (edge) edges.push(edge);
+  }
+  return edges;
+}
+
+function candidateForPair(
+  ctx: WorkflowContext,
+  left: DomainIndex,
+  right: DomainIndex,
+  connection?: WikiRetopologyConnection
+): WikiRetopologyCandidate {
   const explicitLinks = explicitIndexLinks(ctx, left, right);
   const baseScore = cosine(left, right);
   const score = roundScore(Math.min(1, baseScore + explicitLinks.length * EXPLICIT_LINK_BOOST));
@@ -158,7 +343,8 @@ function candidateForPair(ctx: WorkflowContext, left: DomainIndex, right: Domain
     score,
     shared_terms: sharedTerms,
     explicit_links: explicitLinks,
-    evidence
+    evidence,
+    ...(connection ? { connection } : {})
   };
 }
 

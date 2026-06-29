@@ -98,6 +98,14 @@ describe("wiki retopology candidates", () => {
     const focusedCandidate = (focused.candidates as Array<Record<string, unknown>>)[0];
     expect(focusedCandidate.domains).toEqual(["language-models", "robotics"]);
     expect(focusedCandidate.evidence).toContain("index link: language-models/index -> robotics/index");
+    expect(focused.graph).toMatchObject({
+      root: "language-models",
+      depth: 2,
+      nodes: [
+        { domain: "language-models", index: "language-models/index", distance: 0 },
+        { domain: "robotics", index: "robotics/index", distance: 1, path: ["language-models", "robotics"] }
+      ]
+    });
 
     const global = await cli.run("para-zk:wiki-retopology-candidates", { limit: "1" });
     expect(global).toMatchObject({
@@ -106,6 +114,74 @@ describe("wiki retopology candidates", () => {
       mode: "global",
       count: 1,
       returned: 1
+    });
+    expect(global).not.toHaveProperty("graph");
+    const globalCandidate = (global.candidates as Array<Record<string, unknown>>)[0];
+    expect(globalCandidate.connection).toMatchObject({
+      connected: true,
+      depth: 2,
+      distance: 1,
+      path: ["language-models", "robotics"]
+    });
+  });
+
+  it("returns an undirected index graph for focused domains with configurable depth", async () => {
+    const { ctx, app } = createTestContext();
+    await createWikiPage(app, "LLM-Wiki/a/index.md", "A links [[LLM-Wiki/c/index]].");
+    await createWikiPage(app, "LLM-Wiki/b/index.md", "B is isolated.");
+    await createWikiPage(app, "LLM-Wiki/c/index.md", "C links [[LLM-Wiki/e/index]].");
+    await createWikiPage(app, "LLM-Wiki/d/index.md", "D links back [[LLM-Wiki/a/index]].");
+    await createWikiPage(app, "LLM-Wiki/e/index.md", "E terminal.");
+    await createWikiPage(app, "LLM-Wiki/f/index.md", "F links a concept only [[LLM-Wiki/a/Concept]].");
+    await createWikiPage(app, "LLM-Wiki/a/Concept.md", "Concept body must not create an index graph node.");
+
+    const depthOne = await wikiRetopologyCandidates(ctx, { domain: "a", depth: 1, limit: 10 });
+    expect(depthOne.graph?.nodes.map((node) => [node.domain, node.distance, node.path])).toEqual([
+      ["a", 0, ["a"]],
+      ["c", 1, ["a", "c"]],
+      ["d", 1, ["a", "d"]]
+    ]);
+    expect(depthOne.graph?.edges.map((edge) => edge.domains)).toEqual([
+      ["a", "c"],
+      ["a", "d"]
+    ]);
+
+    const defaultDepth = await wikiRetopologyCandidates(ctx, { domain: "a", limit: 10 });
+    expect(defaultDepth.graph?.depth).toBe(2);
+    expect(defaultDepth.graph?.nodes.map((node) => [node.domain, node.distance, node.path])).toEqual([
+      ["a", 0, ["a"]],
+      ["c", 1, ["a", "c"]],
+      ["d", 1, ["a", "d"]],
+      ["e", 2, ["a", "c", "e"]]
+    ]);
+
+    const globalDepthTwo = await wikiRetopologyCandidates(ctx, { depth: 2, limit: 100 });
+    const ae = globalDepthTwo.candidates.find((candidate) => candidate.domains.join("/") === "a/e");
+    expect(ae?.connection).toMatchObject({
+      connected: true,
+      depth: 2,
+      distance: 2,
+      path: ["a", "c", "e"],
+      edges: [
+        { domains: ["a", "c"] },
+        { domains: ["c", "e"] }
+      ]
+    });
+    const af = globalDepthTwo.candidates.find((candidate) => candidate.domains.join("/") === "a/f");
+    expect(af?.connection).toMatchObject({
+      connected: false,
+      depth: 2,
+      distance: null,
+      path: [],
+      edges: []
+    });
+
+    const globalDepthOne = await wikiRetopologyCandidates(ctx, { depth: 1, limit: 100 });
+    const shallowAe = globalDepthOne.candidates.find((candidate) => candidate.domains.join("/") === "a/e");
+    expect(shallowAe?.connection).toMatchObject({
+      connected: false,
+      depth: 1,
+      distance: null
     });
   });
 
@@ -119,5 +195,8 @@ describe("wiki retopology candidates", () => {
     const alias = await cli.run("para-zk:wiki-retopology-candidates", { focus: "language-models" });
     expect(alias.ok).toBe(false);
     expect(String(alias.error)).toContain("Use domain instead of focus");
+
+    const globalDepth = await cli.run("para-zk:wiki-retopology-candidates", { depth: "2" });
+    expect(globalDepth.ok).toBe(true);
   });
 });

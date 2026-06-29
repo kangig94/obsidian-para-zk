@@ -35,7 +35,7 @@ only when the user explicitly asks to apply, or after they approve the proposed 
 | Argument | Routing |
 |----------|---------|
 | `scope=all` (default) | Use global index-pair candidates, then read the returned hubs and enough pages to plan. |
-| `scope=domain domain=<domain>` | Use focused candidates for that domain, then read the returned hubs and enough pages to plan. |
+| `scope=domain domain=<domain>` | Use focused candidates and the returned index graph for that domain, then read the returned hubs and enough pages to plan. |
 | `scope=pages titles=<json-or-comma-list>` | Read the listed pages' domain hubs and use focused candidates when neighboring domains matter. |
 | `apply=true` | After plan presentation/approval, apply deterministic moves/renames before handoff. |
 
@@ -56,9 +56,11 @@ Do not ask the user to resolve invalid arguments; stop with the concrete routing
    - Read domains: `optsidian para-zk:wiki-domains limit=all`.
    - Read the roster: `optsidian para-zk:list type=llm-wiki limit=all`.
    - For `scope=all`, get global index-pair candidates:
-     `optsidian para-zk:wiki-retopology-candidates limit=<k>`.
+     `optsidian para-zk:wiki-retopology-candidates limit=<k>`. Each candidate includes
+     the shortest index-to-index `connection` within `depth=2` by default.
    - For `scope=domain`, get focused candidates:
-     `optsidian para-zk:wiki-retopology-candidates domain="<domain>" limit=<k>`.
+     `optsidian para-zk:wiki-retopology-candidates domain="<domain>" limit=<k>`; it also
+     returns an undirected index graph neighborhood with `depth=2` by default.
    - Read the `<domain>/index` bodies for domains in the returned candidate pairs, plus any
      explicitly user-named domains.
    - For a small vault or an explicitly exhaustive pass, reading every domain index is acceptable.

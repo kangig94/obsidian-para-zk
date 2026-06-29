@@ -20,6 +20,10 @@ export type {
   WikiRetopologyCandidate,
   WikiRetopologyCandidatesOptions,
   WikiRetopologyCandidatesResult,
+  WikiRetopologyConnection,
+  WikiRetopologyGraph,
+  WikiRetopologyGraphEdge,
+  WikiRetopologyGraphNode,
   WorkflowContext,
 } from "./context";
 

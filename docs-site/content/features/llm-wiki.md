@@ -81,9 +81,10 @@ Ingestable source types are `resource`, `digest`, `permanent`, and `subnote`.
 ```bash
 optsidian para-zk:wiki-retopology-candidates limit=20 format=json
 optsidian para-zk:wiki-retopology-candidates domain=language-models limit=10 format=json
+optsidian para-zk:wiki-retopology-candidates domain=language-models depth=3 limit=10 format=json
 ```
 
-Use it to choose which hubs to inspect during domain split, merge, refile, or cross-domain link planning. It is a triage signal, not the final topology judgment.
+Use it to choose which hubs to inspect during domain split, merge, refile, or cross-domain link planning. Each candidate includes the shortest undirected index-to-index `connection` within `depth`; focused mode also returns an undirected index graph neighborhood. `depth` defaults to `2`. It is a triage signal, not the final topology judgment.
 
 ## Audit Checks
 

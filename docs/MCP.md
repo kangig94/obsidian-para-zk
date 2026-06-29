@@ -132,11 +132,14 @@ as `{ path, title, updated_ms }`.
 `para-zk:wiki-retopology-candidates` is also surfaced through
 `describe.workflows`. Invoke it through the CLI when an agent needs an index-only
 top-k over domain pairs before a topology pass: pass `domain=<domain>` for a focused
-ranking, or omit it for a global ranking, plus `limit` and `format`. It compares
-domain index hubs only, boosts explicit cross-domain links found in those hubs, and
-returns `{ ok, command, mode, domain?, count, limit, returned, has_more, candidates }`
+ranking, or omit it for a global ranking, plus `limit`, `depth`, and `format`.
+Focused mode always includes an undirected index graph neighborhood with default
+`depth=2`. It compares domain index hubs only, boosts explicit cross-domain links
+found in those hubs, and returns
+`{ ok, command, mode, domain?, graph?, count, limit, returned, has_more, candidates }`
 where each candidate has `{ domains, indexes, score, shared_terms, explicit_links,
-evidence }`.
+evidence, connection }`. `connection` is the shortest undirected index-to-index
+path between the candidate pair within `depth`.
 
 Related surface notes:
 

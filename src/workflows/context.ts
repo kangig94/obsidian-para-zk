@@ -274,6 +274,7 @@ export type WikiDomainsResult = {
 export type WikiRetopologyCandidatesOptions = {
   domain?: string;
   limit?: number;
+  depth?: number;
 };
 
 export type WikiRetopologyCandidate = {
@@ -286,11 +287,44 @@ export type WikiRetopologyCandidate = {
     to: string;
   }>;
   evidence: string[];
+  connection?: WikiRetopologyConnection;
+};
+
+export type WikiRetopologyGraphNode = {
+  domain: string;
+  index: string;
+  distance: number;
+  path: string[];
+};
+
+export type WikiRetopologyGraphEdge = {
+  domains: [string, string];
+  indexes: [string, string];
+  links: Array<{
+    from: string;
+    to: string;
+  }>;
+};
+
+export type WikiRetopologyGraph = {
+  root: string;
+  depth: number;
+  nodes: WikiRetopologyGraphNode[];
+  edges: WikiRetopologyGraphEdge[];
+};
+
+export type WikiRetopologyConnection = {
+  connected: boolean;
+  depth: number;
+  distance: number | null;
+  path: string[];
+  edges: WikiRetopologyGraphEdge[];
 };
 
 export type WikiRetopologyCandidatesResult = {
   mode: "global" | "domain";
   domain?: string;
+  graph?: WikiRetopologyGraph;
   count: number;
   limit: number;
   returned: number;

@@ -914,6 +914,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     description: "Rank LLM-Wiki domain index pairs for retopology review",
     options: {
       domain: { value: "<domain>", description: "Optional focus domain. When omitted, rank global domain pairs." },
+      depth: { value: "<number>", description: "Undirected index graph depth for focused graph or global pair connections (default: 2)." },
       limit: { value: "<number>", description: "Maximum candidates to return (default: 20)." },
       format: FORMAT_OPTION
     },
@@ -2052,12 +2053,16 @@ function readCliWikiRetopologyCandidatesOptions(args: CliArgs): WikiRetopologyCa
     focus: "domain",
     focus_domain: "domain",
     focusDomain: "domain",
+    graph_depth: "depth",
+    graphDepth: "depth",
     max: "limit"
   });
   const limit = readCliInteger(args, "limit");
+  const depth = readCliInteger(args, "depth");
   return {
     domain: readCliString(args, "domain"),
-    ...(limit !== undefined ? { limit } : {})
+    ...(limit !== undefined ? { limit } : {}),
+    ...(depth !== undefined ? { depth } : {})
   };
 }
 
