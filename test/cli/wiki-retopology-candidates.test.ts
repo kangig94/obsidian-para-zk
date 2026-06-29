@@ -83,7 +83,7 @@ describe("wiki retopology candidates", () => {
     if (!phrasePair || !splitPair) throw new Error("expected bigram comparison pairs");
 
     expect(phrasePair.score).toBeGreaterThan(splitPair.score);
-    expect(phrasePair.shared_terms[0]).toBe("diffusion policy");
+    expect(phrasePair.shared_terms).toContain("diffusion policy");
   });
 
   it("caches index term counts and invalidates them by file stat", async () => {

@@ -19,9 +19,9 @@ const DEFAULT_GRAPH_DEPTH = 2;
 const SCORE_PRECISION = 4;
 const MAX_SHARED_TERMS = 8;
 const BODY_UNIGRAM_WEIGHT = 1;
-const BODY_BIGRAM_WEIGHT = 0.6;
+const BODY_BIGRAM_WEIGHT = 0.4;
 const CACHE_FILE = "retopology-cache.json";
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3;
 const STOPWORDS = new Set([
   "a",
   "an",
@@ -151,17 +151,23 @@ async function readDomainIndexes(ctx: WorkflowContext): Promise<DomainIndex[]> {
     if (segments.length !== 2 || file.basename !== DOMAIN_INDEX_CONCEPT) continue;
 
     const domain = segments[0];
+    const title = `${domain}/${DOMAIN_INDEX_CONCEPT}`;
     const cached = cache?.indexes[path];
     const mtime = file.stat?.mtime ?? 0;
     const size = file.stat?.size ?? 0;
-    const cacheHit = cached && cached.domain === domain && cached.mtime === mtime && cached.size === size;
+    const cacheHit = cached
+      && cached.path === path
+      && cached.domain === domain
+      && cached.title === title
+      && cached.mtime === mtime
+      && cached.size === size;
     const termCounts = cacheHit
       ? mapFromEntries(cached.terms)
       : indexTermCounts(domain, stripManagedPrelude(await ctx.host.read(file)));
     nextCache.indexes[path] = {
       path,
       domain,
-      title: `${domain}/${DOMAIN_INDEX_CONCEPT}`,
+      title,
       mtime,
       size,
       terms: [...termCounts.entries()]
@@ -169,7 +175,7 @@ async function readDomainIndexes(ctx: WorkflowContext): Promise<DomainIndex[]> {
     if (!cacheHit) cacheChanged = true;
     indexes.push({
       domain,
-      title: `${domain}/${DOMAIN_INDEX_CONCEPT}`,
+      title,
       path,
       termCounts
     });
