@@ -166,6 +166,7 @@ describe("describe", () => {
       update: string;
       createInputs: string[];
       rename: boolean;
+      refile: string;
       addressVia?: string;
     };
     expect(wikiAddressing.selectors).toEqual(["title"]);
@@ -174,6 +175,7 @@ describe("describe", () => {
     expect(wikiAddressing.update).toBe("para-zk:update-llm-wiki");
     expect(wikiAddressing.createInputs).toEqual(expect.arrayContaining(["title", "alias", "body", "by"]));
     expect(wikiAddressing.rename).toBe(true);
+    expect(wikiAddressing.refile).toBe("para-zk:refile-llm-wiki");
     expect(wikiAddressing.addressVia).toContain("LLM-Wiki-relative path");
     expect(wikiAddressing.addressVia).toContain("title=\"AI/Foo\"");
     expect(wiki.frontmatterKeys).toEqual(["aliases", "created_by", "updated_by"]);

@@ -91,9 +91,18 @@ optsidian para-zk:wiki-ingest-candidates mode=re-ingest source_path="PARA/Resour
 
 Reason codes are `missing_wiki_citation`, `source_newer_than_wiki`, `per_import`, and `reingest_requested`. `source_newer_than_wiki` derives staleness from page `updated`: the source is newer than at least one citing wiki page, listed in `stale_llm_wikis` as `{ path, title, updated_ms }`.
 
+For retopology, use `para-zk:wiki-retopology-candidates` to rank domain index pairs before reading hubs:
+
+```bash
+optsidian para-zk:wiki-retopology-candidates limit=20 format=json
+optsidian para-zk:wiki-retopology-candidates domain=language-models limit=10 format=json
+```
+
+It compares `<domain>/index` hubs only, boosts explicit cross-domain links found in those hubs, and returns `{ mode, domain?, count, limit, returned, has_more, candidates }` with `{ domains, indexes, score, shared_terms, explicit_links, evidence }` candidates.
+
 The audit checks include `upward_wiki_link` (`medium`), which flags a non-`llm-wiki` note that links into an `llm-wiki` note; `orphan_wiki_page` (`low`), an advisory hint for a wiki page that no other wiki page links to; and `wiki_tag_domain_mismatch` (`low`), which can be fixed with `audit fix=true`.
 
-`create-llm-wiki` and `update-llm-wiki` accept `by=<model-id>` for authorship: create stamps `created_by` and `updated_by`, while changed updates stamp `updated_by`. LLM-Wiki pages include managed props plus Cited-by scoped to `LLM-Wiki/`, then References. Cross-link wiki concept pages with body `[[link]]`; use `references` plus backtick code-span `` `PZ[<id>]` `` citations only for canonical sources outside LLM-Wiki. Bare `PZ[<id>]` text does not render.
+`create-llm-wiki` and `update-llm-wiki` accept `by=<model-id>` for authorship: create stamps `created_by` and `updated_by`, while changed updates stamp `updated_by`. Move a concept page between domains with `refile-llm-wiki title=<current> domain=<target>`; `rename-llm-wiki` only changes the concept name in its current domain. LLM-Wiki pages include managed props plus Cited-by scoped to `LLM-Wiki/`, then References. Cross-link wiki concept pages with body `[[link]]`; use `references` plus backtick code-span `` `PZ[<id>]` `` citations only for canonical sources outside LLM-Wiki. Bare `PZ[<id>]` text does not render.
 
 ## Canonical Arguments
 

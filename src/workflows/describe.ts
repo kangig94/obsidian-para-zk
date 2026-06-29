@@ -362,7 +362,8 @@ const SURFACE_ADDRESSING: Record<SurfaceType, SurfaceAddressing> = {
     create: "para-zk:create-llm-wiki",
     read: "para-zk:read-llm-wiki",
     update: "para-zk:update-llm-wiki",
-    rename: true
+    rename: true,
+    refile: "para-zk:refile-llm-wiki"
   },
   journal: { addressable: true, selectors: ["date"], create: "para-zk:capture-journal", rename: false },
   retro: { addressable: true, selectors: ["title", "date", "archived"], create: "para-zk:create-retro", rename: false },

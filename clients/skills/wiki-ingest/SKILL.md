@@ -57,7 +57,8 @@ the concrete routing error — do not ask the user.
    substitute the native `obsidian` CLI (`obsidian para-zk:…`) when `optsidian` isn't installed —
    the two are interchangeable, so use whichever is on `PATH`.
    Confirm the surface exposes `para-zk:wiki-ingest-candidates`, `para-zk:list`,
-   `para-zk:read-llm-wiki`, `para-zk:create-llm-wiki`, and `para-zk:update-llm-wiki`. If the vault
+   `para-zk:read-llm-wiki`, `para-zk:create-llm-wiki`, `para-zk:update-llm-wiki`, and
+   `para-zk:refile-llm-wiki`. If the vault
    is unavailable, stop with the CLI error; do not fall back to direct file writes.
 
 2. **Resolve mode**: Normalize exactly one mode from `{per-import, delta, uncited, re-ingest}`. Preserve
@@ -116,6 +117,11 @@ the concrete routing error — do not ask the user.
        under an existing broader/narrower domain. One concept = one page across the whole wiki.
      - **Assignment & cross-links:** assign every candidate source to ≥1 page (a source spanning N
        concepts goes into N pages' `sources`); set each page's `links` to the related pages.
+     - **Domain moves:** when an existing concept page belongs under a different domain, add it to a
+       separate `domain_moves` list (`title`, `from_domain`, `to_domain`, `reason`). Do not hide the
+       move inside a page write. Apply it only when the user explicitly requested/approved domain
+       cleanup, using `para-zk:refile-llm-wiki title="<current>" domain="<target>"`; use
+       `rename-llm-wiki` only for same-domain concept-name changes.
      - **Spine:** every domain's hub is `<domain>/index` (create-llm-wiki auto-mints it as an empty
        scaffold when the domain's first page is created, so it always exists — you don't create it).
        Plan it as `type:"hub"` with `title="<domain>/index"` and `children` = that domain's leaf

@@ -236,9 +236,10 @@ Important fields:
   `llm-wiki` surface.
 - `workflows` — named (non-surface) commands with their inputs:
   `conventions`, `list`, `audit`, `wiki-ingest-candidates`, `wiki-domains`,
-  `create-child`, `read-child`, `update-child`, `rename-child`, `delete-child`,
-  `capture-journal`, `distill-spark`, `create-from-digest`, `create-from-resource`,
-  `attach-file`. This is how you discover those commands and args without a
+  `wiki-retopology-candidates`, `create-child`, `read-child`, `update-child`,
+  `rename-child`, `delete-child`, `capture-journal`, `distill-spark`,
+  `create-from-digest`, `create-from-resource`, `attach-file`. This is how you
+  discover those commands and args without a
   separate help lookup.
 - `collectionFilters`
 - `conventions` — pointer to `para-zk:conventions`; fetch it once per task for
@@ -455,6 +456,42 @@ JSON output fields:
   whether the `<domain>/index` hub exists. When `has_index` is `false`, enumerate
   that domain's pages with `list type=llm-wiki query=<domain>/` instead of reading
   an index.
+
+### `para-zk:wiki-retopology-candidates`
+
+Ranks LLM-Wiki domain index pairs for retopology review. This is an index-only
+triage primitive: it reads `<domain>/index` hubs, compares their domain/index text,
+and boosts explicit cross-domain links found in those index hubs. It does not read
+concept-page bodies and does not decide the topology by itself; use the returned
+pair list to choose which indexes to inspect directly.
+
+Options:
+
+| Option | Values | Notes |
+| --- | --- | --- |
+| `domain` | domain name | Optional focus domain. When provided, returns the top candidates between that domain's index and every other domain index. |
+| `limit` | number | Maximum candidates to return (default `20`). |
+| `format` | `json`, `text` | Default `text` renders the data readably; use `json` when the output is machine-parsed. |
+
+```bash
+optsidian para-zk:wiki-retopology-candidates
+optsidian para-zk:wiki-retopology-candidates limit=30
+optsidian para-zk:wiki-retopology-candidates domain=language-models limit=10
+```
+
+JSON output fields:
+
+- `ok`: true on success.
+- `command`: `para-zk:wiki-retopology-candidates`.
+- `mode`: `global` when `domain` is omitted, otherwise `domain`.
+- `domain`: present only for focused mode.
+- `count`, `limit`, `returned`, `has_more`: top-k envelope over candidate pairs.
+- `candidates`: array of
+  `{ domains, indexes, score, shared_terms, explicit_links, evidence }`.
+
+`domains` and `indexes` are two-item arrays. `shared_terms` summarizes index-text
+overlap. `explicit_links` lists cross-domain links emitted by one index into the
+other domain, and those links are also reflected in `evidence`.
 
 ### `para-zk:setup`
 
@@ -859,8 +896,9 @@ domain as `llm-wiki/<domain>` (no per-concept leaf). The domain is the page's fi
 not a relationship — cross-domain links live in the body, and folders do not change the
 link graph. A concept is a single page across the whole wiki: `create-llm-wiki` is
 get-or-create by concept, so re-creating it under a different domain returns the existing
-page (no duplicate); re-filing to another domain is a deliberate `move`/`rename`, not a
-re-create. `read`/`update`/`rename`/`delete-llm-wiki` accept either the full
+page (no duplicate); re-filing to another domain is a deliberate
+`refile-llm-wiki`, not a re-create. `read-llm-wiki`, `update-llm-wiki`,
+`rename-llm-wiki`, `refile-llm-wiki`, and `delete-llm-wiki` accept either the full
 `<domain>/<concept>` path or a bare concept (resolved across domains by basename). There
 is no archived wiki selector: LLM-Wiki pages are active, LLM-owned derived synthesis under
 `LLM-Wiki/`, not canonical PARA/ZK records.
@@ -1147,7 +1185,7 @@ retros are left in place.
 | `para-zk:rename-project` | `title`; optional `archived` | Renames the folder-style project folder and main note. Child notes move with the folder; default project-scoped retros are renamed with it. |
 | `para-zk:rename-area` | `title`; optional `archived` | Renames the folder-style area folder and main note. Child areas move with the folder; default area-scoped retros and area tag namespaces are updated without dropping inherited parent tags. |
 | `para-zk:rename-resource` | `title`; optional `archived`; `/` addresses a Resources-relative path | Renames the resource note file in its current folder. `new_title` must be a bare basename; use native `move`/`rename` to move folders. |
-| `para-zk:rename-llm-wiki` | `title`; `/` addresses an LLM-Wiki-relative path | Renames the wiki note's concept in its current domain folder; the `llm-wiki/<domain>` tag is unchanged (it classifies by domain, not concept). `new_title` must be a bare basename; re-file to another domain with native `move`/`rename`. No `archived`. |
+| `para-zk:rename-llm-wiki` | `title`; `/` addresses an LLM-Wiki-relative path | Renames the wiki note's concept in its current domain folder; the `llm-wiki/<domain>` tag is unchanged (it classifies by domain, not concept). `new_title` may be a bare basename or `<current-domain>/<concept>`. A different domain is rejected; use `refile-llm-wiki`. No `archived`. |
 | `para-zk:rename-zk` | `title` plus optional `kind` | Renames the selected ZK note file in place. |
 | `para-zk:rename-child` | `root_type` + `root_title` + optional `relpath` + `title` | Renames a subnote, fallback note, or nested area. `new_title` renames the addressed child. |
 
@@ -1172,6 +1210,7 @@ optsidian para-zk:rename-child root_type=area root_title="AI" relpath='["Generat
 optsidian para-zk:rename-resource title="Source Paper" new_title="Source Paper Notes"
 optsidian para-zk:rename-resource title="AI/Source Paper" new_title="Source Paper Notes"
 optsidian para-zk:rename-llm-wiki title="AI/Policy" new_title="Policy Wiki"
+optsidian para-zk:rename-llm-wiki title="AI/Policy" new_title="AI/Policy Wiki"
 optsidian para-zk:rename-zk title="Stable Interface Contracts" kind=permanent new_title="Stable CLI Contracts"
 ```
 
@@ -1183,6 +1222,29 @@ Result fields:
 - `fromTitle` and `toTitle`: source and final titles.
 - `renamedRetros`: project/area rename cascades, when default source-scoped
   retro files were renamed. Each entry has `fromPath` and `toPath`.
+
+### `para-zk:refile-llm-wiki`
+
+Moves an LLM-Wiki concept page to another one-segment domain folder. It uses the
+vault's link-safe rename path, updates the page's `llm-wiki/<domain>` identity
+tag, and auto-creates the target domain's `<domain>/index` hub when missing.
+Domain hub pages (`<domain>/index`) are not refiled; create or update the target
+hub instead.
+
+Options:
+
+| Option | Values | Notes |
+| --- | --- | --- |
+| `title` | string | Current LLM-Wiki title. `/` addresses an LLM-Wiki-relative path. |
+| `domain` | string | Required target domain folder. Exactly one path segment. |
+| `by` | model id | Optional. Used only when `refile` must create the target domain's index hub. |
+
+```bash
+optsidian para-zk:refile-llm-wiki title="language-models/Scaling Laws" domain="scaling-laws" by=gpt-5.5
+```
+
+Result fields include `fromPath`, `toPath`, `fromDomain`, `toDomain`,
+`createdIndex`, and `tagChanged`.
 
 ### Delete Commands
 
@@ -1378,9 +1440,9 @@ optsidian para-zk:update-llm-wiki title="AI/Policy" key=references op=insert val
 optsidian para-zk:read-llm-wiki title="AI/Policy" key=references limit=all
 ```
 
-`read-llm-wiki`, `update-llm-wiki`, `rename-llm-wiki`, and `delete-llm-wiki`
-all use `title`, accept the same slash-path addressing, and do not accept
-`archived`.
+`read-llm-wiki`, `update-llm-wiki`, `rename-llm-wiki`, `refile-llm-wiki`, and
+`delete-llm-wiki` all use `title`, accept the same slash-path addressing, and do
+not accept `archived`.
 
 ### `para-zk:create-retro`
 

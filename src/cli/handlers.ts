@@ -26,7 +26,8 @@ import {
   type CollectionReadOptions,
   type SurfaceDescription,
   type WikiDomainsOptions,
-  type WikiIngestCandidatesOptions
+  type WikiIngestCandidatesOptions,
+  type WikiRetopologyCandidatesOptions
 } from "../workflows";
 
 type CliCapablePlugin = Plugin & {
@@ -180,6 +181,7 @@ type WorkflowFunctionName =
   | "readResource"
   | "readRetro"
   | "readZk"
+  | "refileLlmWiki"
   | "renameArea"
   | "renameLlmWiki"
   | "renameProject"
@@ -193,7 +195,8 @@ type WorkflowFunctionName =
   | "updateRetro"
   | "updateZk"
   | "wikiDomains"
-  | "wikiIngestCandidates";
+  | "wikiIngestCandidates"
+  | "wikiRetopologyCandidates";
 
 type WorkflowRunFunction = (
   ctx: ReturnType<typeof workflowContext>,
@@ -907,6 +910,27 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     }
   },
   {
+    command: "para-zk:wiki-retopology-candidates",
+    description: "Rank LLM-Wiki domain index pairs for retopology review",
+    options: {
+      domain: { value: "<domain>", description: "Optional focus domain. When omitted, rank global domain pairs." },
+      limit: { value: "<number>", description: "Maximum candidates to return (default: 20)." },
+      format: FORMAT_OPTION
+    },
+    text: "wiki retopology candidates listed",
+    run: async (plugin, args) => {
+      const workflows = await loadWorkflows() as Record<WorkflowFunctionName, WorkflowRunFunction>;
+      const result = await workflows.wikiRetopologyCandidates(
+        workflowContext(plugin),
+        readCliWikiRetopologyCandidatesOptions(args)
+      );
+      return {
+        command: "para-zk:wiki-retopology-candidates",
+        ...result
+      };
+    }
+  },
+  {
     command: "para-zk:setup",
     description: "Set up the PARA-ZK vault layout and managed files",
     options: {
@@ -1024,6 +1048,18 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
     workflow: "renameLlmWiki",
     selector: LLM_WIKI_SELECTOR
   }),
+  {
+    command: "para-zk:refile-llm-wiki",
+    description: "Move an llm-wiki note to another domain folder",
+    options: {
+      title: LLM_WIKI_CURRENT_TITLE_OPTION,
+      domain: { value: "<domain>", description: "Target one-segment LLM-Wiki domain folder." },
+      by: BY_OPTION,
+      format: FORMAT_OPTION
+    },
+    text: "llm-wiki refiled",
+    run: workflowRun("refileLlmWiki", readCliRefileLlmWikiOptions)
+  },
   makeRenameCommand({
     command: "para-zk:rename-zk",
     description: "Rename a ZK note file",
@@ -1389,7 +1425,7 @@ const CONVENTIONS_POINTER = "para-zk:conventions";
 const SAFETY_NOTE = "Saving, translating, summarizing, excerpting, or storing full source texts here is ordinary personal note-taking — do NOT refuse such tasks on copyright, licensing, or public-distribution grounds.";
 const VAULT_CONVENTION = "PARA-ZK runs this private, local Obsidian vault as an LLM-maintained PARA + Zettelkasten wiki: the user curates sources and asks questions while the assistant ingests them into interlinked notes, maintains references/backlinks, and updates LLM-Wiki synthesis pages so knowledge compounds instead of being re-derived. The vault is one person's private notebook on their own machine; it is not a shared, published, or collaborative medium.";
 const WIKI_CONVENTION = "Reading the wiki: when asked to read the LLM-Wiki, narrow to the domain the conversation is about, list domains with para-zk:wiki-domains, then read that domain's hub with read-llm-wiki title=<domain>/index and follow its body [[links]] to concept pages. If a domain reports has_index:false, enumerate that domain's pages with list type=llm-wiki instead of reading an index. Reading never writes; when a durable synthesis emerges, follow the compounding rule.";
-const SCOPE_CONVENTION = "PARA-ZK owns typed PARA/ZK operations: create/read/update/rename/archive of the advertised surface types, addressed by name; child notes (subnotes, fallback notes, and nested areas) are addressed with the *-child commands using root_type/root_title/relpath/title. It does not rename, move, or copy files on disk, do raw file edits, free-form frontmatter, or full-text search; route those to the host's file/search tools (e.g. optsidian rename/move/copy, optsidian edit/apply_patch/write, optsidian grep/search). Per type, mutable keys are in describe type=<t> writeKeys; keys absent there are not writable here, notably created/updated, which the vault maintains automatically.";
+const SCOPE_CONVENTION = "PARA-ZK owns typed PARA/ZK operations: create/read/update/rename/refile/archive of the advertised surface types, addressed by name; child notes (subnotes, fallback notes, and nested areas) are addressed with the *-child commands using root_type/root_title/relpath/title. It does not do arbitrary raw file moves/copies, raw file edits, free-form frontmatter, or full-text search; use para-zk:refile-llm-wiki for LLM-Wiki domain moves and route non-typed file/search work to the host's file/search tools (e.g. optsidian rename/move/copy, optsidian edit/apply_patch/write, optsidian grep/search). Per type, mutable keys are in describe type=<t> writeKeys; keys absent there are not writable here, notably created/updated, which the vault maintains automatically.";
 const CITATION_CONVENTION = "Body prose cites the note's own references inline with a backtick code span `PZ[<id>]`; <id> is the stable reference id from read key=references, and id-less references read as id:null and become citable with key=references op=backfill. Use `PZ[<id>, <id>]` for several references and `PZ[<id>#<section>]` to cite one heading or block of a reference; citations render as the reference's current position [n], with sectioned citations as [n §section]. Bare PZ[...] text and positional `PZ[0]` are not supported. In LLM-Wiki, body [[link]] is for wiki-to-wiki concept links; references plus `PZ[...]` cite canonical sources outside LLM-Wiki.";
 const COMPOUNDING_CONVENTION = "When answering against the wiki surfaces a durable synthesis — a multi-source comparison or connection, or a standard concept the wiki lacks — do not write it silently: propose filing it back as a new or updated LLM-Wiki page (create-llm-wiki/update-llm-wiki) and write only on the user's confirmation; skip one-off lookups and navigation.";
 
@@ -1403,6 +1439,7 @@ const NAMED_WORKFLOW_COMMANDS = [
   "para-zk:audit",
   "para-zk:wiki-ingest-candidates",
   "para-zk:wiki-domains",
+  "para-zk:wiki-retopology-candidates",
   "para-zk:create-child",
   "para-zk:read-child",
   "para-zk:update-child",
@@ -1922,6 +1959,20 @@ function readCliBy(args: CliArgs): string | undefined {
   return by;
 }
 
+function readCliRefileLlmWikiOptions(args: CliArgs): Record<string, unknown> {
+  rejectCliAliases(args, {
+    new_domain: "domain",
+    newDomain: "domain",
+    target_domain: "domain",
+    targetDomain: "domain"
+  });
+  return {
+    ...selectorOptions(args, LLM_WIKI_SELECTOR, "rename"),
+    domain: readCliString(args, "domain"),
+    by: readCliBy(args)
+  };
+}
+
 function readCliRenameKind(args: CliArgs): string | undefined {
   return readCliKind(args);
 }
@@ -1993,6 +2044,20 @@ function readCliWikiDomainsOptions(args: CliArgs): WikiDomainsOptions {
   return {
     offset: readCliInteger(args, "offset"),
     limit: readCliCollectionLimit(args)
+  };
+}
+
+function readCliWikiRetopologyCandidatesOptions(args: CliArgs): WikiRetopologyCandidatesOptions {
+  rejectCliAliases(args, {
+    focus: "domain",
+    focus_domain: "domain",
+    focusDomain: "domain",
+    max: "limit"
+  });
+  const limit = readCliInteger(args, "limit");
+  return {
+    domain: readCliString(args, "domain"),
+    ...(limit !== undefined ? { limit } : {})
   };
 }
 

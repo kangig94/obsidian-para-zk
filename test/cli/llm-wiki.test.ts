@@ -157,17 +157,66 @@ describe("llm-wiki CLI adapters", () => {
     expect(consumerContent).toContain("[[LLM-Wiki/AI/Policy Wiki.md]]");
     expect(consumerContent).not.toContain("[[LLM-Wiki/AI/Policy.md]]");
 
+    const qualifiedRename = await cli.run("para-zk:rename-llm-wiki", {
+      title: "AI/Policy Wiki",
+      new_title: "AI/Policy Qualified"
+    });
+    expect(qualifiedRename).toMatchObject({
+      ok: true,
+      fromPath: "LLM-Wiki/AI/Policy Wiki.md",
+      toPath: "LLM-Wiki/AI/Policy Qualified.md",
+      title: "Policy Qualified",
+      changed: true
+    });
+
+    const crossDomainRename = await cli.run("para-zk:rename-llm-wiki", {
+      title: "AI/Policy Qualified",
+      new_title: "Alignment/Policy Qualified"
+    });
+    expect(crossDomainRename.ok).toBe(false);
+    expect(String(crossDomainRename.error)).toContain("refile-llm-wiki");
+    expect(cli.app.readPath("LLM-Wiki/Alignment/Policy Qualified.md")).toBeUndefined();
+
+    const refiled = await cli.run("para-zk:refile-llm-wiki", {
+      title: "AI/Policy Qualified",
+      domain: "Alignment",
+      by: "test-model"
+    });
+    expect(refiled).toMatchObject({
+      ok: true,
+      fromPath: "LLM-Wiki/AI/Policy Qualified.md",
+      toPath: "LLM-Wiki/Alignment/Policy Qualified.md",
+      fromDomain: "AI",
+      toDomain: "Alignment",
+      createdIndex: true,
+      tagChanged: true,
+      changed: true
+    });
+    expect(cli.app.readPath("LLM-Wiki/AI/Policy Qualified.md")).toBeUndefined();
+    const refiledContent = cli.app.readPath("LLM-Wiki/Alignment/Policy Qualified.md") ?? "";
+    const refiledFrontmatter = frontmatterAt("LLM-Wiki/Alignment/Policy Qualified.md");
+    expect(refiledFrontmatter.tags).toEqual(["llm-wiki/alignment"]);
+    expect(refiledContent).toContain("llm-wiki/alignment");
+    expect(frontmatterAt("LLM-Wiki/Alignment/index.md")).toMatchObject({
+      type: "llm-wiki",
+      tags: ["llm-wiki/alignment"],
+      created_by: "test-model"
+    });
+    const refiledConsumer = cli.app.readPath("PARA/Resources/Wiki Consumer.md") ?? "";
+    expect(refiledConsumer).toContain("[[LLM-Wiki/Alignment/Policy Qualified.md]]");
+    expect(refiledConsumer).not.toContain("LLM-Wiki/AI/Policy");
+
     const deleted = await cli.run("para-zk:delete-llm-wiki", {
-      title: "AI/Policy Wiki"
+      title: "Alignment/Policy Qualified"
     });
     expect(deleted).toMatchObject({
       ok: true,
-      path: "LLM-Wiki/AI/Policy Wiki.md",
+      path: "LLM-Wiki/Alignment/Policy Qualified.md",
       type: "llm-wiki",
       deleted: true,
       trashed: true
     });
-    expect(cli.app.readPath("LLM-Wiki/AI/Policy Wiki.md")).toBeUndefined();
+    expect(cli.app.readPath("LLM-Wiki/Alignment/Policy Qualified.md")).toBeUndefined();
   });
 
   it("rejects case variants of the reserved index hub name on rename", async () => {
@@ -186,6 +235,30 @@ describe("llm-wiki CLI adapters", () => {
     expect(String(renamed.error)).toContain('domain hub must be named "index" exactly');
     expect(cli.app.readPath("LLM-Wiki/AI/Case Rename.md")).toBeDefined();
     expect(cli.app.readPath("LLM-Wiki/AI/Index.md")).toBeUndefined();
+  });
+
+  it("rejects llm-wiki index hubs explicitly on refile", async () => {
+    await cli.run("para-zk:create-llm-wiki", {
+      title: "AI/Policy",
+      body: "Concept.",
+      open: "false"
+    });
+
+    const qualified = await cli.run("para-zk:refile-llm-wiki", {
+      title: "AI/index",
+      domain: "Alignment"
+    });
+    expect(qualified.ok).toBe(false);
+    expect(String(qualified.error)).toContain("domain hubs cannot be refiled");
+
+    const bare = await cli.run("para-zk:refile-llm-wiki", {
+      title: "index",
+      domain: "Alignment"
+    });
+    expect(bare.ok).toBe(false);
+    expect(String(bare.error)).toContain("domain hubs cannot be refiled");
+    expect(cli.app.readPath("LLM-Wiki/AI/index.md")).toBeDefined();
+    expect(cli.app.readPath("LLM-Wiki/Alignment/index.md")).toBeUndefined();
   });
 
   it("updates aliases and references, then reads references and backlinks collections", async () => {
@@ -407,6 +480,7 @@ describe("llm-wiki CLI adapters", () => {
       "para-zk:read-llm-wiki",
       "para-zk:update-llm-wiki",
       "para-zk:rename-llm-wiki",
+      "para-zk:refile-llm-wiki",
       "para-zk:delete-llm-wiki"
     ]) {
       const help = await cli.run(command, { help: "true" });

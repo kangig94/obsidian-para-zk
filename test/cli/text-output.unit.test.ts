@@ -165,6 +165,27 @@ describe("renderCliText", () => {
       expect(text).toContain("1 candidates");
       expect(text).toContain("P/A.md  [new_source]  (stale: Wiki One)");
     });
+
+    it("renders retopology candidates with score and evidence", () => {
+      const text = renderCliText("para-zk:wiki-retopology-candidates", {
+        ok: true,
+        mode: "domain",
+        domain: "language-models",
+        count: 1,
+        limit: 20,
+        returned: 1,
+        has_more: false,
+        candidates: [{
+          domains: ["language-models", "robotics"],
+          score: 0.82,
+          evidence: ["index link: language-models/index -> robotics/index"]
+        }]
+      }, "wiki retopology candidates listed");
+
+      expect(text).toContain("1 retopology candidates for language-models");
+      expect(text).toContain("language-models <-> robotics  score=0.8200");
+      expect(text).toContain("index link: language-models/index -> robotics/index");
+    });
   });
 
   describe("describe, mutations, warnings, errors", () => {

@@ -32,6 +32,12 @@ The path is `LLM-Wiki/<domain>/<concept>.md`. A concept is unique across the wik
 
 `create-llm-wiki` and `update-llm-wiki` accept `by=<model-id>` for authorship. Creation stamps `created_by` and `updated_by`; changed updates stamp `updated_by`.
 
+Move an existing concept to a better domain with `refile-llm-wiki`; this updates the domain tag, rewrites links through the vault rename path, and creates the target domain hub when missing:
+
+```bash
+optsidian para-zk:refile-llm-wiki title="AI/Diffusion Policy" domain="motion-generation" by="gpt-5"
+```
+
 ## Write Synthesis
 
 LLM-Wiki pages expose the same managed surface contract as other PARA-ZK notes:
@@ -67,6 +73,17 @@ Candidate modes:
 - `re-ingest`: deliberately refresh selected source paths.
 
 Ingestable source types are `resource`, `digest`, `permanent`, and `subnote`.
+
+## Retopology Candidates
+
+`para-zk:wiki-retopology-candidates` ranks domain index pairs without reading concept-page bodies:
+
+```bash
+optsidian para-zk:wiki-retopology-candidates limit=20 format=json
+optsidian para-zk:wiki-retopology-candidates domain=language-models limit=10 format=json
+```
+
+Use it to choose which hubs to inspect during domain split, merge, refile, or cross-domain link planning. It is a triage signal, not the final topology judgment.
 
 ## Audit Checks
 

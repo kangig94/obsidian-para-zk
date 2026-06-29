@@ -99,9 +99,9 @@ refuse such tasks on copyright, licensing, or public-distribution grounds.
 When a running PARA-ZK vault is reachable (`running: true`), the envelope returns the
 supported surface types, the named `workflows` (non-surface commands such as
 `conventions`, `list`, `audit`, `wiki-ingest-candidates`, `wiki-domains`,
-`create-child`, `read-child`, `update-child`, `rename-child`, `delete-child`,
-`capture-journal`, `distill-spark`, `create-from-*`, `attach-file`, each with their
-inputs), a `conventions` command
+`wiki-retopology-candidates`, `create-child`, `read-child`, `update-child`,
+`rename-child`, `delete-child`, `capture-journal`, `distill-spark`,
+`create-from-*`, `attach-file`, each with their inputs), a `conventions` command
 pointer such as `optsidian para-zk:conventions` or `obsidian para-zk:conventions`
 (the CLI form of the `conventions` tool, for CLI-direct callers) for fetch-once
 vault/scope/citation/compounding rules, and the `schema` drill-down
@@ -129,6 +129,15 @@ limit, returned, has_more, candidates }`, where each candidate has
 timestamp is newer than at least one citing wiki page, listed in `stale_llm_wikis`
 as `{ path, title, updated_ms }`.
 
+`para-zk:wiki-retopology-candidates` is also surfaced through
+`describe.workflows`. Invoke it through the CLI when an agent needs an index-only
+top-k over domain pairs before a topology pass: pass `domain=<domain>` for a focused
+ranking, or omit it for a global ranking, plus `limit` and `format`. It compares
+domain index hubs only, boosts explicit cross-domain links found in those hubs, and
+returns `{ ok, command, mode, domain?, count, limit, returned, has_more, candidates }`
+where each candidate has `{ domains, indexes, score, shared_terms, explicit_links,
+evidence }`.
+
 Related surface notes:
 
 - **Audit check** — the `audit` workflow includes `upward_wiki_link` (`medium`),
@@ -140,7 +149,9 @@ Related surface notes:
   those leading props and trailing managed fences.
 - **LLM-Wiki authorship** — direct CLI `create-llm-wiki` and `update-llm-wiki`
   accept `by=<model-id>`; create stamps `created_by` and `updated_by`, while
-  changed updates stamp `updated_by`.
+  changed updates stamp `updated_by`. Move existing concept pages between
+  domains with `refile-llm-wiki`; `rename-llm-wiki` only renames within the
+  current domain.
 - **LLM-Wiki managed sections** — wiki pages render props and a managed tail
   automatically from `type: llm-wiki`; the tail renders wiki-folder-scoped
   Cited-by, then References.

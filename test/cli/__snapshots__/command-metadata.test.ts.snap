@@ -1155,6 +1155,28 @@ exports[`native CLI command metadata is stable 1`] = `
     },
   },
   {
+    "command": "para-zk:refile-llm-wiki",
+    "description": "Move an llm-wiki note to another domain folder",
+    "options": {
+      "by": {
+        "description": "Locale-neutral model id to stamp as llm-wiki authorship.",
+        "value": "<model-id>",
+      },
+      "domain": {
+        "description": "Target one-segment LLM-Wiki domain folder.",
+        "value": "<domain>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "title": {
+        "description": "Current LLM-Wiki title. Use / to address an LLM-Wiki-relative path, e.g. AI/Foo.",
+        "value": "<title>",
+      },
+    },
+  },
+  {
     "command": "para-zk:rename-area",
     "description": "Rename an area note, including its folder-style parent folder",
     "options": {
@@ -1745,6 +1767,24 @@ exports[`native CLI command metadata is stable 1`] = `
       "type": {
         "description": "Optional ingestable source type filter.",
         "value": "<resource|digest|permanent|subnote>",
+      },
+    },
+  },
+  {
+    "command": "para-zk:wiki-retopology-candidates",
+    "description": "Rank LLM-Wiki domain index pairs for retopology review",
+    "options": {
+      "domain": {
+        "description": "Optional focus domain. When omitted, rank global domain pairs.",
+        "value": "<domain>",
+      },
+      "format": {
+        "description": "Output format (default: text).",
+        "value": "<text|json>",
+      },
+      "limit": {
+        "description": "Maximum candidates to return (default: 20).",
+        "value": "<number>",
       },
     },
   },

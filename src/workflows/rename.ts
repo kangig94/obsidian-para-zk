@@ -1,10 +1,20 @@
 import { TFile } from "obsidian";
 import { localePack } from "../i18n";
+import { PARA_ZK_PATHS } from "../layout";
 import { frontmatterLinks, fileFrontmatter, readType, type Frontmatter } from "../vault/frontmatter";
 import { ensureFolder, isInFolder } from "../vault/files";
-import { joinVaultPath, parentFolder, sanitizeFileName, sanitizeVaultRelativePath } from "../vault/paths";
+import { joinVaultPath, normalizeVaultPath, parentFolder, sanitizeFileName, sanitizeVaultRelativePath } from "../vault/paths";
 import { slugify, uniqueStrings } from "../text";
-import type { RenameByTitleOptions, RenameLlmWikiOptions, RenameResult, RenameZkOptions, WorkflowContext } from "./context";
+import type {
+  RefileLlmWikiOptions,
+  RefileLlmWikiResult,
+  RenameByTitleOptions,
+  RenameLlmWikiOptions,
+  RenameResult,
+  RenameZkOptions,
+  WorkflowContext
+} from "./context";
+import { ensureLlmWikiDomainIndex } from "./create";
 import {
   assertVacantPath,
   drillToChild,
@@ -47,20 +57,130 @@ export async function renameResource(ctx: WorkflowContext, options: RenameByTitl
 }
 
 export async function renameLlmWiki(ctx: WorkflowContext, options: RenameLlmWikiOptions): Promise<RenameResult> {
-  const newTitleSegments = sanitizeVaultRelativePath(options.newTitle, "new_title");
-  if (newTitleSegments.length > 1) {
-    throw new Error("new_title for rename-llm-wiki must be a bare basename (use optsidian rename/move to change the folder).");
-  }
-  const newTitle = newTitleSegments[0];
+  const file = await resolveRequiredLlmWiki(ctx, options);
+  const newTitle = llmWikiRenameTargetTitle(file, options.newTitle);
   if (newTitle.toLowerCase() === "index" && newTitle !== "index") {
     throw new Error('llm-wiki domain hub must be named "index" exactly; use new_title=index');
   }
   return renameFlatNote(
     ctx,
-    await resolveRequiredLlmWiki(ctx, options),
+    file,
     newTitle,
     "llm-wiki"
   );
+}
+
+export async function refileLlmWiki(ctx: WorkflowContext, options: RefileLlmWikiOptions): Promise<RefileLlmWikiResult> {
+  rejectLlmWikiIndexRefileSelector(options);
+  const file = await resolveRequiredLlmWiki(ctx, options);
+  if (isLlmWikiIndexBasename(file.basename)) {
+    throw new Error("llm-wiki domain hubs cannot be refiled; create or update the target <domain>/index hub instead.");
+  }
+  const targetDomain = llmWikiTargetDomain(options.domain);
+  const fromPath = file.path;
+  const fromDomain = llmWikiDomainFromPath(file.path);
+  const toPath = joinVaultPath(PARA_ZK_PATHS.wikiFolder, `${targetDomain}/${file.name}`);
+  if (toPath !== fromPath) assertVacantPath(ctx, toPath);
+
+  const createdIndex = await ensureLlmWikiDomainIndex(ctx, targetDomain, options.by);
+  let targetFile = file;
+  const moved = toPath !== fromPath;
+  if (moved) {
+    await ensureFolder(ctx.host, parentFolder(toPath));
+    await ctx.host.renameFile(file, toPath);
+    const renamed = ctx.host.getFile(toPath);
+    if (!renamed) throw new Error(`failed to refile llm-wiki note ${fromPath} to ${toPath}`);
+    targetFile = renamed;
+  }
+
+  const tagChanged = await updateLlmWikiDomainTag(ctx, targetFile, targetDomain);
+  return {
+    path: toPath,
+    title: targetFile.basename,
+    changed: moved || tagChanged || createdIndex,
+    fromPath,
+    toPath,
+    fromDomain,
+    toDomain: targetDomain,
+    createdIndex,
+    tagChanged
+  };
+}
+
+function rejectLlmWikiIndexRefileSelector(options: RefileLlmWikiOptions): void {
+  if (options.title !== undefined) {
+    const segments = sanitizeVaultRelativePath(options.title, "title");
+    if (isLlmWikiIndexBasename(segments.at(-1) ?? "")) {
+      throw new Error("llm-wiki domain hubs cannot be refiled; create or update the target <domain>/index hub instead.");
+    }
+  }
+
+  if (options.path !== undefined) {
+    const basename = normalizeVaultPath(options.path).split("/").at(-1)?.replace(/\.md$/i, "") ?? "";
+    if (isLlmWikiIndexBasename(basename)) {
+      throw new Error("llm-wiki domain hubs cannot be refiled; create or update the target <domain>/index hub instead.");
+    }
+  }
+}
+
+function isLlmWikiIndexBasename(value: string): boolean {
+  return value.trim().toLowerCase() === "index";
+}
+
+function llmWikiRenameTargetTitle(file: TFile, newTitleValue: string | undefined): string {
+  const newTitleSegments = sanitizeVaultRelativePath(newTitleValue, "new_title");
+  if (newTitleSegments.length === 1) return newTitleSegments[0];
+  if (newTitleSegments.length === 2) {
+    const [domain, concept] = newTitleSegments;
+    const currentDomain = llmWikiDomainFromPath(file.path);
+    if (domain === currentDomain) return concept;
+    throw new Error(
+      `new_title changes the llm-wiki domain from ${currentDomain ?? "(none)"} to ${domain}; use para-zk:refile-llm-wiki title="${llmWikiTitleForError(file)}" domain="${domain}" to move between domains.`
+    );
+  }
+  throw new Error(
+    'new_title for rename-llm-wiki must be a bare basename or the current-domain path "<domain>/<concept>"; use para-zk:refile-llm-wiki to move between domains.'
+  );
+}
+
+function llmWikiTargetDomain(value: string | undefined): string {
+  const segments = sanitizeVaultRelativePath(value, "domain");
+  if (segments.length !== 1) {
+    throw new Error("domain for refile-llm-wiki must be exactly one path segment.");
+  }
+  return segments[0];
+}
+
+function llmWikiDomainFromPath(path: string): string | undefined {
+  const root = `${PARA_ZK_PATHS.wikiFolder}/`;
+  const normalized = normalizeVaultPath(path);
+  if (!normalized.startsWith(root)) return undefined;
+  const segments = normalized.slice(root.length).split("/");
+  return segments.length >= 2 ? segments[0] : undefined;
+}
+
+function llmWikiTitleForError(file: TFile): string {
+  const domain = llmWikiDomainFromPath(file.path);
+  return domain ? `${domain}/${file.basename}` : file.basename;
+}
+
+async function updateLlmWikiDomainTag(ctx: WorkflowContext, file: TFile, domain: string): Promise<boolean> {
+  const prefix = localePack(ctx.settings.locale).tags.llmWiki;
+  const expected = `${prefix}/${slugify(domain)}`;
+  let changed = false;
+  await ctx.host.processFrontMatter(file, (fm) => {
+    const current = frontmatterLinks(fm.tags);
+    const others = current.filter((tag) => {
+      const normalized = tag.startsWith("#") ? tag.slice(1) : tag;
+      return normalized !== prefix && !normalized.startsWith(`${prefix}/`);
+    });
+    const next = uniqueStrings([...others, expected]);
+    if (next.length !== current.length || next.some((tag, index) => tag !== current[index])) {
+      fm.tags = next;
+      changed = true;
+    }
+  });
+  return changed;
 }
 
 export async function renameZk(ctx: WorkflowContext, options: RenameZkOptions): Promise<RenameResult> {

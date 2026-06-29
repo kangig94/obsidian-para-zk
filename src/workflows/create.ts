@@ -294,7 +294,7 @@ export async function createLlmWiki(ctx: WorkflowContext, options: CreateLlmWiki
 
   // A concept is a single page across the whole wiki — reuse it regardless of domain, so the
   // same concept is never duplicated into a second folder. Re-filing a page to another domain
-  // is a deliberate move (optsidian rename/move), not a re-create.
+  // is a deliberate refile-llm-wiki move, not a re-create.
   const existing = findLlmWikiConcept(ctx, concept);
   if (existing) {
     await openIfRequested(ctx, existing, options.open);
@@ -304,7 +304,7 @@ export async function createLlmWiki(ctx: WorkflowContext, options: CreateLlmWiki
   // Guarantee the domain's `index` hub exists (a scaffold — the LLM fills its body). Idempotent:
   // minted only when absent, so a domain's first concept page creates its index and later pages
   // find it. The index is the deterministic per-domain entry point an LLM reads for the area map.
-  await ensureDomainIndex(ctx, domain, options.by);
+  await ensureLlmWikiDomainIndex(ctx, domain, options.by);
   await openIfRequested(ctx, file, options.open);
   return noteResult(file, true, options.open);
 }
@@ -313,9 +313,10 @@ function domainIndexPath(ctx: WorkflowContext, domain: string): string {
   return joinVaultPath(PARA_ZK_PATHS.wikiFolder, `${domain}/${DOMAIN_INDEX_CONCEPT}.md`);
 }
 
-async function ensureDomainIndex(ctx: WorkflowContext, domain: string, by: string | undefined): Promise<void> {
-  if (ctx.host.getFile(domainIndexPath(ctx, domain))) return;
+export async function ensureLlmWikiDomainIndex(ctx: WorkflowContext, domain: string, by: string | undefined): Promise<boolean> {
+  if (ctx.host.getFile(domainIndexPath(ctx, domain))) return false;
   await writeLlmWikiPage(ctx, domain, DOMAIN_INDEX_CONCEPT, { by });
+  return true;
 }
 
 // Writes a fresh `<domain>/<concept>.md` wiki page with the managed template + frontmatter; the

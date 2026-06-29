@@ -271,6 +271,33 @@ export type WikiDomainsResult = {
   domains: WikiDomainSummary[];
 };
 
+export type WikiRetopologyCandidatesOptions = {
+  domain?: string;
+  limit?: number;
+};
+
+export type WikiRetopologyCandidate = {
+  domains: [string, string];
+  indexes: [string, string];
+  score: number;
+  shared_terms: string[];
+  explicit_links: Array<{
+    from: string;
+    to: string;
+  }>;
+  evidence: string[];
+};
+
+export type WikiRetopologyCandidatesResult = {
+  mode: "global" | "domain";
+  domain?: string;
+  count: number;
+  limit: number;
+  returned: number;
+  has_more: boolean;
+  candidates: WikiRetopologyCandidate[];
+};
+
 export type AuditSeverity = "high" | "medium" | "low";
 
 export type AuditCheckCode =
@@ -380,6 +407,13 @@ export type RenameLlmWikiOptions = {
   newTitle?: string;
 };
 
+export type RefileLlmWikiOptions = {
+  path?: string;
+  title?: string;
+  domain?: string;
+  by?: string;
+};
+
 export type RenameZkOptions = {
   path?: string;
   title?: string;
@@ -400,6 +434,18 @@ export type RenameResult = {
     fromPath: string;
     toPath: string;
   }>;
+};
+
+export type RefileLlmWikiResult = {
+  path: string;
+  title: string;
+  changed: boolean;
+  fromPath: string;
+  toPath: string;
+  fromDomain?: string;
+  toDomain: string;
+  createdIndex: boolean;
+  tagChanged: boolean;
 };
 
 export type DeleteByTitleOptions = {
@@ -525,6 +571,7 @@ export type SurfaceAddressing = {
   update?: string;
   createInputs?: string[];
   rename?: boolean;
+  refile?: string;
 };
 
 export type SurfaceDescription = {

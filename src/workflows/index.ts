@@ -5,6 +5,8 @@ export type {
   AuditResult,
   CollectionReadOptions,
   ReferenceRead,
+  RefileLlmWikiOptions,
+  RefileLlmWikiResult,
   SurfaceDescription,
   TaskRead,
   WikiDomainSummary,
@@ -15,6 +17,9 @@ export type {
   WikiIngestCandidatesResult,
   WikiIngestMode,
   WikiIngestStalePage,
+  WikiRetopologyCandidate,
+  WikiRetopologyCandidatesOptions,
+  WikiRetopologyCandidatesResult,
   WorkflowContext,
 } from "./context";
 
@@ -45,12 +50,13 @@ export {
   updateRetro,
   updateZk
 } from "./update";
-export { renameArea, renameLlmWiki, renameProject, renameResource, renameZk } from "./rename";
+export { refileLlmWiki, renameArea, renameLlmWiki, renameProject, renameResource, renameZk } from "./rename";
 export { deleteArea, deleteJournal, deleteLlmWiki, deleteProject, deleteResource, deleteRetro, deleteZk } from "./delete";
 export { listNotes } from "./list";
 export { auditVault } from "./audit";
 export { INGESTABLE_TYPES, ingestableCanonicalSource, wikiIngestCandidates } from "./wiki-ingest-candidates";
 export { wikiDomains } from "./wiki-domains";
+export { wikiRetopologyCandidates } from "./wiki-retopology-candidates";
 export { captureJournal, openJournal, distillSpark, createFromDigest, createFromResource } from "./promote";
 export {
   addReference,

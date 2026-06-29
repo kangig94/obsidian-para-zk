@@ -21,6 +21,7 @@ function renderBody(command: string, payload: Envelope, summary: string): string
     case "para-zk:audit": return renderAudit(payload);
     case "para-zk:list": return renderNoteList(payload);
     case "para-zk:wiki-ingest-candidates": return renderCandidates(payload);
+    case "para-zk:wiki-retopology-candidates": return renderRetopologyCandidates(payload);
     case "para-zk:wiki-domains": return renderWikiDomains(payload);
     case "para-zk:conventions": return renderSchema(payload, summary);
     case "para-zk:describe": return renderSchema(payload, summary);
@@ -227,6 +228,34 @@ function renderWikiDomains(payload: Envelope): string {
   const hint = paginationHint(payload);
   if (hint) lines.push(hint);
   return lines.join("\n");
+}
+
+function renderRetopologyCandidates(payload: Envelope): string {
+  const candidates = Array.isArray(payload.candidates) ? payload.candidates : [];
+  const suffix = typeof payload.domain === "string" ? ` for ${payload.domain}` : "";
+  const lines = [listHeader(payload, `retopology candidates${suffix}`)];
+  for (const candidate of candidates) {
+    if (!isRecord(candidate)) continue;
+    const domains = Array.isArray(candidate.domains)
+      ? candidate.domains.map(strOf).filter(Boolean).join(" <-> ")
+      : "";
+    const score = typeof candidate.score === "number" ? candidate.score.toFixed(4) : strOf(candidate.score);
+    const evidence = stringList(candidate.evidence);
+    lines.push(`  ${domains}  score=${score}`);
+    for (const item of evidence.slice(0, 2)) lines.push(`    ${item}`);
+  }
+  const hint = topKHint(payload);
+  if (hint) lines.push(hint);
+  return lines.join("\n");
+}
+
+function topKHint(page: Envelope): string | undefined {
+  if (page.has_more !== true) return undefined;
+  const returned = typeof page.returned === "number" ? page.returned : 0;
+  const count = typeof page.count === "number" ? page.count : undefined;
+  return count !== undefined
+    ? `… +${count - returned} more (${returned}/${count}; increase limit)`
+    : undefined;
 }
 
 function listHeader(payload: Envelope, noun: string): string {

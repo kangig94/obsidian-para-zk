@@ -6,6 +6,7 @@ import {
   deleteLlmWiki,
   listNotes,
   readLlmWiki,
+  refileLlmWiki,
   renameLlmWiki,
   updateLlmWiki,
   updateResource
@@ -170,19 +171,81 @@ describe("llm-wiki workflows", () => {
     expect(app.readPath("LLM-Wiki/AI/Old Name.md")).toBeUndefined();
     expect(app.readPath("LLM-Wiki/AI/New Name.md")).toBeDefined();
 
-    const file = app.vault.getFileByPath("LLM-Wiki/AI/New Name.md");
+    const renamedAgain = await renameLlmWiki(ctx, {
+      title: "AI/New Name",
+      newTitle: "AI/Renamed Again"
+    });
+    expect(renamedAgain).toMatchObject({
+      changed: true,
+      fromPath: "LLM-Wiki/AI/New Name.md",
+      toPath: "LLM-Wiki/AI/Renamed Again.md",
+      title: "Renamed Again"
+    });
+    expect(app.readPath("LLM-Wiki/AI/New Name.md")).toBeUndefined();
+
+    const file = app.vault.getFileByPath("LLM-Wiki/AI/Renamed Again.md");
     if (!file) throw new Error("missing renamed wiki note");
     const frontmatter = await readFileFrontmatterFresh(ctx, file);
     expect(frontmatter.tags).toEqual(["llm-wiki/ai"]);
 
     const consumer = app.readPath("PARA/Resources/Consumer.md") ?? "";
-    expect(consumer).toContain("[[LLM-Wiki/AI/New Name.md]]");
+    expect(consumer).toContain("[[LLM-Wiki/AI/Renamed Again.md]]");
     expect(consumer).not.toContain("Old Name");
 
-    await expect(renameLlmWiki(ctx, { title: "AI/New Name", newTitle: "Other/Folder" }))
-      .rejects.toThrow(/bare basename/);
+    await expect(renameLlmWiki(ctx, { title: "AI/Renamed Again", newTitle: "Other/Folder" }))
+      .rejects.toThrow(/refile-llm-wiki/);
     // The rejected cross-domain rename must not leave a partial write in a new domain folder.
     expect(app.listPaths().some((path) => path.startsWith("LLM-Wiki/Other/"))).toBe(false);
+  });
+
+  it("refiles a concept to another domain, updates its domain tag, and rewrites inbound wikilinks", async () => {
+    const { ctx, app } = createTestContext();
+    await createLlmWiki(ctx, { title: "AI/Policy", open: false });
+    await createResource(ctx, { title: "Wiki Consumer", body: "See [[LLM-Wiki/AI/Policy.md]].", open: false });
+
+    const refiled = await refileLlmWiki(ctx, {
+      title: "AI/Policy",
+      domain: "Alignment",
+      by: "test-model"
+    });
+
+    expect(refiled).toMatchObject({
+      path: "LLM-Wiki/Alignment/Policy.md",
+      title: "Policy",
+      changed: true,
+      fromPath: "LLM-Wiki/AI/Policy.md",
+      toPath: "LLM-Wiki/Alignment/Policy.md",
+      fromDomain: "AI",
+      toDomain: "Alignment",
+      createdIndex: true,
+      tagChanged: true
+    });
+    expect(app.readPath("LLM-Wiki/AI/Policy.md")).toBeUndefined();
+    expect(app.readPath("LLM-Wiki/Alignment/Policy.md")).toBeDefined();
+    expect(app.readPath("LLM-Wiki/Alignment/index.md")).toBeDefined();
+
+    const file = app.vault.getFileByPath("LLM-Wiki/Alignment/Policy.md");
+    if (!file) throw new Error("missing refiled wiki note");
+    const frontmatter = await readFileFrontmatterFresh(ctx, file);
+    expect(frontmatter.tags).toEqual(["llm-wiki/alignment"]);
+
+    const index = app.vault.getFileByPath("LLM-Wiki/Alignment/index.md");
+    if (!index) throw new Error("missing target domain index");
+    const indexFrontmatter = await readFileFrontmatterFresh(ctx, index);
+    expect(indexFrontmatter).toMatchObject({
+      type: "llm-wiki",
+      tags: ["llm-wiki/alignment"],
+      created_by: "test-model"
+    });
+
+    const consumer = app.readPath("PARA/Resources/Wiki Consumer.md") ?? "";
+    expect(consumer).toContain("[[LLM-Wiki/Alignment/Policy.md]]");
+    expect(consumer).not.toContain("[[LLM-Wiki/AI/Policy.md]]");
+
+    await expect(refileLlmWiki(ctx, { title: "Alignment/index", domain: "AI" }))
+      .rejects.toThrow(/domain hubs cannot be refiled/);
+    await expect(refileLlmWiki(ctx, { title: "index", domain: "AI" }))
+      .rejects.toThrow(/domain hubs cannot be refiled/);
   });
 
   it("deletes through core trash and cleans PARA-ZK-owned references", async () => {
