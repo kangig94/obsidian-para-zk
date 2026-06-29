@@ -75,7 +75,6 @@ export async function wikiRetopologyCandidates(
   return {
     mode: focus ? "domain" : "global",
     ...(focus ? { domain: focus } : {}),
-    depth,
     ...(focus ? { graph: graphForDomain(byDomain.get(focus)!, graphEdges, adjacency, depth) } : {}),
     count: candidates.length,
     limit,

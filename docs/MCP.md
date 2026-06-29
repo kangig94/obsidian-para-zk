@@ -120,8 +120,8 @@ The `install` field is present in both states (the active vault running PARA-ZK 
 array, not as a separate MCP tool, consistent with `list` and `audit`. Invoke it
 through the CLI when an agent needs the body-read-free source set for LLM-Wiki
 ingest: `mode=<per-import|delta|uncited|re-ingest>`, `source_path=<vault-path>` or
-`source_paths=<json|comma-list>` for targeted modes only, plus `offset`,
-`limit`, and `format`. Its envelope includes `{ ok, command, count, offset,
+`source_paths=<json|comma-list>` for targeted modes only, plus `offset` and
+`limit`. Its envelope includes `{ ok, command, count, offset,
 limit, returned, has_more, candidates }`, where each candidate has
 `{ path, type, title, updated, updated_ms, stale_llm_wikis, reason }`. Reasons are
 `missing_wiki_citation`, `source_newer_than_wiki`, `per_import`, and
@@ -132,7 +132,7 @@ as `{ path, title, updated_ms }`.
 `para-zk:wiki-retopology-candidates` is also surfaced through
 `describe.workflows`. Invoke it through the CLI when an agent needs an index-only
 top-k over domain pairs before a topology pass: pass `domain=<domain>` for a focused
-ranking, or omit it for a global ranking, plus `limit`, `depth`, and `format`.
+ranking, or omit it for a global ranking, plus `limit` and `depth`.
 Focused mode always includes an undirected index graph neighborhood with default
 `depth=2`. It compares domain index hubs only, boosts explicit cross-domain links
 found in those hubs, and returns

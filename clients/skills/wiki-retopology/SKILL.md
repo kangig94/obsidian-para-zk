@@ -80,38 +80,9 @@ Do not ask the user to resolve invalid arguments; stop with the concrete routing
    - **Handoff to ingest**: page or hub prose needs source-backed synthesis, citations, or a body
      rewrite. Do not do that inside this skill; route it to `wiki-ingest`.
 
-4. **Plan**: Produce a structured plan with these sections. Include concrete titles and one-line
-   rationales.
-
-   ```json
-   {
-     "summary": "...",
-     "domain_moves": [
-       {"title": "old-domain/Concept", "to_domain": "new-domain", "reason": "..."}
-     ],
-     "domain_splits": [
-       {"from_domain": "language-models", "new_domains": ["alignment", "scaling-laws"], "reason": "..."}
-     ],
-     "domain_merges": [
-       {"from_domain": "RL", "to_domain": "reinforcement-learning", "reason": "..."}
-     ],
-     "same_domain_renames": [
-       {"title": "domain/Old", "new_title": "domain/New", "reason": "..."}
-     ],
-     "source_index_prunes": [
-       {"index": "old-domain/index", "remove": "old-domain/Concept", "reason": "moved to new-domain"}
-     ],
-     "cross_domain_links": [
-       {"from": "domain-a/index", "to": "domain-b/index", "placement": "Related domains", "reason": "..."}
-     ],
-     "wiki_ingest_handoff": [
-       {"mode": "re-ingest", "source_path": "PARA/Resources/Source.md", "reason": "..."}
-     ],
-     "manual_decisions": [
-       {"question": "...", "options": ["...", "..."]}
-     ]
-   }
-   ```
+4. **Plan**: Produce a compact text plan with concrete titles and one-line rationales. Include only
+   sections that have entries: summary, domain moves, domain splits, domain merges, same-domain
+   renames, source-index prunes, cross-domain links, wiki-ingest handoff, and manual decisions.
 
    Keep the plan ordered: merges before moves into the merged domain; domain creation before moves
    into the new domain; deterministic moves/renames and source-index prunes before every

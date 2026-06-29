@@ -72,10 +72,10 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
     DRIVE THE CLI THROUGH `mcp__optsidian__command_run` — NOT Bash. The host sandbox blocks a
     sandboxed process (including you) from connecting to Obsidian over its socket, so
     `optsidian para-zk:*` run via Bash fails with "unable to find Obsidian". Call it as
-    `command_run({ command: "para-zk:create-llm-wiki", args: ["title=Robotics/Diffusion Policy", "by=<model-id>", "format=json"] })`;
-    `args` is argv (no shell): each `key=value` is its own token, values may contain spaces/quotes/
-    newlines verbatim, and you add `format=json` yourself. It returns `{ ok, command, exit_code,
-    stdout, stderr }`; parse the para-zk JSON from `stdout`. Pass body/value content INLINE in `args`
+    `command_run({ command: "para-zk:create-llm-wiki", args: ["title=Robotics/Diffusion Policy", "by=<model-id>"] })`;
+    `args` is argv (no shell): each `key=value` is its own token, and values may contain spaces/
+    quotes/newlines verbatim. Prefer the default text output for para-zk commands; request JSON only
+    when a caller must machine-parse fields. Pass body/value content INLINE in `args`
     (`value=<full markdown>`) — there is no shell and no temp file. Use `command_run` for every
     para-zk/optsidian command. NEVER write files directly.
 

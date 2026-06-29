@@ -324,7 +324,6 @@ export type WikiRetopologyConnection = {
 export type WikiRetopologyCandidatesResult = {
   mode: "global" | "domain";
   domain?: string;
-  depth: number;
   graph?: WikiRetopologyGraph;
   count: number;
   limit: number;

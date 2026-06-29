@@ -5,8 +5,7 @@ use when controlling PARA-ZK through a running Obsidian app.
 
 The CLI is intentionally richer than the GUI. GUI commands are optimized for a
 person in Obsidian; CLI handlers are optimized for an LLM that can provide
-structured options and consumes token-efficient results — readable text by
-default, `format=json` when the output is parsed programmatically.
+structured options and consume token-efficient, readable text by default.
 
 ## Invocation
 
@@ -17,11 +16,10 @@ obsidian para-zk:describe
 optsidian para-zk:describe
 ```
 
-**Output format**: text is the default and renders the command's data readably
-(findings, lists, the note surface, the resulting path) — not a static one-line
-summary. `format=json` is the stable, parseable envelope for automation and the MCP
-server; text may compact or omit fields that JSON includes. Reach for `format=json`
-only when something machine-parses the output.
+**Output format**: text is the default and the human-facing contract. It renders
+the command's data readably (findings, lists, the note surface, the resulting
+path), not as a static one-line summary. JSON is reserved for internal automation
+that must machine-parse an envelope.
 
 Notes are addressed **by name, never by file path** — the CLI never exposes a
 `path` option. Directly-addressable notes use their own selectors: `title`
@@ -137,10 +135,10 @@ free | checklist | todo | plan | research | meeting | decision | guide | risk | 
 
 Boolean options accept `true`, `false`, `1`, `0`, `yes`, `no`, `on`, and `off`.
 
-## Output Shape
+## Automation Envelope
 
-Shapes below are the `format=json` envelope — the canonical, stable surface for
-automation and MCP. The default text output renders the same data readably.
+Shapes below describe the machine envelope used by automation and MCP. The
+default CLI output is text and may compact this data for readability.
 
 Successful workflow commands return JSON like:
 
@@ -222,8 +220,7 @@ Important fields:
 
 Describes the live PARA-ZK CLI surface. This is also the preferred readiness
 check: if it succeeds (rather than erroring), Obsidian is running, PARA-ZK is loaded,
-and the native CLI handler is registered. When probing programmatically, add
-`format=json` and check `ok: true`.
+and the native CLI handler is registered.
 
 ```bash
 optsidian para-zk:describe
@@ -387,7 +384,6 @@ Options:
 | `source_paths` | JSON array or comma list | Multiple source note paths. Required for `per-import` and `re-ingest` when `source_path` is omitted; rejected for `delta` and `uncited`. |
 | `offset` | number | Zero-based candidate offset (default `0`). |
 | `limit` | number or `all` | Maximum candidates to return (default `50`). |
-| `format` | `json`, `text` | Default `text` renders the data readably; use `json` when the output is machine-parsed. |
 
 ```bash
 optsidian para-zk:wiki-ingest-candidates mode=uncited limit=all
@@ -397,14 +393,12 @@ optsidian para-zk:wiki-ingest-candidates mode=per-import source_paths='["PARA/Re
 optsidian para-zk:wiki-ingest-candidates mode=re-ingest source_path="PARA/Resources/Source Paper.md"
 ```
 
-JSON output fields:
+Text output includes:
 
-- `ok`: true on success.
-- `command`: `para-zk:wiki-ingest-candidates`.
-- `count`, `offset`, `limit`, `returned`, `has_more`: pagination envelope over
-  the candidate list.
-- `candidates`: array of
-  `{ path, type, title, updated, updated_ms, stale_llm_wikis, reason }`.
+- one line per candidate source path;
+- the source type and reason code;
+- stale wiki titles when a cited source is newer than a wiki page;
+- pagination hints when more candidates are available.
 
 Reason codes:
 
@@ -472,7 +466,6 @@ Options:
 | `domain` | domain name | Optional focus domain. When provided, returns the top candidates between that domain's index and every other domain index, plus an undirected index graph neighborhood. |
 | `depth` | number | Maximum undirected index graph depth for candidate connections and focused graph neighborhoods (default `2`). |
 | `limit` | number | Maximum candidates to return (default `20`). |
-| `format` | `json`, `text` | Default `text` renders the data readably; use `json` when the output is machine-parsed. |
 
 ```bash
 optsidian para-zk:wiki-retopology-candidates
@@ -481,28 +474,16 @@ optsidian para-zk:wiki-retopology-candidates domain=language-models limit=10
 optsidian para-zk:wiki-retopology-candidates domain=language-models depth=3 limit=10
 ```
 
-JSON output fields:
+Text output includes:
 
-- `ok`: true on success.
-- `command`: `para-zk:wiki-retopology-candidates`.
-- `mode`: `global` when `domain` is omitted, otherwise `domain`.
-- `domain`: present only for focused mode.
-- `graph`: present only for focused mode. `{ root, depth, nodes, edges }`, where
-  `nodes` carry `{ domain, index, distance, path }` and `edges` carry
-  `{ domains, indexes, links }`.
-- `count`, `limit`, `returned`, `has_more`: top-k envelope over candidate pairs.
-- `candidates`: array of
-  `{ domains, indexes, score, shared_terms, explicit_links, evidence, connection }`.
+- one line per candidate pair with score;
+- up to two evidence lines per pair, including shared terms or explicit index links;
+- the shortest index-to-index `connection` for global candidates;
+- in focused mode, the undirected index graph neighborhood from the focus domain.
 
-`domains` and `indexes` are two-item arrays. `shared_terms` summarizes index-text
-overlap. `explicit_links` lists cross-domain links emitted by one index into the
-other domain, and those links are also reflected in `evidence`.
-`connection` is the shortest undirected index-to-index graph path between that
-candidate's two domains within `depth`: `{ connected, depth, distance, path, edges }`.
-If the minimum path is direct, it returns that single edge; if the minimum path is
-two hops, it returns only those two connecting edges. `graph` uses the same
-`<domain>/index` to `<domain>/index` resolved links and treats them as undirected
-for focused neighborhood traversal.
+Connections and focused graphs use only resolved links between `<domain>/index`
+hubs. If a minimum path is direct, only that edge is shown; if it is two hops, only
+the two connecting edges are shown.
 
 ### `para-zk:setup`
 
