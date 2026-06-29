@@ -62,7 +62,7 @@ const CACHE_KEY = cacheKeyHash(JSON.stringify({
   bodyBigramWeight: BODY_BIGRAM_WEIGHT,
   minTokenLength: 2,
   tokenizer: "lowercase-wikilink-visible-label-code-strip-unicode-alnum",
-  bigrams: "adjacent-filtered-body-tokens",
+  bigrams: "adjacent-filtered-markdown-segment-tokens",
   stopwords: [...STOPWORD_LIST].sort()
 }));
 
@@ -541,7 +541,7 @@ function indexTermCounts(domain: string, body: string): Map<string, number> {
   for (const token of tokens(domain)) addWeight(vector, token, 3);
   const bodyTokens = tokens(body);
   for (const token of bodyTokens) addWeight(vector, token, BODY_UNIGRAM_WEIGHT);
-  for (const token of bigrams(bodyTokens)) addWeight(vector, token, BODY_BIGRAM_WEIGHT);
+  for (const token of bodyBigrams(body)) addWeight(vector, token, BODY_BIGRAM_WEIGHT);
   return vector;
 }
 
@@ -598,6 +598,42 @@ function wikiLinkLabel(target: string, alias: string | undefined): string {
   if (trimmedAlias) return trimmedAlias;
   const trimmedTarget = target.trim();
   return trimmedTarget.split("/").pop()?.replace(/\.md$/i, "") ?? trimmedTarget;
+}
+
+function bodyBigrams(body: string): string[] {
+  return markdownTokenSegments(body).flatMap((segment) => bigrams(tokens(segment)));
+}
+
+function markdownTokenSegments(markdown: string): string[] {
+  const segments: string[] = [];
+  let paragraph: string[] = [];
+  const flushParagraph = () => {
+    if (paragraph.length === 0) return;
+    segments.push(paragraph.join("\n"));
+    paragraph = [];
+  };
+
+  for (const line of markdown.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      flushParagraph();
+      continue;
+    }
+    if (isMarkdownSegmentBoundary(trimmed)) {
+      flushParagraph();
+      segments.push(trimmed);
+      continue;
+    }
+    paragraph.push(line);
+  }
+
+  flushParagraph();
+  return segments;
+}
+
+function isMarkdownSegmentBoundary(trimmedLine: string): boolean {
+  return /^#{1,6}\s+/.test(trimmedLine)
+    || /^(?:[-*+]\s+|\d+\.\s+)/.test(trimmedLine);
 }
 
 function bigrams(values: string[]): string[] {

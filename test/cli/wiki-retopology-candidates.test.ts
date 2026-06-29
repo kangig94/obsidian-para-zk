@@ -88,6 +88,32 @@ describe("wiki retopology candidates", () => {
     expect(phrasePair.shared_terms).toContain("diffusion policy");
   });
 
+  it("does not create body bigrams across markdown section boundaries", async () => {
+    const { ctx, app } = createTestContext();
+    await createWikiPage(app, "LLM-Wiki/alpha/index.md", "Left bridge.\n## Boundary\nRight bridge.");
+    await createWikiPage(app, "LLM-Wiki/beta/index.md", "Boundary right bridge.");
+
+    const cache = new Map<string, string>();
+    ctx.cache = {
+      readText: async (name) => cache.get(name),
+      writeText: async (name, value) => {
+        cache.set(name, value);
+      }
+    };
+
+    await wikiRetopologyCandidates(ctx, { limit: 10 });
+    const cached = JSON.parse(cache.get("retopology-cache.json") ?? "{}") as Record<string, unknown>;
+    const alphaEntry = (cached.indexes as Record<string, unknown>)["LLM-Wiki/alpha/index.md"] as unknown[];
+    const alphaTerms = alphaEntry[2] as Record<string, number>;
+
+    expect(alphaTerms).toMatchObject({
+      "left bridge": 0.4,
+      "right bridge": 0.4
+    });
+    expect(alphaTerms).not.toHaveProperty("bridge boundary");
+    expect(alphaTerms).not.toHaveProperty("boundary right");
+  });
+
   it("blends cosine with weighted overlap so shared bridges are not over-penalized", async () => {
     const { ctx, app } = createTestContext();
     await createWikiPage(app, "LLM-Wiki/alpha/index.md", "Shared bridge.");
