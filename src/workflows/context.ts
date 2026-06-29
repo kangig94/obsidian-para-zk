@@ -275,7 +275,6 @@ export type WikiRetopologyCandidatesOptions = {
   domain?: string;
   limit?: number;
   depth?: number;
-  links?: boolean;
 };
 
 export type WikiRetopologyCandidate = {
@@ -326,7 +325,6 @@ export type WikiRetopologyCandidatesResult = {
   mode: "global" | "domain";
   domain?: string;
   graph?: WikiRetopologyGraph;
-  links: boolean;
   count: number;
   limit: number;
   returned: number;

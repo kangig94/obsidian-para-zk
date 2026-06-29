@@ -80,12 +80,11 @@ Ingestable source types are `resource`, `digest`, `permanent`, and `subnote`.
 
 ```bash
 optsidian para-zk:wiki-retopology-candidates limit=20
-optsidian para-zk:wiki-retopology-candidates links=true limit=20
 optsidian para-zk:wiki-retopology-candidates domain=language-models limit=10
 optsidian para-zk:wiki-retopology-candidates domain=language-models depth=3 limit=10
 ```
 
-Use it to choose which hubs to inspect during domain split, merge, refile, or cross-domain link planning. Scores use TF-IDF weighted visible index text by default, with wikilinks reduced to their labels; pass `links=true` to include full wikilink target path tokens and explicit cross-domain index-link boosts while keeping link evidence visible either way. Each candidate includes the shortest undirected index-to-index `connection` within `depth`; focused mode also returns an undirected index graph neighborhood. `depth` defaults to `2`. It is a triage signal, not the final topology judgment.
+Use it to choose which hubs to inspect during domain split, merge, refile, or cross-domain link planning. Scores use TF-IDF weighted visible index text, with wikilinks reduced to their labels; explicit cross-domain links stay visible as evidence and graph connections without affecting the score. Each candidate includes the shortest undirected index-to-index `connection` within `depth`; focused mode also returns an undirected index graph neighborhood. `depth` defaults to `2`. It is a triage signal, not the final topology judgment.
 
 ## Audit Checks
 

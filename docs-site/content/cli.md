@@ -95,12 +95,11 @@ For retopology, use `para-zk:wiki-retopology-candidates` to rank domain index pa
 
 ```bash
 optsidian para-zk:wiki-retopology-candidates limit=20
-optsidian para-zk:wiki-retopology-candidates links=true limit=20
 optsidian para-zk:wiki-retopology-candidates domain=language-models limit=10
 optsidian para-zk:wiki-retopology-candidates domain=language-models depth=3 limit=10
 ```
 
-It compares `<domain>/index` hubs only with TF-IDF weighted cosine scores and returns `{ mode, domain?, graph?, links, count, limit, returned, has_more, candidates }` with `{ domains, indexes, score, shared_terms, explicit_links, evidence, connection }` candidates. By default, wikilinks are reduced to their visible labels (alias text, or the target basename when no alias) and explicit cross-domain links do not boost scores or break score ties; pass `links=true` to include full wikilink target path tokens and explicit index-link boosts. Explicit links still appear as evidence and graph connections either way. `connection` is the shortest undirected index-to-index path within `depth`; focused mode also includes an undirected index graph neighborhood. `depth` defaults to `2`.
+It compares `<domain>/index` hubs only with TF-IDF weighted cosine scores and returns `{ mode, domain?, graph?, count, limit, returned, has_more, candidates }` with `{ domains, indexes, score, shared_terms, explicit_links, evidence, connection }` candidates. Wikilinks are reduced to their visible labels (alias text, or the target basename when no alias), while explicit cross-domain links appear as evidence and graph connections without boosting scores or breaking score ties. `connection` is the shortest undirected index-to-index path within `depth`; focused mode also includes an undirected index graph neighborhood. `depth` defaults to `2`.
 
 The audit checks include `upward_wiki_link` (`medium`), which flags a non-`llm-wiki` note that links into an `llm-wiki` note; `orphan_wiki_page` (`low`), an advisory hint for a wiki page that no other wiki page links to; and `wiki_tag_domain_mismatch` (`low`), which can be fixed with `audit fix=true`.
 

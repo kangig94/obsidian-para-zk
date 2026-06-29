@@ -15,7 +15,6 @@ import type {
 const DOMAIN_INDEX_CONCEPT = "index";
 const DEFAULT_LIMIT = 20;
 const DEFAULT_GRAPH_DEPTH = 2;
-const EXPLICIT_LINK_BOOST = 0.35;
 const SCORE_PRECISION = 4;
 const MAX_SHARED_TERMS = 8;
 const STOPWORDS = new Set([
@@ -65,23 +64,21 @@ export async function wikiRetopologyCandidates(
   options: WikiRetopologyCandidatesOptions = {}
 ): Promise<WikiRetopologyCandidatesResult> {
   const limit = normalizeLimit(options.limit);
-  const links = normalizeLinks(options.links);
-  const indexes = await readDomainIndexes(ctx, links);
+  const indexes = await readDomainIndexes(ctx);
   const byDomain = new Map(indexes.map((index) => [index.domain, index]));
   const focus = normalizeDomainOption(options.domain, byDomain);
   const depth = normalizeDepth(options.depth);
   const graphEdges = indexGraphEdges(ctx, indexes);
   const adjacency = graphAdjacency(graphEdges);
   const candidates = focus
-    ? candidatesForDomain(ctx, byDomain.get(focus)!, indexes, links)
-    : candidatesForAll(ctx, indexes, graphEdges, adjacency, depth, links);
+    ? candidatesForDomain(ctx, byDomain.get(focus)!, indexes)
+    : candidatesForAll(ctx, indexes, graphEdges, adjacency, depth);
   const page = candidates.slice(0, limit);
 
   return {
     mode: focus ? "domain" : "global",
     ...(focus ? { domain: focus } : {}),
     ...(focus ? { graph: graphForDomain(byDomain.get(focus)!, graphEdges, adjacency, depth) } : {}),
-    links,
     count: candidates.length,
     limit,
     returned: page.length,
@@ -106,12 +103,6 @@ function normalizeDepth(value: unknown): number {
   return value;
 }
 
-function normalizeLinks(value: unknown): boolean {
-  if (value === undefined) return false;
-  if (typeof value !== "boolean") throw new Error("links must be a boolean");
-  return value;
-}
-
 function normalizeDomainOption(value: unknown, byDomain: Map<string, DomainIndex>): string | undefined {
   if (value === undefined || value === "") return undefined;
   if (typeof value !== "string") throw new Error("domain must be a string");
@@ -125,7 +116,7 @@ function normalizeDomainOption(value: unknown, byDomain: Map<string, DomainIndex
   throw new Error(`domain index not found: ${domain}`);
 }
 
-async function readDomainIndexes(ctx: WorkflowContext, links: boolean): Promise<DomainIndex[]> {
+async function readDomainIndexes(ctx: WorkflowContext): Promise<DomainIndex[]> {
   const wikiRoot = normalizeVaultPath(PARA_ZK_PATHS.wikiFolder);
   const indexes: RawDomainIndex[] = [];
 
@@ -144,7 +135,7 @@ async function readDomainIndexes(ctx: WorkflowContext, links: boolean): Promise<
       domain,
       title: `${domain}/${DOMAIN_INDEX_CONCEPT}`,
       path,
-      termCounts: indexTermCounts(domain, body, links)
+      termCounts: indexTermCounts(domain, body)
     });
   }
 
@@ -156,8 +147,7 @@ function candidatesForAll(
   indexes: DomainIndex[],
   edges: WikiRetopologyGraphEdge[],
   adjacency: Map<string, WikiRetopologyGraphEdge[]>,
-  depth: number,
-  links: boolean
+  depth: number
 ): WikiRetopologyCandidate[] {
   const candidates: WikiRetopologyCandidate[] = [];
   for (let i = 0; i < indexes.length; i += 1) {
@@ -166,24 +156,22 @@ function candidatesForAll(
         ctx,
         indexes[i],
         indexes[j],
-        shortestConnection(indexes[i].domain, indexes[j].domain, edges, adjacency, depth),
-        links
+        shortestConnection(indexes[i].domain, indexes[j].domain, edges, adjacency, depth)
       ));
     }
   }
-  return candidates.sort((left, right) => compareCandidates(left, right, links));
+  return candidates.sort(compareCandidates);
 }
 
 function candidatesForDomain(
   ctx: WorkflowContext,
   focus: DomainIndex,
-  indexes: DomainIndex[],
-  links: boolean
+  indexes: DomainIndex[]
 ): WikiRetopologyCandidate[] {
   return indexes
     .filter((index) => index.domain !== focus.domain)
-    .map((index) => candidateForPair(ctx, focus, index, undefined, links))
-    .sort((left, right) => compareCandidates(left, right, links));
+    .map((index) => candidateForPair(ctx, focus, index))
+    .sort(compareCandidates);
 }
 
 function graphForDomain(
@@ -343,12 +331,10 @@ function candidateForPair(
   ctx: WorkflowContext,
   left: DomainIndex,
   right: DomainIndex,
-  connection?: WikiRetopologyConnection,
-  links = false
+  connection?: WikiRetopologyConnection
 ): WikiRetopologyCandidate {
   const explicitLinks = explicitIndexLinks(ctx, left, right);
-  const baseScore = cosine(left, right);
-  const score = roundScore(Math.min(1, baseScore + (links ? explicitLinks.length * EXPLICIT_LINK_BOOST : 0)));
+  const score = roundScore(cosine(left, right));
   const sharedTerms = topSharedTerms(left, right);
   const evidence = candidateEvidence(sharedTerms, explicitLinks);
   return {
@@ -410,18 +396,16 @@ function candidateEvidence(shared: string[], explicitLinks: Array<{ from: string
   return evidence;
 }
 
-function compareCandidates(left: WikiRetopologyCandidate, right: WikiRetopologyCandidate, links = false): number {
+function compareCandidates(left: WikiRetopologyCandidate, right: WikiRetopologyCandidate): number {
   const score = right.score - left.score;
   if (score !== 0) return score;
-  const explicitLinks = links ? right.explicit_links.length - left.explicit_links.length : 0;
-  if (explicitLinks !== 0) return explicitLinks;
   return left.domains.join("\0").localeCompare(right.domains.join("\0"));
 }
 
-function indexTermCounts(domain: string, body: string, links: boolean): Map<string, number> {
+function indexTermCounts(domain: string, body: string): Map<string, number> {
   const vector = new Map<string, number>();
   for (const token of tokens(domain)) addWeight(vector, token, 3);
-  for (const token of tokens(body, links)) addWeight(vector, token, 1);
+  for (const token of tokens(body)) addWeight(vector, token, 1);
   return vector;
 }
 
@@ -461,12 +445,11 @@ function addWeight(vector: Map<string, number>, token: string, weight: number): 
   vector.set(token, (vector.get(token) ?? 0) + weight);
 }
 
-function tokens(value: string, links = false): string[] {
+function tokens(value: string): string[] {
   const normalized = value
     .toLowerCase()
     .replace(/\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g, (_match, target: string, alias: string | undefined) => {
-      const label = wikiLinkLabel(target, alias);
-      return links ? ` ${target} ${alias?.trim() ?? ""} ` : ` ${label} `;
+      return ` ${wikiLinkLabel(target, alias)} `;
     })
     .replace(/`[^`]*`/g, " ");
   const matches = normalized.match(/[\p{L}\p{N}]+/gu) ?? [];

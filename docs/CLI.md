@@ -416,10 +416,11 @@ When a domain has no index, enumerate that domain's pages with
 
 Ranks LLM-Wiki domain index pairs for retopology review. This is an index-only
 triage primitive: it reads `<domain>/index` hubs, compares their domain/index text
-with TF-IDF weighted cosine scores, and boosts explicit cross-domain links found
-in those index hubs. It does not read concept-page bodies and does not decide the
-topology by itself; use the returned pair list to choose which indexes to inspect
-directly.
+with TF-IDF weighted cosine scores, reducing wikilinks to their visible labels
+(alias text, or the target basename when no alias). Explicit cross-domain links
+are reported as evidence and graph connections, but do not affect the score. It
+does not read concept-page bodies and does not decide the topology by itself; use
+the returned pair list to choose which indexes to inspect directly.
 
 Options:
 
@@ -427,13 +428,11 @@ Options:
 | --- | --- | --- |
 | `domain` | domain name | Optional focus domain. When provided, returns the top candidates between that domain's index and every other domain index, plus an undirected index graph neighborhood. |
 | `depth` | number | Maximum undirected index graph depth for candidate connections and focused graph neighborhoods (default `2`). |
-| `links` | boolean | Include full wikilink target path tokens, explicit cross-domain index-link boosts, and link-count tie-breaks in scoring (default `false`). Explicit links still appear as evidence and graph connections when omitted or false. |
 | `limit` | number | Maximum candidates to return (default `20`). |
 
 ```bash
 optsidian para-zk:wiki-retopology-candidates
 optsidian para-zk:wiki-retopology-candidates limit=30
-optsidian para-zk:wiki-retopology-candidates links=true limit=30
 optsidian para-zk:wiki-retopology-candidates domain=language-models limit=10
 optsidian para-zk:wiki-retopology-candidates domain=language-models depth=3 limit=10
 ```

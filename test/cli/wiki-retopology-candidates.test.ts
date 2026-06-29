@@ -143,7 +143,7 @@ describe("wiki retopology candidates", () => {
     });
   });
 
-  it("can score candidates without explicit link boosts while keeping link evidence", async () => {
+  it("scores wikilinks by visible labels while keeping link evidence", async () => {
     await createWikiPage(
       cli.app,
       "LLM-Wiki/alpha/index.md",
@@ -153,22 +153,18 @@ describe("wiki retopology candidates", () => {
     await createWikiPage(cli.app, "LLM-Wiki/beta/hydraulic-actuator.md", "Hydraulic actuator detail.");
     await createWikiPage(cli.app, "LLM-Wiki/beta/contact-model.md", "Contact model detail.");
 
-    const contentOnly = await cli.run("para-zk:wiki-retopology-candidates", { limit: "1" });
-    const boosted = await cli.run("para-zk:wiki-retopology-candidates", { links: "true", limit: "1" });
+    const result = await cli.run("para-zk:wiki-retopology-candidates", { limit: "1" });
 
-    expect(contentOnly).toMatchObject({ ok: true, links: false });
-    expect(boosted).toMatchObject({ ok: true, links: true });
-    const boostedCandidate = (boosted.candidates as Array<Record<string, unknown>>)[0];
-    const contentOnlyCandidate = (contentOnly.candidates as Array<Record<string, unknown>>)[0];
-    expect(boostedCandidate.explicit_links).toHaveLength(2);
-    expect(contentOnlyCandidate.explicit_links).toEqual(boostedCandidate.explicit_links);
-    expect(contentOnlyCandidate.evidence).toContain("index link: alpha/index -> beta/contact-model");
-    expect(contentOnlyCandidate.shared_terms).toEqual(
+    expect(result).toMatchObject({ ok: true });
+    expect(result).not.toHaveProperty("links");
+    const candidate = (result.candidates as Array<Record<string, unknown>>)[0];
+    expect(candidate.explicit_links).toHaveLength(2);
+    expect(candidate.evidence).toContain("index link: alpha/index -> beta/contact-model");
+    expect(candidate.shared_terms).toEqual(
       expect.arrayContaining(["hydraulic", "actuator", "contact", "dynamics"])
     );
-    expect(contentOnlyCandidate.shared_terms).not.toContain("beta");
-    expect(contentOnlyCandidate.score as number).toBeGreaterThan(0);
-    expect(contentOnlyCandidate.score as number).toBeLessThan(boostedCandidate.score as number);
+    expect(candidate.shared_terms).not.toContain("beta");
+    expect(candidate.score as number).toBeGreaterThan(0);
   });
 
   it("returns an undirected index graph for focused domains with configurable depth", async () => {
