@@ -1,4 +1,4 @@
-import type { App, CachedMetadata, TAbstractFile, TFile } from "obsidian";
+import { Platform, type App, type CachedMetadata, type TAbstractFile, type TFile } from "obsidian";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import type { WorkflowContext } from "../workflows/context";
 import { joinVaultPath, obsidianConfigPath } from "./paths";
@@ -70,6 +70,8 @@ export function workflowContext(plugin: ParaZkPluginContext): WorkflowContext {
 }
 
 function createPluginCache(plugin: ParaZkPluginContext): WorkflowContext["cache"] {
+  if (!Platform.isDesktopApp) return undefined;
+
   const manifest = (plugin as { manifest?: { id?: string; dir?: string } }).manifest;
   const adapter = plugin.app.vault.adapter as CacheAdapter;
   if (!manifest?.id || typeof adapter.read !== "function" || typeof adapter.write !== "function") return undefined;

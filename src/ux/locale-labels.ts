@@ -61,9 +61,8 @@ export const RIBBON_ACTIONS: RibbonAction[] = [
   }
 ];
 
-export function statusCommandEntries(labels: Labels): Array<readonly [string, string]> {
+export function initCommandEntries(labels: Labels): Array<readonly [string, string]> {
   return [
-    ["check-status", labels.statusCommandName],
     ["setup-vault", labels.setupCommandName]
   ];
 }
@@ -91,7 +90,7 @@ export function refreshRegisteredLocaleLabels(plugin: ParaZkPluginContext, previ
 
   const labels = localePack(plugin.settings.locale).labels;
   for (const [id, name] of [
-    ...statusCommandEntries(labels),
+    ...initCommandEntries(labels),
     ...workflowCommandEntries(labels)
   ]) {
     setCommandName(plugin, id, name);

@@ -5,7 +5,7 @@ import { isRecord } from "../../records";
 import type { DependencyInstallScope } from "../../types";
 import { workflowContext } from "../../vault/host";
 import {
-  statusCommandEntries,
+  initCommandEntries,
   workflowCommandEntries
 } from "../locale-labels";
 import { chooseValue, confirmAction, promptDistill, promptSetupOptions, promptText } from "../prompts";
@@ -41,18 +41,10 @@ const INTERACTIVE_WORKFLOW_HANDLERS: Record<string, InteractiveWorkflowHandler> 
   "create-from-digest": createFromDigestWorkflow
 };
 
-export function registerStatusAndInitCommands(plugin: ParaZkPluginContext): void {
+export function registerInitCommands(plugin: ParaZkPluginContext): void {
   const labels = localePack(plugin.settings.locale).labels;
 
-  const commandNames = new Map(statusCommandEntries(labels));
-
-  plugin.addCommand({
-    id: "check-status",
-    name: commandNames.get("check-status") ?? labels.statusCommandName,
-    callback: () => {
-      new Notice(localePack(plugin.settings.locale).messages.statusReady);
-    }
-  });
+  const commandNames = new Map(initCommandEntries(labels));
 
   plugin.addCommand({
     id: "setup-vault",

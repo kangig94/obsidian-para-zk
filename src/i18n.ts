@@ -98,7 +98,6 @@ const ko: LocalePack = {
   },
   labels: {
     setupCommandName: "PARA-ZK vault 구성",
-    statusCommandName: "Check plugin status",
     createProjectCommandName: "새 프로젝트 만들기",
     createAreaCommandName: "새 영역 만들기",
     addReferenceCommandName: "참고 추가",
@@ -329,7 +328,6 @@ const ko: LocalePack = {
   messages: {
     setupReady: "PARA-ZK vault 구성 완료",
     createSubareaNeedsActiveArea: "하위 영역을 만들려면 상위 영역 노트를 먼저 여세요.",
-    statusReady: "PARA-ZK plugin loaded",
     commandComplete: "완료",
     commandCancelled: "취소됨",
     buttonMissingCommand: "PARA-ZK 버튼에 command가 없습니다",
@@ -395,7 +393,6 @@ const en: LocalePack = {
   },
   labels: {
     setupCommandName: "Set up PARA-ZK vault",
-    statusCommandName: "Check plugin status",
     createProjectCommandName: "Create project",
     createAreaCommandName: "Create area",
     addReferenceCommandName: "Add reference",
@@ -626,7 +623,6 @@ const en: LocalePack = {
   messages: {
     setupReady: "PARA-ZK vault set up",
     createSubareaNeedsActiveArea: "Open a parent area note first to create a subarea.",
-    statusReady: "PARA-ZK plugin loaded",
     commandComplete: "Done",
     commandCancelled: "Cancelled",
     buttonMissingCommand: "PARA-ZK button has no command",

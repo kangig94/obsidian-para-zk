@@ -20,7 +20,7 @@ import { registerRibbonActions } from "./ux/actions/ribbon";
 import { ParaZkSettingTab } from "./ux/settings";
 import { registerTaskRenderers } from "./ux/blocks/tasks";
 import {
-  registerStatusAndInitCommands,
+  registerInitCommands,
   registerWorkflowCommands
 } from "./ux/actions/workflows";
 
@@ -30,7 +30,7 @@ export default class ParaZkPlugin extends Plugin {
   async onload(): Promise<void> {
     await this.loadSettings();
 
-    registerStatusAndInitCommands(this);
+    registerInitCommands(this);
     registerWorkflowCommands(this);
     registerEditorWidthControl(this);
     registerRibbonActions(this);

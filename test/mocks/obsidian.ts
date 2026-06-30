@@ -36,6 +36,20 @@ export class App {
     unresolvedLinks: {} as Record<string, Record<string, number>>
   };
 }
+
+export const Platform = {
+  isDesktop: true,
+  isMobile: false,
+  isDesktopApp: true,
+  isMobileApp: false,
+  isIosApp: false,
+  isAndroidApp: false,
+  isPhone: false,
+  isTablet: false,
+  isMacOS: false,
+  isWin: false,
+  isLinux: true
+};
 export class AbstractInputSuggest<T> {
   constructor(_app: App, _textInputEl: HTMLInputElement | HTMLDivElement) {}
 }

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { Platform } from "obsidian";
 import type { ParaZkPluginContext } from "../../src/plugin-interface";
 import { workflowContext } from "../../src/vault/host";
 import { wikiRetopologyCandidates } from "../../src/workflows";
@@ -293,6 +294,40 @@ describe("wiki retopology candidates", () => {
     expect(cached).toHaveProperty("indexes");
     expect(app.listPaths()).not.toContain(staleTempPath);
     expect(app.listPaths().filter((path) => path.startsWith(`${cachePath}.`) && path.endsWith(".tmp"))).toEqual([]);
+  });
+
+  it("does not expose the plugin cache outside the desktop app", async () => {
+    const { ctx: baseCtx, app } = createTestContext();
+    const pluginDir = ".obsidian/plugins/para-zk";
+    const originalPlatform = {
+      isDesktop: Platform.isDesktop,
+      isMobile: Platform.isMobile,
+      isDesktopApp: Platform.isDesktopApp,
+      isMobileApp: Platform.isMobileApp
+    };
+    Platform.isDesktop = false;
+    Platform.isMobile = true;
+    Platform.isDesktopApp = false;
+    Platform.isMobileApp = true;
+
+    try {
+      const ctx = workflowContext({
+        app,
+        settings: baseCtx.settings,
+        manifest: { id: "para-zk", dir: pluginDir }
+      } as unknown as ParaZkPluginContext);
+      await createWikiPage(app, "LLM-Wiki/alpha/index.md", "Diffusion policy action.");
+      await createWikiPage(app, "LLM-Wiki/beta/index.md", "Diffusion policy control.");
+
+      expect(ctx.cache).toBeUndefined();
+      await wikiRetopologyCandidates(ctx, { limit: 10 });
+      expect(app.readPath(`${pluginDir}/retopology-cache.json`)).toBeUndefined();
+    } finally {
+      Platform.isDesktop = originalPlatform.isDesktop;
+      Platform.isMobile = originalPlatform.isMobile;
+      Platform.isDesktopApp = originalPlatform.isDesktopApp;
+      Platform.isMobileApp = originalPlatform.isMobileApp;
+    }
   });
 
   it("skips cache writes when index files change during rebuild", async () => {
