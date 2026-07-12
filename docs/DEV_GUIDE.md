@@ -118,12 +118,17 @@ hand-edited:
 
 - `manifest.json` `version` (Obsidian)
 - `versions.json` — adds `"<version>": "<minAppVersion>"` on first sight
-- `.claude-plugin/marketplace.json` plugin version
 - `clients/.claude-plugin/plugin.json` version
 - `clients/.codex-plugin/plugin.json` version
 - the MCP server bundle, via the esbuild `__VERSION__` define — `src/mcp/server.ts`
   reads that injected global, never a hardcoded literal
 - `clients/para-zk-mcp.mjs.sha256` — SHA-256 for the committed MCP bundle
+
+`.claude-plugin/marketplace.json` is **not** in this list. It is a hand-maintained
+deployment pin: its plugin `source` points at a `git-subdir` + tag `ref`, so the served
+plugin version comes from the pinned tag's `plugin.json`, not from `package.json`. Build
+and version scripts never rewrite it, and it is excluded from the generated-artifact
+drift check.
 
 A same-version rebuild is a no-op, and CI's post-build generated-artifact check fails if
 any artifact drifts from `package.json` or the source bundle. CI also compares the MCP

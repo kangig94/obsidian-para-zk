@@ -7,9 +7,13 @@
   "plugins": [
     {
       "name": "para-zk",
-      "source": "./clients",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/kangig94/obsidian-para-zk.git",
+        "path": "clients",
+        "ref": "0.2.1"
+      },
       "description": "Discover and drive the PARA-ZK Obsidian vault from any LLM via its native CLI.",
-      "version": "0.2.1",
       "author": {
         "name": "kangig94"
       }

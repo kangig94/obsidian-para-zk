@@ -158,22 +158,17 @@ function syncManifestVersions(targetVersion) {
     writeFileSync("versions.json", JSON.stringify(versions, null, 2) + "\n");
   }
 
+  // The marketplace catalog (.claude-plugin/marketplace.json) is intentionally excluded:
+  // it is a hand-maintained deployment pin (git-subdir + tag ref) whose plugin version is
+  // resolved from the pinned tag's plugin.json, so build/version scripts must never rewrite
+  // it. Only the plugin manifests below track package.json's version.
   for (const path of [
-    ".claude-plugin/marketplace.json",
     "clients/.claude-plugin/plugin.json",
     "clients/.codex-plugin/plugin.json"
   ]) {
     const json = JSON.parse(readFileSync(path, "utf8"));
-    let changed = false;
     if (json.version !== undefined && json.version !== targetVersion) {
       json.version = targetVersion;
-      changed = true;
-    }
-    if (json.plugins?.[0]?.version !== undefined && json.plugins[0].version !== targetVersion) {
-      json.plugins[0].version = targetVersion;
-      changed = true;
-    }
-    if (changed) {
       writeFileSync(path, JSON.stringify(json, null, 2) + "\n");
     }
   }

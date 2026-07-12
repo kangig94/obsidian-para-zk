@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
 
+// .claude-plugin/marketplace.json is intentionally absent: it is a hand-maintained
+// deployment pin (git-subdir + tag ref), not a generated artifact, so the build never
+// rewrites it and this drift gate must not demand a rebuild for hand edits to it.
 const generatedFiles = [
   "manifest.json",
   "versions.json",
-  ".claude-plugin/marketplace.json",
   "clients/.claude-plugin/plugin.json",
   "clients/.codex-plugin/plugin.json",
   "clients/para-zk-mcp.mjs",
