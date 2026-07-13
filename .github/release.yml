@@ -1,0 +1,25 @@
+# Configures GitHub's automatic release-notes generation, used by the Release
+# workflow (`gh release create --generate-notes` in .github/workflows/release.yml).
+# Merged PRs are grouped by their single type label. A PR with no matching label
+# lands in "Other Changes"; `ignore-for-release` omits it.
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+  categories:
+    - title: 🚀 Features
+      labels: [enhancement]
+    - title: 🐛 Fixes
+      labels: [bug]
+    - title: ♻️ Refactoring
+      labels: [refactor]
+    - title: 📝 Documentation
+      labels: [documentation]
+    - title: 🧪 Tests
+      labels: [test]
+    - title: 🔧 CI & Build
+      labels: [ci]
+    - title: 🧹 Chores
+      labels: [chore]
+    - title: 📦 Other Changes
+      labels: ["*"]
