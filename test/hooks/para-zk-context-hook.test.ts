@@ -1,4 +1,5 @@
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -62,6 +63,28 @@ describe("para-zk context SessionStart hook", () => {
 
     expect(commands.filter((command) => command.includes("para-zk-context-hook.mjs"))).toHaveLength(1);
     expect(entries.map((entry) => entry.matcher)).toEqual(["startup|resume|clear|compact"]);
+  });
+
+  it("runs as the entry point when invoked through a symlinked plugin root", () => {
+    const root = tempRoot();
+    const vault = makeVault(root, "VaultA", { pages: ["ai/index"] });
+    const registry = writeRegistry(root, [vault]);
+    const linkedPluginRoot = path.join(root, "plugin-root");
+    symlinkSync(path.resolve("clients"), linkedPluginRoot, "dir");
+
+    const result = spawnSync(process.execPath, [path.join(linkedPluginRoot, "hooks", "para-zk-context-hook.mjs")], {
+      encoding: "utf8",
+      env: { ...process.env, OBSIDIAN_CONFIG: registry }
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stderr).toBe("");
+    const output = JSON.parse(result.stdout) as {
+      hookSpecificOutput?: { hookEventName?: string; additionalContext?: string };
+    };
+    expect(output.hookSpecificOutput?.hookEventName).toBe("SessionStart");
+    expect(output.hookSpecificOutput?.additionalContext).toContain(`Vault "VaultA"`);
+    expect(output.hookSpecificOutput?.additionalContext).toContain("ai");
   });
 
   it("enumerates the same domain set as the wiki-domains workflow (drift guard)", async () => {

@@ -13,7 +13,6 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 const WIKI_ROOT = "LLM-Wiki";
 const OPTSIDIAN_URL = "https://github.com/kangig94/optsidian";
@@ -197,6 +196,6 @@ function main() {
   }
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+if (import.meta.main) {
   main();
 }
