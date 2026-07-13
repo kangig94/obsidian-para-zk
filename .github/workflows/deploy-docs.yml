@@ -44,7 +44,7 @@ jobs:
           cp docs-site/quartz.lock.json .quartz-build/quartz.lock.json
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 26
       - name: Cache npm
         uses: actions/cache@v5
         with:

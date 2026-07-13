@@ -1,0 +1,48 @@
+name: PR Labels
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Map title prefix to type label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          case "$PR_TITLE" in
+            feat:*) type_label="enhancement" ;;
+            fix:*) type_label="bug" ;;
+            refactor:*) type_label="refactor" ;;
+            docs:*) type_label="documentation" ;;
+            test:*) type_label="test" ;;
+            ci:*) type_label="ci" ;;
+            chore:*) type_label="chore" ;;
+            *)
+              echo "::warning::No type-label prefix matched; apply the PR label manually"
+              exit 0
+              ;;
+          esac
+
+          mapfile -t current_labels < <(
+            gh api "repos/$REPOSITORY/issues/$PR_NUMBER/labels" --jq '.[].name'
+          )
+          type_labels=(enhancement bug refactor documentation test ci chore)
+          for label in "${type_labels[@]}"; do
+            if printf '%s\n' "${current_labels[@]}" | grep -Fxq "$label"; then
+              gh api --method DELETE \
+                "repos/$REPOSITORY/issues/$PR_NUMBER/labels/$label" >/dev/null
+            fi
+          done
+          gh api --method POST "repos/$REPOSITORY/issues/$PR_NUMBER/labels" \
+            -f "labels[]=$type_label" >/dev/null
+          echo "Applied type label: $type_label"
