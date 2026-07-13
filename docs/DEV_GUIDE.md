@@ -14,8 +14,9 @@ No runtime dependencies — the plugin bundles everything; `obsidian`, `electron
 
 ## Build Targets
 
-`pnpm run build` produces **two** esbuild bundles plus the stylesheet. CI and release
-workflows build on Node 26:
+`pnpm run build` produces **two** esbuild bundles plus the stylesheet. Development,
+release, and documentation workflows build on Node 26; CI also verifies the minimum
+supported Node 24.2 runtime:
 
 1. `src/main.ts` → `build/main.js` (cjs, browser, es2022, minified; externals: `obsidian`,
    `electron`, `@codemirror/*`, node builtins) — the Obsidian plugin.
