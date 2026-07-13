@@ -23,8 +23,9 @@ these labels via [`.github/release.yml`](../../.github/release.yml).
 | `chore:`        | `chore`         |
 
 The `PR Labels` workflow applies this mapping when a PR is opened or its title changes.
-Never leave a PR unlabeled. Use `ignore-for-release` only to omit a PR such as a revert
-or pure no-op.
+If no prefix matches, it leaves the labels unchanged and the type label must be applied
+manually. Never leave a PR unlabeled. Use `ignore-for-release` only to omit a PR such as
+a revert or pure no-op.
 
 ## Releasing
 

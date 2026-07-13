@@ -28,8 +28,8 @@ jobs:
             ci:*) type_label="ci" ;;
             chore:*) type_label="chore" ;;
             *)
-              echo "::error::PR title must start with feat:, fix:, refactor:, docs:, test:, ci:, or chore:"
-              exit 1
+              echo "::warning::No type-label prefix matched; apply the PR label manually"
+              exit 0
               ;;
           esac
 
