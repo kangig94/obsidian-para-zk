@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import { readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
+import { parse as parseYaml } from "yaml";
 
 const repoRoot = process.cwd();
 const violations = [
   ...checkManifest(),
-  ...checkReleaseAttestations(),
+  ...checkReleaseWorkflow(),
   ...checkSourcePatterns(),
   ...checkCssPatterns()
 ];
@@ -52,9 +53,18 @@ function checkManifest() {
   return result;
 }
 
-function checkReleaseAttestations() {
+function checkReleaseWorkflow() {
   const workflow = readText(".github/workflows/release.yml");
+  const config = parseYaml(workflow);
   const required = [
+    "workflow_dispatch:",
+    "actions/create-github-app-token@",
+    "RELEASE_APP_ID",
+    "RELEASE_APP_PRIVATE_KEY",
+    'pnpm version "$VERSION" --no-git-tag-version',
+    "git push --atomic",
+    "gh release create",
+    "--generate-notes",
     "attestations: write",
     "id-token: write",
     "artifact-metadata: write",
@@ -63,9 +73,17 @@ function checkReleaseAttestations() {
     "build/styles.css"
   ];
 
-  return required
+  const result = required
     .filter((needle) => !workflow.includes(needle))
     .map((needle) => `.github/workflows/release.yml must include ${needle}`);
+
+  if (!config?.on?.workflow_dispatch) {
+    result.push(".github/workflows/release.yml must be manually dispatched");
+  }
+  if (config?.on?.push?.tags) {
+    result.push(".github/workflows/release.yml must not publish from pushed tags");
+  }
+  return result;
 }
 
 function checkSourcePatterns() {

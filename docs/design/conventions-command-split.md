@@ -116,4 +116,4 @@ MCP used its own constants → switches to the pointer; skills/tests updated; pr
 
 `pnpm run lint` → `Skill(tier-review)` (surface-contract BLOCKING) → `pnpm run build` (regenerates
 the MCP bundle) → `pnpm run test` (describe + conventions) → `pnpm run smoke:vault` (describe is a
-live CLI/MCP surface) → update `docs/CHANGELOG.md`.
+live CLI/MCP surface) → capture the user-visible change in the PR title.

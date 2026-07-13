@@ -231,5 +231,5 @@ Always run `npm run lint` and `npm run build` before considering a change comple
 - Prefer extending existing workflow functions and adapters over parallel logic. If
   GUI and CLI drift, move shared behavior down into `src/workflows/` and keep each
   adapter focused on input/output shape.
-- Update the changelog for notable behavior, workflow, CLI, template,
-  dashboard, or dependency changes.
+- Use a clear, user-facing PR title for notable behavior, workflow, CLI, template,
+  dashboard, or dependency changes; generated GitHub Release notes are the release history.

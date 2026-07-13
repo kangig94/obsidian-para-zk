@@ -9,7 +9,8 @@
   },
   "scripts": {
     "build": "NODE_ENV=production node tools/build.mjs production",
-    "version": "pnpm run build && git add -u",
+    "build:release": "NODE_ENV=production node tools/build.mjs production --release",
+    "version": "pnpm run build:release && git add -u",
     "dev": "node tools/build.mjs",
     "watch": "node tools/build.mjs --watch",
     "sync": "node tools/sync.mjs",

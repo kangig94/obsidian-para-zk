@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
 
-// .claude-plugin/marketplace.json is intentionally absent: it is a hand-maintained
-// deployment pin (git-subdir + tag ref), not a generated artifact, so the build never
-// rewrites it and this drift gate must not demand a rebuild for hand edits to it.
+// .claude-plugin/marketplace.json is intentionally absent: only `build:release` advances
+// its immutable tag ref. Normal CI builds must not rewrite or require a pending release pin.
 const generatedFiles = [
   "manifest.json",
   "versions.json",

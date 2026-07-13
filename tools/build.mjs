@@ -8,6 +8,7 @@ import { join } from "node:path";
 loadDotEnv();
 
 const production = process.env.NODE_ENV === "production" || process.argv.includes("production");
+const releaseMode = process.argv.includes("--release");
 const watchMode = process.argv.includes("--watch");
 const nodeBuiltins = [...builtinModules, ...builtinModules.map((name) => `node:${name}`)];
 
@@ -22,7 +23,7 @@ const filesToDeploy = ["main.js", "manifest.json", "styles.css"];
 // (__VERSION__) and propagates it into every distribution manifest, so a release only
 // edits package.json without hand-syncing generated distribution files.
 const { version } = JSON.parse(readFileSync("package.json", "utf8"));
-syncManifestVersions(version);
+syncManifestVersions(version, { release: releaseMode });
 
 const mcpBundlePath = "clients/para-zk-mcp.mjs";
 const mcpHashPath = `${mcpBundlePath}.sha256`;
@@ -143,7 +144,7 @@ if (watchMode) {
 // read directly (Obsidian, the BRAT versions map, and the Claude Code / Codex plugin
 // manifests). Each entry is rewritten only when it drifts, so a same-version rebuild is
 // a no-op and CI's post-build generated-artifact check catches any un-synced manifest.
-function syncManifestVersions(targetVersion) {
+function syncManifestVersions(targetVersion, { release = false } = {}) {
   const manifest = JSON.parse(readFileSync("manifest.json", "utf8"));
   if (manifest.version !== targetVersion) {
     manifest.version = targetVersion;
@@ -158,10 +159,6 @@ function syncManifestVersions(targetVersion) {
     writeFileSync("versions.json", JSON.stringify(versions, null, 2) + "\n");
   }
 
-  // The marketplace catalog (.claude-plugin/marketplace.json) is intentionally excluded:
-  // it is a hand-maintained deployment pin (git-subdir + tag ref) whose plugin version is
-  // resolved from the pinned tag's plugin.json, so build/version scripts must never rewrite
-  // it. Only the plugin manifests below track package.json's version.
   for (const path of [
     "clients/.claude-plugin/plugin.json",
     "clients/.codex-plugin/plugin.json"
@@ -170,6 +167,22 @@ function syncManifestVersions(targetVersion) {
     if (json.version !== undefined && json.version !== targetVersion) {
       json.version = targetVersion;
       writeFileSync(path, JSON.stringify(json, null, 2) + "\n");
+    }
+  }
+
+  // Normal builds leave the marketplace deployment pin untouched. The release workflow build
+  // advances it to the immutable Obsidian tag in the same release commit, so installs can never
+  // observe a marketplace ref that is newer or older than the shipped plugin manifests.
+  if (release) {
+    const marketplacePath = ".claude-plugin/marketplace.json";
+    const marketplace = JSON.parse(readFileSync(marketplacePath, "utf8"));
+    const plugin = marketplace.plugins?.find((entry) => entry.name === "para-zk");
+    if (plugin?.source?.source !== "git-subdir") {
+      throw new Error(`Missing para-zk git-subdir source in ${marketplacePath}`);
+    }
+    if (plugin.source.ref !== targetVersion) {
+      plugin.source.ref = targetVersion;
+      writeFileSync(marketplacePath, JSON.stringify(marketplace, null, 2) + "\n");
     }
   }
 }

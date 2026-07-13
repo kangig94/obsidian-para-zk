@@ -112,9 +112,10 @@ matches. User content notes outside the managed scaffolding set are never touche
 
 ## Versioning
 
-The version lives in **one** place — `package.json`. The build (`tools/build.mjs`) reads
-it and propagates it into every artifact a release consumes, so nothing else is
-hand-edited:
+The release version is owned exclusively by the version entered in the GitHub Actions
+**Release** workflow. Normal development and feature PRs do not edit version fields or release
+tags. Inside the release job, `pnpm version` writes `package.json`, then the release build reads
+that value and propagates it into every artifact the release consumes:
 
 - `manifest.json` `version` (Obsidian)
 - `versions.json` — adds `"<version>": "<minAppVersion>"` on first sight
@@ -124,22 +125,25 @@ hand-edited:
   reads that injected global, never a hardcoded literal
 - `clients/para-zk-mcp.mjs.sha256` — SHA-256 for the committed MCP bundle
 
-`.claude-plugin/marketplace.json` is **not** in this list. It is a hand-maintained
-deployment pin: its plugin `source` points at a `git-subdir` + tag `ref`, so the served
-plugin version comes from the pinned tag's `plugin.json`, not from `package.json`. Build
-and version scripts never rewrite it, and it is excluded from the generated-artifact
-drift check.
+Normal builds leave `.claude-plugin/marketplace.json` untouched. The release build advances
+its `git-subdir` tag `ref` to the same version as `package.json`, so the marketplace pin and
+the immutable Obsidian release tag are committed atomically.
 
 A same-version rebuild is a no-op, and CI's post-build generated-artifact check fails if
 any artifact drifts from `package.json` or the source bundle. CI also compares the MCP
-bundle against its committed SHA-256. To release, bump the single source and let the build
-sync the rest:
+bundle against its committed SHA-256.
 
-```bash
-pnpm version patch   # bumps package.json, runs the build (syncs every manifest), commits, tags
-```
+Releases are cut only through the **Release** workflow in GitHub Actions. Choose **Run
+workflow**, enter the exact semver without a `v` prefix, and let the workflow validate main,
+run `pnpm version`, update the marketplace pin, commit through the release GitHub App, create
+the matching tag, and publish the GitHub Release assets. GitHub-generated notes always collect
+the merged PRs and commits since the previous release. PR titles and labels are the release-note
+source, so keep them user-facing and meaningful. Do not bump versions, create release tags, or
+publish releases manually.
 
-See "Cutting a release (maintainers)" in the README for the push + publish steps.
+The `version` lifecycle and `build:release` package scripts are workflow internals, not local
+maintainer commands. Local development uses `pnpm run build` and may sync that build to a test
+vault, but it never performs release versioning or GitHub deployment.
 
 ## Workflow
 
@@ -148,5 +152,4 @@ See "Cutting a release (maintainers)" in the README for the push + publish steps
 3. `pnpm run lint && pnpm run test` (and `pnpm run build`) before considering a change done.
 4. Run `pnpm run smoke:vault` when the change touches engine behavior (links, backlinks,
    renderers, dependency config).
-5. Put notable pending release notes in `docs/CHANGELOG.md`; after publishing the GitHub
-   release, clear it back to the placeholder.
+5. Use a clear, user-facing PR title; GitHub-generated release notes are the release history.

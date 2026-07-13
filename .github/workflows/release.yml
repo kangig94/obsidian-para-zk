@@ -1,18 +1,28 @@
-name: Release Obsidian plugin
+name: Release
 
-# Builds the plugin and publishes the release assets (main.js, manifest.json,
-# styles.css) whenever a version tag is pushed. A NEW tag creates a published
-# release immediately; re-pushing an EXISTING tag refreshes that release's assets
-# in place (a retag re-releases the same version with a fresh build).
-# Tag name must equal manifest.json "version" exactly, no "v" prefix (e.g. 0.0.2).
+# The only supported deployment path: enter a version from the Actions tab, validate main,
+# prepare every versioned manifest and bundle, then commit + tag + publish the Obsidian assets.
+#
+# The push to protected main uses a GitHub App authenticated by RELEASE_APP_ID and
+# RELEASE_APP_PRIVATE_KEY. Configure that App with repository Contents: read & write and add it
+# to the main-branch ruleset bypass list in Always mode. Obsidian requires a tag that exactly
+# matches manifest.json's version, so release tags intentionally have no "v" prefix.
+
 on:
-  push:
-    tags:
-      - "*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version — semver, no leading v (e.g. 0.2.2)"
+        required: true
+        type: string
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
 
 permissions:
   attestations: write
-  contents: write
+  contents: read
   id-token: write
   artifact-metadata: write
 
@@ -20,25 +30,101 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
+      - name: Validate version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          version="$INPUT_VERSION"
+          if ! printf '%s' "$version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "::error::Invalid version '$version' (expected semver like 0.2.2, no leading v)"
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "TAG=$version" >> "$GITHUB_ENV"
+
+      - name: Mint GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: Checkout main
         uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Ensure tag does not already exist
+        run: |
+          git fetch --tags --force --quiet
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::error::Tag $TAG already exists — choose a new version"
+            exit 1
+          fi
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
+
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
           node-version: 26
           cache: pnpm
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Check Obsidian review lint
-        run: pnpm run lint:obsidian-review
-      - name: Build
-        run: pnpm run build
-      - name: Check MCP bundle hash
-        run: pnpm run check:mcp-hash
-      - name: Check generated build artifacts
-        run: pnpm run check:build-drift
+
+      - name: Validate main
+        run: |
+          pnpm run lint
+          pnpm run test
+          pnpm run build
+          pnpm run check:mcp-hash
+          pnpm run check:build-drift
+
+      - name: Bump version and build release
+        run: pnpm version "$VERSION" --no-git-tag-version
+
+      - name: Verify release state
+        run: |
+          pnpm run check:mcp-hash
+          node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+
+          const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
+          const expected = process.env.VERSION;
+          const versionedFiles = [
+            "package.json",
+            "manifest.json",
+            "clients/.claude-plugin/plugin.json",
+            "clients/.codex-plugin/plugin.json"
+          ];
+          for (const path of versionedFiles) {
+            const actual = readJson(path).version;
+            if (actual !== expected) throw new Error(`${path} version ${actual} != ${expected}`);
+          }
+
+          const manifest = readJson("manifest.json");
+          const versions = readJson("versions.json");
+          if (versions[expected] !== manifest.minAppVersion) {
+            throw new Error(`versions.json is missing ${expected} -> ${manifest.minAppVersion}`);
+          }
+
+          const marketplace = readJson(".claude-plugin/marketplace.json");
+          const plugin = marketplace.plugins?.find((entry) => entry.name === "para-zk");
+          if (plugin?.source?.ref !== expected) {
+            throw new Error(`marketplace ref ${plugin?.source?.ref} != ${expected}`);
+          }
+          NODE
+          git diff --check
+          git diff --cached --check
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "::error::Release preparation produced no changes"
+            exit 1
+          fi
+
       - name: Generate artifact attestations
         uses: actions/attest@v4
         with:
@@ -46,30 +132,34 @@ jobs:
             build/main.js
             build/manifest.json
             build/styles.css
-      - name: Create or refresh release
+
+      - name: Resolve App committer identity
+        id: committer
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
         run: |
-          tag="${GITHUB_REF#refs/tags/}"
-          manifest_version="$(node -p "require('./manifest.json').version")"
-          if [ "$tag" != "$manifest_version" ]; then
-            echo "::error::Tag '$tag' does not match manifest.json version '$manifest_version' (Obsidian requires an exact match, no 'v' prefix)."
-            exit 1
-          fi
-          notes_args=(--notes "Release $tag — install PARA-ZK from Obsidian community plugins (see README).")
-          if [ -s docs/CHANGELOG.md ] && ! grep -q '^_No pending release notes\._$' docs/CHANGELOG.md; then
-            notes_args=(--notes-file docs/CHANGELOG.md)
-          fi
-          if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" build/main.js build/manifest.json build/styles.css --clobber
-            edit_args=(--draft=false)
-            if [ "${notes_args[0]}" = "--notes-file" ]; then
-              edit_args+=(--notes-file docs/CHANGELOG.md)
-            fi
-            gh release edit "$tag" "${edit_args[@]}"
-          else
-            gh release create "$tag" \
-              --title "$tag" \
-              "${notes_args[@]}" \
-              build/main.js build/manifest.json build/styles.css
-          fi
+          uid=$(gh api "/users/${APP_SLUG}[bot]" --jq .id)
+          echo "name=${APP_SLUG}[bot]" >> "$GITHUB_OUTPUT"
+          echo "email=${uid}+${APP_SLUG}[bot]@users.noreply.github.com" >> "$GITHUB_OUTPUT"
+
+      - name: Commit, tag, and push to main
+        env:
+          COMMITTER_NAME: ${{ steps.committer.outputs.name }}
+          COMMITTER_EMAIL: ${{ steps.committer.outputs.email }}
+        run: |
+          git config user.name "$COMMITTER_NAME"
+          git config user.email "$COMMITTER_EMAIL"
+          git add -A
+          git commit -m "Release $VERSION"
+          git tag -a "$TAG" -m "Release $VERSION"
+          git push --atomic origin HEAD:main "refs/tags/$TAG"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --generate-notes \
+            build/main.js build/manifest.json build/styles.css
