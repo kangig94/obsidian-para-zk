@@ -5,7 +5,6 @@ import {
   Notice,
   Setting,
   TFile,
-  type CachedMetadata,
   type MarkdownPostProcessorContext
 } from "obsidian";
 import { localePack } from "../../i18n";
@@ -363,7 +362,7 @@ async function workflowWithFreshRootId(ctx: WorkflowContext, rootFile: TFile): P
             ...(cache?.frontmatter ?? {}),
             [ROOT_ID_FRONTMATTER_KEY]: rootId
           }
-        } as CachedMetadata;
+        };
       }
     }
   };
