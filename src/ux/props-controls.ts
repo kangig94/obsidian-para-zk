@@ -944,7 +944,7 @@ function resolveBlockFile(
 }
 
 function fileFrontmatter(plugin: ParaZkPluginContext, file: TFile): Frontmatter {
-  return (plugin.app.metadataCache.getFileCache(file)?.frontmatter ?? {}) as Frontmatter;
+  return plugin.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
 }
 
 function parseInlineInputToken(value: string): InlineInputToken | undefined {

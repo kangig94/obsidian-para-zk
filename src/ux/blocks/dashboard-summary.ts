@@ -234,7 +234,7 @@ function dashboardRecordGroups(records: FileRecord[], settings: ParaZkSettings):
 function vaultRecords(app: App): FileRecord[] {
   return app.vault.getMarkdownFiles().map((file) => ({
     file,
-    frontmatter: (app.metadataCache.getFileCache(file)?.frontmatter ?? {}) as Record<string, unknown>
+    frontmatter: app.metadataCache.getFileCache(file)?.frontmatter ?? {}
   }));
 }
 

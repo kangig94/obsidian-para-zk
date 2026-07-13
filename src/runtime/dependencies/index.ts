@@ -357,7 +357,7 @@ async function requestJson(url: string): Promise<unknown> {
 
 function readPluginManager(app: App): PluginManager | undefined {
   const candidate = (app as unknown as { plugins?: unknown }).plugins;
-  return isRecord(candidate) ? candidate as PluginManager : undefined;
+  return isRecord(candidate) ? candidate : undefined;
 }
 
 function readDependencyState(
