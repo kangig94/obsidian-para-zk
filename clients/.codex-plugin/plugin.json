@@ -1,6 +1,6 @@
 {
   "name": "para-zk",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Thin MCP that surfaces the PARA-ZK Obsidian CLI contract so any LLM can discover and operate the vault.",
   "author": {
     "name": "kangig94",
