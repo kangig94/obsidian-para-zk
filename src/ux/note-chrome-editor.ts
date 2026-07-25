@@ -32,6 +32,7 @@ import {
 } from "./note-chrome-core";
 import { ManagedPanelController } from "./blocks/managed-sections";
 import { renderBlockNotice } from "./blocks/shell";
+import { disposePropsControlRenderers } from "./props-controls";
 
 // Block widgets CANNOT be supplied through a ViewPlugin's `decorations` — CodeMirror
 // throws "Block decorations may not be specified via plugins". The props (top) and
@@ -87,6 +88,10 @@ export function createNoteChromeEditorExtension(plugin: ParaZkPluginContext): Ex
       this.resizeObserver = observeWidgetResize(host, view);
 
       if (this.kind === "props") {
+        const child = new NoteChromeWidgetRenderChild(host);
+        child.register(() => disposePropsControlRenderers(host));
+        child.load();
+        this.child = child;
         renderNoteChromeProps(plugin, host, this.spec);
         view.requestMeasure();
         return host;

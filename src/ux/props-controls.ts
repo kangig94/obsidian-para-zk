@@ -2,6 +2,7 @@ import {
   AbstractInputSuggest,
   ButtonComponent,
   DropdownComponent,
+  MarkdownRenderChild,
   MarkdownView,
   Notice,
   SuggestModal,
@@ -84,6 +85,10 @@ type KindSuggestionStore = {
 
 type KindSuggestionCache = Record<PropsSuggestionKind, KindSuggestionStore>;
 
+type PropsTextSuggestionBinding = {
+  dispose(): void;
+};
+
 type PropsControlRenderContext = {
   plugin: ParaZkPluginContext;
   field: PropsField;
@@ -149,6 +154,12 @@ const PROPS_CONTROL_RENDERERS: Record<PropsField["control"], PropsControlRendere
 const propsRerenderStates = new WeakMap<HTMLElement, PropsRerenderState>();
 const kindSuggestionCaches = new WeakMap<ParaZkPluginContext, KindSuggestionCache>();
 const registeredKindSuggestionCaches = new WeakSet<ParaZkPluginContext>();
+const propsTextSuggestionBindings = new WeakMap<HTMLInputElement, PropsTextSuggestionBinding>();
+const propsTextSuggestionBindingsByPlugin = new WeakMap<
+  ParaZkPluginContext,
+  Set<PropsTextSuggestionBinding>
+>();
+const registeredPropsTextSuggestionLifecycles = new WeakSet<ParaZkPluginContext>();
 
 const KIND_SUGGESTION_SPECS: Record<
   PropsSuggestionKind,
@@ -160,9 +171,19 @@ const KIND_SUGGESTION_SPECS: Record<
 
 export function registerPropsControlRenderers(plugin: ParaZkPluginContext): void {
   registerKindSuggestionCache(plugin);
+  registerPropsTextSuggestionLifecycle(plugin);
   plugin.registerMarkdownPostProcessor((el, ctx) => {
     renderInlinePropsInputs(plugin, el, ctx);
   });
+}
+
+export function disposePropsControlRenderers(container: HTMLElement): void {
+  const inputs = container.querySelectorAll<HTMLInputElement>(
+    "input.para-zk-block__input--combobox"
+  );
+  for (const input of inputs) {
+    propsTextSuggestionBindings.get(input)?.dispose();
+  }
 }
 
 export function renderPropsPanel(
@@ -174,6 +195,7 @@ export function renderPropsPanel(
   const frontmatter = file ? fileFrontmatter(plugin, file) : {};
   const type = inferPropsViewType(frontmatter);
 
+  disposePropsControlRenderers(el);
   el.empty();
   if (!type) {
     renderBlockNotice(el, "props", "PARA-ZK props type is missing or unsupported.");
@@ -210,6 +232,7 @@ function renderInlinePropsInputs(plugin: ParaZkPluginContext, el: HTMLElement, c
     });
     renderFieldControl(plugin, field, frontmatter, container, ctx.sourcePath, container, rerender);
     codeEl.replaceWith(container);
+    ctx.addChild(new InlinePropsRenderChild(container));
   }
 }
 
@@ -223,6 +246,7 @@ function renderPropsGrid(
   const file = sourceFile(plugin, sourcePath);
   const frontmatter = file ? fileFrontmatter(plugin, file) : {};
 
+  disposePropsControlRenderers(container);
   container.empty();
   container.addClass("para-zk-block__grid");
   container.removeClass("is-disabled");
@@ -354,6 +378,7 @@ function renderSingleField(
 ): void {
   const file = sourceFile(plugin, sourcePath);
   const frontmatter = file ? fileFrontmatter(plugin, file) : {};
+  disposePropsControlRenderers(container);
   container.empty();
   const rerender = latestPropsRerender(container, () => {
     renderSingleField(plugin, schema, field, container, sourcePath, blockEl);
@@ -446,7 +471,7 @@ function renderTextInput(
     void writeFrontmatterValue(plugin, sourcePath, blockEl, field.key, value);
   };
   if (options.suggestions?.length) {
-    attachTextSuggestions(plugin.app, input.inputEl, options.suggestions, commit);
+    attachTextSuggestions(plugin, input.inputEl, options.suggestions, commit);
   }
   input.inputEl.addEventListener("change", () => {
     commit(input.getValue());
@@ -454,20 +479,36 @@ function renderTextInput(
 }
 
 function attachTextSuggestions(
-  app: App,
+  plugin: ParaZkPluginContext,
   input: HTMLInputElement,
   suggestions: PropsSelectOption[],
   select: (value: string) => void
 ): void {
   input.setAttr("autocomplete", "off");
   input.addClass("para-zk-block__input--combobox");
-  new PropsTextInputSuggest(app, input, suggestions, select);
+  const suggest = new PropsTextInputSuggest(plugin.app, input, suggestions, select);
+  const observer = observePropsTextSuggestionAnchor(input, () => suggest.syncPopupWidth());
+  const bindings = propsTextSuggestionBindingSet(plugin);
+  let disposed = false;
+  const binding: PropsTextSuggestionBinding = {
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      observer?.disconnect();
+      suggest.close();
+      bindings.delete(binding);
+      propsTextSuggestionBindings.delete(input);
+    }
+  };
+  bindings.add(binding);
+  propsTextSuggestionBindings.set(input, binding);
 }
 
 class PropsTextInputSuggest extends AbstractInputSuggest<PropsSelectOption> {
   private readonly anchorInput: HTMLInputElement;
   private readonly options: PropsSelectOption[];
   private readonly selectValue: (value: string) => void;
+  private popup: HTMLElement | undefined;
 
   constructor(
     app: App,
@@ -491,10 +532,8 @@ class PropsTextInputSuggest extends AbstractInputSuggest<PropsSelectOption> {
   }
 
   renderSuggestion(suggestion: PropsSelectOption, el: HTMLElement): void {
-    const popup = el.closest<HTMLElement>(".suggestion-container");
-    if (popup) {
-      popup.style.setProperty("width", `${this.anchorInput.getBoundingClientRect().width}px`);
-    }
+    this.popup = el.closest<HTMLElement>(".suggestion-container") ?? undefined;
+    this.syncPopupWidth();
     el.createDiv({ text: suggestion.label });
     if (suggestion.label !== suggestion.value) {
       el.createEl("small", { text: suggestion.value });
@@ -509,6 +548,61 @@ class PropsTextInputSuggest extends AbstractInputSuggest<PropsSelectOption> {
     this.selectValue(suggestion.value);
     this.close();
   }
+
+  close(): void {
+    super.close();
+    this.popup = undefined;
+  }
+
+  syncPopupWidth(): void {
+    if (!this.popup) return;
+    const width = `${this.anchorInput.getBoundingClientRect().width}px`;
+    if (this.popup.style.getPropertyValue("width") !== width) {
+      this.popup.style.setProperty("width", width);
+    }
+  }
+}
+
+class InlinePropsRenderChild extends MarkdownRenderChild {
+  onunload(): void {
+    disposePropsControlRenderers(this.containerEl);
+  }
+}
+
+function observePropsTextSuggestionAnchor(
+  input: HTMLInputElement,
+  resize: () => void
+): ResizeObserver | undefined {
+  const windowObserver = input.ownerDocument.defaultView?.ResizeObserver;
+  const Observer = windowObserver
+    ?? (typeof ResizeObserver === "undefined" ? undefined : ResizeObserver);
+  if (!Observer) return undefined;
+  const observer = new Observer(resize);
+  observer.observe(input);
+  return observer;
+}
+
+function propsTextSuggestionBindingSet(
+  plugin: ParaZkPluginContext
+): Set<PropsTextSuggestionBinding> {
+  const existing = propsTextSuggestionBindingsByPlugin.get(plugin);
+  if (existing) return existing;
+  const bindings = new Set<PropsTextSuggestionBinding>();
+  propsTextSuggestionBindingsByPlugin.set(plugin, bindings);
+  return bindings;
+}
+
+function registerPropsTextSuggestionLifecycle(plugin: ParaZkPluginContext): void {
+  if (registeredPropsTextSuggestionLifecycles.has(plugin)) return;
+  registeredPropsTextSuggestionLifecycles.add(plugin);
+  plugin.register(() => {
+    const bindings = propsTextSuggestionBindingsByPlugin.get(plugin);
+    if (bindings) {
+      for (const binding of [...bindings]) binding.dispose();
+    }
+    propsTextSuggestionBindingsByPlugin.delete(plugin);
+    registeredPropsTextSuggestionLifecycles.delete(plugin);
+  });
 }
 
 function kindSuggestions(

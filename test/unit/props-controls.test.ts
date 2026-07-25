@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import type { TAbstractFile, TFile } from "obsidian";
+import { MarkdownView, type TAbstractFile, type TFile } from "obsidian";
 import type { ParaZkPluginContext } from "../../src/plugin-interface";
 import { DEFAULT_SETTINGS } from "../../src/types";
 import { resourceKindLabel, subnoteTypeLabel } from "../../src/vocabulary";
+import { registerNoteChromeRenderers } from "../../src/ux/blocks/note-chrome";
 import {
   registerPropsControlRenderers,
   renderPropsPanel,
@@ -24,6 +25,8 @@ type TestSuggestionOption = {
 type TestInputSuggest = {
   testSuggestions(query: string): TestSuggestionOption[] | Promise<TestSuggestionOption[]>;
   testSelect(value: TestSuggestionOption): void;
+  testIsOpen(): boolean;
+  testPopup(): HTMLElement | undefined;
 };
 
 describe("props url control", () => {
@@ -160,43 +163,8 @@ describe("props url control", () => {
 });
 
 describe("kind suggestion comboboxes", () => {
-  it("suggests Resource examples and Resource vault kinds while accepting a new value", async () => {
-    const app = new MockApp();
-    await app.vault.create("PARA/Resources/Existing Repo.md", [
-      "---",
-      "type: resource",
-      "kind: repo-fork",
-      "---",
-      ""
-    ].join("\n"));
-    await app.vault.create("PARA/Resources/Existing Pipeline.md", [
-      "---",
-      "type: resource",
-      "kind: internal pipeline",
-      "---",
-      ""
-    ].join("\n"));
-    await app.vault.create("PARA/Projects/Not A Resource.md", [
-      "---",
-      "type: project",
-      "kind: project-only",
-      "---",
-      ""
-    ].join("\n"));
-    const file = await app.vault.create("PARA/Resources/Current.md", [
-      "---",
-      "type: resource",
-      "kind: paper",
-      "---",
-      ""
-    ].join("\n"));
-
-    stubAppEvents(app);
-    const root = new FakeElement("div");
-    renderPropsPanel(createPropsPlugin(app, "ko"), root.asHtml(), file.path);
-
-    const control = propsFieldControl(root, "종류");
-    const input = control.querySelector("input.para-zk-block__input") as FakeElement;
+  it("suggests and filters deduplicated Resource examples and vault kinds", async () => {
+    const { root, input } = await renderResourceKindCombobox();
     const options = textSuggestionOptions(input);
     const values = options.map((option) => option.value);
     const paper = options.find((option) => option.value === "paper");
@@ -210,10 +178,39 @@ describe("kind suggestion comboboxes", () => {
     expect(values).toContain("repo-fork");
     expect(values).toContain("internal pipeline");
     expect(values).not.toContain("project-only");
+    expect(values).not.toContain("PAPER");
     expect(values.filter((value) => value === "repo-fork")).toHaveLength(1);
-    expect(textSuggestionOptions(input, resourceKindLabel("paper", "ko")))
-      .toEqual([paper]);
+    expect(textSuggestionOptions(input, "  PAPER  ")).toEqual([paper]);
+    expect(textSuggestionOptions(input, resourceKindLabel("paper", "ko").slice(0, 1)))
+      .toContainEqual(paper);
+    expect(textSuggestionOptions(input, "not-a-kind")).toEqual([]);
+  });
 
+  it("renders and resizes the Resource popup with its input", async () => {
+    const { input } = await renderResourceKindCombobox();
+    input.value = "";
+    input.dispatchEvent({ type: "input" });
+    const suggest = textInputSuggest(input);
+    const popup = suggest.testPopup() as unknown as FakeElement;
+    expect(suggest.testIsOpen()).toBe(true);
+    expect(popup.isConnected).toBe(true);
+    expect(popup.style.getPropertyValue("width")).toBe("196px");
+    const paperItem = popup.querySelectorAll(".suggestion-item")
+      .find((item) => item.querySelector("small")?.textContent === "paper");
+    expect(paperItem?.querySelector("div")?.textContent)
+      .toBe(resourceKindLabel("paper", "ko"));
+    expect(paperItem?.querySelector("small")?.textContent).toBe("paper");
+
+    input.setRenderedWidth(284);
+    FakeResizeObserver.trigger(input.asHtml());
+    expect(popup.style.getPropertyValue("width")).toBe("284px");
+    input.blur();
+    expect(suggest.testIsOpen()).toBe(false);
+    expect(popup.isConnected).toBe(false);
+  });
+
+  it("accepts and persists a new free-form Resource kind", async () => {
+    const { app, file, input } = await renderResourceKindCombobox();
     input.value = "custom pipeline";
     input.dispatchEvent({ type: "change" });
     await waitForFrontmatterValue(app, file, "kind", "custom pipeline");
@@ -263,7 +260,11 @@ describe("kind suggestion comboboxes", () => {
 
     const research = options.find((option) => option.value === "research");
     expect(research).toBeDefined();
-    textInputSuggest(input).testSelect(research!);
+    const suggest = textInputSuggest(input);
+    expect(suggest.testIsOpen()).toBe(true);
+    suggest.testSelect(research!);
+    expect(input.value).toBe("research");
+    expect(suggest.testIsOpen()).toBe(false);
     await waitForFrontmatterValue(app, file, "subnote_type", "research");
 
     input.value = "experiment-log";
@@ -422,9 +423,26 @@ describe("kind suggestion comboboxes", () => {
     registerPropsControlRenderers(plugin);
     expect(getMarkdownFiles).toHaveBeenCalledTimes(1);
     expect(registerEvent).toHaveBeenCalledTimes(3);
-    expect(cleanup).toHaveLength(1);
+    expect(cleanup).toHaveLength(2);
 
-    cleanup[0]();
+    const rendered = await app.vault.create("PARA/Resources/Rendered.md", [
+      "---",
+      "type: resource",
+      "kind: paper",
+      "---",
+      ""
+    ].join("\n"));
+    const root = new FakeElement("div");
+    renderPropsPanel(plugin, root.asHtml(), rendered.path);
+    const input = propsFieldControl(root, "Type")
+      .querySelector("input.para-zk-block__input") as FakeElement;
+    input.value = "";
+    input.dispatchEvent({ type: "input" });
+    const suggest = textInputSuggest(input);
+    expect(suggest.testIsOpen()).toBe(true);
+
+    for (const callback of cleanup.splice(0)) callback();
+    expect(suggest.testIsOpen()).toBe(false);
     expect(getMarkdownFiles).toHaveBeenCalledTimes(1);
 
     const fresh = await app.vault.create("PARA/Resources/Fresh.md", [
@@ -437,7 +455,104 @@ describe("kind suggestion comboboxes", () => {
     registerPropsControlRenderers(plugin);
     expect(getMarkdownFiles).toHaveBeenCalledTimes(2);
     expect(registerEvent).toHaveBeenCalledTimes(6);
+    expect(cleanup).toHaveLength(2);
     expect(kindOptionValues(plugin, fresh)).toContain("after-cleanup");
+  });
+
+  it("closes the previous native popup before a props rerender", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("PARA/Resources/Rerender.md", [
+      "---",
+      "type: resource",
+      "kind: paper",
+      "---",
+      ""
+    ].join("\n"));
+    stubAppEvents(app);
+    const plugin = createPropsPlugin(app);
+    const root = new FakeElement("div");
+    renderPropsPanel(plugin, root.asHtml(), file.path);
+    const input = propsFieldControl(root, "Type")
+      .querySelector("input.para-zk-block__input") as FakeElement;
+    input.value = "";
+    input.dispatchEvent({ type: "input" });
+    const previous = textInputSuggest(input);
+    expect(previous.testIsOpen()).toBe(true);
+
+    renderPropsPanel(plugin, root.asHtml(), file.path);
+
+    expect(previous.testIsOpen()).toBe(false);
+  });
+
+  it("disposes the popup and observer when a Reading view props panel is removed", async () => {
+    vi.useFakeTimers();
+    const cleanup: Array<() => void> = [];
+    try {
+      installReadingViewGlobals();
+      const app = new MockApp();
+      const file = await app.vault.create("PARA/Resources/Reading.md", [
+        "---",
+        "type: resource",
+        "kind: paper",
+        "---",
+        ""
+      ].join("\n"));
+      const viewRoot = new FakeElement("div");
+      const preview = viewRoot.createDiv({ cls: "markdown-preview-view" });
+      const sizer = viewRoot.createDiv({ cls: "markdown-preview-sizer" });
+      const header = sizer.createDiv({ cls: "mod-header" });
+      const view = new MarkdownView();
+      view.file = file;
+      view.containerEl = viewRoot.asHtml();
+
+      const workspaceCallbacks = new Map<string, () => void>();
+      Object.assign(app.metadataCache, {
+        on: () => ({ detach: () => {} })
+      });
+      Object.assign(app.workspace, {
+        containerEl: viewRoot.asHtml(),
+        getLeavesOfType: () => [{ view }],
+        on: (name: string, callback: () => void) => {
+          workspaceCallbacks.set(name, callback);
+          return { detach: () => workspaceCallbacks.delete(name) };
+        },
+        onLayoutReady: (callback: () => void) => callback()
+      });
+      const plugin = createPropsPlugin(app);
+      Object.assign(plugin, {
+        register: (callback: () => void) => cleanup.push(callback),
+        registerEvent: (eventRef: { detach?: () => void }) => {
+          cleanup.push(() => eventRef.detach?.());
+        }
+      });
+
+      registerPropsControlRenderers(plugin);
+      registerNoteChromeRenderers(plugin);
+      await vi.advanceTimersByTimeAsync(100);
+
+      const panel = header.querySelector(".para-zk-note-chrome--props");
+      expect(panel).not.toBeNull();
+      const input = propsFieldControl(panel!, "Type")
+        .querySelector("input.para-zk-block__input") as FakeElement;
+      input.value = "";
+      input.dispatchEvent({ type: "input" });
+      const suggest = textInputSuggest(input);
+      const popup = suggest.testPopup() as unknown as FakeElement;
+      expect(popup.isConnected).toBe(true);
+      expect(FakeResizeObserver.isObserving(input.asHtml())).toBe(true);
+
+      preview.remove();
+      workspaceCallbacks.get("layout-change")?.();
+
+      expect(panel?.isConnected).toBe(false);
+      expect(suggest.testIsOpen()).toBe(false);
+      expect(popup.isConnected).toBe(false);
+      expect(FakeResizeObserver.isObserving(input.asHtml())).toBe(false);
+    } finally {
+      for (const callback of cleanup.splice(0)) callback();
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
   });
 });
 
@@ -695,6 +810,57 @@ async function renderResourceProps(url: string): Promise<{
   return { app, root, control: propsFieldControl(root, "URL"), file };
 }
 
+async function renderResourceKindCombobox(): Promise<{
+  app: MockApp;
+  root: FakeElement;
+  input: FakeElement;
+  file: Awaited<ReturnType<MockApp["vault"]["create"]>>;
+}> {
+  const app = new MockApp();
+  await app.vault.create("PARA/Resources/Existing Repo.md", [
+    "---",
+    "type: resource",
+    "kind: repo-fork",
+    "---",
+    ""
+  ].join("\n"));
+  await app.vault.create("PARA/Resources/Existing Pipeline.md", [
+    "---",
+    "type: resource",
+    "kind: internal pipeline",
+    "---",
+    ""
+  ].join("\n"));
+  await app.vault.create("PARA/Resources/Paper Variant.md", [
+    "---",
+    "type: resource",
+    "kind: \" PAPER \"",
+    "---",
+    ""
+  ].join("\n"));
+  await app.vault.create("PARA/Projects/Not A Resource.md", [
+    "---",
+    "type: project",
+    "kind: project-only",
+    "---",
+    ""
+  ].join("\n"));
+  const file = await app.vault.create("PARA/Resources/Current.md", [
+    "---",
+    "type: resource",
+    "kind: paper",
+    "---",
+    ""
+  ].join("\n"));
+
+  stubAppEvents(app);
+  const root = new FakeElement("div");
+  renderPropsPanel(createPropsPlugin(app, "ko"), root.asHtml(), file.path);
+  const input = propsFieldControl(root, "종류")
+    .querySelector("input.para-zk-block__input") as FakeElement;
+  return { app, root, input, file };
+}
+
 async function renderPropsBlock(_type: string, path: string, content: string): Promise<{
   app: MockApp;
   root: FakeElement;
@@ -814,20 +980,51 @@ async function waitFor(condition: () => boolean): Promise<void> {
 
 class FakeElement {
   readonly ownerDocument = fakeDocument;
-  readonly isConnected = true;
+  readonly dataset: Record<string, string> = {};
+  readonly style = {
+    getPropertyValue: (name: string): string => this.styles.get(name) ?? "",
+    setProperty: (name: string, value: string): void => {
+      this.styles.set(name, value);
+    }
+  };
   parentElement: FakeElement | null = null;
   value = "";
   type = "";
   disabled = false;
+  private renderedWidth = 196;
   private readonly classes = new Set<string>();
   private readonly attributes = new Map<string, string>();
   private readonly listeners = new Map<string, Array<(event: FakeEvent) => void>>();
+  private readonly styles = new Map<string, string>();
   private children: Array<FakeElement | string> = [];
 
-  constructor(private readonly tag: string) {}
+  constructor(
+    private readonly tag: string,
+    private rootConnected = true
+  ) {}
+
+  get isConnected(): boolean {
+    return this.parentElement?.isConnected ?? this.rootConnected;
+  }
 
   get classList(): string[] {
     return [...this.classes];
+  }
+
+  get firstElementChild(): FakeElement | null {
+    return this.elementChildren()[0] ?? null;
+  }
+
+  get lastElementChild(): FakeElement | null {
+    return this.elementChildren().at(-1) ?? null;
+  }
+
+  get offsetWidth(): number {
+    return this.renderedWidth;
+  }
+
+  get offsetHeight(): number {
+    return this.renderedWidth > 0 ? 28 : 0;
   }
 
   get className(): string {
@@ -856,17 +1053,45 @@ class FakeElement {
   }
 
   createEl(tag: string, options?: { cls?: string; text?: string; attr?: Record<string, string> }): FakeElement {
-    const child = new FakeElement(tag.toLowerCase());
-    child.parentElement = this;
+    const child = new FakeElement(tag.toLowerCase(), false);
+    this.appendChild(child.asHtml());
     if (options?.cls) child.addClass(...options.cls.split(/\s+/).filter(Boolean));
     if (options?.text !== undefined) child.textContent = options.text;
     for (const [key, value] of Object.entries(options?.attr ?? {})) child.setAttr(key, value);
-    this.children.push(child);
     return child;
   }
 
+  appendChild(child: HTMLElement): HTMLElement {
+    const fakeChild = child as unknown as FakeElement;
+    fakeChild.parentElement?.removeChild(fakeChild);
+    fakeChild.parentElement = this;
+    fakeChild.rootConnected = false;
+    this.children.push(fakeChild);
+    return child;
+  }
+
+  prepend(child: HTMLElement): void {
+    const fakeChild = child as unknown as FakeElement;
+    fakeChild.parentElement?.removeChild(fakeChild);
+    fakeChild.parentElement = this;
+    fakeChild.rootConnected = false;
+    this.children.unshift(fakeChild);
+  }
+
+  hasChildNodes(): boolean {
+    return this.children.length > 0;
+  }
+
   empty(): void {
+    for (const child of this.children) {
+      if (typeof child !== "string") child.parentElement = null;
+    }
     this.children = [];
+  }
+
+  remove(): void {
+    this.parentElement?.removeChild(this);
+    this.rootConnected = false;
   }
 
   addClass(...classes: string[]): void {
@@ -894,13 +1119,34 @@ class FakeElement {
   }
 
   querySelectorAll(selector: string): FakeElement[] {
-    const matches: FakeElement[] = [];
-    for (const child of this.children) {
-      if (typeof child === "string") continue;
-      if (child.matches(selector)) matches.push(child);
-      matches.push(...child.querySelectorAll(selector));
+    const matches = new Set<FakeElement>();
+    for (const branch of selector.split(",").map((value) => value.trim()).filter(Boolean)) {
+      if (branch.startsWith(":scope > ")) {
+        const path = branch.slice(":scope > ".length).split(/\s*>\s*/);
+        let candidates = [this];
+        for (const segment of path) {
+          candidates = candidates.flatMap((candidate) =>
+            candidate.elementChildren().filter((child) => child.matches(segment))
+          );
+        }
+        for (const candidate of candidates) matches.add(candidate);
+        continue;
+      }
+      for (const child of this.elementChildren()) {
+        if (child.matches(branch)) matches.add(child);
+        for (const descendant of child.querySelectorAll(branch)) matches.add(descendant);
+      }
     }
-    return matches;
+    return [...matches];
+  }
+
+  closest(selector: string): FakeElement | null {
+    let candidate: FakeElement | null = this;
+    while (candidate) {
+      if (candidate.matches(selector)) return candidate;
+      candidate = candidate.parentElement;
+    }
+    return null;
   }
 
   addEventListener(type: string, listener: (event: FakeEvent) => void): void {
@@ -918,7 +1164,9 @@ class FakeElement {
     return true;
   }
 
-  focus(): void {}
+  focus(): void {
+    this.dispatchEvent({ type: "focus" });
+  }
   select(): void {}
   blur(): void {
     this.dispatchEvent({ type: "blur" });
@@ -928,7 +1176,41 @@ class FakeElement {
     return this as unknown as HTMLElement;
   }
 
-  private matches(selector: string): boolean {
+  getBoundingClientRect(): DOMRect {
+    return {
+      bottom: 0,
+      height: 28,
+      left: 0,
+      right: this.renderedWidth,
+      top: 0,
+      width: this.renderedWidth,
+      x: 0,
+      y: 0,
+      toJSON: () => ({})
+    };
+  }
+
+  setRenderedWidth(width: number): void {
+    this.renderedWidth = width;
+  }
+
+  getClientRects(): DOMRect[] {
+    return this.renderedWidth > 0 ? [this.getBoundingClientRect()] : [];
+  }
+
+  private elementChildren(): FakeElement[] {
+    return this.children.filter((child): child is FakeElement => typeof child !== "string");
+  }
+
+  private removeChild(child: FakeElement): void {
+    this.children = this.children.filter((candidate) => candidate !== child);
+    child.parentElement = null;
+  }
+
+  matches(selector: string): boolean {
+    if (selector.includes(",")) {
+      return selector.split(",").some((branch) => this.matches(branch.trim()));
+    }
     const match = selector.match(/^(?:(\w+))?(?:\.([A-Za-z0-9_-]+))?$/);
     if (!match) return false;
     const [, tag, cls] = match;
@@ -936,6 +1218,68 @@ class FakeElement {
   }
 }
 
+class FakeResizeObserver {
+  private static readonly observers = new Set<FakeResizeObserver>();
+  private readonly targets = new Set<Element>();
+
+  constructor(private readonly callback: ResizeObserverCallback) {
+    FakeResizeObserver.observers.add(this);
+  }
+
+  observe(target: Element): void {
+    this.targets.add(target);
+  }
+
+  unobserve(target: Element): void {
+    this.targets.delete(target);
+  }
+
+  disconnect(): void {
+    this.targets.clear();
+    FakeResizeObserver.observers.delete(this);
+  }
+
+  static trigger(target: Element): void {
+    for (const observer of FakeResizeObserver.observers) {
+      if (!observer.targets.has(target)) continue;
+      observer.callback([], observer as unknown as ResizeObserver);
+    }
+  }
+
+  static isObserving(target: Element): boolean {
+    return [...FakeResizeObserver.observers].some((observer) => observer.targets.has(target));
+  }
+}
+
+class FakeMutationObserver {
+  constructor(private readonly callback: MutationCallback) {}
+
+  observe(): void {}
+  disconnect(): void {}
+  takeRecords(): MutationRecord[] {
+    return [];
+  }
+
+  testNotify(records: MutationRecord[]): void {
+    this.callback(records, this as unknown as MutationObserver);
+  }
+}
+
+function installReadingViewGlobals(): void {
+  vi.stubGlobal("MutationObserver", FakeMutationObserver);
+  vi.stubGlobal("ResizeObserver", FakeResizeObserver);
+  vi.stubGlobal("window", {
+    setTimeout: globalThis.setTimeout,
+    clearTimeout: globalThis.clearTimeout,
+    requestAnimationFrame: (callback: FrameRequestCallback): number =>
+      globalThis.setTimeout(() => callback(Date.now()), 0) as unknown as number,
+    cancelAnimationFrame: (id: number): void => globalThis.clearTimeout(id)
+  });
+}
+
 const fakeDocument = {
-  createElement: (tag: string) => new FakeElement(tag.toLowerCase()).asHtml()
+  createElement: (tag: string) => new FakeElement(tag.toLowerCase(), false).asHtml(),
+  defaultView: {
+    ResizeObserver: FakeResizeObserver
+  }
 };
