@@ -1,4 +1,5 @@
 import {
+  AbstractInputSuggest,
   ButtonComponent,
   DropdownComponent,
   MarkdownView,
@@ -432,42 +433,81 @@ function renderTextInput(
   const input = new TextComponent(container);
   input.inputEl.type = "text";
   input.inputEl.addClass("para-zk-block__input");
-  if (options.suggestions?.length) {
-    attachTextSuggestions(container, input.inputEl, options.suggestions);
-  }
   input
     .setValue(valueText(readFieldValue(field, frontmatter)))
     .setDisabled(!field.key || !sourcePath);
-  input.inputEl.addEventListener("change", () => {
+
+  const commit = (raw: string): void => {
     if (!field.key) return;
-    const raw = input.getValue();
     // A list-backed text field (e.g. Obsidian-native `aliases`) keeps a single
     // typed value but stores it as a one-item YAML list, the form Obsidian resolves
     // for links/quick-switcher. Empty clears it to an empty list.
     const value = options.list ? singleItemList(raw) : raw;
     void writeFrontmatterValue(plugin, sourcePath, blockEl, field.key, value);
+  };
+  if (options.suggestions?.length) {
+    attachTextSuggestions(plugin.app, input.inputEl, options.suggestions, commit);
+  }
+  input.inputEl.addEventListener("change", () => {
+    commit(input.getValue());
   });
 }
 
-let textSuggestionListSequence = 0;
-
 function attachTextSuggestions(
-  container: HTMLElement,
+  app: App,
   input: HTMLInputElement,
-  suggestions: PropsSelectOption[]
+  suggestions: PropsSelectOption[],
+  select: (value: string) => void
 ): void {
-  const id = `para-zk-text-suggestions-${++textSuggestionListSequence}`;
-  input.setAttr("list", id);
   input.setAttr("autocomplete", "off");
   input.addClass("para-zk-block__input--combobox");
-  const list = container.createEl("datalist", { attr: { id } });
-  for (const suggestion of suggestions) {
-    list.createEl("option", {
-      attr: {
-        value: suggestion.value,
-        label: suggestion.label
-      }
+  new PropsTextInputSuggest(app, input, suggestions, select);
+}
+
+class PropsTextInputSuggest extends AbstractInputSuggest<PropsSelectOption> {
+  private readonly anchorInput: HTMLInputElement;
+  private readonly options: PropsSelectOption[];
+  private readonly selectValue: (value: string) => void;
+
+  constructor(
+    app: App,
+    input: HTMLInputElement,
+    suggestions: PropsSelectOption[],
+    selectValue: (value: string) => void
+  ) {
+    super(app, input);
+    this.anchorInput = input;
+    this.options = suggestions;
+    this.selectValue = selectValue;
+  }
+
+  protected getSuggestions(query: string): PropsSelectOption[] {
+    const token = query.trim().toLocaleLowerCase();
+    if (!token) return this.options;
+    return this.options.filter((suggestion) => {
+      return suggestion.value.toLocaleLowerCase().includes(token)
+        || suggestion.label.toLocaleLowerCase().includes(token);
     });
+  }
+
+  renderSuggestion(suggestion: PropsSelectOption, el: HTMLElement): void {
+    const popup = el.closest<HTMLElement>(".suggestion-container");
+    if (popup) {
+      popup.style.setProperty("width", `${this.anchorInput.getBoundingClientRect().width}px`);
+    }
+    el.createDiv({ text: suggestion.label });
+    if (suggestion.label !== suggestion.value) {
+      el.createEl("small", { text: suggestion.value });
+    }
+  }
+
+  selectSuggestion(
+    suggestion: PropsSelectOption,
+    _event: MouseEvent | KeyboardEvent
+  ): void {
+    this.setValue(suggestion.value);
+    this.selectValue(suggestion.value);
+    this.close();
   }
 }
 

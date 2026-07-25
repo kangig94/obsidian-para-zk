@@ -16,6 +16,16 @@ type FakeEvent = {
   preventDefault?: () => void;
 };
 
+type TestSuggestionOption = {
+  value: string;
+  label: string;
+};
+
+type TestInputSuggest = {
+  testSuggestions(query: string): TestSuggestionOption[] | Promise<TestSuggestionOption[]>;
+  testSelect(value: TestSuggestionOption): void;
+};
+
 describe("props url control", () => {
   it("renders a valid https URL as a clickable link with an edit button", async () => {
     const url = "https://example.com/paper?x=1";
@@ -187,23 +197,22 @@ describe("kind suggestion comboboxes", () => {
 
     const control = propsFieldControl(root, "종류");
     const input = control.querySelector("input.para-zk-block__input") as FakeElement;
-    const listId = input.getAttribute("list");
-    const list = root.querySelectorAll("datalist")
-      .find((candidate) => candidate.getAttribute("id") === listId);
-    const values = list?.querySelectorAll("option")
-      .map((option) => option.getAttribute("value"));
-    const paper = list?.querySelectorAll("option")
-      .find((option) => option.getAttribute("value") === "paper");
+    const options = textSuggestionOptions(input);
+    const values = options.map((option) => option.value);
+    const paper = options.find((option) => option.value === "paper");
 
-    expect(listId).toBeTruthy();
+    expect(input.getAttribute("list")).toBeNull();
+    expect(root.querySelector("datalist")).toBeNull();
     expect(input.classList).toContain("para-zk-block__input--combobox");
     expect(values).toContain("paper");
-    expect(paper?.getAttribute("label")).toBe(resourceKindLabel("paper", "ko"));
-    expect(values?.filter((value) => value === "paper")).toHaveLength(1);
+    expect(paper?.label).toBe(resourceKindLabel("paper", "ko"));
+    expect(values.filter((value) => value === "paper")).toHaveLength(1);
     expect(values).toContain("repo-fork");
     expect(values).toContain("internal pipeline");
     expect(values).not.toContain("project-only");
-    expect(values?.filter((value) => value === "repo-fork")).toHaveLength(1);
+    expect(values.filter((value) => value === "repo-fork")).toHaveLength(1);
+    expect(textSuggestionOptions(input, resourceKindLabel("paper", "ko")))
+      .toEqual([paper]);
 
     input.value = "custom pipeline";
     input.dispatchEvent({ type: "change" });
@@ -242,19 +251,20 @@ describe("kind suggestion comboboxes", () => {
 
     const control = propsFieldControl(root, "종류");
     const input = control.querySelector("input.para-zk-block__input") as FakeElement;
-    const listId = input.getAttribute("list");
-    const list = root.querySelectorAll("datalist")
-      .find((candidate) => candidate.getAttribute("id") === listId);
-    const values = list?.querySelectorAll("option")
-      .map((option) => option.getAttribute("value"));
-    const meeting = list?.querySelectorAll("option")
-      .find((option) => option.getAttribute("value") === "meeting");
+    const options = textSuggestionOptions(input);
+    const values = options.map((option) => option.value);
+    const meeting = options.find((option) => option.value === "meeting");
 
     expect(input.classList).toContain("para-zk-block__input--combobox");
-    expect(meeting?.getAttribute("label")).toBe(subnoteTypeLabel("meeting", "ko"));
-    expect(values?.filter((value) => value === "meeting")).toHaveLength(1);
+    expect(meeting?.label).toBe(subnoteTypeLabel("meeting", "ko"));
+    expect(values.filter((value) => value === "meeting")).toHaveLength(1);
     expect(values).toContain("daily-standup");
     expect(values).not.toContain("repo-fork");
+
+    const research = options.find((option) => option.value === "research");
+    expect(research).toBeDefined();
+    textInputSuggest(input).testSelect(research!);
+    await waitForFrontmatterValue(app, file, "subnote_type", "research");
 
     input.value = "experiment-log";
     input.dispatchEvent({ type: "change" });
@@ -758,11 +768,25 @@ function kindOptionValues(
   renderPropsPanel(plugin, root.asHtml(), file.path);
   const input = propsFieldControl(root, "Type")
     .querySelector("input.para-zk-block__input") as FakeElement;
-  const listId = input.getAttribute("list");
-  const list = root.querySelectorAll("datalist")
-    .find((candidate) => candidate.getAttribute("id") === listId);
-  return list?.querySelectorAll("option")
-    .map((option) => option.getAttribute("value")) ?? [];
+  return textSuggestionOptions(input).map((option) => option.value);
+}
+
+function textSuggestionOptions(
+  input: FakeElement,
+  query = ""
+): TestSuggestionOption[] {
+  const suggestions = textInputSuggest(input).testSuggestions(query);
+  if (suggestions instanceof Promise) {
+    throw new Error("expected synchronous props suggestions");
+  }
+  return suggestions;
+}
+
+function textInputSuggest(input: FakeElement): TestInputSuggest {
+  const suggest = (input as unknown as { __abstractInputSuggest?: TestInputSuggest })
+    .__abstractInputSuggest;
+  if (!suggest) throw new Error("text input suggest not attached");
+  return suggest;
 }
 
 async function nextMicrotask(): Promise<void> {

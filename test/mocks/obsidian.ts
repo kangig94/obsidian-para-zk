@@ -51,7 +51,48 @@ export const Platform = {
   isLinux: true
 };
 export class AbstractInputSuggest<T> {
-  constructor(_app: App, _textInputEl: HTMLInputElement | HTMLDivElement) {}
+  limit = 100;
+  private readonly suggestions = {
+    setSuggestions: (_values: T[]) => {}
+  };
+  private readonly textInputEl: HTMLInputElement | HTMLDivElement;
+
+  constructor(_app: App, textInputEl: HTMLInputElement | HTMLDivElement) {
+    this.textInputEl = textInputEl;
+    Object.assign(textInputEl, { __abstractInputSuggest: this });
+  }
+
+  setValue(value: string): void {
+    if ("value" in this.textInputEl) this.textInputEl.value = value;
+    else this.textInputEl.textContent = value;
+  }
+
+  getValue(): string {
+    return "value" in this.textInputEl
+      ? this.textInputEl.value
+      : this.textInputEl.textContent ?? "";
+  }
+
+  protected getSuggestions(_query: string): T[] | Promise<T[]> {
+    return [];
+  }
+
+  renderSuggestion(_value: T, _el: HTMLElement): void {}
+
+  selectSuggestion(_value: T, _event: MouseEvent | KeyboardEvent): void {}
+
+  close(): void {}
+
+  testSuggestions(query: string): T[] | Promise<T[]> {
+    const values = this.getSuggestions(query);
+    if (values instanceof Promise) return values;
+    this.suggestions.setSuggestions(values);
+    return values;
+  }
+
+  testSelect(value: T): void {
+    this.selectSuggestion(value, {} as KeyboardEvent);
+  }
 }
 export class Component {
   private readonly registeredCallbacks: Array<() => void> = [];
