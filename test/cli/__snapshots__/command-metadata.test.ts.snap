@@ -132,8 +132,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<project|area>",
       },
       "subnote_type": {
-        "description": "type=subnote only. Locale-neutral subnote type code.",
-        "value": "<free|checklist|todo|plan|research|meeting|decision|guide|risk|idea|settlement>",
+        "description": "type=subnote only. Free-form subnote kind; defaults to free.",
+        "value": "<kind>",
       },
       "title": {
         "description": "New child. For type=subnote, a relative path (subdir/title) files it in a subfolder under the parent; it stays the parent's child by frontmatter regardless of subfolder. For type=area, the child area title.",

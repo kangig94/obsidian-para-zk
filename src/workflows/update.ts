@@ -23,12 +23,10 @@ import {
   MATURITY_CODE_HELP,
   PRIORITY_CODE_HELP,
   PROJECT_STATUS_CODE_HELP,
-  SUBNOTE_TYPE_CODE_HELP,
   parseEnergyCode,
   parseMaturityCode,
   parsePriorityCode,
-  parseProjectStatusCode,
-  parseSubnoteTypeCode
+  parseProjectStatusCode
 } from "../vocabulary";
 import { readOptionalCode } from "./code-options";
 import type {
@@ -841,7 +839,7 @@ function valuePrompt(target: WritableSurfaceTarget, allowedOps: UpdateOperation[
 }
 
 function frontmatterValuePlaceholder(key: string): string {
-  if (["status", "priority", "energy", "subnote_type", "maturity"].includes(key)) return "<code>";
+  if (["status", "priority", "energy", "maturity"].includes(key)) return "<code>";
   if (key === "processed") return "<boolean>";
   return "<text>";
 }
@@ -909,9 +907,6 @@ function normalizeFrontmatterUpdateValue(type: string, key: string, value: unkno
   }
   if (type === "journal" && key === "energy") {
     return readOptionalCode(String(value), parseEnergyCode, "energy", ENERGY_CODE_HELP);
-  }
-  if (type === "subnote" && key === "subnote_type") {
-    return readOptionalCode(String(value), parseSubnoteTypeCode, "subnote_type", SUBNOTE_TYPE_CODE_HELP);
   }
   if (type === "permanent" && key === "maturity") {
     return readOptionalCode(String(value), parseMaturityCode, "maturity", MATURITY_CODE_HELP);

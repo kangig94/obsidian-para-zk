@@ -5,17 +5,14 @@ import {
   MATURITY_CODES,
   PRIORITY_CODES,
   PROJECT_STATUS_CODES,
-  SUBNOTE_TYPE_CODES,
   energyLabel,
   maturityLabel,
   priorityLabel,
   projectStatusLabel,
-  subnoteTypeLabel,
   type EnergyCode,
   type MaturityCode,
   type PriorityCode,
-  type ProjectStatusCode,
-  type SubnoteTypeCode
+  type ProjectStatusCode
 } from "../vocabulary";
 
 const PROPS_VIEW_TYPES = [
@@ -40,11 +37,13 @@ type PropsFieldControl =
   | "datetime-display"
   | "relative-time"
   | "display"
-  | "resource-kind"
+  | "kind-suggestions"
   | "select"
   | "text"
   | "url"
   | "text-list";
+
+export type PropsSuggestionKind = "resource" | "subnote";
 
 export type PropsSelectOption = {
   value: string;
@@ -58,6 +57,7 @@ export type PropsField = {
   control: PropsFieldControl;
   options?: PropsSelectOption[];
   display?: "areas" | "period";
+  suggestionKind?: PropsSuggestionKind;
 };
 
 export type PropsSchema = {
@@ -130,7 +130,7 @@ export function propsSchemaForType(type: PropsViewType, locale: Locale): PropsSc
         ],
         [
           field("license", "license", t.labels.license, "text"),
-          field("kind", "kind", t.labels.kind, "resource-kind")
+          kindSuggestionField("kind", "kind", t.labels.kind, "resource")
         ]
       ]
     },
@@ -167,7 +167,7 @@ export function propsSchemaForType(type: PropsViewType, locale: Locale): PropsSc
       type: "subnote",
       rows: [
         [created, updated],
-        [selectField("subnote_type", "subnote_type", t.labels.kind, subnoteTypeOptions(locale))]
+        [kindSuggestionField("subnote_type", "subnote_type", t.labels.kind, "subnote")]
       ]
     },
     spark: {
@@ -218,6 +218,15 @@ function selectField(id: string, key: string, label: string, options: PropsSelec
   return { id, key, label, control: "select", options };
 }
 
+function kindSuggestionField(
+  id: string,
+  key: string,
+  label: string,
+  suggestionKind: PropsSuggestionKind
+): PropsField {
+  return { id, key, label, control: "kind-suggestions", suggestionKind };
+}
+
 function statusOptions(locale: Locale): PropsSelectOption[] {
   return PROJECT_STATUS_CODES.map((code: ProjectStatusCode) => ({
     value: code,
@@ -243,12 +252,5 @@ function energyOptions(locale: Locale): PropsSelectOption[] {
   return ENERGY_CODES.map((code: EnergyCode) => ({
     value: code,
     label: energyLabel(code, locale)
-  }));
-}
-
-function subnoteTypeOptions(locale: Locale): PropsSelectOption[] {
-  return SUBNOTE_TYPE_CODES.map((code: SubnoteTypeCode) => ({
-    value: code,
-    label: subnoteTypeLabel(code, locale)
   }));
 }

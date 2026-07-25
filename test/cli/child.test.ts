@@ -30,6 +30,46 @@ describe("*-child commands", () => {
     })).rejects.toThrow(/unknown CLI command: para-zk:create-subnote/);
   });
 
+  it("round-trips a free-form subnote kind through create and update", async () => {
+    await cli.run("para-zk:create-project", { title: "Lab", open: "false" });
+
+    const created = await cli.run("para-zk:create-child", {
+      type: "subnote",
+      root_type: "project",
+      root_title: "Lab",
+      title: "Trial",
+      subnote_type: "experiment-log",
+      open: "false"
+    });
+    expect(created.ok).toBe(true);
+
+    const initial = await cli.run("para-zk:read-child", {
+      root_type: "project",
+      root_title: "Lab",
+      title: "Trial",
+      key: "frontmatter/subnote_type"
+    });
+    expect(initial.value).toBe("experiment-log");
+
+    const updated = await cli.run("para-zk:update-child", {
+      root_type: "project",
+      root_title: "Lab",
+      title: "Trial",
+      key: "frontmatter/subnote_type",
+      op: "set",
+      value: "daily-observation"
+    });
+    expect(updated.changed).toBe(true);
+
+    const read = await cli.run("para-zk:read-child", {
+      root_type: "project",
+      root_title: "Lab",
+      title: "Trial",
+      key: "frontmatter/subnote_type"
+    });
+    expect(read.value).toBe("daily-observation");
+  });
+
   it("files a subnote in a subfolder when the title is a relative path, still addressable by basename", async () => {
     await cli.run("para-zk:create-project", { title: "Alpha", open: "false" });
 

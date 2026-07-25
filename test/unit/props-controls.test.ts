@@ -148,8 +148,8 @@ describe("props url control", () => {
   });
 });
 
-describe("resource kind combobox", () => {
-  it("suggests examples and distinct vault kinds while accepting a new value", async () => {
+describe("kind suggestion comboboxes", () => {
+  it("suggests Resource examples and Resource vault kinds while accepting a new value", async () => {
     const app = new MockApp();
     await app.vault.create("PARA/Resources/Existing Repo.md", [
       "---",
@@ -209,18 +209,81 @@ describe("resource kind combobox", () => {
     expect(app.metadataCache.getFileCache(file)?.frontmatter?.kind).toBe("custom pipeline");
   });
 
-  it("scans once and updates the cache from metadata and delete events", async () => {
+  it("suggests Subnote examples and Subnote vault kinds without mixing Resource kinds", async () => {
     const app = new MockApp();
-    const existing = await app.vault.create("PARA/Resources/Cached.md", [
+    await app.vault.create("PARA/Projects/Alpha/Standup.md", [
+      "---",
+      "type: subnote",
+      "subnote_type: daily-standup",
+      "---",
+      ""
+    ].join("\n"));
+    await app.vault.create("PARA/Resources/Repository.md", [
+      "---",
+      "type: resource",
+      "kind: repo-fork",
+      "---",
+      ""
+    ].join("\n"));
+    const file = await app.vault.create("PARA/Projects/Alpha/Current.md", [
+      "---",
+      "type: subnote",
+      "subnote_type: meeting",
+      "---",
+      ""
+    ].join("\n"));
+
+    stubAppEvents(app);
+    const plugin = createPropsPlugin(app);
+    const root = new FakeElement("div");
+    renderPropsPanel(plugin, root.asHtml(), file.path);
+
+    const control = propsFieldControl(root, "Type");
+    const input = control.querySelector("input.para-zk-block__input") as FakeElement;
+    const listId = input.getAttribute("list");
+    const list = root.querySelectorAll("datalist")
+      .find((candidate) => candidate.getAttribute("id") === listId);
+    const values = list?.querySelectorAll("option")
+      .map((option) => option.getAttribute("value"));
+    const meeting = list?.querySelectorAll("option")
+      .find((option) => option.getAttribute("value") === "meeting");
+
+    expect(input.classList).toContain("para-zk-block__input--combobox");
+    expect(meeting?.getAttribute("label")).toBe("Meeting notes");
+    expect(values).toContain("daily-standup");
+    expect(values).not.toContain("repo-fork");
+
+    input.value = "experiment-log";
+    input.dispatchEvent({ type: "change" });
+    await waitForFrontmatterValue(app, file, "subnote_type", "experiment-log");
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.subnote_type).toBe("experiment-log");
+  });
+
+  it("scans once and updates separated caches from metadata and delete events", async () => {
+    const app = new MockApp();
+    const resource = await app.vault.create("PARA/Resources/Cached.md", [
       "---",
       "type: resource",
       "kind: cached-kind",
       "---",
       ""
     ].join("\n"));
-    const current = await app.vault.create("PARA/Resources/Current.md", [
+    const subnote = await app.vault.create("PARA/Projects/Alpha/Cached.md", [
+      "---",
+      "type: subnote",
+      "subnote_type: cached-subnote-kind",
+      "---",
+      ""
+    ].join("\n"));
+    const currentResource = await app.vault.create("PARA/Resources/Current.md", [
       "---",
       "type: resource",
+      "---",
+      ""
+    ].join("\n"));
+    const currentSubnote = await app.vault.create("PARA/Projects/Alpha/Current.md", [
+      "---",
+      "type: subnote",
       "---",
       ""
     ].join("\n"));
@@ -249,21 +312,30 @@ describe("resource kind combobox", () => {
     });
     registerPropsControlRenderers(plugin);
 
-    expect(resourceKindOptionValues(plugin, current)).toContain("cached-kind");
-    expect(resourceKindOptionValues(plugin, current)).toContain("cached-kind");
+    expect(kindOptionValues(plugin, currentResource)).toContain("cached-kind");
+    expect(kindOptionValues(plugin, currentResource)).not.toContain("cached-subnote-kind");
+    expect(kindOptionValues(plugin, currentSubnote)).toContain("cached-subnote-kind");
+    expect(kindOptionValues(plugin, currentSubnote)).not.toContain("cached-kind");
     expect(getMarkdownFiles).toHaveBeenCalledTimes(1);
 
-    await app.fileManager.processFrontMatter(existing, (frontmatter) => {
+    await app.fileManager.processFrontMatter(resource, (frontmatter) => {
       frontmatter.kind = "updated-kind";
     });
-    metadataChanged?.(existing);
+    metadataChanged?.(resource);
+    await app.fileManager.processFrontMatter(subnote, (frontmatter) => {
+      frontmatter.subnote_type = "updated-subnote-kind";
+    });
+    metadataChanged?.(subnote);
 
-    expect(resourceKindOptionValues(plugin, current)).toContain("updated-kind");
-    expect(resourceKindOptionValues(plugin, current)).not.toContain("cached-kind");
+    expect(kindOptionValues(plugin, currentResource)).toContain("updated-kind");
+    expect(kindOptionValues(plugin, currentResource)).not.toContain("cached-kind");
+    expect(kindOptionValues(plugin, currentSubnote)).toContain("updated-subnote-kind");
+    expect(kindOptionValues(plugin, currentSubnote)).not.toContain("cached-subnote-kind");
     expect(getMarkdownFiles).toHaveBeenCalledTimes(1);
 
-    vaultDeleted?.(existing);
-    expect(resourceKindOptionValues(plugin, current)).not.toContain("updated-kind");
+    vaultDeleted?.(resource);
+    expect(kindOptionValues(plugin, currentResource)).not.toContain("updated-kind");
+    expect(kindOptionValues(plugin, currentSubnote)).toContain("updated-subnote-kind");
     expect(getMarkdownFiles).toHaveBeenCalledTimes(1);
   });
 });
@@ -578,7 +650,7 @@ function propsFieldControl(root: FakeElement, label: string): FakeElement {
   return control;
 }
 
-function resourceKindOptionValues(
+function kindOptionValues(
   plugin: ParaZkPluginContext,
   file: Awaited<ReturnType<MockApp["vault"]["create"]>>
 ): Array<string | null> {

@@ -21,7 +21,15 @@ describe("props schema lead fields", () => {
     ]);
     expect(findPropsField(resource, "aliases")).toBe(resource.lead);
     expect(findPropsField(resource, "url")?.control).toBe("url");
-    expect(findPropsField(resource, "kind")?.control).toBe("resource-kind");
+    expect(findPropsField(resource, "kind")).toMatchObject({
+      control: "kind-suggestions",
+      suggestionKind: "resource"
+    });
+
+    expect(findPropsField(propsSchemaForType("subnote", "en"), "subnote_type")).toMatchObject({
+      control: "kind-suggestions",
+      suggestionKind: "subnote"
+    });
 
     const permanent = propsSchemaForType("permanent", "en");
     expect(permanent.lead?.id).toBe("aliases");

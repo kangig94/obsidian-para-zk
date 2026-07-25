@@ -123,6 +123,17 @@ The Resource props editor presents these examples and distinct `kind` values
 already used by Resource notes in the current vault as dropdown suggestions.
 The field remains editable, so choosing a suggestion is optional.
 
+Subnote `subnote_type` is also free-form, but uses its own separate vocabulary.
+Common values include:
+
+```text
+free | checklist | todo | plan | research | meeting | decision | guide | risk | idea | settlement
+```
+
+The Subnote props editor presents these localized examples and distinct
+`subnote_type` values already used by Subnote notes in the current vault.
+Resource kinds and Subnote kinds remain separate suggestion sets.
+
 Maturity:
 
 ```text
@@ -631,7 +642,7 @@ Options:
 | `root_title` | string | Required directly-addressable root ancestor title. |
 | `relpath` | JSON list | Optional ancestor chain from root to immediate parent. Empty or omitted means directly under the root. |
 | `title` | string | Required child title. Full drill path is `[...relpath, title]`. For `type=subnote`, may be a `subdir/title` path to file the note in a subfolder under the parent; it stays the parent's child by frontmatter. Existing subfoldered subnotes may be addressed by basename when unique or by `subdir/title(.md)` to disambiguate. |
-| `subnote_type` | subnote type code | `type=subnote` only. Defaults to `free`. |
+| `subnote_type` | string | `type=subnote` only. Free-form subnote kind; defaults to `free`. |
 | `body` | markdown | `type=subnote` only. Optional initial free-form body content. Accepts `@<absolute-path>`. |
 | `inherit_parent_tag` | boolean | `type=area` only. Include the parent area tag too. Default `true`. |
 | `open` | boolean | Default `false`. |

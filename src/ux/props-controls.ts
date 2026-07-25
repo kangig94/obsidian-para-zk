@@ -25,11 +25,14 @@ import {
   type PropsField,
   type PropsSchema,
   type PropsSelectOption,
+  type PropsSuggestionKind,
   type PropsViewType
 } from "../props/schema";
 import {
   RESOURCE_KIND_CODES,
-  resourceKindLabel
+  SUBNOTE_TYPE_CODES,
+  resourceKindLabel,
+  subnoteTypeLabel
 } from "../vocabulary";
 import { frontmatterLinks, readFileTypeFresh } from "../vault/frontmatter";
 import { workflowContext } from "../vault/host";
@@ -72,9 +75,14 @@ type PropsRerenderState = {
   generation: number;
 };
 
-type ResourceKindCache = {
-  byPath: Map<string, string>;
-  distinct?: string[];
+type KindSuggestionEntry = {
+  kind: PropsSuggestionKind;
+  value: string;
+};
+
+type KindSuggestionCache = {
+  byPath: Map<string, KindSuggestionEntry>;
+  distinct: Partial<Record<PropsSuggestionKind, string[]>>;
 };
 
 type PropsControlRenderContext = {
@@ -106,9 +114,11 @@ const PROPS_CONTROL_RENDERERS: Record<PropsField["control"], PropsControlRendere
   "text-list": ({ plugin, field, frontmatter, container, sourcePath, blockEl }) => {
     renderTextInput(plugin, field, frontmatter, container, sourcePath, blockEl, { list: true });
   },
-  "resource-kind": ({ plugin, field, frontmatter, container, sourcePath, blockEl }) => {
+  "kind-suggestions": ({ plugin, field, frontmatter, container, sourcePath, blockEl }) => {
     renderTextInput(plugin, field, frontmatter, container, sourcePath, blockEl, {
-      suggestions: resourceKindSuggestions(plugin)
+      suggestions: field.suggestionKind
+        ? kindSuggestions(plugin, field.suggestionKind)
+        : []
     });
   },
   url: ({ plugin, field, frontmatter, container, sourcePath, blockEl, rerender }) => {
@@ -138,11 +148,19 @@ const PROPS_CONTROL_RENDERERS: Record<PropsField["control"], PropsControlRendere
 };
 
 const propsRerenderStates = new WeakMap<HTMLElement, PropsRerenderState>();
-const resourceKindCaches = new WeakMap<ParaZkPluginContext, ResourceKindCache>();
-const registeredResourceKindCaches = new WeakSet<ParaZkPluginContext>();
+const kindSuggestionCaches = new WeakMap<ParaZkPluginContext, KindSuggestionCache>();
+const registeredKindSuggestionCaches = new WeakSet<ParaZkPluginContext>();
+
+const KIND_SUGGESTION_SPECS: Record<
+  PropsSuggestionKind,
+  { noteTypes: readonly string[]; frontmatterKey: string }
+> = {
+  resource: { noteTypes: ["resource"], frontmatterKey: "kind" },
+  subnote: { noteTypes: ["subnote", "doc"], frontmatterKey: "subnote_type" }
+};
 
 export function registerPropsControlRenderers(plugin: ParaZkPluginContext): void {
-  registerResourceKindCache(plugin);
+  registerKindSuggestionCache(plugin);
   plugin.registerMarkdownPostProcessor((el, ctx) => {
     renderInlinePropsInputs(plugin, el, ctx);
   });
@@ -455,7 +473,10 @@ function attachTextSuggestions(
   }
 }
 
-function resourceKindSuggestions(plugin: ParaZkPluginContext): PropsSelectOption[] {
+function kindSuggestions(
+  plugin: ParaZkPluginContext,
+  kind: PropsSuggestionKind
+): PropsSelectOption[] {
   const values = new Map<string, PropsSelectOption>();
   const add = (value: string, label = value): void => {
     const trimmed = value.trim();
@@ -464,96 +485,123 @@ function resourceKindSuggestions(plugin: ParaZkPluginContext): PropsSelectOption
     if (!values.has(key)) values.set(key, { value: trimmed, label });
   };
 
-  for (const code of RESOURCE_KIND_CODES) {
-    add(code, resourceKindLabel(code, plugin.settings.locale));
-  }
-
-  for (const kind of cachedResourceKinds(plugin)) add(kind);
+  for (const option of defaultKindSuggestions(plugin, kind)) add(option.value, option.label);
+  for (const value of cachedKindSuggestions(plugin, kind)) add(value);
 
   return Array.from(values.values());
 }
 
-function registerResourceKindCache(plugin: ParaZkPluginContext): void {
-  ensureResourceKindCache(plugin);
-  if (registeredResourceKindCaches.has(plugin)) return;
-  registeredResourceKindCaches.add(plugin);
+function defaultKindSuggestions(
+  plugin: ParaZkPluginContext,
+  kind: PropsSuggestionKind
+): PropsSelectOption[] {
+  if (kind === "resource") {
+    return RESOURCE_KIND_CODES.map((code) => ({
+      value: code,
+      label: resourceKindLabel(code, plugin.settings.locale)
+    }));
+  }
+  return SUBNOTE_TYPE_CODES.map((code) => ({
+    value: code,
+    label: subnoteTypeLabel(code, plugin.settings.locale)
+  }));
+}
+
+function registerKindSuggestionCache(plugin: ParaZkPluginContext): void {
+  ensureKindSuggestionCache(plugin);
+  if (registeredKindSuggestionCaches.has(plugin)) return;
+  registeredKindSuggestionCaches.add(plugin);
 
   plugin.registerEvent(
-    plugin.app.metadataCache.on("changed", (file) => updateCachedResourceKind(plugin, file))
+    plugin.app.metadataCache.on("changed", (file) => updateCachedKindSuggestion(plugin, file))
   );
   plugin.registerEvent(
     plugin.app.vault.on("delete", (file) => {
-      if (file instanceof TFile) removeCachedResourceKind(plugin, file.path);
+      if (file instanceof TFile) removeCachedKindSuggestion(plugin, file.path);
     })
   );
   plugin.registerEvent(
     plugin.app.vault.on("rename", (file, oldPath) => {
-      removeCachedResourceKind(plugin, oldPath);
-      if (file instanceof TFile) updateCachedResourceKind(plugin, file);
+      removeCachedKindSuggestion(plugin, oldPath);
+      if (file instanceof TFile) updateCachedKindSuggestion(plugin, file);
     })
   );
   plugin.register(() => {
-    resourceKindCaches.delete(plugin);
-    registeredResourceKindCaches.delete(plugin);
+    kindSuggestionCaches.delete(plugin);
+    registeredKindSuggestionCaches.delete(plugin);
   });
 }
 
-function cachedResourceKinds(plugin: ParaZkPluginContext): string[] {
-  const cache = ensureResourceKindCache(plugin);
-  if (!cache.distinct) {
+function cachedKindSuggestions(
+  plugin: ParaZkPluginContext,
+  kind: PropsSuggestionKind
+): string[] {
+  const cache = ensureKindSuggestionCache(plugin);
+  if (!cache.distinct[kind]) {
     const values = new Map<string, string>();
-    for (const value of cache.byPath.values()) {
-      const key = value.toLocaleLowerCase();
-      if (!values.has(key)) values.set(key, value);
+    for (const entry of cache.byPath.values()) {
+      if (entry.kind !== kind) continue;
+      const key = entry.value.toLocaleLowerCase();
+      if (!values.has(key)) values.set(key, entry.value);
     }
-    cache.distinct = Array.from(values.values())
+    cache.distinct[kind] = Array.from(values.values())
       .sort((left, right) => left.localeCompare(right));
   }
-  return cache.distinct;
+  return cache.distinct[kind] ?? [];
 }
 
-function ensureResourceKindCache(plugin: ParaZkPluginContext): ResourceKindCache {
-  const existing = resourceKindCaches.get(plugin);
+function ensureKindSuggestionCache(plugin: ParaZkPluginContext): KindSuggestionCache {
+  const existing = kindSuggestionCaches.get(plugin);
   if (existing) return existing;
 
-  const cache: ResourceKindCache = { byPath: new Map() };
-  resourceKindCaches.set(plugin, cache);
+  const cache: KindSuggestionCache = { byPath: new Map(), distinct: {} };
+  kindSuggestionCaches.set(plugin, cache);
   for (const file of plugin.app.vault.getMarkdownFiles()) {
-    setCachedResourceKind(cache, file.path, resourceKindForFile(plugin, file));
+    setCachedKindSuggestion(cache, file.path, kindSuggestionForFile(plugin, file));
   }
   return cache;
 }
 
-function updateCachedResourceKind(plugin: ParaZkPluginContext, file: TFile): void {
-  const cache = ensureResourceKindCache(plugin);
-  setCachedResourceKind(cache, file.path, resourceKindForFile(plugin, file));
+function updateCachedKindSuggestion(plugin: ParaZkPluginContext, file: TFile): void {
+  const cache = ensureKindSuggestionCache(plugin);
+  setCachedKindSuggestion(cache, file.path, kindSuggestionForFile(plugin, file));
 }
 
-function removeCachedResourceKind(plugin: ParaZkPluginContext, path: string): void {
-  const cache = ensureResourceKindCache(plugin);
+function removeCachedKindSuggestion(plugin: ParaZkPluginContext, path: string): void {
+  const cache = ensureKindSuggestionCache(plugin);
   if (!cache.byPath.delete(path)) return;
-  cache.distinct = undefined;
+  cache.distinct = {};
 }
 
-function setCachedResourceKind(
-  cache: ResourceKindCache,
+function setCachedKindSuggestion(
+  cache: KindSuggestionCache,
   path: string,
-  kind: string | undefined
+  entry: KindSuggestionEntry | undefined
 ): void {
   const previous = cache.byPath.get(path);
-  if (kind === undefined) {
+  if (entry === undefined) {
     if (!cache.byPath.delete(path)) return;
   } else {
-    if (previous === kind) return;
-    cache.byPath.set(path, kind);
+    if (previous?.kind === entry.kind && previous.value === entry.value) return;
+    cache.byPath.set(path, entry);
   }
-  cache.distinct = undefined;
+  cache.distinct = {};
 }
 
-function resourceKindForFile(plugin: ParaZkPluginContext, file: TFile): string | undefined {
+function kindSuggestionForFile(
+  plugin: ParaZkPluginContext,
+  file: TFile
+): KindSuggestionEntry | undefined {
   const frontmatter = fileFrontmatter(plugin, file);
-  if (frontmatter.type !== "resource" || typeof frontmatter.kind !== "string") return undefined;
-  return frontmatter.kind.trim() || undefined;
+  for (const kind of ["resource", "subnote"] as const) {
+    const spec = KIND_SUGGESTION_SPECS[kind];
+    if (typeof frontmatter.type !== "string" || !spec.noteTypes.includes(frontmatter.type)) continue;
+    const value = frontmatter[spec.frontmatterKey];
+    if (typeof value !== "string") return undefined;
+    const trimmed = value.trim();
+    return trimmed ? { kind, value: trimmed } : undefined;
+  }
+  return undefined;
 }
 
 function renderUrlField(
