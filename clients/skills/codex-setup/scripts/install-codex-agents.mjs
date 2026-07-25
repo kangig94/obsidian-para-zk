@@ -83,9 +83,9 @@ function convertAgentMarkdown(source, sourcePath, displaySourcePath, warnings) {
     "",
     "Required tool assumptions:",
     tools
-      ? `- Source agent requested Claude tools: ${tools}. In Codex, use the current session's equivalent tools. The PARA-ZK weaver requires the Optsidian MCP command runner, exposed as \`mcp__optsidian__command_run\`.`
+      ? `- Source agent requested Claude tools: ${tools}. In Codex, use the current session's equivalent tools. For PARA-ZK commands, prefer the Optsidian MCP command runner when available; otherwise follow the source agent's CLI fallback order.`
       : "- Use the current Codex session tools available to this agent.",
-    "- Do not use Bash for Optsidian/para-zk commands when the source prompt says to use the Optsidian MCP command runner.",
+    "- Never read or write vault files directly. Use the MCP command runner when exposed; otherwise use the shell CLI selected by the source prompt.",
     "",
     prompt
   ].join("\n");

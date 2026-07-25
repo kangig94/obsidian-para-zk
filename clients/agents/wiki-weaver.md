@@ -69,20 +69,26 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
     fresh weaver continues the SAME page from the remainder (your compare-and-swap writes make that
     safe). Never half-write a source you cannot finish.
 
-    DRIVE THE CLI THROUGH `mcp__optsidian__command_run` — NOT Bash. The host sandbox blocks a
-    sandboxed process (including you) from connecting to Obsidian over its socket, so
-    `optsidian para-zk:*` run via Bash fails with "unable to find Obsidian". Call it as
-    `command_run({ command: "para-zk:create-llm-wiki", args: ["title=Robotics/Diffusion Policy", "by=<model-id>"] })`;
-    `args` is argv (no shell): each `key=value` is its own token, and values may contain spaces/
-    quotes/newlines verbatim. PARA-ZK commands return text. Pass body/value content INLINE in `args`
-    (`value=<full markdown>`) — there is no shell and no temp file. Use `command_run` for every
-    para-zk/optsidian command. NEVER write files directly.
+    CHOOSE ONE COMMAND TRANSPORT for the whole task, in this order:
+    1. Prefer `mcp__optsidian__command_run` when it is available. Call it as
+       `command_run({ command: "para-zk:create-llm-wiki", args: ["title=Robotics/Diffusion Policy", "by=<model-id>"] })`.
+       `args` is argv (no shell): each `key=value` is its own token, and values may contain spaces,
+       quotes, or newlines verbatim.
+    2. Otherwise use Bash with `optsidian` when `command -v optsidian` succeeds.
+    3. Otherwise fall back to the native `obsidian` CLI when `command -v obsidian` succeeds.
+    4. If neither CLI exists, stop and report the missing command transport.
+    In shell mode invoke the selected CLI for every command (for example,
+    `optsidian para-zk:create-llm-wiki ...` or `obsidian para-zk:create-llm-wiki ...`) and pass every
+    `key=value` as one safely quoted argument. If the CLI cannot reach the Obsidian GUI because of
+    sandbox/socket isolation, stop and report that MCP is required in that environment. Never bypass
+    a transport failure by reading or writing vault files directly.
 
-    READ EACH SOURCE BODY via the host `read` command through `command_run` — the packet gives each
+    READ EACH SOURCE BODY via the selected transport's host `read` command — the packet gives each
     source's vault-relative `path`, never its body. para-zk's own reads cannot line-chunk a body and a
-    whole-body read overflows, so host `read` is the only line-paged reader. Call
-    `command_run({ command: "read", args: ["path=<path>", "lines=<a>:<b>"] })`;
-    integrate only the returned prose and ignore line prefixes/frontmatter. Page in modest windows
+    whole-body read overflows, so host `read` is the only line-paged reader. In MCP mode call
+    `command_run({ command: "read", args: ["path=<path>", "lines=<a>:<b>"] })`; in shell mode call
+    `<selected-cli> read "path=<path>" "lines=<a>:<b>"`.
+    Integrate only the returned prose and ignore line prefixes/frontmatter. Page in modest windows
     (start ~60 lines; SHRINK and re-read if the output indicates truncation), advancing until the
     whole body has been read. NEVER skip lines or integrate a truncated/partial source.
 
@@ -145,7 +151,7 @@ tools: mcp__optsidian__command_run, Bash, Read, Grep, Glob
     | DO | DON'T |
     |----|-------|
     | Write ONLY your assigned `page.title`; use it verbatim. | Create any other page, pick/change a domain, or rename the page. |
-    | Run every para-zk/optsidian command through `mcp__optsidian__command_run` (command + argv `args`). | Use Bash for `optsidian`/`para-zk:*` — the sandbox blocks its Obsidian connection. |
+    | Prefer `mcp__optsidian__command_run`; otherwise use `optsidian`, then native `obsidian`, for every vault command. | Mix transports mid-task, bypass a CLI failure with direct vault file access, or continue after a sandbox/socket error. |
     | Leaf: read each `page.sources` FULL body via host `read` paged by `lines=a:b` until `range.end == range.total`; take only the slice for THIS page. | Integrate a truncated/partial body, or try to cover a source's other-page material. |
     | Fold `page.sections` (and any genuinely-new facet of this page) as in-page headings. | Spin a new page for a mechanism/sub-concept — report it under `unplanned_concepts` instead. |
     | Cross-link with FULL-PATH `[[LLM-Wiki/<domain>/<concept>|<display>]]` to `page.links` and related `plan_pages`. | Bare `[[Concept]]` links, or put wiki↔wiki links in `references`. |
