@@ -8,7 +8,6 @@ import {
   MATURITY_CODE_HELP,
   PRIORITY_CODE_HELP,
   PROJECT_STATUS_CODE_HELP,
-  RESOURCE_KIND_CODE_HELP,
   SUBNOTE_TYPE_CODE_HELP
 } from "../vocabulary";
 import { RESOURCE_CREATE_KIND_CODE_HELP, ZK_KIND_CODE_HELP } from "../zk/kinds";
@@ -1225,7 +1224,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       url: { value: "<url>", description: "Optional provenance: where the source came from." },
       first_author: { value: "<name>", description: "Optional provenance: the source's first author." },
       license: { value: "<spdx-id>", description: "Optional provenance: source license as an SPDX identifier (e.g. MIT, CC-BY-4.0); when no SPDX id fits, a short recognizable token (e.g. arXiv)." },
-      kind: { value: `<${RESOURCE_KIND_CODE_HELP}>`, description: "Optional provenance: locale-neutral source kind code." },
+      kind: { value: "<kind>", description: "Optional provenance: free-form source kind." },
       domain: { value: "<domain>", description: "Optional subject domain for the identity tag (<type>/<domain>, e.g. resource/ai); omit for a flat type tag. Reuse an existing domain vocabulary." },
       body: { value: "<markdown>", description: "Optional initial free-form body content." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },

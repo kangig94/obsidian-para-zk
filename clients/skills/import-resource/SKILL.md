@@ -103,7 +103,8 @@ attach useful extracted figures, and drop duplicate/debug images before applying
 Record source provenance for everything (URL, file path, identifier, date, license/permission
 where relevant). The four core fields go in the resource **frontmatter** at create time (see step 6):
 `url`, `first_author`, `license`, `kind` — `license` as an SPDX identifier (short recognizable
-token like `arXiv` when none fits, never a long sentence), `kind` as a code. Keep any extra detail
+token like `arXiv` when none fits, never a long sentence), `kind` as a concise free-form source
+classification. Keep any extra detail
 (DOI, version, other URLs) in a short body provenance section only when useful. Do not add routine
 transform notes such as "translated", "converted", or "cleaned" unless the user explicitly asks for
 that metadata or it is needed to avoid ambiguity. For images:
@@ -229,13 +230,15 @@ no recognized representative name exists, use the original title.
 
 ```
 optsidian para-zk:create-resource title="<title>" body=@/tmp/<file>.md \
-  url="<source url>" first_author="<first author>" license="<SPDX id>" kind=<paper|article|book|video|web|code|guide|other> \
+  url="<source url>" first_author="<first author>" license="<SPDX id>" kind="<source kind>" \
   domain="<subject domain>"
 ```
 
 `license` is an SPDX identifier (`MIT`, `Apache-2.0`, `CC-BY-4.0`, `CC-BY-SA-4.0`, `CC0-1.0`, …); when
 no SPDX id fits use a short recognizable token (e.g. `arXiv` for an arXiv-default paper), never a long
-descriptive sentence. `kind` is one of the codes shown. `domain` is the subject group for the identity
+descriptive sentence. `kind` accepts any concise string; common values include `paper`, `article`,
+`book`, `video`, `web`, `code`, and `guide`, while more specific values such as `repo-fork`, `vault`,
+`tool`, or `dataset` are valid. `domain` is the subject group for the identity
 tag — reuse an existing domain vocabulary; omit it for a flat resource tag. Omit any field you cannot
 determine — don't guess.
 

@@ -5,7 +5,6 @@ import type { ZkKind } from "../types";
 import type { Frontmatter } from "../vault/frontmatter";
 import {
   type MaturityCode,
-  type ResourceKindCode,
   type SubnoteTypeCode
 } from "../vocabulary";
 import { zkKindCode } from "../zk/kinds";
@@ -17,7 +16,7 @@ export type ResourceFrontmatterOptions = {
   alias?: string;
   domain?: string;
   firstAuthor?: string;
-  kind?: ResourceKindCode;
+  kind?: string;
   license?: string;
   url?: string;
 };

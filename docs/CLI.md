@@ -112,11 +112,16 @@ Resource-create target kind:
 digest | permanent
 ```
 
-Resource kind (source type):
+Resource `kind` (source type) is a free-form string, not a stable-code enum.
+Common values include:
 
 ```text
 paper | article | book | video | web | code | guide | other
 ```
+
+The Resource props editor presents these examples and distinct `kind` values
+already used by Resource notes in the current vault as dropdown suggestions.
+The field remains editable, so choosing a suggestion is optional.
 
 Maturity:
 
@@ -1330,7 +1335,7 @@ Options:
 | `url` | string | Optional provenance: where the source came from. |
 | `first_author` | string | Optional provenance: the source's first author. |
 | `license` | SPDX id | Optional provenance: SPDX identifier (e.g. `MIT`, `CC-BY-4.0`); when no SPDX id fits, a short recognizable token (e.g. `arXiv`). |
-| `kind` | `paper` \| `article` \| `book` \| `video` \| `web` \| `code` \| `guide` \| `other` | Optional provenance: locale-neutral source kind code. |
+| `kind` | string | Optional free-form source classification, such as `paper`, `repo-fork`, `vault`, `tool`, or `dataset`. |
 | `domain` | string | Optional subject domain for the identity tag. With a domain the tag is `리소스/<domain>`; omit for a flat `리소스` tag. Reuse an existing domain vocabulary. |
 | `body` | markdown | Optional initial free-form body content. |
 | `open` | boolean | Default `false`. |
@@ -1338,12 +1343,12 @@ Options:
 The identity tag classifies (groups) the note rather than naming it: `리소스/<domain>`
 when `domain` is given, otherwise the flat `리소스`. The four provenance keys and `aliases` are also editable after creation via
 `para-zk:update-resource key=frontmatter/<aliases|url|first_author|license|kind>`
-(and surfaced by `para-zk:describe type=resource`); `kind` is validated against
-the code list above. `aliases` is stored as a single-item list for one canonical
+(and surfaced by `para-zk:describe type=resource`); `kind` preserves any string
+supplied by the caller. `aliases` is stored as a single-item list for one canonical
 value. For example:
 
 ```bash
-optsidian para-zk:update-resource title="Attention" key=frontmatter/kind op=set value=paper
+optsidian para-zk:update-resource title="Attention" key=frontmatter/kind op=set value=repo-fork
 ```
 
 Example:

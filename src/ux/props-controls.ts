@@ -27,6 +27,10 @@ import {
   type PropsSelectOption,
   type PropsViewType
 } from "../props/schema";
+import {
+  RESOURCE_KIND_CODES,
+  resourceKindLabel
+} from "../vocabulary";
 import { frontmatterLinks, readFileTypeFresh } from "../vault/frontmatter";
 import { workflowContext } from "../vault/host";
 import { normalizeVaultPath, wikiLink } from "../vault/paths";
@@ -96,6 +100,11 @@ const PROPS_CONTROL_RENDERERS: Record<PropsField["control"], PropsControlRendere
   },
   "text-list": ({ plugin, field, frontmatter, container, sourcePath, blockEl }) => {
     renderTextInput(plugin, field, frontmatter, container, sourcePath, blockEl, { list: true });
+  },
+  "resource-kind": ({ plugin, field, frontmatter, container, sourcePath, blockEl }) => {
+    renderTextInput(plugin, field, frontmatter, container, sourcePath, blockEl, {
+      suggestions: resourceKindSuggestions(plugin)
+    });
   },
   url: ({ plugin, field, frontmatter, container, sourcePath, blockEl, rerender }) => {
     renderUrlField(plugin, field, frontmatter, container, sourcePath, blockEl, rerender);
@@ -394,11 +403,14 @@ function renderTextInput(
   container: HTMLElement,
   sourcePath: string | undefined,
   blockEl: HTMLElement,
-  options: { list?: boolean } = {}
+  options: { list?: boolean; suggestions?: PropsSelectOption[] } = {}
 ): void {
   const input = new TextComponent(container);
   input.inputEl.type = "text";
   input.inputEl.addClass("para-zk-block__input");
+  if (options.suggestions?.length) {
+    attachTextSuggestions(container, input.inputEl, options.suggestions);
+  }
   input
     .setValue(valueText(readFieldValue(field, frontmatter)))
     .setDisabled(!field.key || !sourcePath);
@@ -411,6 +423,53 @@ function renderTextInput(
     const value = options.list ? singleItemList(raw) : raw;
     void writeFrontmatterValue(plugin, sourcePath, blockEl, field.key, value);
   });
+}
+
+let textSuggestionListSequence = 0;
+
+function attachTextSuggestions(
+  container: HTMLElement,
+  input: HTMLInputElement,
+  suggestions: PropsSelectOption[]
+): void {
+  const id = `para-zk-text-suggestions-${++textSuggestionListSequence}`;
+  input.setAttr("list", id);
+  input.setAttr("autocomplete", "off");
+  input.addClass("para-zk-block__input--combobox");
+  const list = container.createEl("datalist", { attr: { id } });
+  for (const suggestion of suggestions) {
+    list.createEl("option", {
+      attr: {
+        value: suggestion.value,
+        label: suggestion.label
+      }
+    });
+  }
+}
+
+function resourceKindSuggestions(plugin: ParaZkPluginContext): PropsSelectOption[] {
+  const values = new Map<string, PropsSelectOption>();
+  const add = (value: string, label = value): void => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const key = trimmed.toLocaleLowerCase();
+    if (!values.has(key)) values.set(key, { value: trimmed, label });
+  };
+
+  for (const code of RESOURCE_KIND_CODES) {
+    add(code, resourceKindLabel(code, plugin.settings.locale));
+  }
+
+  const vaultKinds: string[] = [];
+  for (const file of plugin.app.vault.getMarkdownFiles()) {
+    const frontmatter = fileFrontmatter(plugin, file);
+    if (frontmatter.type !== "resource" || typeof frontmatter.kind !== "string") continue;
+    vaultKinds.push(frontmatter.kind);
+  }
+  vaultKinds.sort((left, right) => left.localeCompare(right));
+  for (const kind of vaultKinds) add(kind);
+
+  return Array.from(values.values());
 }
 
 function renderUrlField(

@@ -16,12 +16,10 @@ import {
   MATURITY_CODE_HELP,
   PRIORITY_CODE_HELP,
   PROJECT_STATUS_CODE_HELP,
-  RESOURCE_KIND_CODE_HELP,
   SUBNOTE_TYPE_CODE_HELP,
   parseMaturityCode,
   parsePriorityCode,
   parseProjectStatusCode,
-  parseResourceKindCode,
   parseSubnoteTypeCode,
   type MaturityCode
 } from "../vocabulary";
@@ -230,7 +228,7 @@ export async function createResource(ctx: WorkflowContext, options: CreateResour
     await openIfRequested(ctx, existing, options.open);
     return { ...noteResult(existing, false, options.open), linkedFromSource: false };
   }
-  const kind = readOptionalCode(options.kind, parseResourceKindCode, "kind", RESOURCE_KIND_CODE_HELP);
+  const kind = options.kind?.trim() || undefined;
   const source = await resolveOptionalOrigin(ctx, options);
   const file = await createMarkdownFile(ctx, "resource", path, {
     slug: slugify(title.basename),

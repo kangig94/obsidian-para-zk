@@ -18,6 +18,8 @@ export const SUBNOTE_TYPE_CODES = [
   "idea",
   "settlement"
 ] as const;
+// Suggested Resource kinds for localized UI choices only. Resource `kind`
+// storage remains free-form and is not validated against this list.
 export const RESOURCE_KIND_CODES = [
   "paper",
   "article",
@@ -41,7 +43,6 @@ export const PRIORITY_CODE_HELP = codeHelp(PRIORITY_CODES);
 export const MATURITY_CODE_HELP = codeHelp(MATURITY_CODES);
 export const ENERGY_CODE_HELP = codeHelp(ENERGY_CODES);
 export const SUBNOTE_TYPE_CODE_HELP = codeHelp(SUBNOTE_TYPE_CODES);
-export const RESOURCE_KIND_CODE_HELP = codeHelp(RESOURCE_KIND_CODES);
 
 export function parseProjectStatusCode(value: string | undefined): ProjectStatusCode | undefined {
   return parseCode(value, PROJECT_STATUS_CODES);
@@ -61,10 +62,6 @@ export function parseEnergyCode(value: string | undefined): EnergyCode | undefin
 
 export function parseSubnoteTypeCode(value: string | undefined): SubnoteTypeCode | undefined {
   return parseCode(value, SUBNOTE_TYPE_CODES);
-}
-
-export function parseResourceKindCode(value: string | undefined): ResourceKindCode | undefined {
-  return parseCode(value, RESOURCE_KIND_CODES);
 }
 
 export function projectStatusLabel(code: ProjectStatusCode, locale: Locale): string {

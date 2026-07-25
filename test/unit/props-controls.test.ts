@@ -143,6 +143,68 @@ describe("props url control", () => {
   });
 });
 
+describe("resource kind combobox", () => {
+  it("suggests examples and distinct vault kinds while accepting a new value", async () => {
+    const app = new MockApp();
+    await app.vault.create("PARA/Resources/Existing Repo.md", [
+      "---",
+      "type: resource",
+      "kind: repo-fork",
+      "---",
+      ""
+    ].join("\n"));
+    await app.vault.create("PARA/Resources/Existing Pipeline.md", [
+      "---",
+      "type: resource",
+      "kind: internal pipeline",
+      "---",
+      ""
+    ].join("\n"));
+    await app.vault.create("PARA/Projects/Not A Resource.md", [
+      "---",
+      "type: project",
+      "kind: project-only",
+      "---",
+      ""
+    ].join("\n"));
+    const file = await app.vault.create("PARA/Resources/Current.md", [
+      "---",
+      "type: resource",
+      "kind: paper",
+      "---",
+      ""
+    ].join("\n"));
+
+    stubAppEvents(app);
+    const root = new FakeElement("div");
+    renderPropsPanel(createPropsPlugin(app), root.asHtml(), file.path);
+
+    const control = propsFieldControl(root, "Type");
+    const input = control.querySelector("input.para-zk-block__input") as FakeElement;
+    const listId = input.getAttribute("list");
+    const list = root.querySelectorAll("datalist")
+      .find((candidate) => candidate.getAttribute("id") === listId);
+    const values = list?.querySelectorAll("option")
+      .map((option) => option.getAttribute("value"));
+    const paper = list?.querySelectorAll("option")
+      .find((option) => option.getAttribute("value") === "paper");
+
+    expect(listId).toBeTruthy();
+    expect(input.classList).toContain("para-zk-block__input--combobox");
+    expect(values).toContain("paper");
+    expect(paper?.getAttribute("label")).toBe("Paper");
+    expect(values).toContain("repo-fork");
+    expect(values).toContain("internal pipeline");
+    expect(values).not.toContain("project-only");
+    expect(values?.filter((value) => value === "repo-fork")).toHaveLength(1);
+
+    input.value = "custom pipeline";
+    input.dispatchEvent({ type: "change" });
+    await waitForFrontmatterValue(app, file, "kind", "custom pipeline");
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.kind).toBe("custom pipeline");
+  });
+});
+
 describe("props timestamp display controls", () => {
   it("renders created as a read-only absolute timestamp (T stripped), not an editable input", async () => {
     const { root } = await renderPropsBlock("resource", "PARA/Resources/Doc.md", [
@@ -244,7 +306,7 @@ describe("props frontmatter workflow routing", () => {
     expect(app.metadataCache.getFileCache(file)?.frontmatter?.created).toBe("2026-06-10 08:30");
   });
 
-  it("routes resource writes through workflow validation and alias normalization", async () => {
+  it("routes free-form resource kinds and aliases through the workflow", async () => {
     const app = new MockApp();
     const file = await app.vault.create("PARA/Resources/Doc.md", [
       "---",
@@ -254,8 +316,8 @@ describe("props frontmatter workflow routing", () => {
       ""
     ].join("\n"));
 
-    await expectConsoleErrorDuring(() => writePropsFrontmatter(app, file, "kind", "invalid-kind"));
-    expect(app.metadataCache.getFileCache(file)?.frontmatter?.kind).toBe("paper");
+    await writePropsFrontmatter(app, file, "kind", "repo-fork");
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.kind).toBe("repo-fork");
 
     await writePropsFrontmatter(app, file, "aliases", ["Research Note"]);
     expect(app.metadataCache.getFileCache(file)?.frontmatter?.aliases).toEqual(["Research Note"]);

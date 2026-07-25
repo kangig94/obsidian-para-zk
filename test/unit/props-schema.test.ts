@@ -21,6 +21,7 @@ describe("props schema lead fields", () => {
     ]);
     expect(findPropsField(resource, "aliases")).toBe(resource.lead);
     expect(findPropsField(resource, "url")?.control).toBe("url");
+    expect(findPropsField(resource, "kind")?.control).toBe("resource-kind");
 
     const permanent = propsSchemaForType("permanent", "en");
     expect(permanent.lead?.id).toBe("aliases");

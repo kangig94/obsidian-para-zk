@@ -5,19 +5,16 @@ import {
   MATURITY_CODES,
   PRIORITY_CODES,
   PROJECT_STATUS_CODES,
-  RESOURCE_KIND_CODES,
   SUBNOTE_TYPE_CODES,
   energyLabel,
   maturityLabel,
   priorityLabel,
   projectStatusLabel,
-  resourceKindLabel,
   subnoteTypeLabel,
   type EnergyCode,
   type MaturityCode,
   type PriorityCode,
   type ProjectStatusCode,
-  type ResourceKindCode,
   type SubnoteTypeCode
 } from "../vocabulary";
 
@@ -43,6 +40,7 @@ type PropsFieldControl =
   | "datetime-display"
   | "relative-time"
   | "display"
+  | "resource-kind"
   | "select"
   | "text"
   | "url"
@@ -132,7 +130,7 @@ export function propsSchemaForType(type: PropsViewType, locale: Locale): PropsSc
         ],
         [
           field("license", "license", t.labels.license, "text"),
-          selectField("kind", "kind", t.labels.kind, resourceKindOptions(locale))
+          field("kind", "kind", t.labels.kind, "resource-kind")
         ]
       ]
     },
@@ -252,12 +250,5 @@ function subnoteTypeOptions(locale: Locale): PropsSelectOption[] {
   return SUBNOTE_TYPE_CODES.map((code: SubnoteTypeCode) => ({
     value: code,
     label: subnoteTypeLabel(code, locale)
-  }));
-}
-
-function resourceKindOptions(locale: Locale): PropsSelectOption[] {
-  return RESOURCE_KIND_CODES.map((code: ResourceKindCode) => ({
-    value: code,
-    label: resourceKindLabel(code, locale)
   }));
 }

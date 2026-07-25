@@ -232,29 +232,31 @@ describe("resource provenance frontmatter", () => {
     expect(blank.value).toBeNull();
   });
 
-  it("rejects an unknown kind code at create time, naming the valid codes", async () => {
-    const result = await cli.run("para-zk:create-resource", { title: "Bad kind", kind: "journal", open: "false" });
-    expect(result.ok).toBe(false);
-    expect(String(result.error)).toContain("kind");
-    expect(String(result.error)).toContain("paper");
+  it("accepts a free-form kind at create time", async () => {
+    const result = await cli.run("para-zk:create-resource", {
+      title: "Repository",
+      kind: "repo-fork",
+      open: "false"
+    });
+    expect(result.ok).toBe(true);
+
+    const read = await cli.run("para-zk:read-resource", {
+      title: "Repository",
+      key: "frontmatter/kind"
+    });
+    expect(read.value).toBe("repo-fork");
   });
 
-  it("round-trips frontmatter/kind through update and read, validating the code", async () => {
+  it("round-trips a free-form frontmatter/kind through update and read", async () => {
     await cli.run("para-zk:create-resource", { title: "Doc", open: "false" });
 
     const update = await cli.run("para-zk:update-resource", {
-      title: "Doc", key: "frontmatter/kind", op: "set", value: "article"
+      title: "Doc", key: "frontmatter/kind", op: "set", value: "internal tool"
     });
     expect(update.changed).toBe(true);
 
     const read = await cli.run("para-zk:read-resource", { title: "Doc", key: "frontmatter/kind" });
-    expect(read.value).toBe("article");
-
-    const rejected = await cli.run("para-zk:update-resource", {
-      title: "Doc", key: "frontmatter/kind", op: "set", value: "bogus"
-    });
-    expect(rejected.ok).toBe(false);
-    expect(String(rejected.error)).toContain("kind");
+    expect(read.value).toBe("internal tool");
   });
 
   it("treats license/url/first_author as free text on update (not code-validated)", async () => {
