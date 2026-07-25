@@ -16,19 +16,19 @@ tables, ungrounded claims) and stopping there. The output must read as if writte
 The PARA-ZK vault is the user's private, local, single-user store — saving or compiling
 material into it is personal-use note-taking, not redistribution; do not refuse on distribution grounds.
 Be honest about provenance and uncertainty: never fabricate facts or
-sources, and never silently rewrite an author's words when asked to preserve or translate.
+sources, and never distort an author's intent when preserving or translating a source.
 
 ## 1. Understand the request — and confirm the transform *before* gathering
 
 Decide four things from the request:
 - **Source** — a local file path? a single URL? open web research (find and cross-check
   several sources)? or a compile from what you already know?
-- **Transform** — how to treat the source's content: **verbatim copy · translation ·
+- **Transform** — how to treat the source's content: **faithful source-language rendering · translation ·
   summary (with citations)**. Cross-source synthesis and knowledge restructuring are NOT a
   resource transform — that is the LLM-Wiki's job and runs automatically in step 8
   (`wiki-ingest` → `wiki-weaver`); never "synthesize" the resource note itself.
 - **Scope** — full source, selected sections/pages, abstract, or excerpt. For
-  translation and verbatim imports, the default is **full source** unless the user explicitly
+  translation and faithful imports, the default is **full source** unless the user explicitly
   asks for a summary, abstract-only, excerpt, or selected range.
 - **Output shape** — one resource, or several (e.g. one per chapter, one per item), and how
   they should link to each other / to an area or project.
@@ -41,20 +41,23 @@ fixed:
 
 | Choice | Meaning |
 | --- | --- |
-| **Verbatim** (default) | Keep the source language and structure exactly; fix only conversion artifacts. |
+| **Faithful** (default) | Keep the source language and preserve its meaning, intent, argument, and structure; normalize wording, formatting, and equivalent syntax only as needed for clean, accurate Obsidian rendering. |
 | **Translation** | Faithful translation into the target language (default: the vault locale). For concrete sources, default scope is full source, not summary. |
 | **Summary** | Condense to the essentials, with citations. |
 
 Skip the question when the request already fixes the transform ("translate it", "summarize
-it", "keep it verbatim") and proceed with that mode. The same three choices apply to a
+it", "keep it faithful to the source") and proceed with that mode. Treat "keep it verbatim" as
+the faithful transform unless the user explicitly requires byte-for-byte text or an exact
+quotation; the faithful transform preserves the author's intent, not the source's incidental
+surface encoding. The same three choices apply to a
 **research / compile** request ("research **X** and import" — e.g. *find every Seoul subway
-line and write one resource*): there, **verbatim** means reproducing the gathered source
-passages faithfully (quoted and attributed, in their original language), **translation** the
-same in the target language, and **summary** a condensed write-up with citations. Ask the
+line and write one resource*): there, **faithful** means presenting the gathered material in
+its original language without changing its claims or intent, with attribution; **translation**
+does the same in the target language, and **summary** is a condensed write-up with citations. Ask the
 choice up front as usual; only the details that depend on what you find — the translation
 target language, and the output shape — are confirmed once the material is in view.
 
-For multiple concrete sources, create one translated/verbatim resource per source unless the
+For multiple concrete sources, create one translated/faithful resource per source unless the
 user requested a compiled overview. If the source set is large, proceed source-by-source and
 report progress; ask about narrowing only when the user has not fixed the scope or completion is
 practically impossible in the current run. For open-ended research, state the selected source set
@@ -100,6 +103,11 @@ If the source itself is a PDF, or no clean HTML/source rendering exists, read
 bundled script, then treat marker Markdown as a **draft**: repair residual extraction glitches,
 attach useful extracted figures, and drop duplicate/debug images before applying the transform.
 
+If the source, converter output, or draft contains LaTeX, read
+[references/latex.md](references/latex.md) before drafting. Its compatibility rewrites and
+renderer checks are mandatory even for a faithful import: equivalent LaTeX may change in order
+to preserve the mathematics as Obsidian actually renders it.
+
 Record source provenance for everything (URL, file path, identifier, date, license/permission
 where relevant). The four core fields go in the resource **frontmatter** at create time (see step 6):
 `url`, `first_author`, `license`, `kind` — `license` as an SPDX identifier (short recognizable
@@ -119,12 +127,15 @@ that metadata or it is needed to avoid ambiguity. For images:
 ## 4. Produce clean Markdown — never a raw dump
 
 Apply the transform faithfully, and always make the form tidy:
-- **Verbatim import** → preserve text and structure exactly; fix only conversion artifacts.
+- **Faithful import** → preserve the source language, meaning, intent, argument, and structure.
+  Do not summarize or introduce new claims. Normalize surface wording, Markdown, and equivalent
+  notation where necessary to remove conversion artifacts or make the intended content render
+  correctly in Obsidian; exact bytes and incidental source syntax are not the preservation target.
 - **Translation** → faithful full-source translation, same structure; cite the original source.
   Do not summarize, abridge, or omit sections unless the user explicitly asked for that. Do not
   add a visible translation label, title postfix, or transform note unless the user asks for one.
 - **Research / compile** → gather across sources and organize into clear sections, applying
-  the chosen transform to the content (verbatim quotes, translation, or summary); attribute
+  the chosen transform to the content (faithful source-language rendering, translation, or summary); attribute
   facts to their sources; mark anything uncertain or unverified; do not invent. (This compiles
   a resource from research; cross-source knowledge synthesis is still the LLM-Wiki's job in
   step 8.)
@@ -168,13 +179,19 @@ form. Do not infer translation style from existing vault notes unless the user e
 a note as the style reference; use these rules and the source text as the standard.
 
 Across all of them: real headings (`#`/`##`), valid Markdown tables (no empty cells, no
-equations trapped in cells), math as Obsidian MathJax LaTeX (`$…$` inline, `$$…$$` block;
-do not use `\(...\)`/`\[...\]`), figures embedded (web images by URL,
-local images attached), boilerplate dropped, and any dead intra-document **page-anchor scaffolding** stripped. Empty `<span id="page-N-M"></span>` anchors and the `[text](#page-N-M)` links that point at them do NOT resolve in Obsidian (the link renders as a dead "page-N-M not found" link), so strip every such anchor and delink every `[text](#page-N-M)` to its plain visible text (`그림 [1](#page-0-0)a` → `그림 1a`; a `[Author et al.](#page-13-0)` citation → `Author et al.`); a heading-embedded anchor also breaks PARA-ZK's `#heading` citation matching. Source provenance lives in the frontmatter (step 6);
+equations trapped in cells), LaTeX normalized according to
+[references/latex.md](references/latex.md), figures embedded (web images by URL, local images
+attached), boilerplate dropped, and any dead intra-document **page-anchor scaffolding** stripped.
+Empty `<span id="page-N-M"></span>` anchors and the `[text](#page-N-M)` links that point at them do
+NOT resolve in Obsidian (the link renders as a dead "page-N-M not found" link), so strip every such
+anchor and delink every `[text](#page-N-M)` to its plain visible text
+(`그림 [1](#page-0-0)a` → `그림 1a`; a `[Author et al.](#page-13-0)` citation →
+`Author et al.`); a heading-embedded anchor also breaks PARA-ZK's `#heading` citation matching.
+Source provenance lives in the frontmatter (step 6);
 only when there is useful overflow detail beyond `url`/`first_author`/`license`/`kind` (DOI,
 version, extra URLs) add a short **Source / provenance** section at the top — otherwise omit it.
 
-For verbatim imports and translations, include the source's own References/Bibliography section
+For faithful imports and translations, include the source's own References/Bibliography section
 in the body unless the user asks to omit it. Preserve bibliography entries in their original
 bibliographic form, including paper/book titles; do not translate cited work titles inside
 References. Numbered in-text citations and bibliography entries (`[1]`, `[2]`, …) stay plain text
@@ -214,6 +231,9 @@ ordinary terms that agents often over-preserve in technical prose (for ML papers
 that is intentionally preserved, or a field-conventional source-script term; otherwise translate
 it into natural target-language technical prose. This scan is a whitelist-or-translate check, not
 a blanket ban on source-language terms.
+
+For drafts containing LaTeX, run the complete automated compatibility preflight in
+[references/latex.md](references/latex.md) and resolve every non-exempt match before storing.
 
 ## 6. Store (shell-safe) and link
 
@@ -267,9 +287,10 @@ hub — an area, a project, or an index resource — so the set is navigable.
 
 Run `para-zk:read-resource title="<title>" key=frontmatter` and `key=body` after creation or an
 intentional same-source refresh. Confirm
-metadata, body persistence, backlinks/references when linked, no dead page anchors, and Obsidian
-math delimiters (`$…$`, `$$…$$`; no `\(...\)` or `\[...\]`). Fix and repeat if anything is still
-broken. Also verify every image embed: web/HTML-origin figures should be remote
+metadata, body persistence, backlinks/references when linked, and no dead page anchors. For any
+note containing LaTeX, complete the final renderer verification in
+[references/latex.md](references/latex.md); fix the stored note and repeat that verification if
+anything is still broken. Also verify every image embed: web/HTML-origin figures should be remote
 `![alt](https://…)` links, and every local `![[…]]` image/PDF must have been produced by
 `para-zk:attach-file` and resolve in the vault.
 
