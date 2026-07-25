@@ -11,7 +11,7 @@
         "source": "git-subdir",
         "url": "https://github.com/kangig94/obsidian-para-zk.git",
         "path": "clients",
-        "ref": "0.2.2"
+        "ref": "0.2.3"
       },
       "description": "Discover and drive the PARA-ZK Obsidian vault from any LLM via its native CLI.",
       "author": {
