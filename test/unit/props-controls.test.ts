@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { TAbstractFile, TFile } from "obsidian";
 import type { ParaZkPluginContext } from "../../src/plugin-interface";
 import { DEFAULT_SETTINGS } from "../../src/types";
+import { resourceKindLabel, subnoteTypeLabel } from "../../src/vocabulary";
 import {
   registerPropsControlRenderers,
   renderPropsPanel,
@@ -182,9 +183,9 @@ describe("kind suggestion comboboxes", () => {
 
     stubAppEvents(app);
     const root = new FakeElement("div");
-    renderPropsPanel(createPropsPlugin(app), root.asHtml(), file.path);
+    renderPropsPanel(createPropsPlugin(app, "ko"), root.asHtml(), file.path);
 
-    const control = propsFieldControl(root, "Type");
+    const control = propsFieldControl(root, "종류");
     const input = control.querySelector("input.para-zk-block__input") as FakeElement;
     const listId = input.getAttribute("list");
     const list = root.querySelectorAll("datalist")
@@ -197,7 +198,8 @@ describe("kind suggestion comboboxes", () => {
     expect(listId).toBeTruthy();
     expect(input.classList).toContain("para-zk-block__input--combobox");
     expect(values).toContain("paper");
-    expect(paper?.getAttribute("label")).toBe("Paper");
+    expect(paper?.getAttribute("label")).toBe(resourceKindLabel("paper", "ko"));
+    expect(values?.filter((value) => value === "paper")).toHaveLength(1);
     expect(values).toContain("repo-fork");
     expect(values).toContain("internal pipeline");
     expect(values).not.toContain("project-only");
@@ -234,11 +236,11 @@ describe("kind suggestion comboboxes", () => {
     ].join("\n"));
 
     stubAppEvents(app);
-    const plugin = createPropsPlugin(app);
+    const plugin = createPropsPlugin(app, "ko");
     const root = new FakeElement("div");
     renderPropsPanel(plugin, root.asHtml(), file.path);
 
-    const control = propsFieldControl(root, "Type");
+    const control = propsFieldControl(root, "종류");
     const input = control.querySelector("input.para-zk-block__input") as FakeElement;
     const listId = input.getAttribute("list");
     const list = root.querySelectorAll("datalist")
@@ -249,7 +251,8 @@ describe("kind suggestion comboboxes", () => {
       .find((option) => option.getAttribute("value") === "meeting");
 
     expect(input.classList).toContain("para-zk-block__input--combobox");
-    expect(meeting?.getAttribute("label")).toBe("Meeting notes");
+    expect(meeting?.getAttribute("label")).toBe(subnoteTypeLabel("meeting", "ko"));
+    expect(values?.filter((value) => value === "meeting")).toHaveLength(1);
     expect(values).toContain("daily-standup");
     expect(values).not.toContain("repo-fork");
 
@@ -259,7 +262,7 @@ describe("kind suggestion comboboxes", () => {
     expect(app.metadataCache.getFileCache(file)?.frontmatter?.subnote_type).toBe("experiment-log");
   });
 
-  it("scans once and updates separated caches from metadata and delete events", async () => {
+  it("scans once and updates separated caches across metadata, rename, and delete events", async () => {
     const app = new MockApp();
     const resource = await app.vault.create("PARA/Resources/Cached.md", [
       "---",
@@ -291,10 +294,15 @@ describe("kind suggestion comboboxes", () => {
     const getMarkdownFiles = vi.fn(app.vault.getMarkdownFiles);
     let metadataChanged: ((file: TFile) => void) | undefined;
     let vaultDeleted: ((file: TAbstractFile) => void) | undefined;
+    let vaultRenamed: ((file: TAbstractFile, oldPath: string) => void) | undefined;
     Object.assign(app.vault, {
       getMarkdownFiles,
-      on: (name: string, callback: (file: TAbstractFile) => void) => {
+      on: (
+        name: string,
+        callback: (file: TAbstractFile, oldPath: string) => void
+      ) => {
         if (name === "delete") vaultDeleted = callback;
+        if (name === "rename") vaultRenamed = callback;
         return { detach: () => {} };
       }
     });
@@ -333,10 +341,93 @@ describe("kind suggestion comboboxes", () => {
     expect(kindOptionValues(plugin, currentSubnote)).not.toContain("cached-subnote-kind");
     expect(getMarkdownFiles).toHaveBeenCalledTimes(1);
 
-    vaultDeleted?.(resource);
+    await app.fileManager.processFrontMatter(subnote, (frontmatter) => {
+      delete frontmatter.subnote_type;
+    });
+    metadataChanged?.(subnote);
+    expect(kindOptionValues(plugin, currentSubnote)).not.toContain("updated-subnote-kind");
+
+    await app.fileManager.processFrontMatter(subnote, (frontmatter) => {
+      frontmatter.subnote_type = "restored-subnote-kind";
+    });
+    metadataChanged?.(subnote);
+    expect(kindOptionValues(plugin, currentSubnote)).toContain("restored-subnote-kind");
+
+    await app.fileManager.processFrontMatter(subnote, (frontmatter) => {
+      frontmatter.type = "resource";
+      delete frontmatter.subnote_type;
+      frontmatter.kind = "reclassified-resource";
+    });
+    metadataChanged?.(subnote);
+    expect(kindOptionValues(plugin, currentResource)).toContain("reclassified-resource");
+    expect(kindOptionValues(plugin, currentSubnote)).not.toContain("restored-subnote-kind");
+
+    await app.fileManager.processFrontMatter(subnote, (frontmatter) => {
+      frontmatter.type = "project";
+    });
+    metadataChanged?.(subnote);
+    expect(kindOptionValues(plugin, currentResource)).not.toContain("reclassified-resource");
+
+    const oldPath = resource.path;
+    await app.fileManager.renameFile(resource, "PARA/Resources/Renamed.md");
+    vaultRenamed?.(resource, oldPath);
+    await app.fileManager.processFrontMatter(resource, (frontmatter) => {
+      frontmatter.kind = "renamed-kind";
+    });
+    metadataChanged?.(resource);
+    expect(kindOptionValues(plugin, currentResource)).toContain("renamed-kind");
     expect(kindOptionValues(plugin, currentResource)).not.toContain("updated-kind");
-    expect(kindOptionValues(plugin, currentSubnote)).toContain("updated-subnote-kind");
+
+    vaultDeleted?.(resource);
+    expect(kindOptionValues(plugin, currentResource)).not.toContain("renamed-kind");
     expect(getMarkdownFiles).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops cache registration state during plugin cleanup", async () => {
+    const app = new MockApp();
+    await app.vault.create("PARA/Resources/Cached.md", [
+      "---",
+      "type: resource",
+      "kind: cached-kind",
+      "---",
+      ""
+    ].join("\n"));
+    const getMarkdownFiles = vi.fn(app.vault.getMarkdownFiles);
+    Object.assign(app.vault, {
+      getMarkdownFiles,
+      on: () => ({ detach: () => {} })
+    });
+    Object.assign(app.metadataCache, {
+      on: () => ({ detach: () => {} })
+    });
+
+    const cleanup: Array<() => void> = [];
+    const registerEvent = vi.fn();
+    const plugin = createPropsPlugin(app);
+    Object.assign(plugin, {
+      registerEvent,
+      register: (callback: () => void) => cleanup.push(callback)
+    });
+
+    registerPropsControlRenderers(plugin);
+    expect(getMarkdownFiles).toHaveBeenCalledTimes(1);
+    expect(registerEvent).toHaveBeenCalledTimes(3);
+    expect(cleanup).toHaveLength(1);
+
+    cleanup[0]();
+    expect(getMarkdownFiles).toHaveBeenCalledTimes(1);
+
+    const fresh = await app.vault.create("PARA/Resources/Fresh.md", [
+      "---",
+      "type: resource",
+      "kind: after-cleanup",
+      "---",
+      ""
+    ].join("\n"));
+    registerPropsControlRenderers(plugin);
+    expect(getMarkdownFiles).toHaveBeenCalledTimes(2);
+    expect(registerEvent).toHaveBeenCalledTimes(6);
+    expect(kindOptionValues(plugin, fresh)).toContain("after-cleanup");
   });
 });
 
@@ -451,11 +542,14 @@ describe("props frontmatter workflow routing", () => {
       ""
     ].join("\n"));
 
-    await writePropsFrontmatter(app, file, "kind", "repo-fork");
-    expect(app.metadataCache.getFileCache(file)?.frontmatter?.kind).toBe("repo-fork");
+    await writePropsFrontmatter(app, file, "kind", "  연구 도구  ");
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.kind).toBe("연구 도구");
 
     await writePropsFrontmatter(app, file, "aliases", ["Research Note"]);
     expect(app.metadataCache.getFileCache(file)?.frontmatter?.aliases).toEqual(["Research Note"]);
+
+    await expectConsoleErrorDuring(() => writePropsFrontmatter(app, file, "created", "2026-06-11 09:45"));
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.created).toBeUndefined();
   });
 
   it("routes journal writes by file path through workflow validation", async () => {
@@ -540,7 +634,7 @@ describe("props frontmatter workflow routing", () => {
     expect(app.metadataCache.getFileCache(file)?.frontmatter?.maturity).toBe("draft");
   });
 
-  it("keeps the subnote path-only fallback isolated to subnote frontmatter writes", async () => {
+  it("routes legacy doc Subnote writes through the validated path workflow", async () => {
     const app = new MockApp();
     const file = await app.vault.create("PARA/Projects/Alpha/Meeting.md", [
       "---",
@@ -550,9 +644,12 @@ describe("props frontmatter workflow routing", () => {
       ""
     ].join("\n"));
 
-    await writePropsFrontmatter(app, file, "subnote_type", "meeting");
+    await writePropsFrontmatter(app, file, "subnote_type", "  관찰 일지  ");
 
-    expect(app.metadataCache.getFileCache(file)?.frontmatter?.subnote_type).toBe("meeting");
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.subnote_type).toBe("관찰 일지");
+
+    await expectConsoleErrorDuring(() => writePropsFrontmatter(app, file, "created", "2026-06-11 09:45"));
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.created).toBeUndefined();
   });
 
   it("keeps llm-wiki props display-only with no workflow write route", async () => {
@@ -614,10 +711,13 @@ async function writePropsFrontmatter(
   await writeFrontmatterValue(plugin, file.path, new FakeElement("div").asHtml(), key, value);
 }
 
-function createPropsPlugin(app: MockApp): ParaZkPluginContext {
+function createPropsPlugin(
+  app: MockApp,
+  locale: ParaZkPluginContext["settings"]["locale"] = DEFAULT_SETTINGS.locale
+): ParaZkPluginContext {
   return {
     app,
-    settings: DEFAULT_SETTINGS,
+    settings: { ...DEFAULT_SETTINGS, locale },
     registerMarkdownCodeBlockProcessor: () => {},
     registerMarkdownPostProcessor: () => {}
   } as unknown as ParaZkPluginContext;

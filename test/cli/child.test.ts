@@ -38,7 +38,7 @@ describe("*-child commands", () => {
       root_type: "project",
       root_title: "Lab",
       title: "Trial",
-      subnote_type: "experiment-log",
+      subnote_type: "  실험 기록  ",
       open: "false"
     });
     expect(created.ok).toBe(true);
@@ -49,7 +49,7 @@ describe("*-child commands", () => {
       title: "Trial",
       key: "frontmatter/subnote_type"
     });
-    expect(initial.value).toBe("experiment-log");
+    expect(initial.value).toBe("실험 기록");
 
     const updated = await cli.run("para-zk:update-child", {
       root_type: "project",
@@ -57,7 +57,7 @@ describe("*-child commands", () => {
       title: "Trial",
       key: "frontmatter/subnote_type",
       op: "set",
-      value: "daily-observation"
+      value: "  일일 관찰  "
     });
     expect(updated.changed).toBe(true);
 
@@ -67,7 +67,76 @@ describe("*-child commands", () => {
       title: "Trial",
       key: "frontmatter/subnote_type"
     });
-    expect(read.value).toBe("daily-observation");
+    expect(read.value).toBe("일일 관찰");
+
+    const cleared = await cli.run("para-zk:update-child", {
+      root_type: "project",
+      root_title: "Lab",
+      title: "Trial",
+      key: "frontmatter/subnote_type",
+      op: "set",
+      value: "   "
+    });
+    expect(cleared.changed).toBe(true);
+    const blankUpdate = await cli.run("para-zk:read-child", {
+      root_type: "project",
+      root_title: "Lab",
+      title: "Trial",
+      key: "frontmatter/subnote_type"
+    });
+    expect(blankUpdate.value).toBe("");
+
+    await cli.run("para-zk:create-child", {
+      type: "subnote",
+      root_type: "project",
+      root_title: "Lab",
+      title: "Blank",
+      subnote_type: "   ",
+      open: "false"
+    });
+    const blankCreate = await cli.run("para-zk:read-child", {
+      root_type: "project",
+      root_title: "Lab",
+      title: "Blank",
+      key: "frontmatter/subnote_type"
+    });
+    expect(blankCreate.value).toBe("free");
+  });
+
+  it.each([
+    { arbitrary: "object" },
+    ["array"],
+    null,
+    42,
+    true
+  ])("rejects a non-string frontmatter/subnote_type value_json: %j", async (value) => {
+    await cli.run("para-zk:create-project", { title: "Typed Child", open: "false" });
+    await cli.run("para-zk:create-child", {
+      type: "subnote",
+      root_type: "project",
+      root_title: "Typed Child",
+      title: "Trial",
+      open: "false"
+    });
+
+    const update = await cli.run("para-zk:update-child", {
+      root_type: "project",
+      root_title: "Typed Child",
+      title: "Trial",
+      key: "frontmatter/subnote_type",
+      op: "set",
+      value_json: JSON.stringify(value)
+    });
+    expect(update.ok).toBe(false);
+    expect(String(update.error)).toContain("subnote_type must be a string");
+
+    const read = await cli.run("para-zk:read-child", {
+      root_type: "project",
+      root_title: "Typed Child",
+      title: "Trial",
+      key: "frontmatter/subnote_type"
+    });
+    expect(read.value).toBe("free");
   });
 
   it("files a subnote in a subfolder when the title is a relative path, still addressable by basename", async () => {

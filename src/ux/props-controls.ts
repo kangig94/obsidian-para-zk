@@ -43,6 +43,7 @@ import {
   updateProject,
   updateResource,
   updateRetro,
+  updateSubnoteByPath,
   updateZk
 } from "../workflows";
 import {
@@ -75,15 +76,12 @@ type PropsRerenderState = {
   generation: number;
 };
 
-type KindSuggestionEntry = {
-  kind: PropsSuggestionKind;
-  value: string;
+type KindSuggestionStore = {
+  byPath: Map<string, string>;
+  distinct?: string[];
 };
 
-type KindSuggestionCache = {
-  byPath: Map<string, KindSuggestionEntry>;
-  distinct: Partial<Record<PropsSuggestionKind, string[]>>;
-};
+type KindSuggestionCache = Record<PropsSuggestionKind, KindSuggestionStore>;
 
 type PropsControlRenderContext = {
   plugin: ParaZkPluginContext;
@@ -536,25 +534,27 @@ function cachedKindSuggestions(
   plugin: ParaZkPluginContext,
   kind: PropsSuggestionKind
 ): string[] {
-  const cache = ensureKindSuggestionCache(plugin);
-  if (!cache.distinct[kind]) {
+  const store = ensureKindSuggestionCache(plugin)[kind];
+  if (!store.distinct) {
     const values = new Map<string, string>();
-    for (const entry of cache.byPath.values()) {
-      if (entry.kind !== kind) continue;
-      const key = entry.value.toLocaleLowerCase();
-      if (!values.has(key)) values.set(key, entry.value);
+    for (const value of store.byPath.values()) {
+      const key = value.toLocaleLowerCase();
+      if (!values.has(key)) values.set(key, value);
     }
-    cache.distinct[kind] = Array.from(values.values())
+    store.distinct = Array.from(values.values())
       .sort((left, right) => left.localeCompare(right));
   }
-  return cache.distinct[kind] ?? [];
+  return store.distinct;
 }
 
 function ensureKindSuggestionCache(plugin: ParaZkPluginContext): KindSuggestionCache {
   const existing = kindSuggestionCaches.get(plugin);
   if (existing) return existing;
 
-  const cache: KindSuggestionCache = { byPath: new Map(), distinct: {} };
+  const cache: KindSuggestionCache = {
+    resource: { byPath: new Map() },
+    subnote: { byPath: new Map() }
+  };
   kindSuggestionCaches.set(plugin, cache);
   for (const file of plugin.app.vault.getMarkdownFiles()) {
     setCachedKindSuggestion(cache, file.path, kindSuggestionForFile(plugin, file));
@@ -569,29 +569,33 @@ function updateCachedKindSuggestion(plugin: ParaZkPluginContext, file: TFile): v
 
 function removeCachedKindSuggestion(plugin: ParaZkPluginContext, path: string): void {
   const cache = ensureKindSuggestionCache(plugin);
-  if (!cache.byPath.delete(path)) return;
-  cache.distinct = {};
+  for (const kind of ["resource", "subnote"] as const) {
+    const store = cache[kind];
+    if (store.byPath.delete(path)) store.distinct = undefined;
+  }
 }
 
 function setCachedKindSuggestion(
   cache: KindSuggestionCache,
   path: string,
-  entry: KindSuggestionEntry | undefined
+  entry: { kind: PropsSuggestionKind; value: string } | undefined
 ): void {
-  const previous = cache.byPath.get(path);
-  if (entry === undefined) {
-    if (!cache.byPath.delete(path)) return;
-  } else {
-    if (previous?.kind === entry.kind && previous.value === entry.value) return;
-    cache.byPath.set(path, entry);
+  for (const kind of ["resource", "subnote"] as const) {
+    const store = cache[kind];
+    if (entry?.kind === kind) {
+      if (store.byPath.get(path) === entry.value) continue;
+      store.byPath.set(path, entry.value);
+      store.distinct = undefined;
+      continue;
+    }
+    if (store.byPath.delete(path)) store.distinct = undefined;
   }
-  cache.distinct = {};
 }
 
 function kindSuggestionForFile(
   plugin: ParaZkPluginContext,
   file: TFile
-): KindSuggestionEntry | undefined {
+): { kind: PropsSuggestionKind; value: string } | undefined {
   const frontmatter = fileFrontmatter(plugin, file);
   for (const kind of ["resource", "subnote"] as const) {
     const spec = KIND_SUGGESTION_SPECS[kind];
@@ -990,12 +994,11 @@ export async function writeFrontmatterValue(
     const rawType = await readFileTypeFresh(workflow, file);
     const type = normalizePropsWorkflowType(rawType);
     if (type === "subnote") {
-      // Core child updates are addressed by root project/area plus child-title chain, while
-      // a rendered subnote only has its own file path. Keep this direct write isolated here
-      // until the core grows a path selector for child-note updates.
-      await plugin.app.fileManager.processFrontMatter(file, (frontmatter) => {
-        const target = frontmatter as Record<string, unknown>;
-        target[key] = value;
+      await updateSubnoteByPath(workflow, {
+        path: file.path,
+        key: `frontmatter/${key}`,
+        operation: "set",
+        value
       });
       return;
     }

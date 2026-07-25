@@ -41,6 +41,7 @@ import type {
   UpdateProjectOptions,
   UpdateResourceOptions,
   UpdateRetroOptions,
+  UpdateSubnoteByPathOptions,
   UpdateSurfaceResult,
   UpdateZkOptions,
   WorkflowContext
@@ -75,6 +76,7 @@ import {
   resolveRequiredJournal,
   resolveRequiredLlmWiki,
   resolveRequiredProject,
+  resolveRequiredFile,
   resolveRequiredResource,
   resolveRequiredRetro,
   resolveRequiredZk
@@ -106,6 +108,18 @@ export async function updateArea(ctx: WorkflowContext, options: UpdateAreaOption
 
 export async function updateResource(ctx: WorkflowContext, options: UpdateResourceOptions): Promise<UpdateSurfaceResult> {
   return updateSurface(ctx, await resolveRequiredResource(ctx, options), RESOURCE_READ_SPEC, options);
+}
+
+export async function updateSubnoteByPath(
+  ctx: WorkflowContext,
+  options: UpdateSubnoteByPathOptions
+): Promise<UpdateSurfaceResult> {
+  const file = resolveRequiredFile(ctx, options.path, "subnote path");
+  const type = await readFileTypeFresh(ctx, file);
+  if (type !== "subnote" && type !== "doc") {
+    throw new Error(`expected subnote: ${file.path}`);
+  }
+  return updateSurface(ctx, file, specForType("subnote"), options);
 }
 
 export async function updateLlmWiki(ctx: WorkflowContext, options: UpdateLlmWikiOptions): Promise<UpdateSurfaceResult> {
@@ -898,6 +912,13 @@ function requireReplacementText(options: UpdatePayloadOptions): string {
 function normalizeFrontmatterUpdateValue(type: string, key: string, value: unknown): unknown {
   if (key === "aliases") {
     return normalizeAliasList(value);
+  }
+  if (
+    (type === "resource" && key === "kind")
+    || ((type === "subnote" || type === "doc") && key === "subnote_type")
+  ) {
+    if (typeof value !== "string") throw new Error(`${key} must be a string`);
+    return value.trim();
   }
   if (type === "project" && key === "status") {
     return readOptionalCode(String(value), parseProjectStatusCode, "status", PROJECT_STATUS_CODE_HELP);

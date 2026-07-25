@@ -24,6 +24,7 @@ export type {
   WikiRetopologyGraph,
   WikiRetopologyGraphEdge,
   WikiRetopologyGraphNode,
+  UpdateSubnoteByPathOptions,
   WorkflowContext,
 } from "./context";
 
@@ -52,6 +53,7 @@ export {
   updateProject,
   updateResource,
   updateRetro,
+  updateSubnoteByPath,
   updateZk
 } from "./update";
 export { refileLlmWiki, renameArea, renameLlmWiki, renameProject, renameResource, renameZk } from "./rename";

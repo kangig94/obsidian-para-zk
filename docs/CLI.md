@@ -83,10 +83,12 @@ with `@` must be supplied through a file. Only `body` and update `value` are fil
 short fields like a journal `content` memo or a regex `match` / `with` are always literal,
 so `@mentions` and backslash escapes are kept verbatim.
 
-## Stable Codes
+## Stable Codes and Kind Suggestions
 
-CLI options store locale-neutral codes in frontmatter. The GUI and generated
-Markdown render localized labels from those codes.
+Enumerated CLI fields below store locale-neutral codes in frontmatter. The GUI
+and generated Markdown render localized labels from those codes. Resource
+`kind` and Subnote `subnote_type` are exceptions: they accept any string, and
+their built-in values are localized UI suggestions rather than validation lists.
 
 Project status:
 
@@ -144,12 +146,6 @@ Journal energy:
 
 ```text
 high | normal | low
-```
-
-Subnote type:
-
-```text
-free | checklist | todo | plan | research | meeting | decision | guide | risk | idea | settlement
 ```
 
 Boolean options accept `true`, `false`, `1`, `0`, `yes`, `no`, `on`, and `off`.
@@ -1152,6 +1148,12 @@ Use `para-zk:update-child` for child notes:
 | `title` | string | Required child title. Subfoldered subnotes may be addressed by basename when unique or by `subdir/title(.md)`. |
 | `key`/`op`/`value`/`value_json`/`match`/`with`/`all` | same as update commands | The `key` is the addressed child's key. |
 
+For example, set any free-form Subnote kind:
+
+```text
+optsidian para-zk:update-child root_type=project root_title="Model Evaluation" title="Planning Meeting" key=frontmatter/subnote_type op=set value=daily-observation
+```
+
 ### Rename Commands
 
 Renames are explicit structural commands rather than raw path edits. They update
@@ -1354,8 +1356,8 @@ Options:
 The identity tag classifies (groups) the note rather than naming it: `리소스/<domain>`
 when `domain` is given, otherwise the flat `리소스`. The four provenance keys and `aliases` are also editable after creation via
 `para-zk:update-resource key=frontmatter/<aliases|url|first_author|license|kind>`
-(and surfaced by `para-zk:describe type=resource`); `kind` preserves any string
-supplied by the caller. `aliases` is stored as a single-item list for one canonical
+(and surfaced by `para-zk:describe type=resource`); `kind` accepts any string
+classification and trims surrounding whitespace. `aliases` is stored as a single-item list for one canonical
 value. For example:
 
 ```bash

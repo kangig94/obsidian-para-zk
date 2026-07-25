@@ -408,6 +408,9 @@ type UpdateByTitleOptions = ByTitleSelectorOptions & UpdatePayloadOptions;
 export type UpdateProjectOptions = UpdateByTitleOptions;
 export type UpdateAreaOptions = UpdateByTitleOptions;
 export type UpdateResourceOptions = UpdateByTitleOptions;
+export type UpdateSubnoteByPathOptions = UpdatePayloadOptions & {
+  path: string;
+};
 export type UpdateLlmWikiOptions = NoArchiveByTitleSelectorOptions & UpdatePayloadOptions & {
   by?: string;
 };

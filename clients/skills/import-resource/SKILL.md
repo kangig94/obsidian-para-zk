@@ -234,6 +234,15 @@ optsidian para-zk:create-resource title="<title>" body=@/tmp/<file>.md \
   domain="<subject domain>"
 ```
 
+Inspect the command result's `created` field. If it is `false`, do not repeat
+`create-resource`: the existing note was returned unchanged. Read its
+frontmatter and body first. If it represents the same source and the user
+requested a refresh, update the body and provenance intentionally with
+`para-zk:update-resource` (`key=body`, then `frontmatter/url`,
+`frontmatter/first_author`, `frontmatter/license`, or `frontmatter/kind` as
+needed). If it is unrelated, choose a distinct title. Never silently overwrite
+an unrelated existing note.
+
 `license` is an SPDX identifier (`MIT`, `Apache-2.0`, `CC-BY-4.0`, `CC-BY-SA-4.0`, `CC0-1.0`, …); when
 no SPDX id fits use a short recognizable token (e.g. `arXiv` for an arXiv-default paper), never a long
 descriptive sentence. `kind` accepts any concise string; common values include `paper`, `article`,
@@ -256,7 +265,8 @@ hub — an area, a project, or an index resource — so the set is navigable.
 
 ## 7. Verify
 
-Run `para-zk:read-resource title="<title>" key=frontmatter` and `key=body` after creation. Confirm
+Run `para-zk:read-resource title="<title>" key=frontmatter` and `key=body` after creation or an
+intentional same-source refresh. Confirm
 metadata, body persistence, backlinks/references when linked, no dead page anchors, and Obsidian
 math delimiters (`$…$`, `$$…$$`; no `\(...\)` or `\[...\]`). Fix and repeat if anything is still
 broken. Also verify every image embed: web/HTML-origin figures should be remote
@@ -267,20 +277,22 @@ broken. Also verify every image embed: web/HTML-origin figures should be remote
 
 `wiki-ingest` is a **skill, not a CLI command** — there is no `optsidian wiki-ingest` or
 `obsidian wiki-ingest`. After
-every resource in this import has been created, linked, and verified, **invoke the
-`para-zk:wiki-ingest` skill** once for the whole created set: read its `SKILL.md` and carry out
+every accepted resource in this import has been created or intentionally refreshed, linked, and
+verified, **invoke the `para-zk:wiki-ingest` skill** once for the whole accepted set: read its
+`SKILL.md` and carry out
 its workflow yourself (or run the `/para-zk:wiki-ingest` slash command), background /
 session-scoped. The inputs to that skill are:
 
 ```text
-mode=per-import source_paths='["<created resource path>","<created resource path>"]'
+mode=per-import source_paths='["<accepted resource path>","<accepted resource path>"]'
 ```
 
-(these are skill inputs, not shell arguments — do not pass them to `optsidian`). Use the `path`
-returned by each `create-resource` result in this import. The wiki-ingest skill itself plans the
-whole imported set and spawns the `wiki-weaver` subagents; do **not** spawn `wiki-weaver`
-yourself, and do **not** invoke wiki-ingest once per file — one `per-import` hand-off covers the
-entire set.
+(these are skill inputs, not shell arguments — do not pass them to `optsidian`). Include exactly
+one final accepted path per requested resource: newly created notes and intentionally refreshed
+same-source notes belong in the list; rejected `created:false` collision results do not. The
+wiki-ingest skill itself plans the whole imported set and spawns the `wiki-weaver` subagents; do
+**not** spawn `wiki-weaver` yourself, and do **not** invoke wiki-ingest once per file — one
+`per-import` hand-off covers the entire set.
 
 ## Examples
 
@@ -302,5 +314,5 @@ entire set.
   CLI alike; pass an **absolute** path.
 - Keep `title` stable — links and backlinks address notes by name.
 - The final hand-off invokes the `para-zk:wiki-ingest` **skill** (not a CLI command) once,
-  background / session-scoped, with `mode=per-import` and all created resource paths in
-  `source_paths`.
+  background / session-scoped, with `mode=per-import` and all accepted created-or-refreshed
+  resource paths in `source_paths`, excluding rejected collision results.
