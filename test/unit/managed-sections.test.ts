@@ -8,6 +8,7 @@ const childCounts = vi.hoisted(() => ({
   references: 0,
   tasks: 0,
   unloaded: 0,
+  throwOnDataviewConstruct: false,
   throwOnDataviewLoad: false,
   connectedLoads: {
     dataview: [] as boolean[],
@@ -24,6 +25,7 @@ vi.mock("../../src/ux/blocks/dataview", () => ({
       _plugin: ParaZkPluginContext,
       containerEl: HTMLElement
     ) {
+      if (childCounts.throwOnDataviewConstruct) throw new Error("dataview constructor failed");
       this.containerEl = containerEl;
       childCounts.dataview += 1;
     }
@@ -94,6 +96,7 @@ describe("ManagedPanelController", () => {
     childCounts.references = 0;
     childCounts.tasks = 0;
     childCounts.unloaded = 0;
+    childCounts.throwOnDataviewConstruct = false;
     childCounts.throwOnDataviewLoad = false;
     childCounts.connectedLoads.dataview.length = 0;
     childCounts.connectedLoads.references.length = 0;
@@ -148,6 +151,25 @@ describe("ManagedPanelController", () => {
     expect(childCounts.unloaded).toBe(1);
     controller.dispose();
     expect(childCounts.unloaded).toBe(1);
+  });
+
+  it("removes helper-created elements when managed child construction fails", async () => {
+    const { ManagedPanelController } = await import("../../src/ux/blocks/managed-sections");
+    const root = new FakeElement("div");
+    fakeDocumentBody.appendChild(root);
+    const parent = new MarkdownRenderChild(root.asHtml());
+    parent.load();
+    const controller = new ManagedPanelController(fakePlugin(), root.asHtml(), parent);
+    childCounts.throwOnDataviewConstruct = true;
+
+    expect(() => controller.update("PARA/Resources/Paper.md", "resource"))
+      .toThrow("dataview constructor failed");
+
+    expect(root.querySelector("hr")).toBeNull();
+    expect(root.querySelector(".block-language-para-zk-view")).toBeNull();
+    expect(childCounts.unloaded).toBe(0);
+    controller.dispose();
+    expect(childCounts.unloaded).toBe(0);
   });
 });
 

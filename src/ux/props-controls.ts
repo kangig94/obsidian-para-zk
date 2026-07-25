@@ -17,6 +17,7 @@ import { formatRelativeTime, localePack } from "../i18n";
 import { PARA_ZK_PATHS } from "../layout";
 import type { ParaZkPluginContext } from "../plugin-interface";
 import { singleItemList } from "../text";
+import { createDetachedSpan } from "./dom";
 import { formatDateTimeMinutes, frontmatterTimeMs, minutesFromMs, relativeTimeParts } from "../time";
 import {
   findPropsField,
@@ -225,8 +226,7 @@ function renderInlinePropsInputs(plugin: ParaZkPluginContext, el: HTMLElement, c
     const field = findPropsField(schema, token.fieldId);
     if (!field) continue;
 
-    const container = activeDocument.createElement("span");
-    container.addClass("para-zk-inline-input");
+    const container = createDetachedSpan(codeEl, { cls: "para-zk-inline-input" });
     const rerender = latestPropsRerender(container, () => {
       renderSingleField(plugin, schema, field, container, ctx.sourcePath, container);
     });

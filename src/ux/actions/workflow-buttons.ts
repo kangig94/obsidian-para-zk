@@ -9,13 +9,13 @@ type WorkflowButtonOptions = {
 
 export function createWorkflowButton(
   plugin: ParaZkPluginContext,
+  container: HTMLElement,
   label: string,
   command: string | undefined,
   sourcePath?: string,
   options: WorkflowButtonOptions = {}
 ): HTMLButtonElement {
-  const host = activeDocument.createElement("span");
-  const component = new ButtonComponent(host);
+  const component = new ButtonComponent(container);
   const button = component.buttonEl;
   button.addClass("para-zk-command-button", "mod-cta");
   if (options.icon) component.setIcon(options.icon);
