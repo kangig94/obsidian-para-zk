@@ -72,6 +72,11 @@ type PropsRerenderState = {
   generation: number;
 };
 
+type ResourceKindCache = {
+  byPath: Map<string, string>;
+  distinct?: string[];
+};
+
 type PropsControlRenderContext = {
   plugin: ParaZkPluginContext;
   field: PropsField;
@@ -133,8 +138,11 @@ const PROPS_CONTROL_RENDERERS: Record<PropsField["control"], PropsControlRendere
 };
 
 const propsRerenderStates = new WeakMap<HTMLElement, PropsRerenderState>();
+const resourceKindCaches = new WeakMap<ParaZkPluginContext, ResourceKindCache>();
+const registeredResourceKindCaches = new WeakSet<ParaZkPluginContext>();
 
 export function registerPropsControlRenderers(plugin: ParaZkPluginContext): void {
+  registerResourceKindCache(plugin);
   plugin.registerMarkdownPostProcessor((el, ctx) => {
     renderInlinePropsInputs(plugin, el, ctx);
   });
@@ -460,16 +468,92 @@ function resourceKindSuggestions(plugin: ParaZkPluginContext): PropsSelectOption
     add(code, resourceKindLabel(code, plugin.settings.locale));
   }
 
-  const vaultKinds: string[] = [];
-  for (const file of plugin.app.vault.getMarkdownFiles()) {
-    const frontmatter = fileFrontmatter(plugin, file);
-    if (frontmatter.type !== "resource" || typeof frontmatter.kind !== "string") continue;
-    vaultKinds.push(frontmatter.kind);
-  }
-  vaultKinds.sort((left, right) => left.localeCompare(right));
-  for (const kind of vaultKinds) add(kind);
+  for (const kind of cachedResourceKinds(plugin)) add(kind);
 
   return Array.from(values.values());
+}
+
+function registerResourceKindCache(plugin: ParaZkPluginContext): void {
+  ensureResourceKindCache(plugin);
+  if (registeredResourceKindCaches.has(plugin)) return;
+  registeredResourceKindCaches.add(plugin);
+
+  plugin.registerEvent(
+    plugin.app.metadataCache.on("changed", (file) => updateCachedResourceKind(plugin, file))
+  );
+  plugin.registerEvent(
+    plugin.app.vault.on("delete", (file) => {
+      if (file instanceof TFile) removeCachedResourceKind(plugin, file.path);
+    })
+  );
+  plugin.registerEvent(
+    plugin.app.vault.on("rename", (file, oldPath) => {
+      removeCachedResourceKind(plugin, oldPath);
+      if (file instanceof TFile) updateCachedResourceKind(plugin, file);
+    })
+  );
+  plugin.register(() => {
+    resourceKindCaches.delete(plugin);
+    registeredResourceKindCaches.delete(plugin);
+  });
+}
+
+function cachedResourceKinds(plugin: ParaZkPluginContext): string[] {
+  const cache = ensureResourceKindCache(plugin);
+  if (!cache.distinct) {
+    const values = new Map<string, string>();
+    for (const value of cache.byPath.values()) {
+      const key = value.toLocaleLowerCase();
+      if (!values.has(key)) values.set(key, value);
+    }
+    cache.distinct = Array.from(values.values())
+      .sort((left, right) => left.localeCompare(right));
+  }
+  return cache.distinct;
+}
+
+function ensureResourceKindCache(plugin: ParaZkPluginContext): ResourceKindCache {
+  const existing = resourceKindCaches.get(plugin);
+  if (existing) return existing;
+
+  const cache: ResourceKindCache = { byPath: new Map() };
+  resourceKindCaches.set(plugin, cache);
+  for (const file of plugin.app.vault.getMarkdownFiles()) {
+    setCachedResourceKind(cache, file.path, resourceKindForFile(plugin, file));
+  }
+  return cache;
+}
+
+function updateCachedResourceKind(plugin: ParaZkPluginContext, file: TFile): void {
+  const cache = ensureResourceKindCache(plugin);
+  setCachedResourceKind(cache, file.path, resourceKindForFile(plugin, file));
+}
+
+function removeCachedResourceKind(plugin: ParaZkPluginContext, path: string): void {
+  const cache = ensureResourceKindCache(plugin);
+  if (!cache.byPath.delete(path)) return;
+  cache.distinct = undefined;
+}
+
+function setCachedResourceKind(
+  cache: ResourceKindCache,
+  path: string,
+  kind: string | undefined
+): void {
+  const previous = cache.byPath.get(path);
+  if (kind === undefined) {
+    if (!cache.byPath.delete(path)) return;
+  } else {
+    if (previous === kind) return;
+    cache.byPath.set(path, kind);
+  }
+  cache.distinct = undefined;
+}
+
+function resourceKindForFile(plugin: ParaZkPluginContext, file: TFile): string | undefined {
+  const frontmatter = fileFrontmatter(plugin, file);
+  if (frontmatter.type !== "resource" || typeof frontmatter.kind !== "string") return undefined;
+  return frontmatter.kind.trim() || undefined;
 }
 
 function renderUrlField(

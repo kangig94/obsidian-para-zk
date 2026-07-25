@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
+import type { TAbstractFile, TFile } from "obsidian";
 import type { ParaZkPluginContext } from "../../src/plugin-interface";
 import { DEFAULT_SETTINGS } from "../../src/types";
-import { renderPropsPanel, writeFrontmatterValue } from "../../src/ux/props-controls";
+import {
+  registerPropsControlRenderers,
+  renderPropsPanel,
+  writeFrontmatterValue
+} from "../../src/ux/props-controls";
 import { MockApp } from "../harness/vault";
 
 type FakeEvent = {
@@ -202,6 +207,64 @@ describe("resource kind combobox", () => {
     input.dispatchEvent({ type: "change" });
     await waitForFrontmatterValue(app, file, "kind", "custom pipeline");
     expect(app.metadataCache.getFileCache(file)?.frontmatter?.kind).toBe("custom pipeline");
+  });
+
+  it("scans once and updates the cache from metadata and delete events", async () => {
+    const app = new MockApp();
+    const existing = await app.vault.create("PARA/Resources/Cached.md", [
+      "---",
+      "type: resource",
+      "kind: cached-kind",
+      "---",
+      ""
+    ].join("\n"));
+    const current = await app.vault.create("PARA/Resources/Current.md", [
+      "---",
+      "type: resource",
+      "---",
+      ""
+    ].join("\n"));
+
+    const getMarkdownFiles = vi.fn(app.vault.getMarkdownFiles);
+    let metadataChanged: ((file: TFile) => void) | undefined;
+    let vaultDeleted: ((file: TAbstractFile) => void) | undefined;
+    Object.assign(app.vault, {
+      getMarkdownFiles,
+      on: (name: string, callback: (file: TAbstractFile) => void) => {
+        if (name === "delete") vaultDeleted = callback;
+        return { detach: () => {} };
+      }
+    });
+    Object.assign(app.metadataCache, {
+      on: (name: string, callback: (file: TFile) => void) => {
+        if (name === "changed") metadataChanged = callback;
+        return { detach: () => {} };
+      }
+    });
+
+    const plugin = createPropsPlugin(app);
+    Object.assign(plugin, {
+      registerEvent: () => {},
+      register: () => {}
+    });
+    registerPropsControlRenderers(plugin);
+
+    expect(resourceKindOptionValues(plugin, current)).toContain("cached-kind");
+    expect(resourceKindOptionValues(plugin, current)).toContain("cached-kind");
+    expect(getMarkdownFiles).toHaveBeenCalledTimes(1);
+
+    await app.fileManager.processFrontMatter(existing, (frontmatter) => {
+      frontmatter.kind = "updated-kind";
+    });
+    metadataChanged?.(existing);
+
+    expect(resourceKindOptionValues(plugin, current)).toContain("updated-kind");
+    expect(resourceKindOptionValues(plugin, current)).not.toContain("cached-kind");
+    expect(getMarkdownFiles).toHaveBeenCalledTimes(1);
+
+    vaultDeleted?.(existing);
+    expect(resourceKindOptionValues(plugin, current)).not.toContain("updated-kind");
+    expect(getMarkdownFiles).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -513,6 +576,21 @@ function propsFieldControl(root: FakeElement, label: string): FakeElement {
   const control = field?.querySelector(".para-zk-block__control");
   if (!control) throw new Error(`field not found: ${label}`);
   return control;
+}
+
+function resourceKindOptionValues(
+  plugin: ParaZkPluginContext,
+  file: Awaited<ReturnType<MockApp["vault"]["create"]>>
+): Array<string | null> {
+  const root = new FakeElement("div");
+  renderPropsPanel(plugin, root.asHtml(), file.path);
+  const input = propsFieldControl(root, "Type")
+    .querySelector("input.para-zk-block__input") as FakeElement;
+  const listId = input.getAttribute("list");
+  const list = root.querySelectorAll("datalist")
+    .find((candidate) => candidate.getAttribute("id") === listId);
+  return list?.querySelectorAll("option")
+    .map((option) => option.getAttribute("value")) ?? [];
 }
 
 async function nextMicrotask(): Promise<void> {
