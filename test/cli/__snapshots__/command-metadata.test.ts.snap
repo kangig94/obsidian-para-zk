@@ -132,8 +132,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<project|area>",
       },
       "subnote_type": {
-        "description": "type=subnote only. Locale-neutral subnote type code.",
-        "value": "<free|checklist|todo|plan|research|meeting|decision|guide|risk|idea|settlement>",
+        "description": "type=subnote only. Free-form subnote kind; defaults to free.",
+        "value": "<kind>",
       },
       "title": {
         "description": "New child. For type=subnote, a relative path (subdir/title) files it in a subfolder under the parent; it stays the parent's child by frontmatter regardless of subfolder. For type=area, the child area title.",
@@ -282,8 +282,8 @@ exports[`native CLI command metadata is stable 1`] = `
         "value": "<name>",
       },
       "kind": {
-        "description": "Optional provenance: locale-neutral source kind code.",
-        "value": "<paper|article|book|video|web|code|guide|other>",
+        "description": "Optional provenance: free-form source kind.",
+        "value": "<kind>",
       },
       "license": {
         "description": "Optional provenance: source license as an SPDX identifier (e.g. MIT, CC-BY-4.0); when no SPDX id fits, a short recognizable token (e.g. arXiv).",

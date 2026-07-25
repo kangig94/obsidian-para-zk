@@ -83,10 +83,12 @@ with `@` must be supplied through a file. Only `body` and update `value` are fil
 short fields like a journal `content` memo or a regex `match` / `with` are always literal,
 so `@mentions` and backslash escapes are kept verbatim.
 
-## Stable Codes
+## Stable Codes and Kind Suggestions
 
-CLI options store locale-neutral codes in frontmatter. The GUI and generated
-Markdown render localized labels from those codes.
+Enumerated CLI fields below store locale-neutral codes in frontmatter. The GUI
+and generated Markdown render localized labels from those codes. Resource
+`kind` and Subnote `subnote_type` are exceptions: they accept any string, and
+their built-in values are localized UI suggestions rather than validation lists.
 
 Project status:
 
@@ -112,11 +114,27 @@ Resource-create target kind:
 digest | permanent
 ```
 
-Resource kind (source type):
+Resource `kind` (source type) is a free-form string, not a stable-code enum.
+Common values include:
 
 ```text
 paper | article | book | video | web | code | guide | other
 ```
+
+The Resource props editor presents these examples and distinct `kind` values
+already used by Resource notes in the current vault as dropdown suggestions.
+The field remains editable, so choosing a suggestion is optional.
+
+Subnote `subnote_type` is also free-form, but uses its own separate vocabulary.
+Common values include:
+
+```text
+free | checklist | todo | plan | research | meeting | decision | guide | risk | idea | settlement
+```
+
+The Subnote props editor presents these localized examples and distinct
+`subnote_type` values already used by Subnote notes in the current vault.
+Resource kinds and Subnote kinds remain separate suggestion sets.
 
 Maturity:
 
@@ -128,12 +146,6 @@ Journal energy:
 
 ```text
 high | normal | low
-```
-
-Subnote type:
-
-```text
-free | checklist | todo | plan | research | meeting | decision | guide | risk | idea | settlement
 ```
 
 Boolean options accept `true`, `false`, `1`, `0`, `yes`, `no`, `on`, and `off`.
@@ -626,7 +638,7 @@ Options:
 | `root_title` | string | Required directly-addressable root ancestor title. |
 | `relpath` | JSON list | Optional ancestor chain from root to immediate parent. Empty or omitted means directly under the root. |
 | `title` | string | Required child title. Full drill path is `[...relpath, title]`. For `type=subnote`, may be a `subdir/title` path to file the note in a subfolder under the parent; it stays the parent's child by frontmatter. Existing subfoldered subnotes may be addressed by basename when unique or by `subdir/title(.md)` to disambiguate. |
-| `subnote_type` | subnote type code | `type=subnote` only. Defaults to `free`. |
+| `subnote_type` | string | `type=subnote` only. Free-form subnote kind; defaults to `free`. |
 | `body` | markdown | `type=subnote` only. Optional initial free-form body content. Accepts `@<absolute-path>`. |
 | `inherit_parent_tag` | boolean | `type=area` only. Include the parent area tag too. Default `true`. |
 | `open` | boolean | Default `false`. |
@@ -1136,6 +1148,12 @@ Use `para-zk:update-child` for child notes:
 | `title` | string | Required child title. Subfoldered subnotes may be addressed by basename when unique or by `subdir/title(.md)`. |
 | `key`/`op`/`value`/`value_json`/`match`/`with`/`all` | same as update commands | The `key` is the addressed child's key. |
 
+For example, set any free-form Subnote kind:
+
+```text
+optsidian para-zk:update-child root_type=project root_title="Model Evaluation" title="Planning Meeting" key=frontmatter/subnote_type op=set value=daily-observation
+```
+
 ### Rename Commands
 
 Renames are explicit structural commands rather than raw path edits. They update
@@ -1330,7 +1348,7 @@ Options:
 | `url` | string | Optional provenance: where the source came from. |
 | `first_author` | string | Optional provenance: the source's first author. |
 | `license` | SPDX id | Optional provenance: SPDX identifier (e.g. `MIT`, `CC-BY-4.0`); when no SPDX id fits, a short recognizable token (e.g. `arXiv`). |
-| `kind` | `paper` \| `article` \| `book` \| `video` \| `web` \| `code` \| `guide` \| `other` | Optional provenance: locale-neutral source kind code. |
+| `kind` | string | Optional free-form source classification, such as `paper`, `repo-fork`, `vault`, `tool`, or `dataset`. |
 | `domain` | string | Optional subject domain for the identity tag. With a domain the tag is `리소스/<domain>`; omit for a flat `리소스` tag. Reuse an existing domain vocabulary. |
 | `body` | markdown | Optional initial free-form body content. |
 | `open` | boolean | Default `false`. |
@@ -1338,12 +1356,12 @@ Options:
 The identity tag classifies (groups) the note rather than naming it: `리소스/<domain>`
 when `domain` is given, otherwise the flat `리소스`. The four provenance keys and `aliases` are also editable after creation via
 `para-zk:update-resource key=frontmatter/<aliases|url|first_author|license|kind>`
-(and surfaced by `para-zk:describe type=resource`); `kind` is validated against
-the code list above. `aliases` is stored as a single-item list for one canonical
+(and surfaced by `para-zk:describe type=resource`); `kind` accepts any string
+classification and trims surrounding whitespace. `aliases` is stored as a single-item list for one canonical
 value. For example:
 
 ```bash
-optsidian para-zk:update-resource title="Attention" key=frontmatter/kind op=set value=paper
+optsidian para-zk:update-resource title="Attention" key=frontmatter/kind op=set value=repo-fork
 ```
 
 Example:

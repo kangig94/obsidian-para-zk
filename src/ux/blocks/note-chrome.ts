@@ -10,6 +10,7 @@ import {
   renderNoteChromeProps,
   type NoteChromeSpec
 } from "../note-chrome-core";
+import { disposePropsControlRenderers } from "../props-controls";
 import { ManagedPanelController } from "./managed-sections";
 import { placeReadingManagedPanel, placeReadingPropsPanel } from "./reading-note-chrome-slots";
 import { refreshPreviewChromeSections } from "./reading-preview-height-sync";
@@ -324,7 +325,7 @@ class NoteChromeController {
 
   private removePropsPanel(): void {
     if (this.propsEl) this.resizeObserver?.unobserve(this.propsEl);
-    this.propsEl?.remove();
+    if (this.propsEl) removePropsPanelElement(this.propsEl);
     this.propsEl = undefined;
     this.renderedPropsSignature = undefined;
   }
@@ -490,7 +491,7 @@ function disposeAllNoteChromeControllers(): void {
 
 function removeDuplicatePropsPanels(container: HTMLElement, keep: HTMLElement): void {
   for (const panel of propsPanelCandidates(container)) {
-    if (panel !== keep) panel.remove();
+    if (panel !== keep) removePropsPanelElement(panel);
   }
 }
 
@@ -502,14 +503,27 @@ function removeDuplicateManagedPanels(container: HTMLElement, keep: HTMLElement)
 
 function removeStaleInjectedPanels(container: HTMLElement, sourcePath: string | undefined): void {
   for (const panel of injectedPanelCandidates(container)) {
-    if (panel.dataset.paraZkSourcePath !== sourcePath) panel.remove();
+    if (panel.dataset.paraZkSourcePath !== sourcePath) removeInjectedPanelElement(panel);
   }
 }
 
 function removeInjectedPanels(container: HTMLElement): void {
   for (const panel of injectedPanelCandidates(container)) {
-    panel.remove();
+    removeInjectedPanelElement(panel);
   }
+}
+
+function removePropsPanelElement(panel: HTMLElement): void {
+  disposePropsControlRenderers(panel);
+  panel.remove();
+}
+
+function removeInjectedPanelElement(panel: HTMLElement): void {
+  if (panel.matches(".para-zk-note-chrome--props")) {
+    removePropsPanelElement(panel);
+    return;
+  }
+  panel.remove();
 }
 
 function injectedPanelCandidates(container: HTMLElement): HTMLElement[] {

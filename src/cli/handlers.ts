@@ -7,9 +7,7 @@ import {
   ENERGY_CODE_HELP,
   MATURITY_CODE_HELP,
   PRIORITY_CODE_HELP,
-  PROJECT_STATUS_CODE_HELP,
-  RESOURCE_KIND_CODE_HELP,
-  SUBNOTE_TYPE_CODE_HELP
+  PROJECT_STATUS_CODE_HELP
 } from "../vocabulary";
 import { RESOURCE_CREATE_KIND_CODE_HELP, ZK_KIND_CODE_HELP } from "../zk/kinds";
 import { parseList } from "./parse";
@@ -1162,7 +1160,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       type: { value: "<subnote|area>", description: "Child type to create. type=area requires root_type=area; type=subnote allows root_type=project or area." },
       ...CHILD_ADDRESS_OPTIONS,
       title: { value: "<title|subdir/title>", description: "New child. For type=subnote, a relative path (subdir/title) files it in a subfolder under the parent; it stays the parent's child by frontmatter regardless of subfolder. For type=area, the child area title." },
-      subnote_type: { value: `<${SUBNOTE_TYPE_CODE_HELP}>`, description: "type=subnote only. Locale-neutral subnote type code." },
+      subnote_type: { value: "<kind>", description: "type=subnote only. Free-form subnote kind; defaults to free." },
       body: { value: "<markdown>", description: "type=subnote only. Optional initial free-form body content." },
       inherit_parent_tag: { value: "<true|false>", description: "type=area only. Include the parent area tag as well as the child tag (default true)." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },
@@ -1225,7 +1223,7 @@ const NATIVE_CLI_COMMANDS: NativeCliCommand[] = [
       url: { value: "<url>", description: "Optional provenance: where the source came from." },
       first_author: { value: "<name>", description: "Optional provenance: the source's first author." },
       license: { value: "<spdx-id>", description: "Optional provenance: source license as an SPDX identifier (e.g. MIT, CC-BY-4.0); when no SPDX id fits, a short recognizable token (e.g. arXiv)." },
-      kind: { value: `<${RESOURCE_KIND_CODE_HELP}>`, description: "Optional provenance: locale-neutral source kind code." },
+      kind: { value: "<kind>", description: "Optional provenance: free-form source kind." },
       domain: { value: "<domain>", description: "Optional subject domain for the identity tag (<type>/<domain>, e.g. resource/ai); omit for a flat type tag. Reuse an existing domain vocabulary." },
       body: { value: "<markdown>", description: "Optional initial free-form body content." },
       open: { value: "<true|false>", description: "Open the created note in Obsidian." },

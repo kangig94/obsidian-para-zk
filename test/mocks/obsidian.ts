@@ -51,7 +51,90 @@ export const Platform = {
   isLinux: true
 };
 export class AbstractInputSuggest<T> {
-  constructor(_app: App, _textInputEl: HTMLInputElement | HTMLDivElement) {}
+  limit = 100;
+  private readonly suggestions = {
+    setSuggestions: (values: T[]) => this.showSuggestions(values)
+  };
+  private readonly textInputEl: HTMLInputElement | HTMLDivElement;
+  private popupEl: HTMLElement | undefined;
+
+  constructor(_app: App, textInputEl: HTMLInputElement | HTMLDivElement) {
+    this.textInputEl = textInputEl;
+    Object.assign(textInputEl, { __abstractInputSuggest: this });
+    textInputEl.addEventListener("input", () => this.updateSuggestions());
+    textInputEl.addEventListener("focus", () => this.updateSuggestions());
+    textInputEl.addEventListener("blur", () => this.close());
+  }
+
+  setValue(value: string): void {
+    if ("value" in this.textInputEl) this.textInputEl.value = value;
+    else this.textInputEl.textContent = value;
+  }
+
+  getValue(): string {
+    return "value" in this.textInputEl
+      ? this.textInputEl.value
+      : this.textInputEl.textContent ?? "";
+  }
+
+  protected getSuggestions(_query: string): T[] | Promise<T[]> {
+    return [];
+  }
+
+  renderSuggestion(_value: T, _el: HTMLElement): void {}
+
+  selectSuggestion(_value: T, _event: MouseEvent | KeyboardEvent): void {}
+
+  close(): void {
+    this.popupEl?.remove();
+    this.popupEl = undefined;
+  }
+
+  testSuggestions(query: string): T[] | Promise<T[]> {
+    const values = this.getSuggestions(query);
+    if (values instanceof Promise) return values;
+    this.suggestions.setSuggestions(values);
+    return values;
+  }
+
+  testSelect(value: T): void {
+    this.selectSuggestion(value, {} as KeyboardEvent);
+  }
+
+  testIsOpen(): boolean {
+    return this.popupEl !== undefined;
+  }
+
+  testPopup(): HTMLElement | undefined {
+    return this.popupEl;
+  }
+
+  private updateSuggestions(): void {
+    const values = this.getSuggestions(this.getValue());
+    if (values instanceof Promise) {
+      void values.then((resolved) => this.suggestions.setSuggestions(resolved));
+      return;
+    }
+    this.suggestions.setSuggestions(values);
+  }
+
+  private showSuggestions(values: T[]): void {
+    this.close();
+    const parent = this.textInputEl.parentElement;
+    if (!parent || values.length === 0) return;
+    const popup = this.textInputEl.ownerDocument.createElement("div");
+    addElementClass(popup, "suggestion-container");
+    const list = createChildElement(popup, "div");
+    addElementClass(list, "suggestion");
+    this.popupEl = popup;
+    const visibleValues = this.limit === 0 ? values : values.slice(0, this.limit);
+    for (const value of visibleValues) {
+      const item = createChildElement(list, "div");
+      addElementClass(item, "suggestion-item");
+      this.renderSuggestion(value, item);
+    }
+    parent.appendChild(popup);
+  }
 }
 export class Component {
   private readonly registeredCallbacks: Array<() => void> = [];

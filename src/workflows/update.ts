@@ -23,14 +23,10 @@ import {
   MATURITY_CODE_HELP,
   PRIORITY_CODE_HELP,
   PROJECT_STATUS_CODE_HELP,
-  RESOURCE_KIND_CODE_HELP,
-  SUBNOTE_TYPE_CODE_HELP,
   parseEnergyCode,
   parseMaturityCode,
   parsePriorityCode,
-  parseProjectStatusCode,
-  parseResourceKindCode,
-  parseSubnoteTypeCode
+  parseProjectStatusCode
 } from "../vocabulary";
 import { readOptionalCode } from "./code-options";
 import type {
@@ -45,6 +41,7 @@ import type {
   UpdateProjectOptions,
   UpdateResourceOptions,
   UpdateRetroOptions,
+  UpdateSubnoteByPathOptions,
   UpdateSurfaceResult,
   UpdateZkOptions,
   WorkflowContext
@@ -79,6 +76,7 @@ import {
   resolveRequiredJournal,
   resolveRequiredLlmWiki,
   resolveRequiredProject,
+  resolveRequiredFile,
   resolveRequiredResource,
   resolveRequiredRetro,
   resolveRequiredZk
@@ -110,6 +108,18 @@ export async function updateArea(ctx: WorkflowContext, options: UpdateAreaOption
 
 export async function updateResource(ctx: WorkflowContext, options: UpdateResourceOptions): Promise<UpdateSurfaceResult> {
   return updateSurface(ctx, await resolveRequiredResource(ctx, options), RESOURCE_READ_SPEC, options);
+}
+
+export async function updateSubnoteByPath(
+  ctx: WorkflowContext,
+  options: UpdateSubnoteByPathOptions
+): Promise<UpdateSurfaceResult> {
+  const file = resolveRequiredFile(ctx, options.path, "subnote path");
+  const type = await readFileTypeFresh(ctx, file);
+  if (type !== "subnote" && type !== "doc") {
+    throw new Error(`expected subnote: ${file.path}`);
+  }
+  return updateSurface(ctx, file, specForType("subnote"), options);
 }
 
 export async function updateLlmWiki(ctx: WorkflowContext, options: UpdateLlmWikiOptions): Promise<UpdateSurfaceResult> {
@@ -843,7 +853,7 @@ function valuePrompt(target: WritableSurfaceTarget, allowedOps: UpdateOperation[
 }
 
 function frontmatterValuePlaceholder(key: string): string {
-  if (["status", "priority", "energy", "subnote_type", "kind", "maturity"].includes(key)) return "<code>";
+  if (["status", "priority", "energy", "maturity"].includes(key)) return "<code>";
   if (key === "processed") return "<boolean>";
   return "<text>";
 }
@@ -903,6 +913,13 @@ function normalizeFrontmatterUpdateValue(type: string, key: string, value: unkno
   if (key === "aliases") {
     return normalizeAliasList(value);
   }
+  if (
+    (type === "resource" && key === "kind")
+    || ((type === "subnote" || type === "doc") && key === "subnote_type")
+  ) {
+    if (typeof value !== "string") throw new Error(`${key} must be a string`);
+    return value.trim();
+  }
   if (type === "project" && key === "status") {
     return readOptionalCode(String(value), parseProjectStatusCode, "status", PROJECT_STATUS_CODE_HELP);
   }
@@ -911,12 +928,6 @@ function normalizeFrontmatterUpdateValue(type: string, key: string, value: unkno
   }
   if (type === "journal" && key === "energy") {
     return readOptionalCode(String(value), parseEnergyCode, "energy", ENERGY_CODE_HELP);
-  }
-  if (type === "subnote" && key === "subnote_type") {
-    return readOptionalCode(String(value), parseSubnoteTypeCode, "subnote_type", SUBNOTE_TYPE_CODE_HELP);
-  }
-  if (type === "resource" && key === "kind") {
-    return readOptionalCode(String(value), parseResourceKindCode, "kind", RESOURCE_KIND_CODE_HELP);
   }
   if (type === "permanent" && key === "maturity") {
     return readOptionalCode(String(value), parseMaturityCode, "maturity", MATURITY_CODE_HELP);

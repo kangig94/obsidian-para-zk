@@ -1,6 +1,8 @@
 import {
+  AbstractInputSuggest,
   ButtonComponent,
   DropdownComponent,
+  MarkdownRenderChild,
   MarkdownView,
   Notice,
   SuggestModal,
@@ -25,8 +27,15 @@ import {
   type PropsField,
   type PropsSchema,
   type PropsSelectOption,
+  type PropsSuggestionKind,
   type PropsViewType
 } from "../props/schema";
+import {
+  RESOURCE_KIND_CODES,
+  SUBNOTE_TYPE_CODES,
+  resourceKindLabel,
+  subnoteTypeLabel
+} from "../vocabulary";
 import { frontmatterLinks, readFileTypeFresh } from "../vault/frontmatter";
 import { workflowContext } from "../vault/host";
 import { normalizeVaultPath, wikiLink } from "../vault/paths";
@@ -36,6 +45,7 @@ import {
   updateProject,
   updateResource,
   updateRetro,
+  updateSubnoteByPath,
   updateZk
 } from "../workflows";
 import {
@@ -68,6 +78,17 @@ type PropsRerenderState = {
   generation: number;
 };
 
+type KindSuggestionStore = {
+  byPath: Map<string, string>;
+  distinct?: string[];
+};
+
+type KindSuggestionCache = Record<PropsSuggestionKind, KindSuggestionStore>;
+
+type PropsTextSuggestionBinding = {
+  dispose(): void;
+};
+
 type PropsControlRenderContext = {
   plugin: ParaZkPluginContext;
   field: PropsField;
@@ -97,6 +118,13 @@ const PROPS_CONTROL_RENDERERS: Record<PropsField["control"], PropsControlRendere
   "text-list": ({ plugin, field, frontmatter, container, sourcePath, blockEl }) => {
     renderTextInput(plugin, field, frontmatter, container, sourcePath, blockEl, { list: true });
   },
+  "kind-suggestions": ({ plugin, field, frontmatter, container, sourcePath, blockEl }) => {
+    renderTextInput(plugin, field, frontmatter, container, sourcePath, blockEl, {
+      suggestions: field.suggestionKind
+        ? kindSuggestions(plugin, field.suggestionKind)
+        : []
+    });
+  },
   url: ({ plugin, field, frontmatter, container, sourcePath, blockEl, rerender }) => {
     renderUrlField(plugin, field, frontmatter, container, sourcePath, blockEl, rerender);
   },
@@ -124,11 +152,38 @@ const PROPS_CONTROL_RENDERERS: Record<PropsField["control"], PropsControlRendere
 };
 
 const propsRerenderStates = new WeakMap<HTMLElement, PropsRerenderState>();
+const kindSuggestionCaches = new WeakMap<ParaZkPluginContext, KindSuggestionCache>();
+const registeredKindSuggestionCaches = new WeakSet<ParaZkPluginContext>();
+const propsTextSuggestionBindings = new WeakMap<HTMLInputElement, PropsTextSuggestionBinding>();
+const propsTextSuggestionBindingsByPlugin = new WeakMap<
+  ParaZkPluginContext,
+  Set<PropsTextSuggestionBinding>
+>();
+const registeredPropsTextSuggestionLifecycles = new WeakSet<ParaZkPluginContext>();
+
+const KIND_SUGGESTION_SPECS: Record<
+  PropsSuggestionKind,
+  { noteTypes: readonly string[]; frontmatterKey: string }
+> = {
+  resource: { noteTypes: ["resource"], frontmatterKey: "kind" },
+  subnote: { noteTypes: ["subnote", "doc"], frontmatterKey: "subnote_type" }
+};
 
 export function registerPropsControlRenderers(plugin: ParaZkPluginContext): void {
+  registerKindSuggestionCache(plugin);
+  registerPropsTextSuggestionLifecycle(plugin);
   plugin.registerMarkdownPostProcessor((el, ctx) => {
     renderInlinePropsInputs(plugin, el, ctx);
   });
+}
+
+export function disposePropsControlRenderers(container: HTMLElement): void {
+  const inputs = container.querySelectorAll<HTMLInputElement>(
+    "input.para-zk-block__input--combobox"
+  );
+  for (const input of inputs) {
+    propsTextSuggestionBindings.get(input)?.dispose();
+  }
 }
 
 export function renderPropsPanel(
@@ -140,6 +195,7 @@ export function renderPropsPanel(
   const frontmatter = file ? fileFrontmatter(plugin, file) : {};
   const type = inferPropsViewType(frontmatter);
 
+  disposePropsControlRenderers(el);
   el.empty();
   if (!type) {
     renderBlockNotice(el, "props", "PARA-ZK props type is missing or unsupported.");
@@ -176,6 +232,7 @@ function renderInlinePropsInputs(plugin: ParaZkPluginContext, el: HTMLElement, c
     });
     renderFieldControl(plugin, field, frontmatter, container, ctx.sourcePath, container, rerender);
     codeEl.replaceWith(container);
+    ctx.addChild(new InlinePropsRenderChild(container));
   }
 }
 
@@ -189,6 +246,7 @@ function renderPropsGrid(
   const file = sourceFile(plugin, sourcePath);
   const frontmatter = file ? fileFrontmatter(plugin, file) : {};
 
+  disposePropsControlRenderers(container);
   container.empty();
   container.addClass("para-zk-block__grid");
   container.removeClass("is-disabled");
@@ -320,6 +378,7 @@ function renderSingleField(
 ): void {
   const file = sourceFile(plugin, sourcePath);
   const frontmatter = file ? fileFrontmatter(plugin, file) : {};
+  disposePropsControlRenderers(container);
   container.empty();
   const rerender = latestPropsRerender(container, () => {
     renderSingleField(plugin, schema, field, container, sourcePath, blockEl);
@@ -394,7 +453,7 @@ function renderTextInput(
   container: HTMLElement,
   sourcePath: string | undefined,
   blockEl: HTMLElement,
-  options: { list?: boolean } = {}
+  options: { list?: boolean; suggestions?: PropsSelectOption[] } = {}
 ): void {
   const input = new TextComponent(container);
   input.inputEl.type = "text";
@@ -402,15 +461,285 @@ function renderTextInput(
   input
     .setValue(valueText(readFieldValue(field, frontmatter)))
     .setDisabled(!field.key || !sourcePath);
-  input.inputEl.addEventListener("change", () => {
+
+  const commit = (raw: string): void => {
     if (!field.key) return;
-    const raw = input.getValue();
     // A list-backed text field (e.g. Obsidian-native `aliases`) keeps a single
     // typed value but stores it as a one-item YAML list, the form Obsidian resolves
     // for links/quick-switcher. Empty clears it to an empty list.
     const value = options.list ? singleItemList(raw) : raw;
     void writeFrontmatterValue(plugin, sourcePath, blockEl, field.key, value);
+  };
+  if (options.suggestions?.length) {
+    attachTextSuggestions(plugin, input.inputEl, options.suggestions, commit);
+  }
+  input.inputEl.addEventListener("change", () => {
+    commit(input.getValue());
   });
+}
+
+function attachTextSuggestions(
+  plugin: ParaZkPluginContext,
+  input: HTMLInputElement,
+  suggestions: PropsSelectOption[],
+  select: (value: string) => void
+): void {
+  input.setAttr("autocomplete", "off");
+  input.addClass("para-zk-block__input--combobox");
+  const suggest = new PropsTextInputSuggest(plugin.app, input, suggestions, select);
+  const observer = observePropsTextSuggestionAnchor(input, () => suggest.syncPopupWidth());
+  const bindings = propsTextSuggestionBindingSet(plugin);
+  let disposed = false;
+  const binding: PropsTextSuggestionBinding = {
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      observer?.disconnect();
+      suggest.close();
+      bindings.delete(binding);
+      propsTextSuggestionBindings.delete(input);
+    }
+  };
+  bindings.add(binding);
+  propsTextSuggestionBindings.set(input, binding);
+}
+
+class PropsTextInputSuggest extends AbstractInputSuggest<PropsSelectOption> {
+  private readonly anchorInput: HTMLInputElement;
+  private readonly options: PropsSelectOption[];
+  private readonly selectValue: (value: string) => void;
+  private popup: HTMLElement | undefined;
+
+  constructor(
+    app: App,
+    input: HTMLInputElement,
+    suggestions: PropsSelectOption[],
+    selectValue: (value: string) => void
+  ) {
+    super(app, input);
+    this.anchorInput = input;
+    this.options = suggestions;
+    this.selectValue = selectValue;
+  }
+
+  protected getSuggestions(query: string): PropsSelectOption[] {
+    const token = query.trim().toLocaleLowerCase();
+    if (!token) return this.options;
+    return this.options.filter((suggestion) => {
+      return suggestion.value.toLocaleLowerCase().includes(token)
+        || suggestion.label.toLocaleLowerCase().includes(token);
+    });
+  }
+
+  renderSuggestion(suggestion: PropsSelectOption, el: HTMLElement): void {
+    this.popup = el.closest<HTMLElement>(".suggestion-container") ?? undefined;
+    this.syncPopupWidth();
+    el.createDiv({ text: suggestion.label });
+    if (suggestion.label !== suggestion.value) {
+      el.createEl("small", { text: suggestion.value });
+    }
+  }
+
+  selectSuggestion(
+    suggestion: PropsSelectOption,
+    _event: MouseEvent | KeyboardEvent
+  ): void {
+    this.setValue(suggestion.value);
+    this.selectValue(suggestion.value);
+    this.close();
+  }
+
+  close(): void {
+    super.close();
+    this.popup = undefined;
+  }
+
+  syncPopupWidth(): void {
+    if (!this.popup) return;
+    const width = `${this.anchorInput.getBoundingClientRect().width}px`;
+    if (this.popup.style.getPropertyValue("width") !== width) {
+      this.popup.style.setProperty("width", width);
+    }
+  }
+}
+
+class InlinePropsRenderChild extends MarkdownRenderChild {
+  onunload(): void {
+    disposePropsControlRenderers(this.containerEl);
+  }
+}
+
+function observePropsTextSuggestionAnchor(
+  input: HTMLInputElement,
+  resize: () => void
+): ResizeObserver | undefined {
+  const windowObserver = input.ownerDocument.defaultView?.ResizeObserver;
+  const Observer = windowObserver
+    ?? (typeof ResizeObserver === "undefined" ? undefined : ResizeObserver);
+  if (!Observer) return undefined;
+  const observer = new Observer(resize);
+  observer.observe(input);
+  return observer;
+}
+
+function propsTextSuggestionBindingSet(
+  plugin: ParaZkPluginContext
+): Set<PropsTextSuggestionBinding> {
+  const existing = propsTextSuggestionBindingsByPlugin.get(plugin);
+  if (existing) return existing;
+  const bindings = new Set<PropsTextSuggestionBinding>();
+  propsTextSuggestionBindingsByPlugin.set(plugin, bindings);
+  return bindings;
+}
+
+function registerPropsTextSuggestionLifecycle(plugin: ParaZkPluginContext): void {
+  if (registeredPropsTextSuggestionLifecycles.has(plugin)) return;
+  registeredPropsTextSuggestionLifecycles.add(plugin);
+  plugin.register(() => {
+    const bindings = propsTextSuggestionBindingsByPlugin.get(plugin);
+    if (bindings) {
+      for (const binding of [...bindings]) binding.dispose();
+    }
+    propsTextSuggestionBindingsByPlugin.delete(plugin);
+    registeredPropsTextSuggestionLifecycles.delete(plugin);
+  });
+}
+
+function kindSuggestions(
+  plugin: ParaZkPluginContext,
+  kind: PropsSuggestionKind
+): PropsSelectOption[] {
+  const values = new Map<string, PropsSelectOption>();
+  const add = (value: string, label = value): void => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const key = trimmed.toLocaleLowerCase();
+    if (!values.has(key)) values.set(key, { value: trimmed, label });
+  };
+
+  for (const option of defaultKindSuggestions(plugin, kind)) add(option.value, option.label);
+  for (const value of cachedKindSuggestions(plugin, kind)) add(value);
+
+  return Array.from(values.values());
+}
+
+function defaultKindSuggestions(
+  plugin: ParaZkPluginContext,
+  kind: PropsSuggestionKind
+): PropsSelectOption[] {
+  if (kind === "resource") {
+    return RESOURCE_KIND_CODES.map((code) => ({
+      value: code,
+      label: resourceKindLabel(code, plugin.settings.locale)
+    }));
+  }
+  return SUBNOTE_TYPE_CODES.map((code) => ({
+    value: code,
+    label: subnoteTypeLabel(code, plugin.settings.locale)
+  }));
+}
+
+function registerKindSuggestionCache(plugin: ParaZkPluginContext): void {
+  ensureKindSuggestionCache(plugin);
+  if (registeredKindSuggestionCaches.has(plugin)) return;
+  registeredKindSuggestionCaches.add(plugin);
+
+  plugin.registerEvent(
+    plugin.app.metadataCache.on("changed", (file) => updateCachedKindSuggestion(plugin, file))
+  );
+  plugin.registerEvent(
+    plugin.app.vault.on("delete", (file) => {
+      if (file instanceof TFile) removeCachedKindSuggestion(plugin, file.path);
+    })
+  );
+  plugin.registerEvent(
+    plugin.app.vault.on("rename", (file, oldPath) => {
+      removeCachedKindSuggestion(plugin, oldPath);
+      if (file instanceof TFile) updateCachedKindSuggestion(plugin, file);
+    })
+  );
+  plugin.register(() => {
+    kindSuggestionCaches.delete(plugin);
+    registeredKindSuggestionCaches.delete(plugin);
+  });
+}
+
+function cachedKindSuggestions(
+  plugin: ParaZkPluginContext,
+  kind: PropsSuggestionKind
+): string[] {
+  const store = ensureKindSuggestionCache(plugin)[kind];
+  if (!store.distinct) {
+    const values = new Map<string, string>();
+    for (const value of store.byPath.values()) {
+      const key = value.toLocaleLowerCase();
+      if (!values.has(key)) values.set(key, value);
+    }
+    store.distinct = Array.from(values.values())
+      .sort((left, right) => left.localeCompare(right));
+  }
+  return store.distinct;
+}
+
+function ensureKindSuggestionCache(plugin: ParaZkPluginContext): KindSuggestionCache {
+  const existing = kindSuggestionCaches.get(plugin);
+  if (existing) return existing;
+
+  const cache: KindSuggestionCache = {
+    resource: { byPath: new Map() },
+    subnote: { byPath: new Map() }
+  };
+  kindSuggestionCaches.set(plugin, cache);
+  for (const file of plugin.app.vault.getMarkdownFiles()) {
+    setCachedKindSuggestion(cache, file.path, kindSuggestionForFile(plugin, file));
+  }
+  return cache;
+}
+
+function updateCachedKindSuggestion(plugin: ParaZkPluginContext, file: TFile): void {
+  const cache = ensureKindSuggestionCache(plugin);
+  setCachedKindSuggestion(cache, file.path, kindSuggestionForFile(plugin, file));
+}
+
+function removeCachedKindSuggestion(plugin: ParaZkPluginContext, path: string): void {
+  const cache = ensureKindSuggestionCache(plugin);
+  for (const kind of ["resource", "subnote"] as const) {
+    const store = cache[kind];
+    if (store.byPath.delete(path)) store.distinct = undefined;
+  }
+}
+
+function setCachedKindSuggestion(
+  cache: KindSuggestionCache,
+  path: string,
+  entry: { kind: PropsSuggestionKind; value: string } | undefined
+): void {
+  for (const kind of ["resource", "subnote"] as const) {
+    const store = cache[kind];
+    if (entry?.kind === kind) {
+      if (store.byPath.get(path) === entry.value) continue;
+      store.byPath.set(path, entry.value);
+      store.distinct = undefined;
+      continue;
+    }
+    if (store.byPath.delete(path)) store.distinct = undefined;
+  }
+}
+
+function kindSuggestionForFile(
+  plugin: ParaZkPluginContext,
+  file: TFile
+): { kind: PropsSuggestionKind; value: string } | undefined {
+  const frontmatter = fileFrontmatter(plugin, file);
+  for (const kind of ["resource", "subnote"] as const) {
+    const spec = KIND_SUGGESTION_SPECS[kind];
+    if (typeof frontmatter.type !== "string" || !spec.noteTypes.includes(frontmatter.type)) continue;
+    const value = frontmatter[spec.frontmatterKey];
+    if (typeof value !== "string") return undefined;
+    const trimmed = value.trim();
+    return trimmed ? { kind, value: trimmed } : undefined;
+  }
+  return undefined;
 }
 
 function renderUrlField(
@@ -799,12 +1128,11 @@ export async function writeFrontmatterValue(
     const rawType = await readFileTypeFresh(workflow, file);
     const type = normalizePropsWorkflowType(rawType);
     if (type === "subnote") {
-      // Core child updates are addressed by root project/area plus child-title chain, while
-      // a rendered subnote only has its own file path. Keep this direct write isolated here
-      // until the core grows a path selector for child-note updates.
-      await plugin.app.fileManager.processFrontMatter(file, (frontmatter) => {
-        const target = frontmatter as Record<string, unknown>;
-        target[key] = value;
+      await updateSubnoteByPath(workflow, {
+        path: file.path,
+        key: `frontmatter/${key}`,
+        operation: "set",
+        value
       });
       return;
     }

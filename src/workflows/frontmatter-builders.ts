@@ -3,11 +3,7 @@ import { localePack } from "../i18n";
 import { singleItemList, slugify } from "../text";
 import type { ZkKind } from "../types";
 import type { Frontmatter } from "../vault/frontmatter";
-import {
-  type MaturityCode,
-  type ResourceKindCode,
-  type SubnoteTypeCode
-} from "../vocabulary";
+import type { MaturityCode } from "../vocabulary";
 import { zkKindCode } from "../zk/kinds";
 import type { WorkflowContext } from "./context";
 import { linkToFile } from "./locations";
@@ -17,7 +13,7 @@ export type ResourceFrontmatterOptions = {
   alias?: string;
   domain?: string;
   firstAuthor?: string;
-  kind?: ResourceKindCode;
+  kind?: string;
   license?: string;
   url?: string;
 };
@@ -29,7 +25,7 @@ export type ZkFrontmatterOptions = {
 
 export type SubnoteFrontmatterOptions = {
   parent: TFile;
-  subnoteType?: SubnoteTypeCode;
+  subnoteType?: string;
 };
 
 export async function applyResourceFrontmatter(

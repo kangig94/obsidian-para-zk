@@ -16,13 +16,9 @@ import {
   MATURITY_CODE_HELP,
   PRIORITY_CODE_HELP,
   PROJECT_STATUS_CODE_HELP,
-  RESOURCE_KIND_CODE_HELP,
-  SUBNOTE_TYPE_CODE_HELP,
   parseMaturityCode,
   parsePriorityCode,
   parseProjectStatusCode,
-  parseResourceKindCode,
-  parseSubnoteTypeCode,
   type MaturityCode
 } from "../vocabulary";
 import { ZK_KIND_CODE_HELP, parseZkKind, zkKindCode } from "../zk/kinds";
@@ -230,7 +226,7 @@ export async function createResource(ctx: WorkflowContext, options: CreateResour
     await openIfRequested(ctx, existing, options.open);
     return { ...noteResult(existing, false, options.open), linkedFromSource: false };
   }
-  const kind = readOptionalCode(options.kind, parseResourceKindCode, "kind", RESOURCE_KIND_CODE_HELP);
+  const kind = options.kind?.trim() || undefined;
   const source = await resolveOptionalOrigin(ctx, options);
   const file = await createMarkdownFile(ctx, "resource", path, {
     slug: slugify(title.basename),
@@ -360,8 +356,7 @@ export async function createSubnote(ctx: WorkflowContext, options: CreateSubnote
     throw new Error(`subnote title conflicts with parent note: ${title.basename}`);
   }
   const parent = await ensureFolderStyleParent(ctx, source);
-  const subnoteTypeCode = readOptionalCode(options.subnoteType, parseSubnoteTypeCode, "subnote_type", SUBNOTE_TYPE_CODE_HELP);
-  const subnoteType = subnoteTypeCode ?? "free";
+  const subnoteType = options.subnoteType?.trim() || "free";
   const path = joinVaultPath(parent.childFolder, `${title.relpath}.md`);
   if (path === parent.file.path) {
     throw new Error(`subnote title conflicts with parent note: ${title.basename}`);

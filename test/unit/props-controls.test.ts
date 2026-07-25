@@ -1,13 +1,32 @@
 import { describe, expect, it, vi } from "vitest";
+import { MarkdownView, type TAbstractFile, type TFile } from "obsidian";
 import type { ParaZkPluginContext } from "../../src/plugin-interface";
 import { DEFAULT_SETTINGS } from "../../src/types";
-import { renderPropsPanel, writeFrontmatterValue } from "../../src/ux/props-controls";
+import { resourceKindLabel, subnoteTypeLabel } from "../../src/vocabulary";
+import { registerNoteChromeRenderers } from "../../src/ux/blocks/note-chrome";
+import {
+  registerPropsControlRenderers,
+  renderPropsPanel,
+  writeFrontmatterValue
+} from "../../src/ux/props-controls";
 import { MockApp } from "../harness/vault";
 
 type FakeEvent = {
   type: string;
   key?: string;
   preventDefault?: () => void;
+};
+
+type TestSuggestionOption = {
+  value: string;
+  label: string;
+};
+
+type TestInputSuggest = {
+  testSuggestions(query: string): TestSuggestionOption[] | Promise<TestSuggestionOption[]>;
+  testSelect(value: TestSuggestionOption): void;
+  testIsOpen(): boolean;
+  testPopup(): HTMLElement | undefined;
 };
 
 describe("props url control", () => {
@@ -143,6 +162,400 @@ describe("props url control", () => {
   });
 });
 
+describe("kind suggestion comboboxes", () => {
+  it("suggests and filters deduplicated Resource examples and vault kinds", async () => {
+    const { root, input } = await renderResourceKindCombobox();
+    const options = textSuggestionOptions(input);
+    const values = options.map((option) => option.value);
+    const paper = options.find((option) => option.value === "paper");
+
+    expect(input.getAttribute("list")).toBeNull();
+    expect(root.querySelector("datalist")).toBeNull();
+    expect(input.classList).toContain("para-zk-block__input--combobox");
+    expect(values).toContain("paper");
+    expect(paper?.label).toBe(resourceKindLabel("paper", "ko"));
+    expect(values.filter((value) => value === "paper")).toHaveLength(1);
+    expect(values).toContain("repo-fork");
+    expect(values).toContain("internal pipeline");
+    expect(values).not.toContain("project-only");
+    expect(values).not.toContain("PAPER");
+    expect(values.filter((value) => value === "repo-fork")).toHaveLength(1);
+    expect(textSuggestionOptions(input, "  PAPER  ")).toEqual([paper]);
+    expect(textSuggestionOptions(input, resourceKindLabel("paper", "ko").slice(0, 1)))
+      .toContainEqual(paper);
+    expect(textSuggestionOptions(input, "not-a-kind")).toEqual([]);
+  });
+
+  it("renders and resizes the Resource popup with its input", async () => {
+    const { input } = await renderResourceKindCombobox();
+    input.value = "";
+    input.dispatchEvent({ type: "input" });
+    const suggest = textInputSuggest(input);
+    const popup = suggest.testPopup() as unknown as FakeElement;
+    expect(suggest.testIsOpen()).toBe(true);
+    expect(popup.isConnected).toBe(true);
+    expect(popup.style.getPropertyValue("width")).toBe("196px");
+    const paperItem = popup.querySelectorAll(".suggestion-item")
+      .find((item) => item.querySelector("small")?.textContent === "paper");
+    expect(paperItem?.querySelector("div")?.textContent)
+      .toBe(resourceKindLabel("paper", "ko"));
+    expect(paperItem?.querySelector("small")?.textContent).toBe("paper");
+
+    input.setRenderedWidth(284);
+    FakeResizeObserver.trigger(input.asHtml());
+    expect(popup.style.getPropertyValue("width")).toBe("284px");
+    input.blur();
+    expect(suggest.testIsOpen()).toBe(false);
+    expect(popup.isConnected).toBe(false);
+  });
+
+  it("accepts and persists a new free-form Resource kind", async () => {
+    const { app, file, input } = await renderResourceKindCombobox();
+    input.value = "custom pipeline";
+    input.dispatchEvent({ type: "change" });
+    await waitForFrontmatterValue(app, file, "kind", "custom pipeline");
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.kind).toBe("custom pipeline");
+  });
+
+  it("suggests Subnote examples and Subnote vault kinds without mixing Resource kinds", async () => {
+    const app = new MockApp();
+    await app.vault.create("PARA/Projects/Alpha/Standup.md", [
+      "---",
+      "type: subnote",
+      "subnote_type: daily-standup",
+      "---",
+      ""
+    ].join("\n"));
+    await app.vault.create("PARA/Resources/Repository.md", [
+      "---",
+      "type: resource",
+      "kind: repo-fork",
+      "---",
+      ""
+    ].join("\n"));
+    const file = await app.vault.create("PARA/Projects/Alpha/Current.md", [
+      "---",
+      "type: subnote",
+      "subnote_type: meeting",
+      "---",
+      ""
+    ].join("\n"));
+
+    stubAppEvents(app);
+    const plugin = createPropsPlugin(app, "ko");
+    const root = new FakeElement("div");
+    renderPropsPanel(plugin, root.asHtml(), file.path);
+
+    const control = propsFieldControl(root, "종류");
+    const input = control.querySelector("input.para-zk-block__input") as FakeElement;
+    const options = textSuggestionOptions(input);
+    const values = options.map((option) => option.value);
+    const meeting = options.find((option) => option.value === "meeting");
+
+    expect(input.classList).toContain("para-zk-block__input--combobox");
+    expect(meeting?.label).toBe(subnoteTypeLabel("meeting", "ko"));
+    expect(values.filter((value) => value === "meeting")).toHaveLength(1);
+    expect(values).toContain("daily-standup");
+    expect(values).not.toContain("repo-fork");
+
+    const research = options.find((option) => option.value === "research");
+    expect(research).toBeDefined();
+    const suggest = textInputSuggest(input);
+    expect(suggest.testIsOpen()).toBe(true);
+    suggest.testSelect(research!);
+    expect(input.value).toBe("research");
+    expect(suggest.testIsOpen()).toBe(false);
+    await waitForFrontmatterValue(app, file, "subnote_type", "research");
+
+    input.value = "experiment-log";
+    input.dispatchEvent({ type: "change" });
+    await waitForFrontmatterValue(app, file, "subnote_type", "experiment-log");
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.subnote_type).toBe("experiment-log");
+  });
+
+  it("scans once and updates separated caches across metadata, rename, and delete events", async () => {
+    const app = new MockApp();
+    const resource = await app.vault.create("PARA/Resources/Cached.md", [
+      "---",
+      "type: resource",
+      "kind: cached-kind",
+      "---",
+      ""
+    ].join("\n"));
+    const subnote = await app.vault.create("PARA/Projects/Alpha/Cached.md", [
+      "---",
+      "type: subnote",
+      "subnote_type: cached-subnote-kind",
+      "---",
+      ""
+    ].join("\n"));
+    const currentResource = await app.vault.create("PARA/Resources/Current.md", [
+      "---",
+      "type: resource",
+      "---",
+      ""
+    ].join("\n"));
+    const currentSubnote = await app.vault.create("PARA/Projects/Alpha/Current.md", [
+      "---",
+      "type: subnote",
+      "---",
+      ""
+    ].join("\n"));
+
+    const getMarkdownFiles = vi.fn(app.vault.getMarkdownFiles);
+    let metadataChanged: ((file: TFile) => void) | undefined;
+    let vaultDeleted: ((file: TAbstractFile) => void) | undefined;
+    let vaultRenamed: ((file: TAbstractFile, oldPath: string) => void) | undefined;
+    Object.assign(app.vault, {
+      getMarkdownFiles,
+      on: (
+        name: string,
+        callback: (file: TAbstractFile, oldPath: string) => void
+      ) => {
+        if (name === "delete") vaultDeleted = callback;
+        if (name === "rename") vaultRenamed = callback;
+        return { detach: () => {} };
+      }
+    });
+    Object.assign(app.metadataCache, {
+      on: (name: string, callback: (file: TFile) => void) => {
+        if (name === "changed") metadataChanged = callback;
+        return { detach: () => {} };
+      }
+    });
+
+    const plugin = createPropsPlugin(app);
+    Object.assign(plugin, {
+      registerEvent: () => {},
+      register: () => {}
+    });
+    registerPropsControlRenderers(plugin);
+
+    expect(kindOptionValues(plugin, currentResource)).toContain("cached-kind");
+    expect(kindOptionValues(plugin, currentResource)).not.toContain("cached-subnote-kind");
+    expect(kindOptionValues(plugin, currentSubnote)).toContain("cached-subnote-kind");
+    expect(kindOptionValues(plugin, currentSubnote)).not.toContain("cached-kind");
+    expect(getMarkdownFiles).toHaveBeenCalledTimes(1);
+
+    await app.fileManager.processFrontMatter(resource, (frontmatter) => {
+      frontmatter.kind = "updated-kind";
+    });
+    metadataChanged?.(resource);
+    await app.fileManager.processFrontMatter(subnote, (frontmatter) => {
+      frontmatter.subnote_type = "updated-subnote-kind";
+    });
+    metadataChanged?.(subnote);
+
+    expect(kindOptionValues(plugin, currentResource)).toContain("updated-kind");
+    expect(kindOptionValues(plugin, currentResource)).not.toContain("cached-kind");
+    expect(kindOptionValues(plugin, currentSubnote)).toContain("updated-subnote-kind");
+    expect(kindOptionValues(plugin, currentSubnote)).not.toContain("cached-subnote-kind");
+    expect(getMarkdownFiles).toHaveBeenCalledTimes(1);
+
+    await app.fileManager.processFrontMatter(subnote, (frontmatter) => {
+      delete frontmatter.subnote_type;
+    });
+    metadataChanged?.(subnote);
+    expect(kindOptionValues(plugin, currentSubnote)).not.toContain("updated-subnote-kind");
+
+    await app.fileManager.processFrontMatter(subnote, (frontmatter) => {
+      frontmatter.subnote_type = "restored-subnote-kind";
+    });
+    metadataChanged?.(subnote);
+    expect(kindOptionValues(plugin, currentSubnote)).toContain("restored-subnote-kind");
+
+    await app.fileManager.processFrontMatter(subnote, (frontmatter) => {
+      frontmatter.type = "resource";
+      delete frontmatter.subnote_type;
+      frontmatter.kind = "reclassified-resource";
+    });
+    metadataChanged?.(subnote);
+    expect(kindOptionValues(plugin, currentResource)).toContain("reclassified-resource");
+    expect(kindOptionValues(plugin, currentSubnote)).not.toContain("restored-subnote-kind");
+
+    await app.fileManager.processFrontMatter(subnote, (frontmatter) => {
+      frontmatter.type = "project";
+    });
+    metadataChanged?.(subnote);
+    expect(kindOptionValues(plugin, currentResource)).not.toContain("reclassified-resource");
+
+    const oldPath = resource.path;
+    await app.fileManager.renameFile(resource, "PARA/Resources/Renamed.md");
+    vaultRenamed?.(resource, oldPath);
+    await app.fileManager.processFrontMatter(resource, (frontmatter) => {
+      frontmatter.kind = "renamed-kind";
+    });
+    metadataChanged?.(resource);
+    expect(kindOptionValues(plugin, currentResource)).toContain("renamed-kind");
+    expect(kindOptionValues(plugin, currentResource)).not.toContain("updated-kind");
+
+    vaultDeleted?.(resource);
+    expect(kindOptionValues(plugin, currentResource)).not.toContain("renamed-kind");
+    expect(getMarkdownFiles).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops cache registration state during plugin cleanup", async () => {
+    const app = new MockApp();
+    await app.vault.create("PARA/Resources/Cached.md", [
+      "---",
+      "type: resource",
+      "kind: cached-kind",
+      "---",
+      ""
+    ].join("\n"));
+    const getMarkdownFiles = vi.fn(app.vault.getMarkdownFiles);
+    Object.assign(app.vault, {
+      getMarkdownFiles,
+      on: () => ({ detach: () => {} })
+    });
+    Object.assign(app.metadataCache, {
+      on: () => ({ detach: () => {} })
+    });
+
+    const cleanup: Array<() => void> = [];
+    const registerEvent = vi.fn();
+    const plugin = createPropsPlugin(app);
+    Object.assign(plugin, {
+      registerEvent,
+      register: (callback: () => void) => cleanup.push(callback)
+    });
+
+    registerPropsControlRenderers(plugin);
+    expect(getMarkdownFiles).toHaveBeenCalledTimes(1);
+    expect(registerEvent).toHaveBeenCalledTimes(3);
+    expect(cleanup).toHaveLength(2);
+
+    const rendered = await app.vault.create("PARA/Resources/Rendered.md", [
+      "---",
+      "type: resource",
+      "kind: paper",
+      "---",
+      ""
+    ].join("\n"));
+    const root = new FakeElement("div");
+    renderPropsPanel(plugin, root.asHtml(), rendered.path);
+    const input = propsFieldControl(root, "Type")
+      .querySelector("input.para-zk-block__input") as FakeElement;
+    input.value = "";
+    input.dispatchEvent({ type: "input" });
+    const suggest = textInputSuggest(input);
+    expect(suggest.testIsOpen()).toBe(true);
+
+    for (const callback of cleanup.splice(0)) callback();
+    expect(suggest.testIsOpen()).toBe(false);
+    expect(getMarkdownFiles).toHaveBeenCalledTimes(1);
+
+    const fresh = await app.vault.create("PARA/Resources/Fresh.md", [
+      "---",
+      "type: resource",
+      "kind: after-cleanup",
+      "---",
+      ""
+    ].join("\n"));
+    registerPropsControlRenderers(plugin);
+    expect(getMarkdownFiles).toHaveBeenCalledTimes(2);
+    expect(registerEvent).toHaveBeenCalledTimes(6);
+    expect(cleanup).toHaveLength(2);
+    expect(kindOptionValues(plugin, fresh)).toContain("after-cleanup");
+  });
+
+  it("closes the previous native popup before a props rerender", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("PARA/Resources/Rerender.md", [
+      "---",
+      "type: resource",
+      "kind: paper",
+      "---",
+      ""
+    ].join("\n"));
+    stubAppEvents(app);
+    const plugin = createPropsPlugin(app);
+    const root = new FakeElement("div");
+    renderPropsPanel(plugin, root.asHtml(), file.path);
+    const input = propsFieldControl(root, "Type")
+      .querySelector("input.para-zk-block__input") as FakeElement;
+    input.value = "";
+    input.dispatchEvent({ type: "input" });
+    const previous = textInputSuggest(input);
+    expect(previous.testIsOpen()).toBe(true);
+
+    renderPropsPanel(plugin, root.asHtml(), file.path);
+
+    expect(previous.testIsOpen()).toBe(false);
+  });
+
+  it("disposes the popup and observer when a Reading view props panel is removed", async () => {
+    vi.useFakeTimers();
+    const cleanup: Array<() => void> = [];
+    try {
+      installReadingViewGlobals();
+      const app = new MockApp();
+      const file = await app.vault.create("PARA/Resources/Reading.md", [
+        "---",
+        "type: resource",
+        "kind: paper",
+        "---",
+        ""
+      ].join("\n"));
+      const viewRoot = new FakeElement("div");
+      const preview = viewRoot.createDiv({ cls: "markdown-preview-view" });
+      const sizer = viewRoot.createDiv({ cls: "markdown-preview-sizer" });
+      const header = sizer.createDiv({ cls: "mod-header" });
+      const view = new MarkdownView();
+      view.file = file;
+      view.containerEl = viewRoot.asHtml();
+
+      const workspaceCallbacks = new Map<string, () => void>();
+      Object.assign(app.metadataCache, {
+        on: () => ({ detach: () => {} })
+      });
+      Object.assign(app.workspace, {
+        containerEl: viewRoot.asHtml(),
+        getLeavesOfType: () => [{ view }],
+        on: (name: string, callback: () => void) => {
+          workspaceCallbacks.set(name, callback);
+          return { detach: () => workspaceCallbacks.delete(name) };
+        },
+        onLayoutReady: (callback: () => void) => callback()
+      });
+      const plugin = createPropsPlugin(app);
+      Object.assign(plugin, {
+        register: (callback: () => void) => cleanup.push(callback),
+        registerEvent: (eventRef: { detach?: () => void }) => {
+          cleanup.push(() => eventRef.detach?.());
+        }
+      });
+
+      registerPropsControlRenderers(plugin);
+      registerNoteChromeRenderers(plugin);
+      await vi.advanceTimersByTimeAsync(100);
+
+      const panel = header.querySelector(".para-zk-note-chrome--props");
+      expect(panel).not.toBeNull();
+      const input = propsFieldControl(panel!, "Type")
+        .querySelector("input.para-zk-block__input") as FakeElement;
+      input.value = "";
+      input.dispatchEvent({ type: "input" });
+      const suggest = textInputSuggest(input);
+      const popup = suggest.testPopup() as unknown as FakeElement;
+      expect(popup.isConnected).toBe(true);
+      expect(FakeResizeObserver.isObserving(input.asHtml())).toBe(true);
+
+      preview.remove();
+      workspaceCallbacks.get("layout-change")?.();
+
+      expect(panel?.isConnected).toBe(false);
+      expect(suggest.testIsOpen()).toBe(false);
+      expect(popup.isConnected).toBe(false);
+      expect(FakeResizeObserver.isObserving(input.asHtml())).toBe(false);
+    } finally {
+      for (const callback of cleanup.splice(0)) callback();
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe("props timestamp display controls", () => {
   it("renders created as a read-only absolute timestamp (T stripped), not an editable input", async () => {
     const { root } = await renderPropsBlock("resource", "PARA/Resources/Doc.md", [
@@ -244,7 +657,7 @@ describe("props frontmatter workflow routing", () => {
     expect(app.metadataCache.getFileCache(file)?.frontmatter?.created).toBe("2026-06-10 08:30");
   });
 
-  it("routes resource writes through workflow validation and alias normalization", async () => {
+  it("routes free-form resource kinds and aliases through the workflow", async () => {
     const app = new MockApp();
     const file = await app.vault.create("PARA/Resources/Doc.md", [
       "---",
@@ -254,11 +667,14 @@ describe("props frontmatter workflow routing", () => {
       ""
     ].join("\n"));
 
-    await expectConsoleErrorDuring(() => writePropsFrontmatter(app, file, "kind", "invalid-kind"));
-    expect(app.metadataCache.getFileCache(file)?.frontmatter?.kind).toBe("paper");
+    await writePropsFrontmatter(app, file, "kind", "  연구 도구  ");
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.kind).toBe("연구 도구");
 
     await writePropsFrontmatter(app, file, "aliases", ["Research Note"]);
     expect(app.metadataCache.getFileCache(file)?.frontmatter?.aliases).toEqual(["Research Note"]);
+
+    await expectConsoleErrorDuring(() => writePropsFrontmatter(app, file, "created", "2026-06-11 09:45"));
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.created).toBeUndefined();
   });
 
   it("routes journal writes by file path through workflow validation", async () => {
@@ -343,7 +759,7 @@ describe("props frontmatter workflow routing", () => {
     expect(app.metadataCache.getFileCache(file)?.frontmatter?.maturity).toBe("draft");
   });
 
-  it("keeps the subnote path-only fallback isolated to subnote frontmatter writes", async () => {
+  it("routes legacy doc Subnote writes through the validated path workflow", async () => {
     const app = new MockApp();
     const file = await app.vault.create("PARA/Projects/Alpha/Meeting.md", [
       "---",
@@ -353,9 +769,12 @@ describe("props frontmatter workflow routing", () => {
       ""
     ].join("\n"));
 
-    await writePropsFrontmatter(app, file, "subnote_type", "meeting");
+    await writePropsFrontmatter(app, file, "subnote_type", "  관찰 일지  ");
 
-    expect(app.metadataCache.getFileCache(file)?.frontmatter?.subnote_type).toBe("meeting");
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.subnote_type).toBe("관찰 일지");
+
+    await expectConsoleErrorDuring(() => writePropsFrontmatter(app, file, "created", "2026-06-11 09:45"));
+    expect(app.metadataCache.getFileCache(file)?.frontmatter?.created).toBeUndefined();
   });
 
   it("keeps llm-wiki props display-only with no workflow write route", async () => {
@@ -391,6 +810,57 @@ async function renderResourceProps(url: string): Promise<{
   return { app, root, control: propsFieldControl(root, "URL"), file };
 }
 
+async function renderResourceKindCombobox(): Promise<{
+  app: MockApp;
+  root: FakeElement;
+  input: FakeElement;
+  file: Awaited<ReturnType<MockApp["vault"]["create"]>>;
+}> {
+  const app = new MockApp();
+  await app.vault.create("PARA/Resources/Existing Repo.md", [
+    "---",
+    "type: resource",
+    "kind: repo-fork",
+    "---",
+    ""
+  ].join("\n"));
+  await app.vault.create("PARA/Resources/Existing Pipeline.md", [
+    "---",
+    "type: resource",
+    "kind: internal pipeline",
+    "---",
+    ""
+  ].join("\n"));
+  await app.vault.create("PARA/Resources/Paper Variant.md", [
+    "---",
+    "type: resource",
+    "kind: \" PAPER \"",
+    "---",
+    ""
+  ].join("\n"));
+  await app.vault.create("PARA/Projects/Not A Resource.md", [
+    "---",
+    "type: project",
+    "kind: project-only",
+    "---",
+    ""
+  ].join("\n"));
+  const file = await app.vault.create("PARA/Resources/Current.md", [
+    "---",
+    "type: resource",
+    "kind: paper",
+    "---",
+    ""
+  ].join("\n"));
+
+  stubAppEvents(app);
+  const root = new FakeElement("div");
+  renderPropsPanel(createPropsPlugin(app, "ko"), root.asHtml(), file.path);
+  const input = propsFieldControl(root, "종류")
+    .querySelector("input.para-zk-block__input") as FakeElement;
+  return { app, root, input, file };
+}
+
 async function renderPropsBlock(_type: string, path: string, content: string): Promise<{
   app: MockApp;
   root: FakeElement;
@@ -417,10 +887,13 @@ async function writePropsFrontmatter(
   await writeFrontmatterValue(plugin, file.path, new FakeElement("div").asHtml(), key, value);
 }
 
-function createPropsPlugin(app: MockApp): ParaZkPluginContext {
+function createPropsPlugin(
+  app: MockApp,
+  locale: ParaZkPluginContext["settings"]["locale"] = DEFAULT_SETTINGS.locale
+): ParaZkPluginContext {
   return {
     app,
-    settings: DEFAULT_SETTINGS,
+    settings: { ...DEFAULT_SETTINGS, locale },
     registerMarkdownCodeBlockProcessor: () => {},
     registerMarkdownPostProcessor: () => {}
   } as unknown as ParaZkPluginContext;
@@ -453,6 +926,35 @@ function propsFieldControl(root: FakeElement, label: string): FakeElement {
   return control;
 }
 
+function kindOptionValues(
+  plugin: ParaZkPluginContext,
+  file: Awaited<ReturnType<MockApp["vault"]["create"]>>
+): Array<string | null> {
+  const root = new FakeElement("div");
+  renderPropsPanel(plugin, root.asHtml(), file.path);
+  const input = propsFieldControl(root, "Type")
+    .querySelector("input.para-zk-block__input") as FakeElement;
+  return textSuggestionOptions(input).map((option) => option.value);
+}
+
+function textSuggestionOptions(
+  input: FakeElement,
+  query = ""
+): TestSuggestionOption[] {
+  const suggestions = textInputSuggest(input).testSuggestions(query);
+  if (suggestions instanceof Promise) {
+    throw new Error("expected synchronous props suggestions");
+  }
+  return suggestions;
+}
+
+function textInputSuggest(input: FakeElement): TestInputSuggest {
+  const suggest = (input as unknown as { __abstractInputSuggest?: TestInputSuggest })
+    .__abstractInputSuggest;
+  if (!suggest) throw new Error("text input suggest not attached");
+  return suggest;
+}
+
 async function nextMicrotask(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
@@ -478,20 +980,51 @@ async function waitFor(condition: () => boolean): Promise<void> {
 
 class FakeElement {
   readonly ownerDocument = fakeDocument;
-  readonly isConnected = true;
+  readonly dataset: Record<string, string> = {};
+  readonly style = {
+    getPropertyValue: (name: string): string => this.styles.get(name) ?? "",
+    setProperty: (name: string, value: string): void => {
+      this.styles.set(name, value);
+    }
+  };
   parentElement: FakeElement | null = null;
   value = "";
   type = "";
   disabled = false;
+  private renderedWidth = 196;
   private readonly classes = new Set<string>();
   private readonly attributes = new Map<string, string>();
   private readonly listeners = new Map<string, Array<(event: FakeEvent) => void>>();
+  private readonly styles = new Map<string, string>();
   private children: Array<FakeElement | string> = [];
 
-  constructor(private readonly tag: string) {}
+  constructor(
+    private readonly tag: string,
+    private rootConnected = true
+  ) {}
+
+  get isConnected(): boolean {
+    return this.parentElement?.isConnected ?? this.rootConnected;
+  }
 
   get classList(): string[] {
     return [...this.classes];
+  }
+
+  get firstElementChild(): FakeElement | null {
+    return this.elementChildren()[0] ?? null;
+  }
+
+  get lastElementChild(): FakeElement | null {
+    return this.elementChildren().at(-1) ?? null;
+  }
+
+  get offsetWidth(): number {
+    return this.renderedWidth;
+  }
+
+  get offsetHeight(): number {
+    return this.renderedWidth > 0 ? 28 : 0;
   }
 
   get className(): string {
@@ -520,17 +1053,45 @@ class FakeElement {
   }
 
   createEl(tag: string, options?: { cls?: string; text?: string; attr?: Record<string, string> }): FakeElement {
-    const child = new FakeElement(tag.toLowerCase());
-    child.parentElement = this;
+    const child = new FakeElement(tag.toLowerCase(), false);
+    this.appendChild(child.asHtml());
     if (options?.cls) child.addClass(...options.cls.split(/\s+/).filter(Boolean));
     if (options?.text !== undefined) child.textContent = options.text;
     for (const [key, value] of Object.entries(options?.attr ?? {})) child.setAttr(key, value);
-    this.children.push(child);
     return child;
   }
 
+  appendChild(child: HTMLElement): HTMLElement {
+    const fakeChild = child as unknown as FakeElement;
+    fakeChild.parentElement?.removeChild(fakeChild);
+    fakeChild.parentElement = this;
+    fakeChild.rootConnected = false;
+    this.children.push(fakeChild);
+    return child;
+  }
+
+  prepend(child: HTMLElement): void {
+    const fakeChild = child as unknown as FakeElement;
+    fakeChild.parentElement?.removeChild(fakeChild);
+    fakeChild.parentElement = this;
+    fakeChild.rootConnected = false;
+    this.children.unshift(fakeChild);
+  }
+
+  hasChildNodes(): boolean {
+    return this.children.length > 0;
+  }
+
   empty(): void {
+    for (const child of this.children) {
+      if (typeof child !== "string") child.parentElement = null;
+    }
     this.children = [];
+  }
+
+  remove(): void {
+    this.parentElement?.removeChild(this);
+    this.rootConnected = false;
   }
 
   addClass(...classes: string[]): void {
@@ -558,13 +1119,34 @@ class FakeElement {
   }
 
   querySelectorAll(selector: string): FakeElement[] {
-    const matches: FakeElement[] = [];
-    for (const child of this.children) {
-      if (typeof child === "string") continue;
-      if (child.matches(selector)) matches.push(child);
-      matches.push(...child.querySelectorAll(selector));
+    const matches = new Set<FakeElement>();
+    for (const branch of selector.split(",").map((value) => value.trim()).filter(Boolean)) {
+      if (branch.startsWith(":scope > ")) {
+        const path = branch.slice(":scope > ".length).split(/\s*>\s*/);
+        let candidates = [this];
+        for (const segment of path) {
+          candidates = candidates.flatMap((candidate) =>
+            candidate.elementChildren().filter((child) => child.matches(segment))
+          );
+        }
+        for (const candidate of candidates) matches.add(candidate);
+        continue;
+      }
+      for (const child of this.elementChildren()) {
+        if (child.matches(branch)) matches.add(child);
+        for (const descendant of child.querySelectorAll(branch)) matches.add(descendant);
+      }
     }
-    return matches;
+    return [...matches];
+  }
+
+  closest(selector: string): FakeElement | null {
+    let candidate: FakeElement | null = this;
+    while (candidate) {
+      if (candidate.matches(selector)) return candidate;
+      candidate = candidate.parentElement;
+    }
+    return null;
   }
 
   addEventListener(type: string, listener: (event: FakeEvent) => void): void {
@@ -582,7 +1164,9 @@ class FakeElement {
     return true;
   }
 
-  focus(): void {}
+  focus(): void {
+    this.dispatchEvent({ type: "focus" });
+  }
   select(): void {}
   blur(): void {
     this.dispatchEvent({ type: "blur" });
@@ -592,7 +1176,41 @@ class FakeElement {
     return this as unknown as HTMLElement;
   }
 
-  private matches(selector: string): boolean {
+  getBoundingClientRect(): DOMRect {
+    return {
+      bottom: 0,
+      height: 28,
+      left: 0,
+      right: this.renderedWidth,
+      top: 0,
+      width: this.renderedWidth,
+      x: 0,
+      y: 0,
+      toJSON: () => ({})
+    };
+  }
+
+  setRenderedWidth(width: number): void {
+    this.renderedWidth = width;
+  }
+
+  getClientRects(): DOMRect[] {
+    return this.renderedWidth > 0 ? [this.getBoundingClientRect()] : [];
+  }
+
+  private elementChildren(): FakeElement[] {
+    return this.children.filter((child): child is FakeElement => typeof child !== "string");
+  }
+
+  private removeChild(child: FakeElement): void {
+    this.children = this.children.filter((candidate) => candidate !== child);
+    child.parentElement = null;
+  }
+
+  matches(selector: string): boolean {
+    if (selector.includes(",")) {
+      return selector.split(",").some((branch) => this.matches(branch.trim()));
+    }
     const match = selector.match(/^(?:(\w+))?(?:\.([A-Za-z0-9_-]+))?$/);
     if (!match) return false;
     const [, tag, cls] = match;
@@ -600,6 +1218,68 @@ class FakeElement {
   }
 }
 
+class FakeResizeObserver {
+  private static readonly observers = new Set<FakeResizeObserver>();
+  private readonly targets = new Set<Element>();
+
+  constructor(private readonly callback: ResizeObserverCallback) {
+    FakeResizeObserver.observers.add(this);
+  }
+
+  observe(target: Element): void {
+    this.targets.add(target);
+  }
+
+  unobserve(target: Element): void {
+    this.targets.delete(target);
+  }
+
+  disconnect(): void {
+    this.targets.clear();
+    FakeResizeObserver.observers.delete(this);
+  }
+
+  static trigger(target: Element): void {
+    for (const observer of FakeResizeObserver.observers) {
+      if (!observer.targets.has(target)) continue;
+      observer.callback([], observer as unknown as ResizeObserver);
+    }
+  }
+
+  static isObserving(target: Element): boolean {
+    return [...FakeResizeObserver.observers].some((observer) => observer.targets.has(target));
+  }
+}
+
+class FakeMutationObserver {
+  constructor(private readonly callback: MutationCallback) {}
+
+  observe(): void {}
+  disconnect(): void {}
+  takeRecords(): MutationRecord[] {
+    return [];
+  }
+
+  testNotify(records: MutationRecord[]): void {
+    this.callback(records, this as unknown as MutationObserver);
+  }
+}
+
+function installReadingViewGlobals(): void {
+  vi.stubGlobal("MutationObserver", FakeMutationObserver);
+  vi.stubGlobal("ResizeObserver", FakeResizeObserver);
+  vi.stubGlobal("window", {
+    setTimeout: globalThis.setTimeout,
+    clearTimeout: globalThis.clearTimeout,
+    requestAnimationFrame: (callback: FrameRequestCallback): number =>
+      globalThis.setTimeout(() => callback(Date.now()), 0) as unknown as number,
+    cancelAnimationFrame: (id: number): void => globalThis.clearTimeout(id)
+  });
+}
+
 const fakeDocument = {
-  createElement: (tag: string) => new FakeElement(tag.toLowerCase()).asHtml()
+  createElement: (tag: string) => new FakeElement(tag.toLowerCase(), false).asHtml(),
+  defaultView: {
+    ResizeObserver: FakeResizeObserver
+  }
 };
