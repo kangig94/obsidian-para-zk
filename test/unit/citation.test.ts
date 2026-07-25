@@ -191,6 +191,8 @@ describe("registerCitationRenderers", () => {
     });
 
     expect(root.text()).toBe("[0]");
+    expect(root.elements("code")).toHaveLength(0);
+    expect(root.elements("span")).toHaveLength(1);
     expect(root.links()[0].attrs.href).toBe("https://example.com/b");
 
     frontmatter = {
@@ -238,6 +240,9 @@ function createCitationHost(): { host: HTMLElement; links: FakeLink[]; text: () 
       links.push(link);
       textParts.push(link.text);
       return link;
+    },
+    createSpan(options?: { cls?: string; text?: string }) {
+      return this.createEl("span", options);
     }
   };
   return { host: host as unknown as HTMLElement, links, text: () => textParts.join("") };
@@ -327,6 +332,16 @@ class FakeElement {
     if (text !== undefined) this.children.push(text);
   }
 
+  get win(): { createSpan: (options?: { cls?: string; text?: string }) => HTMLElement } {
+    return {
+      createSpan: (options) => {
+        const element = new FakeElement("span", options?.text);
+        if (options?.cls) element.className = options.cls;
+        return element.asHtml();
+      }
+    };
+  }
+
   get textContent(): string {
     return this.children.map((child) => typeof child === "string" ? child : child.textContent).join("");
   }
@@ -356,11 +371,17 @@ class FakeElement {
 
   replaceWith(next: FakeElement): void {
     if (!this.parent) return;
-    const index = this.parent.children.indexOf(this);
+    const parent = this.parent;
+    next.remove();
+    const index = parent.children.indexOf(this);
     if (index === -1) return;
-    next.parent = this.parent;
-    this.parent.children[index] = next;
+    next.parent = parent;
+    parent.children[index] = next;
     this.parent = undefined;
+  }
+
+  createSpan(options?: { cls?: string; text?: string }): FakeElement {
+    return this.createEl("span", options);
   }
 
   createEl(tag: string, options?: { cls?: string; text?: string }): FakeElement {
@@ -369,6 +390,13 @@ class FakeElement {
     if (options?.cls) child.className = options.cls;
     this.children.push(child);
     return child;
+  }
+
+  remove(): void {
+    if (!this.parent) return;
+    const index = this.parent.children.indexOf(this);
+    if (index !== -1) this.parent.children.splice(index, 1);
+    this.parent = undefined;
   }
 
   appendText(text: string): void {
@@ -399,12 +427,18 @@ const fakeDocument = {
   createElement: (tag: string) => new FakeElement(tag)
 };
 
-function fakeMarkdownSectionWithCode(codeText: string): { asHtml: () => HTMLElement; text: () => string; links: () => FakeElement[] } {
+function fakeMarkdownSectionWithCode(codeText: string): {
+  asHtml: () => HTMLElement;
+  text: () => string;
+  links: () => FakeElement[];
+  elements: (tag: string) => FakeElement[];
+} {
   const root = new FakeElement("div");
   root.createEl("code", { text: codeText });
   return {
     asHtml: () => root.asHtml(),
     text: () => root.textContent,
-    links: () => root.querySelectorAll("a")
+    links: () => root.querySelectorAll("a"),
+    elements: (tag) => root.querySelectorAll(tag)
   };
 }

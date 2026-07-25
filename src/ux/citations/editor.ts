@@ -10,6 +10,7 @@ import {
 import { TFile, editorInfoField, editorLivePreviewField } from "obsidian";
 import type { ParaZkPluginContext } from "../../plugin-interface";
 import type { ReferenceRead } from "../../workflows";
+import { createDetachedSpan } from "../dom";
 import { CITATION_TOKEN_RE, parseCitationKeys, type CitationKey } from "../../citation-token";
 import { buildCitationElement, resolveReferences } from "./renderer";
 
@@ -45,9 +46,8 @@ export function createCitationEditorExtension(plugin: ParaZkPluginContext): Exte
           key.id === widget.keys[position].id && key.subpath === widget.keys[position].subpath);
     }
 
-    toDOM(): HTMLElement {
-      const host = activeDocument.createElement("span");
-      host.className = "para-zk-citation-host";
+    toDOM(view: EditorView): HTMLElement {
+      const host = createDetachedSpan(view.dom, { cls: "para-zk-citation-host" });
       buildCitationElement(plugin, this.references, this.keys, this.sourcePath, host);
       return host;
     }

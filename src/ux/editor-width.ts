@@ -34,21 +34,21 @@ function renderEditorWidthControl(plugin: ParaZkPluginContext): void {
   const item = plugin.addStatusBarItem();
   item.classList.add(WIDTH_SLIDER_CLASS);
 
-  const slider = activeDocument.createElement("input");
-  slider.type = "range";
-  slider.min = String(EDITOR_LINE_WIDTH_MIN);
-  slider.max = String(EDITOR_LINE_WIDTH_MAX);
-  slider.step = String(EDITOR_LINE_WIDTH_STEP);
-  slider.value = String(plugin.settings.editorLineWidth);
-  slider.classList.add("para-zk-width-slider__input");
-  slider.setAttribute("aria-label", "Editor line width");
+  const slider = item.createEl("input", {
+    type: "range",
+    value: String(plugin.settings.editorLineWidth),
+    cls: "para-zk-width-slider__input",
+    attr: {
+      min: String(EDITOR_LINE_WIDTH_MIN),
+      max: String(EDITOR_LINE_WIDTH_MAX),
+      step: String(EDITOR_LINE_WIDTH_STEP),
+      "aria-label": "Editor line width"
+    }
+  });
   slider.title = "Editor line width";
 
-  const label = activeDocument.createElement("span");
-  label.classList.add("para-zk-width-slider__label");
+  const label = item.createSpan({ cls: "para-zk-width-slider__label" });
   setLabel(label, plugin.settings.editorLineWidth);
-
-  item.append(slider, label);
 
   plugin.registerDomEvent(slider, "input", () => {
     const value = readSliderValue(slider, plugin.settings.editorLineWidth);

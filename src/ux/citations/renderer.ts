@@ -3,6 +3,7 @@ import { type CitationKey, parseCitationKeys } from "../../citation-token";
 import type { ParaZkPluginContext } from "../../plugin-interface";
 import { workflowContext } from "../../vault/host";
 import { readReferenceItemsFromFrontmatter, type ReferenceRead } from "../../workflows";
+import { createDetachedSpan } from "../dom";
 import { referenceTitle, renderReferenceAnchor } from "./reference-link";
 
 // Synchronous reference lookup from the note's cached frontmatter — both the reading-view
@@ -40,7 +41,7 @@ export function buildCitationElement(
     const text = `${position === 0 ? "[" : " "}${index === -1 ? "?" : index}${section}${position === last ? "]" : ""}`;
     const reference = index === -1 ? undefined : references[index];
     if (!reference) {
-      const broken = host.createEl("span", { cls: "para-zk-citation is-unresolved", text });
+      const broken = host.createSpan({ cls: "para-zk-citation is-unresolved", text });
       broken.setAttr("title", `No reference for ${key.id}`);
       return;
     }
@@ -109,8 +110,7 @@ class CitationRenderChild extends MarkdownRenderChild {
       const keys = parseCitationKeys(codeEl.textContent ?? "");
       if (!keys) continue;
 
-      const host = codeEl.ownerDocument.createElement("span");
-      host.className = "para-zk-citation-host";
+      const host = createDetachedSpan(codeEl, { cls: "para-zk-citation-host" });
       buildCitationElement(this.plugin, references, keys, this.sourcePath, host);
       this.citations.push({ host, keys });
       codeEl.replaceWith(host);

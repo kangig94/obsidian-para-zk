@@ -4,6 +4,7 @@ import {
   TFile
 } from "obsidian";
 import type { ParaZkPluginContext } from "../../plugin-interface";
+import { createDetachedDiv } from "../dom";
 import { DATAVIEW_VIEW_KEYS, dataviewViewBlock, type DataviewViewKey } from "../../templates";
 import {
   renderBlockNotice,
@@ -235,8 +236,7 @@ async function renderDataviewViewBuffered(
   renderActions: DataviewViewActionRenderer | undefined,
   options: { replaceUnsettled: boolean; timeoutMs: number }
 ): Promise<void> {
-  const buffer = el.ownerDocument.createElement("div");
-  buffer.addClass("para-zk-view-buffer");
+  const buffer = createDetachedDiv(el, { cls: "para-zk-view-buffer" });
   buffer.setCssProps({
     "--para-zk-buffer-width": `${Math.max(1, Math.round(el.getBoundingClientRect().width))}px`
   });

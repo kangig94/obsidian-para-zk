@@ -226,8 +226,18 @@ export class MarkdownView {
 export class Modal {
   contentEl: HTMLElement = undefined as unknown as HTMLElement;
 }
-export class PluginSettingTab {}
-export class Setting {}
+export class PluginSettingTab {
+  readonly app: App;
+  readonly plugin: Plugin;
+  containerEl: HTMLElement;
+
+  constructor(app: App, plugin: Plugin) {
+    this.app = app;
+    this.plugin = plugin;
+    this.containerEl = (plugin as Plugin & { __settingContainerEl?: HTMLElement }).__settingContainerEl
+      ?? undefined as unknown as HTMLElement;
+  }
+}
 
 type ElementFactoryOptions = {
   cls?: string;
@@ -335,6 +345,69 @@ export class DropdownComponent {
 
   onChange(callback: (value: string) => void): this {
     this.selectEl.addEventListener("change", () => callback(this.selectEl.value));
+    return this;
+  }
+}
+
+export class ToggleComponent {
+  readonly toggleEl: HTMLInputElement;
+
+  constructor(container: HTMLElement) {
+    this.toggleEl = createChildElement(container, "input") as HTMLInputElement;
+    this.toggleEl.type = "checkbox";
+  }
+
+  setValue(value: boolean): this {
+    this.toggleEl.checked = value;
+    return this;
+  }
+
+  onChange(callback: (value: boolean) => void): this {
+    this.toggleEl.addEventListener("change", () => callback(this.toggleEl.checked));
+    return this;
+  }
+}
+
+export class Setting {
+  readonly settingEl: HTMLElement;
+  readonly nameEl: HTMLElement;
+  readonly descEl: HTMLElement;
+  readonly controlEl: HTMLElement;
+
+  constructor(container: HTMLElement) {
+    this.settingEl = createChildElement(container, "div");
+    this.nameEl = createChildElement(this.settingEl, "div");
+    this.descEl = createChildElement(this.settingEl, "div");
+    this.controlEl = createChildElement(this.settingEl, "div");
+  }
+
+  setName(name: string): this {
+    this.nameEl.textContent = name;
+    return this;
+  }
+
+  setDesc(desc: string): this {
+    this.descEl.textContent = desc;
+    return this;
+  }
+
+  setHeading(): this {
+    addElementClass(this.settingEl, "is-heading");
+    return this;
+  }
+
+  addDropdown(callback: (component: DropdownComponent) => void): this {
+    callback(new DropdownComponent(this.controlEl));
+    return this;
+  }
+
+  addButton(callback: (component: ButtonComponent) => void): this {
+    callback(new ButtonComponent(this.controlEl));
+    return this;
+  }
+
+  addToggle(callback: (component: ToggleComponent) => void): this {
+    callback(new ToggleComponent(this.controlEl));
     return this;
   }
 }

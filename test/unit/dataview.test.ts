@@ -134,10 +134,14 @@ describe("DataviewViewRenderChild", () => {
   it("discards buffered render children when the rendered Dataview output is unchanged", async () => {
     const metadata = createEventBus();
     const plugin = fakeDataviewPlugin(metadata);
+    const parent = new FakeElement("section");
     const root = new FakeElement("div");
+    parent.appendChild(root);
     let cleanupCount = 0;
     const render = vi.spyOn(MarkdownRenderer, "render")
       .mockImplementation(async (_app, _markdown, el, _sourcePath, component) => {
+        const buffer = (el as unknown as FakeElement).parentElement;
+        expect(parent.childNodes).toEqual([root, buffer]);
         component.register(() => {
           cleanupCount += 1;
         });
@@ -159,8 +163,34 @@ describe("DataviewViewRenderChild", () => {
 
     expect(render).toHaveBeenCalledTimes(2);
     expect(cleanupCount).toBe(1);
+    expect(parent.querySelector(".para-zk-view-buffer")).toBeNull();
+    expect(parent.childNodes).toEqual([root]);
     child.unload();
     expect(cleanupCount).toBe(2);
+  });
+
+  it("removes the sibling buffer when Dataview rendering throws", async () => {
+    const plugin = fakeDataviewPlugin(createEventBus());
+    const parent = new FakeElement("section");
+    const root = new FakeElement("div");
+    parent.appendChild(root);
+    const render = vi.spyOn(MarkdownRenderer, "render").mockImplementation(async (_app, _markdown, el) => {
+      const buffer = (el as unknown as FakeElement).parentElement;
+      expect(parent.childNodes).toEqual([root, buffer]);
+      throw new Error("render failed");
+    });
+    const child = new DataviewViewRenderChild(plugin, root.asHtml(), {
+      key: "cited-by",
+      title: "Cited by"
+    }, "PARA/Resources/Paper.md");
+
+    child.load();
+    await flushPromises();
+
+    expect(render).toHaveBeenCalledTimes(1);
+    expect(parent.querySelector(".para-zk-view-buffer")).toBeNull();
+    expect(parent.childNodes).toEqual([root]);
+    child.unload();
   });
 
   it("rerenders current-source dependent views when the current source changes", async () => {
@@ -294,6 +324,17 @@ class FakeElement {
 
   constructor(private readonly tag: string) {}
 
+  get win(): { createDiv: (options?: { cls?: string; text?: string }) => HTMLElement } {
+    return {
+      createDiv: (options) => {
+        const element = new FakeElement("div");
+        if (options?.cls) element.addClass(...options.cls.split(/\s+/).filter(Boolean));
+        if (options?.text !== undefined) element.textContent = options.text;
+        return element.asHtml();
+      }
+    };
+  }
+
   get childNodes(): FakeChild[] {
     return this.children;
   }
@@ -319,6 +360,13 @@ class FakeElement {
     child.parentElement = this;
     if (options?.cls) child.addClass(...options.cls.split(/\s+/).filter(Boolean));
     if (options?.text !== undefined) child.textContent = options.text;
+    this.children.push(child);
+    return child;
+  }
+
+  appendChild(child: FakeElement): FakeElement {
+    child.remove();
+    child.parentElement = this;
     this.children.push(child);
     return child;
   }

@@ -20,6 +20,7 @@ import {
   type EventRef
 } from "obsidian";
 import type { ParaZkPluginContext } from "../plugin-interface";
+import { createDetachedDiv } from "./dom";
 import {
   yamlFrontmatterRange
 } from "../vault/sections";
@@ -80,8 +81,9 @@ export function createNoteChromeEditorExtension(plugin: ParaZkPluginContext): Ex
     }
 
     toDOM(view: EditorView): HTMLElement {
-      const host = activeDocument.createElement("div");
-      host.addClass("para-zk-note-chrome-widget", `para-zk-note-chrome-widget--${this.kind}`);
+      const host = createDetachedDiv(view.dom, {
+        cls: `para-zk-note-chrome-widget para-zk-note-chrome-widget--${this.kind}`
+      });
       if (this.spec.sourcePath) host.dataset.paraZkSourcePath = this.spec.sourcePath;
       host.contentEditable = "false";
       host.setAttribute("contenteditable", "false");

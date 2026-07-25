@@ -10,6 +10,15 @@ import { refreshRegisteredLocaleLabels } from "./locale-labels";
 import { refreshRibbonActions } from "./actions/ribbon";
 import { confirmAction } from "./prompts";
 
+// Obsidian 1.13 adds these interfaces to the public API. Keep a structural
+// compatibility type here while minAppVersion (and therefore the pinned
+// Obsidian type package) remains on 1.12.3.
+type CompatibleSettingDefinition = {
+  name: string;
+  desc?: string;
+  render: (setting: Setting, group?: unknown) => void | (() => void);
+};
+
 export class ParaZkSettingTab extends PluginSettingTab {
   private readonly plugin: ParaZkPluginContext;
 
@@ -18,151 +27,178 @@ export class ParaZkSettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
+  // Obsidian 1.13+ uses these definitions for rendering and settings search.
+  // Older versions ignore this method and continue through display().
+  getSettingDefinitions(): CompatibleSettingDefinition[] {
+    return this.settingDefinitions();
+  }
+
   display(): void {
     this.renderSettings();
   }
 
   private renderSettings(): void {
     const { containerEl } = this;
-    const labels = localePack(this.plugin.settings.locale).labels;
     containerEl.empty();
 
-    new Setting(containerEl)
-      .setName(labels.settingsHeading)
-      .setHeading();
-    containerEl.createEl("p", {
-      cls: "para-zk-setting-note",
-      text: labels.settingsNote
-    });
-
-    const setupSetting = new Setting(containerEl)
-      .setName(labels.settingsSetupVault)
-      .setDesc(labels.settingsSetupVaultDesc);
-    // Fixed English caption to the left of the language picker; it stays
-    // "Language:" regardless of the selected locale.
-    setupSetting.controlEl.createSpan({ cls: "para-zk-language-label", text: "Language:" });
-    setupSetting
-      .addDropdown((dropdown) => {
-        dropdown
-          .addOption("ko", "한국어")
-          .addOption("en", "English")
-          .setValue(this.plugin.settings.locale)
-          .onChange(async (value) => {
-            const previousLocale = this.plugin.settings.locale;
-            this.plugin.settings.locale = normalizeLocale(value, previousLocale);
-            await this.plugin.saveSettings();
-            refreshRegisteredLocaleLabels(this.plugin, previousLocale);
-            this.renderSettings();
-          });
-      })
-      .addButton((button) => {
-        button
-          .setButtonText(labels.settingsSetupVaultButton)
-          .setCta()
-          .onClick(() => {
-            void this.confirmAndRunSetupAction(button);
-          });
-      });
-
-    new Setting(containerEl)
-      .setName(labels.setupRequiredDeps)
-      .setDesc(labels.setupRequiredDepsDesc)
-      .addButton((button) => {
-        button
-          .setButtonText(labels.settingsInstallRequiredDepsButton)
-          .onClick(() => {
-            void this.runSetupAction(button, { deps: "required" });
-          });
-      });
-
-    new Setting(containerEl)
-      .setName(labels.setupEnhancementDeps)
-      .setDesc(labels.setupEnhancementDepsDesc)
-      .addButton((button) => {
-        button
-          .setButtonText(labels.settingsInstallEnhancementDepsButton)
-          .onClick(() => {
-            void this.runSetupAction(button, { deps: "enhancements" });
-          });
-      });
-
-    new Setting(containerEl)
-      .setName(labels.settingsShowRibbon)
-      .setDesc(labels.settingsShowRibbonDesc)
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.plugin.settings.showRibbon)
-          .onChange(async (value) => {
-            this.plugin.settings.showRibbon = value;
-            await this.plugin.saveSettings();
-            refreshRibbonActions(this.plugin);
-          });
-      });
-
-    new Setting(containerEl)
-      .setName(labels.settingsEmptyTrashAction)
-      .setDesc(labels.settingsEmptyTrashActionDesc)
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.plugin.settings.showEmptyTrashAction)
-          .onChange(async (value) => {
-            this.plugin.settings.showEmptyTrashAction = value;
-            await this.plugin.saveSettings();
-            refreshExplorerActions(this.plugin);
-          });
-      });
-
-    new Setting(containerEl)
-      .setName(labels.settingsEditorWidthSlider)
-      .setDesc(labels.settingsEditorWidthSliderDesc)
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.plugin.settings.editorWidthSliderEnabled)
-          .onChange(async (value) => {
-            this.plugin.settings.editorWidthSliderEnabled = value;
-            await this.plugin.saveSettings();
-            refreshEditorWidthControl(this.plugin);
-          });
-      });
-
-    new Setting(containerEl)
-      .setName(labels.settingsRememberCursorPosition)
-      .setDesc(labels.settingsRememberCursorPositionDesc)
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.plugin.settings.rememberCursorPosition)
-          .onChange(async (value) => {
-            this.plugin.settings.rememberCursorPosition = value;
-            await this.plugin.saveSettings();
-            if (value) {
-              const { registerPositionMemory } = await import("./position-memory");
-              await registerPositionMemory(this.plugin);
-            } else {
-              const { unregisterPositionMemory } = await import("./position-memory");
-              unregisterPositionMemory(this.plugin);
-            }
-          });
-      });
-
-    this.renderSupportSection();
+    for (const definition of this.settingDefinitions()) {
+      const setting = new Setting(containerEl).setName(definition.name);
+      if (definition.desc) setting.setDesc(definition.desc);
+      definition.render(setting);
+    }
   }
 
-  private renderSupportSection(): void {
-    const links = fundingLinks(this.plugin.manifest);
-    if (!links) return;
-
-    const { containerEl } = this;
+  private settingDefinitions(): CompatibleSettingDefinition[] {
     const labels = localePack(this.plugin.settings.locale).labels;
-    new Setting(containerEl)
-      .setName(labels.settingsSupportHeading)
-      .setHeading();
-    containerEl.createEl("p", {
-      cls: "para-zk-setting-note",
-      text: labels.settingsSupportNote
-    });
+    const definitions: CompatibleSettingDefinition[] = [
+      {
+        name: labels.settingsHeading,
+        desc: labels.settingsNote,
+        render: (setting) => {
+          setting.setHeading();
+        }
+      },
+      {
+        name: labels.settingsSetupVault,
+        desc: labels.settingsSetupVaultDesc,
+        render: (setting) => {
+          // Fixed English caption to the left of the language picker; it stays
+          // "Language:" regardless of the selected locale.
+          setting.controlEl.createSpan({ cls: "para-zk-language-label", text: "Language:" });
+          setting
+            .addDropdown((dropdown) => {
+              dropdown
+                .addOption("ko", "한국어")
+                .addOption("en", "English")
+                .setValue(this.plugin.settings.locale)
+                .onChange(async (value) => {
+                  const previousLocale = this.plugin.settings.locale;
+                  this.plugin.settings.locale = normalizeLocale(value, previousLocale);
+                  await this.plugin.saveSettings();
+                  refreshRegisteredLocaleLabels(this.plugin, previousLocale);
+                  this.refreshSettings();
+                });
+            })
+            .addButton((button) => {
+              button
+                .setButtonText(labels.settingsSetupVaultButton)
+                .setCta()
+                .onClick(() => {
+                  void this.confirmAndRunSetupAction(button);
+                });
+            });
+        }
+      },
+      {
+        name: labels.setupRequiredDeps,
+        desc: labels.setupRequiredDepsDesc,
+        render: (setting) => {
+          setting.addButton((button) => {
+            button
+              .setButtonText(labels.settingsInstallRequiredDepsButton)
+              .onClick(() => {
+                void this.runSetupAction(button, { deps: "required" });
+              });
+          });
+        }
+      },
+      {
+        name: labels.setupEnhancementDeps,
+        desc: labels.setupEnhancementDepsDesc,
+        render: (setting) => {
+          setting.addButton((button) => {
+            button
+              .setButtonText(labels.settingsInstallEnhancementDepsButton)
+              .onClick(() => {
+                void this.runSetupAction(button, { deps: "enhancements" });
+              });
+          });
+        }
+      },
+      {
+        name: labels.settingsShowRibbon,
+        desc: labels.settingsShowRibbonDesc,
+        render: (setting) => {
+          setting.addToggle((toggle) => {
+            toggle
+              .setValue(this.plugin.settings.showRibbon)
+              .onChange(async (value) => {
+                this.plugin.settings.showRibbon = value;
+                await this.plugin.saveSettings();
+                refreshRibbonActions(this.plugin);
+              });
+          });
+        }
+      },
+      {
+        name: labels.settingsEmptyTrashAction,
+        desc: labels.settingsEmptyTrashActionDesc,
+        render: (setting) => {
+          setting.addToggle((toggle) => {
+            toggle
+              .setValue(this.plugin.settings.showEmptyTrashAction)
+              .onChange(async (value) => {
+                this.plugin.settings.showEmptyTrashAction = value;
+                await this.plugin.saveSettings();
+                refreshExplorerActions(this.plugin);
+              });
+          });
+        }
+      },
+      {
+        name: labels.settingsEditorWidthSlider,
+        desc: labels.settingsEditorWidthSliderDesc,
+        render: (setting) => {
+          setting.addToggle((toggle) => {
+            toggle
+              .setValue(this.plugin.settings.editorWidthSliderEnabled)
+              .onChange(async (value) => {
+                this.plugin.settings.editorWidthSliderEnabled = value;
+                await this.plugin.saveSettings();
+                refreshEditorWidthControl(this.plugin);
+              });
+          });
+        }
+      },
+      {
+        name: labels.settingsRememberCursorPosition,
+        desc: labels.settingsRememberCursorPositionDesc,
+        render: (setting) => {
+          setting.addToggle((toggle) => {
+            toggle
+              .setValue(this.plugin.settings.rememberCursorPosition)
+              .onChange(async (value) => {
+                this.plugin.settings.rememberCursorPosition = value;
+                await this.plugin.saveSettings();
+                if (value) {
+                  const { registerPositionMemory } = await import("./position-memory");
+                  await registerPositionMemory(this.plugin);
+                } else {
+                  const { unregisterPositionMemory } = await import("./position-memory");
+                  unregisterPositionMemory(this.plugin);
+                }
+              });
+          });
+        }
+      }
+    ];
 
+    const links = fundingLinks(this.plugin.manifest);
+    if (links) {
+      definitions.push({
+        name: labels.settingsSupportHeading,
+        desc: labels.settingsSupportNote,
+        render: (setting) => {
+          setting.setHeading();
+          this.renderSupportLinks(setting.settingEl, links);
+        }
+      });
+    }
+    return definitions;
+  }
+
+  private renderSupportLinks(containerEl: HTMLElement, links: FundingLinks): void {
     const row = containerEl.createDiv({ cls: "para-zk-donate-row" });
-
     const sponsors = row.createEl("a", {
       cls: "para-zk-donate-button is-sponsors",
       href: links.githubSponsors,
@@ -183,6 +219,15 @@ export class ParaZkSettingTab extends PluginSettingTab {
       cls: "para-zk-donate-badge-img",
       attr: { src: BUY_ME_A_COFFEE_BADGE_URI, alt: "Buy me a coffee" }
     });
+  }
+
+  private refreshSettings(): void {
+    const update = (this as PluginSettingTab & { update?: () => void }).update;
+    if (typeof update === "function") {
+      update.call(this);
+      return;
+    }
+    this.renderSettings();
   }
 
   private async confirmAndRunSetupAction(button: ButtonComponent): Promise<void> {
@@ -206,7 +251,7 @@ export class ParaZkSettingTab extends PluginSettingTab {
         deps: options.deps
       });
       new Notice(this.setupNotice(result));
-      this.renderSettings();
+      this.refreshSettings();
     } catch (error) {
       console.error(error);
       new Notice(`PARA-ZK error: ${errorMessage(error)}`);

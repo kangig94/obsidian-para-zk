@@ -19,7 +19,7 @@
     "smoke:vault": "node tools/smoke-test-vault.mjs",
     "typecheck": "tsc --noEmit",
     "lint:architecture": "node tools/check-architecture.mjs",
-    "lint:obsidian-review": "node tools/check-obsidian-review.mjs",
+    "lint:obsidian-review": "node tools/check-obsidian-review.mjs && eslint \"src/**/*.{ts,tsx}\"",
     "lint:deadcode": "knip",
     "check:mcp-hash": "node tools/check-mcp-build-hash.mjs",
     "check:build-drift": "node tools/check-generated-drift.mjs",
@@ -38,9 +38,12 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/node": "^25.9.1",
     "esbuild": "^0.28.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-obsidianmd": "^0.4.1",
     "knip": "^6.15.0",
     "obsidian": "1.12.3",
     "typescript": "^6.0.3",
+    "typescript-eslint": "^8.65.0",
     "vitest": "^4.1.8",
     "yaml": "^2.9.0"
   }

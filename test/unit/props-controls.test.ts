@@ -484,6 +484,45 @@ describe("kind suggestion comboboxes", () => {
     expect(previous.testIsOpen()).toBe(false);
   });
 
+  it("replaces an inline props token in place without disturbing surrounding siblings", async () => {
+    const app = new MockApp();
+    const file = await app.vault.create("PARA/Resources/Inline.md", [
+      "---",
+      "type: resource",
+      "kind: paper",
+      "---",
+      ""
+    ].join("\n"));
+    stubAppEvents(app);
+    let processor: ((el: HTMLElement, ctx: {
+      sourcePath: string;
+      addChild: (child: unknown) => void;
+    }) => void) | undefined;
+    const plugin = createPropsPlugin(app);
+    Object.assign(plugin, {
+      register: () => {},
+      registerEvent: () => {},
+      registerMarkdownPostProcessor: (callback: typeof processor) => {
+        processor = callback;
+      }
+    });
+    const root = new FakeElement("div");
+    const before = root.createSpan({ text: "before" });
+    root.createEl("code", { text: "PZ_INPUT[kind]" });
+    const after = root.createSpan({ text: "after" });
+
+    registerPropsControlRenderers(plugin);
+    processor?.(root.asHtml(), {
+      sourcePath: file.path,
+      addChild: () => {}
+    });
+
+    expect(root.querySelectorAll("code")).toHaveLength(0);
+    expect(root.querySelectorAll(".para-zk-inline-input")).toHaveLength(1);
+    expect(root.firstElementChild).toBe(before);
+    expect(root.lastElementChild).toBe(after);
+  });
+
   it("disposes the popup and observer when a Reading view props panel is removed", async () => {
     vi.useFakeTimers();
     const cleanup: Array<() => void> = [];
@@ -1003,6 +1042,20 @@ class FakeElement {
     private rootConnected = true
   ) {}
 
+  get win(): {
+    createSpan: (options?: { cls?: string; text?: string; attr?: Record<string, string> }) => HTMLElement;
+  } {
+    return {
+      createSpan: (options) => {
+        const element = new FakeElement("span", false);
+        if (options?.cls) element.addClass(...options.cls.split(/\s+/).filter(Boolean));
+        if (options?.text !== undefined) element.textContent = options.text;
+        for (const [key, value] of Object.entries(options?.attr ?? {})) element.setAttr(key, value);
+        return element.asHtml();
+      }
+    };
+  }
+
   get isConnected(): boolean {
     return this.parentElement?.isConnected ?? this.rootConnected;
   }
@@ -1091,6 +1144,20 @@ class FakeElement {
 
   remove(): void {
     this.parentElement?.removeChild(this);
+    this.rootConnected = false;
+  }
+
+  replaceWith(next: HTMLElement): void {
+    const parent = this.parentElement;
+    if (!parent) return;
+    const replacement = next as unknown as FakeElement;
+    replacement.parentElement?.removeChild(replacement);
+    const index = parent.children.indexOf(this);
+    if (index === -1) return;
+    replacement.parentElement = parent;
+    replacement.rootConnected = false;
+    parent.children[index] = replacement;
+    this.parentElement = null;
     this.rootConnected = false;
   }
 

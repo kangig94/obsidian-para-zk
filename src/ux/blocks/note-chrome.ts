@@ -223,8 +223,9 @@ class NoteChromeController {
       ) ?? undefined;
     }
     if (!this.propsEl) {
-      this.propsEl = this.container.ownerDocument.createElement("div");
-      this.propsEl.addClass("para-zk-note-chrome", "para-zk-note-chrome--props");
+      this.propsEl = this.container.createDiv({
+        cls: "para-zk-note-chrome para-zk-note-chrome--props"
+      });
     }
     this.resizeObserver?.observe(this.propsEl);
     removeDuplicatePropsPanels(this.container, this.propsEl);
@@ -238,8 +239,9 @@ class NoteChromeController {
       ) ?? undefined;
     }
     if (!this.managedEl) {
-      this.managedEl = this.container.ownerDocument.createElement("div");
-      this.managedEl.addClass("para-zk-note-chrome", "para-zk-note-chrome--managed");
+      this.managedEl = this.container.createDiv({
+        cls: "para-zk-note-chrome para-zk-note-chrome--managed"
+      });
     }
     this.resizeObserver?.observe(this.managedEl);
     removeDuplicateManagedPanels(this.container, this.managedEl);

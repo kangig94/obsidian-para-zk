@@ -93,17 +93,22 @@ export class ManagedPanelController {
   }
 
   private createEntry(spec: ManagedBlockSpec): ManagedBlockEntry {
-    const separatorEl = this.el.ownerDocument.createElement("hr");
-    const blockEl = this.el.ownerDocument.createElement("div");
-    blockEl.addClass(`block-language-para-zk-${spec.block.kind}`);
-    const child = createManagedBlockChild(
-      this.plugin,
-      blockEl,
-      spec.block,
-      this.sourcePath,
-      spec.actions
-    );
-    return { key: spec.key, separatorEl, blockEl, child };
+    const separatorEl = this.el.createEl("hr");
+    const blockEl = this.el.createDiv({ cls: `block-language-para-zk-${spec.block.kind}` });
+    try {
+      const child = createManagedBlockChild(
+        this.plugin,
+        blockEl,
+        spec.block,
+        this.sourcePath,
+        spec.actions
+      );
+      return { key: spec.key, separatorEl, blockEl, child };
+    } catch (error) {
+      separatorEl.remove();
+      blockEl.remove();
+      throw error;
+    }
   }
 
   private disposeEntries(): void {
