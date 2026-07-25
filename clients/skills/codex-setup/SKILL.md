@@ -11,11 +11,8 @@ the plugin's shared `clients/agents/*.md` agent definitions into Codex's
 
 ## Workflow
 
-1. Confirm the Optsidian MCP dependency is available in the current session. The
-   generated agents expect `mcp__optsidian__command_run`; if that tool is missing,
-   stop and tell the user to enable the Optsidian MCP server, then start a new
-   Codex thread.
-2. Run the bundled installer:
+1. Run the bundled installer. Do not block installation on Optsidian or its MCP
+   server: those are runtime command transports, not installer dependencies.
 
    ```bash
    node clients/skills/codex-setup/scripts/install-codex-agents.mjs
@@ -28,6 +25,14 @@ the plugin's shared `clients/agents/*.md` agent definitions into Codex's
    node <this-skill-dir>/scripts/install-codex-agents.mjs
    ```
 
+2. Check and report which runtime command transport the installed agents can use,
+   without failing or undoing the installation:
+   - Prefer `mcp__optsidian__command_run` when it is available in the current
+     session.
+   - Otherwise use `optsidian` from `PATH`.
+   - Otherwise fall back to the native `obsidian` CLI from `PATH`.
+   - If none is available, warn that vault-working agents such as `wiki-weaver`
+     cannot run yet. The agent files are still installed successfully.
 3. Report the installed, updated, unchanged, and warning lines from the script.
 4. Tell the user to restart Codex or start a new thread before expecting the new
    agent names to appear.

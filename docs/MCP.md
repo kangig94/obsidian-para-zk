@@ -33,8 +33,9 @@ into clean resource note(s) from any source — gather, produce clean Markdown,
 **correct/verify**, store via the CLI, and link it — so a caller does not stop at a raw,
 unreviewed dump. `codex-setup` installs PARA-ZK custom Codex agents from the bundled
 `clients/agents/*.md` definitions into `~/.codex/agents/*.toml`; this is what lets Codex
-spawn named agents such as `wiki-weaver` after a restart/new thread. Those agents assume the
-Optsidian MCP command runner (`mcp__optsidian__command_run`) is available. Clients without
+spawn named agents such as `wiki-weaver` after a restart/new thread. Vault-working agents prefer
+the Optsidian MCP command runner (`mcp__optsidian__command_run`) when available, then fall back to
+the `optsidian` CLI and finally the native `obsidian` CLI. Clients without
 skill support still get the always-on `safety` note through `describe`; usage conventions
 are fetched once with the `conventions` tool (MCP callers) or the equivalent CLI command
 `optsidian para-zk:conventions` / `obsidian para-zk:conventions` (CLI-direct callers).
